@@ -571,6 +571,7 @@ async function api(method, path, body=null, isForm=false) {
   const opts = { method, headers: {} };
   if (body && isForm) { opts.body = body; }
   else if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  opts.credentials = 'include';
   const r = await fetch(API + path, opts);
   return r.json();
 }
