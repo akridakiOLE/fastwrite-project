@@ -336,7 +336,7 @@ def auth_login():
         return jsonify({"error": "Invalid credentials"}), 401
     token = create_token(user["id"], user["username"])
     resp = make_response(jsonify({"success": True, "username": user["username"], "role": user["role"]}))
-    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="Lax", max_age=86400, path="/")
+    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="Lax", secure=False, max_age=86400, path="/")
     return resp
 
 @app.post("/api/auth/logout")
@@ -386,7 +386,10 @@ button:hover{opacity:.85;}
     <label>Username</label>
     <input type="text" id="username" autocomplete="username" required/>
     <label>Password</label>
-    <input type="password" id="password" autocomplete="current-password" required/>
+    <div style="position:relative">
+      <input type="password" id="password" autocomplete="current-password" required style="width:100%;padding-right:40px"/>
+      <span onclick="var p=document.getElementById('password');p.type=p.type==='password'?'text':'password'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#7c8299;font-size:18px;">👁</span>
+    </div>
     <button type="submit">Sign In</button>
   </form>
 </div>
@@ -396,7 +399,7 @@ async function doLogin(e){
   const err=document.getElementById('error-msg');
   err.style.display='none';
   try{
-    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    const r=await fetch('/api/auth/login',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({username:document.getElementById('username').value,password:document.getElementById('password').value})});
     const d=await r.json();
     if(r.ok){window.location.href='/ui';}
