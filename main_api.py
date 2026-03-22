@@ -180,6 +180,19 @@ def delete_document(doc_id):
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
     db.delete_document(doc_id)
     return jsonify({"success": True, "message": f"Έγγραφο #{doc_id} διαγράφηκε."})
+@app.get("/api/stats")
+def get_stats():
+    docs = db.list_documents()
+    total     = len(docs)
+    completed = sum(1 for d in docs if d["status"] == "Completed")
+    pending   = sum(1 for d in docs if d["status"] in ("Pending","pending_review"))
+    failed    = sum(1 for d in docs if d["status"] == "Failed")
+    templates = db.list_templates()
+    return jsonify({"total":total,"completed":completed,
+                    "pending":pending,"failed":failed,
+                    "templates":len(templates)})
+
+
 
 
 # ── Pending Review Endpoints ──────────────────────────────────────────────────
