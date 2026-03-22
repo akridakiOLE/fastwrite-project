@@ -1,3 +1,4 @@
+# FastWrite Validator - 27 validation checks across 5 categories
 """
 Module 6: Κανόνες Λογιστικής Εγκυρότητας (Validation Engine)
 Λαμβάνει το JSON από το AI (Module 5) και εφαρμόζει:
