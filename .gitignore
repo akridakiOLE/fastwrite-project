@@ -2,3 +2,12 @@ venv/
 *.pyc
 __pycache__/
 *.pdf
+data/
+exports/
+processed/
+uploads/
+secrets/
+GRAMMATEAS_Backup/
+PYEOF
+*.db
+*.log
