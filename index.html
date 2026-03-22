@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FastWrite — AI Document Extractor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:        #0a0c10;
+  --bg2:       #111318;
+  --bg3:       #181c24;
+  --border:    #1e2330;
+  --accent:    #00e5a0;
+  --accent2:   #0066ff;
+  --warn:      #ffb300;
+  --danger:    #ff4444;
+  --text:      #e8eaf0;
+  --text2:     #7c8299;
+  --text3:     #3d4259;
+  --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+/* ── Layout ── */
+.layout{display:grid;grid-template-columns:220px 1fr;min-height:100vh;}
+
+/* ── Sidebar ── */
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;}
+.logo{padding:28px 24px 20px;border-bottom:1px solid var(--border);}
+.logo-mark{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;letter-spacing:-0.5px;color:var(--text);}
+.logo-mark span{color:var(--accent);}
+.logo-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-top:4px;letter-spacing:1px;text-transform:uppercase;}
+.nav{padding:16px 12px;flex:1;}
+.nav-section{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;padding:8px 12px;margin-top:8px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:all .15s;color:var(--text2);font-size:14px;font-weight:400;border:none;background:none;width:100%;text-align:left;}
+.nav-item:hover{background:var(--bg3);color:var(--text);}
+.nav-item.active{background:rgba(0,229,160,0.08);color:var(--accent);font-weight:500;}
+.nav-item .icon{width:18px;height:18px;opacity:.7;flex-shrink:0;}
+.nav-item.active .icon{opacity:1;}
+.sidebar-footer{padding:16px;border-top:1px solid var(--border);}
+.status-dot{display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-right:6px;box-shadow:0 0 8px var(--accent);}
+.status-text{font-size:12px;color:var(--text2);}
+
+/* ── Main ── */
+.main{background:var(--bg);overflow-y:auto;}
+.topbar{padding:20px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);}
+.page-title{font-family:'Syne',sans-serif;font-weight:700;font-size:20px;}
+.topbar-actions{display:flex;gap:10px;align-items:center;}
+.content{padding:28px 32px;}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;border:none;font-family:'DM Sans',sans-serif;}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-primary:hover{background:#00ffb3;transform:translateY(-1px);}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--text3);background:var(--border);}
+.btn-danger{background:rgba(255,68,68,0.1);color:var(--danger);border:1px solid rgba(255,68,68,0.2);}
+.btn-danger:hover{background:rgba(255,68,68,0.2);}
+.btn-sm{padding:6px 12px;font-size:13px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+
+/* ── Cards ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;}
+.card-title{font-family:'Syne',sans-serif;font-weight:600;font-size:15px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+
+/* ── Stats Grid ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.stat-card.green::before{background:var(--accent);}
+.stat-card.blue::before{background:var(--accent2);}
+.stat-card.yellow::before{background:var(--warn);}
+.stat-card.red::before{background:var(--danger);}
+.stat-value{font-family:'Syne',sans-serif;font-weight:800;font-size:28px;line-height:1;}
+.stat-label{font-size:12px;color:var(--text2);margin-top:6px;font-family:'DM Mono',monospace;letter-spacing:.5px;}
+
+/* ── Table ── */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{padding:10px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:hover{background:var(--bg3);}
+tbody td{padding:12px 14px;color:var(--text2);}
+tbody td:first-child{color:var(--text);}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;font-family:'DM Mono',monospace;}
+.badge-green{background:rgba(0,229,160,0.1);color:var(--accent);}
+.badge-yellow{background:rgba(255,179,0,0.1);color:var(--warn);}
+.badge-red{background:rgba(255,68,68,0.1);color:var(--danger);}
+.badge-gray{background:var(--bg3);color:var(--text2);}
+
+/* ── Upload Zone ── */
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:48px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2);}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(0,229,160,0.04);}
+.upload-icon{font-size:40px;margin-bottom:16px;}
+.upload-title{font-family:'Syne',sans-serif;font-weight:600;font-size:16px;margin-bottom:8px;}
+.upload-sub{font-size:13px;color:var(--text2);}
+.upload-zone input[type=file]{display:none;}
+
+/* ── Progress ── */
+.progress-bar{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s;}
+
+/* ── Form ── */
+.form-group{margin-bottom:16px;}
+.form-label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px;font-family:'DM Mono',monospace;letter-spacing:.5px;}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;transition:border-color .15s;}
+.form-input:focus{outline:none;border-color:var(--accent);}
+.form-input::placeholder{color:var(--text3);}
+select.form-input option{background:var(--bg2);}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:560px;max-width:90vw;max-height:85vh;overflow-y:auto;padding:28px;transform:translateY(20px);transition:transform .2s;}
+.modal-overlay.open .modal{transform:translateY(0);}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+.modal-title{font-family:'Syne',sans-serif;font-weight:700;font-size:18px;}
+.modal-close{background:none;border:none;color:var(--text2);cursor:pointer;font-size:20px;padding:4px;border-radius:4px;}
+.modal-close:hover{color:var(--text);}
+
+/* ── Data Display ── */
+.data-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.data-item{background:var(--bg3);border-radius:8px;padding:12px 14px;}
+.data-key{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:.5px;margin-bottom:4px;}
+.data-val{font-size:14px;color:var(--text);font-weight:500;}
+
+/* ── Toast ── */
+.toast-container{position:fixed;bottom:24px;right:24px;z-index:200;display:flex;flex-direction:column;gap:8px;}
+.toast{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:var(--card-shadow);animation:slideIn .2s ease;min-width:260px;}
+.toast.success{border-left:3px solid var(--accent);}
+.toast.error{border-left:3px solid var(--danger);}
+.toast.info{border-left:3px solid var(--accent2);}
+@keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:24px;}
+.tab{padding:10px 18px;font-size:14px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;font-weight:400;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500;}
+
+/* ── Fields Builder ── */
+.field-row{display:grid;grid-template-columns:1fr 140px auto;gap:10px;align-items:center;margin-bottom:10px;}
+.field-remove{background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:4px 8px;border-radius:4px;transition:color .15s;}
+.field-remove:hover{color:var(--danger);}
+
+/* ── Empty State ── */
+.empty{text-align:center;padding:60px 20px;color:var(--text2);}
+.empty-icon{font-size:48px;margin-bottom:16px;opacity:.4;}
+.empty-title{font-family:'Syne',sans-serif;font-size:16px;color:var(--text);margin-bottom:8px;}
+.empty-sub{font-size:13px;}
+
+/* ── Spinner ── */
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Job Progress Card ── */
+.job-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;}
+.job-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.job-id{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);}
+
+/* ── Responsive ── */
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;}
+  .sidebar{display:none;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">Fast<span>Write</span></div>
+      <div class="logo-sub">AI Document Extractor</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Κύριο Μενού</div>
+      <button class="nav-item active" onclick="showPage('dashboard')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" onclick="showPage('upload')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload & Extract
+      </button>
+      <button class="nav-item" onclick="showPage('documents')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Έγγραφα
+      </button>
+      <button class="nav-item" onclick="showPage('batch')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/><circle cx="17" cy="17" r="3"/><path d="M17 15v2l1 1"/></svg>
+        Batch Processing
+      </button>
+      <div class="nav-section">Ρυθμίσεις</div>
+      <button class="nav-item" onclick="showPage('templates')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Templates
+      </button>
+      <button class="nav-item" onclick="showPage('settings')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
+        Ρυθμίσεις
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="status-dot"></span>
+      <span class="status-text" id="server-status">Σύνδεση...</span>
+      <button onclick="doLogout()" style="display:block;margin-top:12px;width:100%;padding:8px;background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">Logout</button>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ── -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page">
+      <div class="topbar">
+        <div class="page-title">Dashboard</div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">↻ Ανανέωση</button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="stats-grid">
+          <div class="stat-card green">
+            <div class="stat-value" id="stat-total">—</div>
+            <div class="stat-label">Σύνολο Εγγράφων</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-value" id="stat-completed">—</div>
+            <div class="stat-label">Ολοκληρωμένα</div>
+          </div>
+          <div class="stat-card yellow">
+            <div class="stat-value" id="stat-pending">—</div>
+            <div class="stat-label">Σε Αναμονή</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-value" id="stat-failed">—</div>
+            <div class="stat-label">Αποτυχημένα</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
+            Τελευταία Έγγραφα
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Αρχείο</th><th>Προμηθευτής</th><th>Σύνολο</th><th>Κατάσταση</th><th></th></tr></thead>
+              <tbody id="dashboard-docs"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- UPLOAD -->
+    <div id="page-upload" class="page" style="display:none">
+      <div class="topbar"><div class="page-title">Upload & Extract</div></div>
+      <div class="content">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+          <!-- Single -->
+          <div class="card">
+            <div class="card-title">📄 Μεμονωμένο Έγγραφο</div>
+            <div class="upload-zone" id="single-zone" onclick="document.getElementById('single-file').click()" ondragover="dragOver(event,'single-zone')" ondragleave="dragLeave('single-zone')" ondrop="dropFile(event,'single')">
+              <input type="file" id="single-file" accept=".pdf,.png,.jpg,.jpeg" onchange="fileSelected('single')"/>
+              <div class="upload-icon">📄</div>
+              <div class="upload-title">Σύρε ή κάνε κλικ</div>
+              <div class="upload-sub">PDF, PNG, JPG έως 20MB</div>
+            </div>
+            <div id="single-selected" style="display:none;margin-top:12px;">
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:13px;">
+                <span>📎</span>
+                <span id="single-filename" style="flex:1;color:var(--text)"></span>
+                <button onclick="clearFile('single')" style="background:none;border:none;color:var(--text2);cursor:pointer;">✕</button>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:16px;">
+              <label class="form-label">Template</label>
+              <select class="form-input" id="single-schema"></select>
+            </div>
+            <button class="btn btn-primary" style="width:100%" onclick="doSingleExtract()" id="single-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Εξαγωγή Δεδομένων
+            </button>
+            <div id="single-result" style="margin-top:16px;display:none;"></div>
+          </div>
+
+          <!-- Batch -->
+          <div class="card">
+            <div class="card-title">📦 Batch (Πολλαπλά Τιμολόγια)</div>
+            <div class="upload-zone" id="batch-zone" onclick="document.getElementById('batch-file').click()" ondragover="dragOver(event,'batch-zone')" ondragleave="dragLeave('batch-zone')" ondrop="dropFile(event,'batch')">
+              <input type="file" id="batch-file" accept=".pdf" onchange="fileSelected('batch')"/>
+              <div class="upload-icon">📦</div>
+              <div class="upload-title">PDF με πολλαπλά τιμολόγια</div>
+              <div class="upload-sub">Έως 200 τιμολόγια ανά αρχείο</div>
+            </div>
+            <div id="batch-selected" style="display:none;margin-top:12px;">
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:13px;">
+                <span>📎</span>
+                <span id="batch-filename" style="flex:1;color:var(--text)"></span>
+                <button onclick="clearFile('batch')" style="background:none;border:none;color:var(--text2);cursor:pointer;">✕</button>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:16px;">
+              <label class="form-label">Template</label>
+              <select class="form-input" id="batch-schema"></select>
+            </div>
+            <button class="btn btn-primary" style="width:100%" onclick="doBatchUpload()" id="batch-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Έναρξη Batch
+            </button>
+            <div id="batch-progress" style="margin-top:16px;display:none;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px;">
+                <span id="batch-status-text">Επεξεργασία...</span>
+                <span id="batch-pct">0%</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" id="batch-fill" style="width:0%"></div></div>
+              <div style="font-size:12px;color:var(--text2);margin-top:6px;" id="batch-detail"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCUMENTS -->
+    <div id="page-documents" class="page" style="display:none">
+      <div class="topbar">
+        <div class="page-title">Έγγραφα</div>
+        <div class="topbar-actions">
+          <input class="form-input" style="width:220px;padding:8px 12px;font-size:13px;" placeholder="🔍 Αναζήτηση..." id="doc-search" oninput="filterDocs()"/>
+          <select class="form-input" style="width:140px;padding:8px 12px;font-size:13px;" id="doc-filter" onchange="filterDocs()">
+            <option value="">Όλα</option>
+            <option value="Completed">Completed</option>
+            <option value="Pending">Pending</option>
+            <option value="Failed">Failed</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="exportDocs('csv')">↓ CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportDocs('xlsx')">↓ XLSX</button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Αρχείο</th><th>Template</th><th>Προμηθευτής</th><th>Τιμολόγιο</th><th>Σύνολο</th><th>Κατάσταση</th><th>Ημ/νία</th><th></th></tr></thead>
+              <tbody id="docs-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BATCH PAGE -->
+    <div id="page-batch" class="page" style="display:none">
+      <div class="topbar">
+        <div class="page-title">Batch Processing</div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary btn-sm" onclick="loadBatchJobs()">↻ Ανανέωση</button>
+        </div>
+      </div>
+      <div class="content">
+        <div id="batch-jobs-list">
+          <div class="empty"><div class="empty-icon">📦</div><div class="empty-title">Δεν υπάρχουν batch jobs</div><div class="empty-sub">Ανέβασε ένα PDF από το Upload & Extract</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEMPLATES -->
+    <div id="page-templates" class="page" style="display:none">
+      <div class="topbar">
+        <div class="page-title">Templates</div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary btn-sm" onclick="openTemplateModal()">+ Νέο Template</button>
+        </div>
+      </div>
+      <div class="content">
+        <div id="templates-list"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="page-settings" class="page" style="display:none">
+      <div class="topbar"><div class="page-title">Ρυθμίσεις</div></div>
+      <div class="content">
+        <div style="max-width:560px;display:flex;flex-direction:column;gap:20px;">
+
+          <div class="card">
+            <div class="card-title">🔑 API Keys</div>
+            <div id="keys-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
+            <div class="form-group">
+              <label class="form-label">Παροχέας</label>
+              <select class="form-input" id="key-service">
+                <option value="gemini">Gemini (Google)</option>
+                <option value="openai">OpenAI</option>
+                <option value="claude">Claude (Anthropic)</option>
+                <option value="mistral">Mistral</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">API Key</label>
+              <input class="form-input" type="password" id="key-value" placeholder="Εισήγαγε το API key..."/>
+            </div>
+            <button class="btn btn-primary" onclick="saveKey()">Αποθήκευση Key</button>
+          </div>
+
+          <div class="card">
+            <div class="card-title">⚙️ Πληροφορίες Συστήματος</div>
+            <div id="system-info" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── Document Modal ── -->
+<div class="modal-overlay" id="doc-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="doc-modal-title">Λεπτομέρειες Εγγράφου</div>
+      <button class="modal-close" onclick="closeModal('doc-modal')">✕</button>
+    </div>
+    <div id="doc-modal-body"></div>
+  </div>
+</div>
+
+<!-- ── Template Modal ── -->
+<div class="modal-overlay" id="tmpl-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Νέο Template</div>
+      <button class="modal-close" onclick="closeModal('tmpl-modal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Όνομα Template</label>
+      <input class="form-input" id="tmpl-name" placeholder="π.χ. invoice, receipt..."/>
+    </div>
+    <div id="tmpl-fields"></div>
+    <button class="btn btn-secondary btn-sm" onclick="addField()" style="margin-bottom:16px;">+ Προσθήκη Πεδίου</button>
+    <button class="btn btn-primary" style="width:100%" onclick="saveTemplate()">Αποθήκευση Template</button>
+  </div>
+</div>
+
+<!-- ── Toast Container ── -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+async function doLogout(){
+  await fetch('/api/auth/logout',{method:'POST'});
+  window.location.href='/ui/login';
+}
+const API = '';  // same origin
+let allDocs = [];
+let batchJobs = {};
+let pollIntervals = {};
+
+// ── API Helper ──────────────────────────────────────────────────────────────
+async function api(method, path, body=null, isForm=false) {
+  const opts = { method, headers: {} };
+  if (body && isForm) { opts.body = body; }
+  else if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(API + path, opts);
+  return r.json();
+}
+
+// ── Toast ───────────────────────────────────────────────────────────────────
+function toast(msg, type='info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${type==='success'?'✓':type==='error'?'✕':'ℹ'}</span><span>${msg}</span>`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── Navigation ──────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.style.display='none');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+name).style.display='block';
+  event.currentTarget.classList.add('active');
+  if (name==='dashboard') loadDashboard();
+  if (name==='documents') loadDocuments();
+  if (name==='templates') loadTemplates();
+  if (name==='settings')  loadSettings();
+  if (name==='upload')    loadSchemas();
+  if (name==='batch')     loadBatchJobs();
+}
+
+// ── Dashboard ───────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  const [docs, stats] = await Promise.all([
+    api('GET','/api/documents'),
+    api('GET','/api/stats')
+  ]);
+  const d = docs.documents || [];
+  const completed = d.filter(x=>x.status==='Completed').length;
+  const pending   = d.filter(x=>x.status==='Pending').length;
+  const failed    = d.filter(x=>x.status==='Failed').length;
+  document.getElementById('stat-total').textContent     = d.length;
+  document.getElementById('stat-completed').textContent = completed;
+  document.getElementById('stat-pending').textContent   = pending;
+  document.getElementById('stat-failed').textContent    = failed;
+
+  const tbody = document.getElementById('dashboard-docs');
+  const recent = d.slice(0,8);
+  tbody.innerHTML = recent.length ? recent.map(doc => {
+    const rd = doc.result_data || {};
+    return `<tr>
+      <td><span style="font-family:'DM Mono',monospace;color:var(--text3)">#${doc.id}</span></td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${doc.filename}</td>
+      <td>${rd.supplier_name||'—'}</td>
+      <td>${rd.total_gross ? '€'+rd.total_gross.toLocaleString('el') : '—'}</td>
+      <td>${badgeHtml(doc.status)}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="viewDoc(${doc.id})">Προβολή</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:32px">Δεν υπάρχουν έγγραφα</td></tr>';
+}
+
+// ── Documents ───────────────────────────────────────────────────────────────
+async function loadDocuments() {
+  const res = await api('GET','/api/documents');
+  allDocs = res.documents || [];
+  renderDocs(allDocs);
+}
+
+function filterDocs() {
+  const q = document.getElementById('doc-search').value.toLowerCase();
+  const f = document.getElementById('doc-filter').value;
+  let filtered = allDocs;
+  if (f) filtered = filtered.filter(d=>d.status===f);
+  if (q) filtered = filtered.filter(d=>
+    d.filename.toLowerCase().includes(q) ||
+    (d.result_data?.supplier_name||'').toLowerCase().includes(q) ||
+    (d.result_data?.invoice_number||'').toLowerCase().includes(q)
+  );
+  renderDocs(filtered);
+}
+
+function renderDocs(docs) {
+  const tbody = document.getElementById('docs-table');
+  if (!docs.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:40px">Δεν βρέθηκαν έγγραφα</td></tr>';
+    return;
+  }
+  tbody.innerHTML = docs.map(doc => {
+    const rd = doc.result_data || {};
+    const date = doc.created_at ? doc.created_at.split('T')[0] : '—';
+    return `<tr>
+      <td><span style="font-family:'DM Mono',monospace;color:var(--text3)">#${doc.id}</span></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${doc.filename}</td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${doc.schema_name||'—'}</span></td>
+      <td>${rd.supplier_name||'—'}</td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px">${rd.invoice_number||'—'}</span></td>
+      <td>${rd.total_gross ? '<span style="color:var(--accent)">€'+rd.total_gross.toLocaleString('el')+'</span>' : '—'}</td>
+      <td>${badgeHtml(doc.status)}</td>
+      <td><span style="font-size:12px;color:var(--text2)">${date}</span></td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick="viewDoc(${doc.id})">👁</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteDoc(${doc.id})">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function viewDoc(id) {
+  const doc = await api('GET',`/api/documents/${id}`);
+  const rd  = doc.result_data || {};
+  document.getElementById('doc-modal-title').textContent = doc.filename;
+  const fields = Object.entries(rd).map(([k,v])=>`
+    <div class="data-item">
+      <div class="data-key">${k}</div>
+      <div class="data-val">${v??'—'}</div>
+    </div>`).join('');
+  document.getElementById('doc-modal-body').innerHTML = `
+    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+      ${badgeHtml(doc.status)}
+      <span style="font-size:13px;color:var(--text2)">${doc.created_at?.split('T')[0]||''}</span>
+    </div>
+    ${fields ? `<div class="data-grid">${fields}</div>` : '<p style="color:var(--text2);font-size:13px">Δεν υπάρχουν εξαγόμενα δεδομένα.</p>'}`;
+  openModal('doc-modal');
+}
+
+async function deleteDoc(id) {
+  if (!confirm('Διαγραφή εγγράφου #'+id+';')) return;
+  await api('DELETE',`/api/documents/${id}`);
+  toast('Έγγραφο διαγράφηκε','success');
+  loadDocuments();
+}
+
+async function exportDocs(fmt) {
+  const r = await api('POST',`/api/export/${fmt}`,{});
+  if (r.error) { toast(r.error,'error'); return; }
+  toast('Εξαγωγή ξεκίνησε — ελέγξτε το server','info');
+}
+
+// ── Upload & Extract ─────────────────────────────────────────────────────────
+async function loadSchemas() {
+  const res = await api('GET','/api/templates');
+  const opts = (res.templates||[]).map(t=>`<option value="${t.name}">${t.name}</option>`).join('');
+  document.getElementById('single-schema').innerHTML = opts || '<option value="">— Δεν υπάρχουν templates —</option>';
+  document.getElementById('batch-schema').innerHTML  = opts || '<option value="">— Δεν υπάρχουν templates —</option>';
+}
+
+function dragOver(e,id){e.preventDefault();document.getElementById(id).classList.add('drag');}
+function dragLeave(id){document.getElementById(id).classList.remove('drag');}
+function dropFile(e,type){
+  e.preventDefault();
+  dragLeave(type+'-zone');
+  const file=e.dataTransfer.files[0];
+  if(!file)return;
+  const inp=document.getElementById(type+'-file');
+  const dt=new DataTransfer();dt.items.add(file);inp.files=dt.files;
+  fileSelected(type);
+}
+
+function fileSelected(type) {
+  const inp = document.getElementById(type+'-file');
+  if (!inp.files.length) return;
+  document.getElementById(type+'-filename').textContent = inp.files[0].name;
+  document.getElementById(type+'-selected').style.display = 'block';
+}
+
+function clearFile(type) {
+  document.getElementById(type+'-file').value='';
+  document.getElementById(type+'-selected').style.display='none';
+}
+
+async function doSingleExtract() {
+  const inp    = document.getElementById('single-file');
+  const schema = document.getElementById('single-schema').value;
+  if (!inp.files.length) { toast('Επίλεξε αρχείο πρώτα','error'); return; }
+  if (!schema) { toast('Επίλεξε template','error'); return; }
+
+  const btn = document.getElementById('single-btn');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Ανέβασμα...';
+
+  const fd = new FormData();
+  fd.append('file', inp.files[0]);
+  fd.append('schema_name', schema);
+
+  const up = await api('POST','/api/upload',fd,true);
+  if (!up.success) { toast(up.error||'Upload failed','error'); btn.disabled=false; btn.textContent='Εξαγωγή Δεδομένων'; return; }
+
+  btn.innerHTML='<span class="spinner"></span> Εξαγωγή AI...';
+  const ex = await api('POST',`/api/extract/${up.doc_id}`,{schema_name:schema});
+
+  btn.disabled=false;
+  btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Εξαγωγή Δεδομένων';
+
+  const res = document.getElementById('single-result');
+  if (ex.success) {
+    const fields = Object.entries(ex.data||{}).map(([k,v])=>`<div class="data-item"><div class="data-key">${k}</div><div class="data-val">${v??'—'}</div></div>`).join('');
+    res.style.display='block';
+    res.innerHTML=`<div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);border-radius:10px;padding:16px"><div style="color:var(--accent);font-weight:600;margin-bottom:12px;">✓ Επιτυχής Εξαγωγή</div><div class="data-grid">${fields}</div></div>`;
+    toast('Εξαγωγή ολοκληρώθηκε!','success');
+  } else {
+    res.style.display='block';
+    res.innerHTML=`<div style="background:rgba(255,68,68,0.06);border:1px solid rgba(255,68,68,0.2);border-radius:10px;padding:16px;color:var(--danger);">✕ ${ex.error}</div>`;
+    toast('Σφάλμα εξαγωγής','error');
+  }
+}
+
+async function doBatchUpload() {
+  const inp    = document.getElementById('batch-file');
+  const schema = document.getElementById('batch-schema').value;
+  if (!inp.files.length) { toast('Επίλεξε PDF πρώτα','error'); return; }
+  if (!schema) { toast('Επίλεξε template','error'); return; }
+
+  const btn = document.getElementById('batch-btn');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Ανέβασμα...';
+
+  const fd = new FormData();
+  fd.append('file', inp.files[0]);
+  fd.append('schema_name', schema);
+
+  const res = await api('POST','/api/batch',fd,true);
+  btn.disabled=false;
+  btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Έναρξη Batch';
+
+  if (!res.success) { toast(res.error||'Σφάλμα','error'); return; }
+  toast('Batch ξεκίνησε! Job: '+res.job_id.slice(0,8)+'...','success');
+  pollBatchJob(res.job_id);
+  document.getElementById('batch-progress').style.display='block';
+}
+
+function pollBatchJob(job_id) {
+  const interval = setInterval(async () => {
+    const st = await api('GET',`/api/batch/${job_id}/status`);
+    const pct = st.progress_pct||0;
+    document.getElementById('batch-fill').style.width = pct+'%';
+    document.getElementById('batch-pct').textContent  = pct+'%';
+    document.getElementById('batch-status-text').textContent =
+      `${st.processed||0}/${st.total_invoices||0} τιμολόγια`;
+    document.getElementById('batch-detail').textContent =
+      `Σελίδες: ${st.total_pages||0} | Αποτυχίες: ${st.failed||0}`;
+    if (st.status==='completed' || st.status==='failed') {
+      clearInterval(interval);
+      toast(st.status==='completed' ? `✓ Batch ολοκλήρωθηκε: ${st.processed} τιμολόγια` : '✕ Batch απέτυχε', st.status==='completed'?'success':'error');
+    }
+  }, 2000);
+}
+
+// ── Batch Jobs Page ──────────────────────────────────────────────────────────
+async function loadBatchJobs() {
+  const res = await api('GET','/api/batch');
+  const jobs = (res.jobs||[]).reverse();
+  const el = document.getElementById('batch-jobs-list');
+  if (!jobs.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📦</div><div class="empty-title">Δεν υπάρχουν batch jobs</div><div class="empty-sub">Ανέβασε ένα PDF από το Upload & Extract</div></div>';
+    return;
+  }
+  el.innerHTML = jobs.map(j=>`
+    <div class="job-card">
+      <div class="job-header">
+        <div>
+          <span class="job-id">${j.job_id.slice(0,16)}...</span>
+          <span style="margin-left:10px">${badgeHtml(j.status==='completed'?'Completed':j.status==='failed'?'Failed':'Pending')}</span>
+        </div>
+        <span style="font-size:12px;color:var(--text2)">${j.started_at?.split('T')[0]||''}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px;color:var(--text2);margin-bottom:10px">
+        <div>Σελίδες: <b style="color:var(--text)">${j.total_pages}</b></div>
+        <div>Τιμολόγια: <b style="color:var(--text)">${j.total_invoices}</b></div>
+        <div>Επιτυχία: <b style="color:var(--accent)">${j.processed}</b></div>
+        <div>Αποτυχία: <b style="color:var(--danger)">${j.failed}</b></div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${j.progress_pct}%"></div></div>
+      ${j.errors?.length ? `<div style="margin-top:8px;font-size:11px;color:var(--danger)">${j.errors.slice(0,2).join(' | ')}</div>` : ''}
+    </div>`).join('');
+}
+
+// ── Templates ────────────────────────────────────────────────────────────────
+async function loadTemplates() {
+  const res = await api('GET','/api/templates');
+  const templates = res.templates||[];
+  const el = document.getElementById('templates-list');
+  if (!templates.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Δεν υπάρχουν templates</div><div class="empty-sub">Δημιούργησε το πρώτο σου template</div></div>';
+    return;
+  }
+  el.innerHTML = templates.map(t=>`
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="card-title" style="margin:0">${t.name}</div>
+        <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${t.name}')">Διαγραφή</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${(t.fields||[]).map(f=>`<span style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--text2)">${f.name} <span style="color:var(--text3)">${f.type}</span></span>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function openTemplateModal() {
+  document.getElementById('tmpl-name').value='';
+  document.getElementById('tmpl-fields').innerHTML='';
+  addField(); addField(); addField();
+  openModal('tmpl-modal');
+}
+
+function addField() {
+  const div = document.createElement('div');
+  div.className='field-row';
+  div.innerHTML=`
+    <input class="form-input" placeholder="Όνομα πεδίου" style="font-size:13px"/>
+    <select class="form-input" style="font-size:13px">
+      <option value="string">string</option>
+      <option value="number">number</option>
+      <option value="date">date</option>
+      <option value="integer">integer</option>
+      <option value="boolean">boolean</option>
+    </select>
+    <button class="field-remove" onclick="this.parentElement.remove()">✕</button>`;
+  document.getElementById('tmpl-fields').appendChild(div);
+}
+
+async function saveTemplate() {
+  const name = document.getElementById('tmpl-name').value.trim();
+  if (!name) { toast('Εισήγαγε όνομα template','error'); return; }
+  const rows = document.querySelectorAll('#tmpl-fields .field-row');
+  const fields = [];
+  rows.forEach(r => {
+    const inputs = r.querySelectorAll('input,select');
+    const n = inputs[0].value.trim();
+    const t = inputs[1].value;
+    if (n) fields.push({name:n,type:t,required:true});
+  });
+  if (!fields.length) { toast('Πρόσθεσε τουλάχιστον ένα πεδίο','error'); return; }
+  const res = await api('POST','/api/templates',{name,fields,description:name});
+  if (res.success) { toast('Template αποθηκεύτηκε!','success'); closeModal('tmpl-modal'); loadTemplates(); }
+  else toast(res.error||'Σφάλμα','error');
+}
+
+async function deleteTemplate(name) {
+  if (!confirm('Διαγραφή template "'+name+'";')) return;
+  await api('DELETE',`/api/templates/${name}`);
+  toast('Template διαγράφηκε','success');
+  loadTemplates();
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+async function loadSettings() {
+  const [keys, health] = await Promise.all([api('GET','/api/keys/status'), api('GET','/health')]);
+  const services = keys.configured_services||[];
+  document.getElementById('keys-status').innerHTML = services.length
+    ? services.map(s=>`<span class="badge badge-green" style="margin-right:6px">✓ ${s}</span>`).join('')
+    : '<span style="color:var(--text3)">Δεν υπάρχουν αποθηκευμένα keys</span>';
+  document.getElementById('system-info').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="data-item"><div class="data-key">Database</div><div class="data-val">${health.checks?.database||'—'}</div></div>
+      <div class="data-item"><div class="data-key">Gemini Key</div><div class="data-val">${health.checks?.gemini_key||'—'}</div></div>
+      <div class="data-item"><div class="data-key">Status</div><div class="data-val" style="color:var(--accent)">${health.status||'—'}</div></div>
+      <div class="data-item"><div class="data-key">Domain</div><div class="data-val">fastwrite.duckdns.org</div></div>
+    </div>`;
+}
+
+async function saveKey() {
+  const service = document.getElementById('key-service').value;
+  const key     = document.getElementById('key-value').value.trim();
+  if (!key) { toast('Εισήγαγε API key','error'); return; }
+  const res = await api('POST','/api/keys/save',{service,api_key:key});
+  if (res.success) { toast('Key αποθηκεύτηκε!','success'); document.getElementById('key-value').value=''; loadSettings(); }
+  else toast(res.error||'Σφάλμα','error');
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function badgeHtml(status) {
+  const map = {
+    'Completed':'badge-green','completed':'badge-green',
+    'Pending':'badge-yellow','pending':'badge-yellow',
+    'Failed':'badge-red','failed':'badge-red',
+  };
+  return `<span class="badge ${map[status]||'badge-gray'}">${status}</span>`;
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m =>
+  m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
+
+// ── Server Status ─────────────────────────────────────────────────────────────
+async function checkServer() {
+  try {
+    const r = await api('GET','/health');
+    document.getElementById('server-status').textContent =
+      r.status==='healthy' ? 'Διαθέσιμο' : 'Μειωμένη λειτουργία';
+  } catch {
+    document.getElementById('server-status').innerHTML =
+      '<span style="color:var(--danger)">● Αδύνατη σύνδεση</span>';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+checkServer();
+loadDashboard();
+setInterval(checkServer, 30000);
+</script>
+</body>
+</html>
