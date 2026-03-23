@@ -424,7 +424,8 @@ def serve_ui():
     return send_file("/app/projects/static/index.html")
 
 @app.get("/ui/template-builder")
-def serve_template_builder():
+@app.get("/ui/template-builder/<int:doc_id>")
+def serve_template_builder(doc_id=None):
     token = request.cookies.get(COOKIE_NAME)
     if not token or not verify_token(token):
         return redirect("/ui/login")
