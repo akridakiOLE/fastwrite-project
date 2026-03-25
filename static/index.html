@@ -1662,16 +1662,16 @@ async function tbSaveTemplate() {
 async function openTemplateBuilder(type) {
   if (type === 'batch') {
     if (lastBatchJobId) {
-      // Batch έχει τρέξει — άνοιξε το πρώτο doc
+      // Batch έχει τρέξει — άνοιξε το πρώτο doc στο Review
       const st = await api('GET', '/api/batch/' + lastBatchJobId + '/status');
       if (st && st.doc_ids && st.doc_ids.length) {
-        window.open('/ui/template-builder/' + st.doc_ids[0], '_blank');
+        window.open('/ui/review/' + st.doc_ids[0], '_blank');
         return;
       }
     }
     // Reuse existing upload if available
     if (uploadedDocIds['batch']) {
-      window.open('/ui/template-builder/' + uploadedDocIds['batch'], '_blank');
+      window.open('/ui/review/' + uploadedDocIds['batch'], '_blank');
       return;
     }
     // Batch δεν έχει τρέξει — ανέβασε το αρχείο ως preview
@@ -1684,12 +1684,12 @@ async function openTemplateBuilder(type) {
     const data = await r.json();
     if (!data.doc_id) { toast('Σφάλμα ανεβάσματος', 'error'); return; }
     uploadedDocIds['batch'] = data.doc_id;
-    window.open('/ui/template-builder/' + data.doc_id, '_blank');
+    window.open('/ui/review/' + data.doc_id, '_blank');
     return;
   }
   // Reuse existing upload if available
   if (uploadedDocIds[type]) {
-    window.open('/ui/template-builder/' + uploadedDocIds[type], '_blank');
+    window.open('/ui/review/' + uploadedDocIds[type], '_blank');
     return;
   }
   // First upload the file if not already uploaded
@@ -1706,8 +1706,8 @@ async function openTemplateBuilder(type) {
   if (!data.doc_id) { toast('Σφάλμα ανεβάσματος', 'error'); return; }
 
   uploadedDocIds[type] = data.doc_id;
-  // Open template builder in new tab
-  window.open('/ui/template-builder/' + data.doc_id, '_blank');
+  // Open review page in new tab
+  window.open('/ui/review/' + data.doc_id, '_blank');
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

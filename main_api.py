@@ -43,7 +43,7 @@ def add_cors(response):
     origin = request.headers.get("Origin", "")
     if origin in ALLOWED_ORIGINS:
         response.headers["Access-Control-Allow-Origin"] = origin
-    response.headers["Access-Control-Allow-Methods"]    = "GET,POST,DELETE,OPTIONS"
+    response.headers["Access-Control-Allow-Methods"]    = "GET,POST,DELETE,PATCH,OPTIONS"
     response.headers["Access-Control-Allow-Headers"]    = "Content-Type,Authorization"
     response.headers["Access-Control-Allow-Credentials"]= "true"
     return response
@@ -195,6 +195,122 @@ def cleanup_pending():
             deleted += 1
     return jsonify({"success": True, "deleted": deleted,
                     "message": f"Διαγράφηκαν {deleted} εκκρεμή έγγραφα."})
+
+# ── Document Actions (Approve / Reject / Edit Data) ──────────────────────────
+@app.post("/api/documents/<int:doc_id>/approve")
+@require_auth
+def approve_document(doc_id):
+    doc = db.get_document(doc_id)
+    if not doc:
+        return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    db.update_document_status(doc_id, status="Completed", result_json=doc.get("result_json"))
+    return jsonify({"success": True, "doc_id": doc_id, "status": "Completed"})
+
+@app.post("/api/documents/<int:doc_id>/reject")
+@require_auth
+def reject_document(doc_id):
+    if not db.get_document(doc_id):
+        return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    db.update_document_status(doc_id, status="Failed")
+    return jsonify({"success": True, "doc_id": doc_id, "status": "Failed"})
+
+@app.route("/api/documents/<int:doc_id>/data", methods=["PATCH"])
+@require_auth
+def update_document_data(doc_id):
+    doc = db.get_document(doc_id)
+    if not doc:
+        return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    new_data = request.get_json(force=True) or {}
+    existing = {}
+    if doc.get("result_json"):
+        try: existing = json.loads(doc["result_json"])
+        except: pass
+    existing.update(new_data)
+    db.update_document_status(doc_id, status=doc["status"], result_json=json.dumps(existing))
+    return jsonify({"success": True, "doc_id": doc_id, "data": existing})
+
+@app.get("/api/documents/<int:doc_id>/file")
+@require_auth
+def serve_document_file(doc_id):
+    """Σερβίρει το processed αρχείο (PNG/εικόνα) για preview στο UI."""
+    doc = db.get_document(doc_id)
+    if not doc:
+        return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    file_path = Path(doc["file_path"])
+    if not file_path.exists():
+        return jsonify({"error": "Αρχείο δεν βρέθηκε στο σύστημα."}), 404
+    suffix = file_path.suffix.lower()
+    mime_map = {".pdf":"application/pdf",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp"}
+    return send_file(str(file_path), mimetype=mime_map.get(suffix, "application/octet-stream"))
+
+@app.get("/api/documents/<int:doc_id>/original-pdf")
+@require_auth
+def serve_original_pdf(doc_id):
+    """Σερβίρει το πρωτότυπο PDF αρχείο."""
+    doc = db.get_document(doc_id)
+    if not doc:
+        return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    original = doc.get("original_filename") or doc.get("filename", "")
+    pdf_path = UPLOAD_DIR / original
+    if not pdf_path.exists():
+        return jsonify({"error": "Original PDF δεν βρέθηκε."}), 404
+    return send_file(str(pdf_path), mimetype="application/pdf")
+
+@app.get("/api/documents/<int:doc_id>/line-positions")
+@require_auth
+def get_line_positions(doc_id):
+    """Επιστρέφει τις y-θέσεις γραμμών πίνακα (ως % ύψους σελίδας) μέσω pdfplumber."""
+    import re as _re
+    doc = db.get_document(doc_id)
+    if not doc:
+        return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    fp = doc.get("file_path", "")
+    page_num = 0
+    m = _re.search(r"page_(\d+)", fp)
+    if m:
+        page_num = int(m.group(1)) - 1
+    original = doc.get("original_filename") or doc.get("filename", "")
+    pdf_path = UPLOAD_DIR / original
+    if not pdf_path.exists() or not str(pdf_path).lower().endswith(".pdf"):
+        return jsonify({"positions": []})
+    try:
+        import pdfplumber
+        with pdfplumber.open(str(pdf_path)) as pdf:
+            if page_num >= len(pdf.pages):
+                return jsonify({"positions": []})
+            page = pdf.pages[page_num]
+            tables = page.find_tables()
+            if not tables:
+                return jsonify({"positions": []})
+            tbl = tables[0]
+            page_h = float(page.height)
+            positions = []
+            for row in tbl.rows:
+                cells = row.cells
+                if not cells:
+                    continue
+                tops = [c[1] for c in cells if c]
+                bots = [c[3] for c in cells if c]
+                if tops and bots:
+                    positions.append({"top_pct": min(tops)/page_h, "bottom_pct": max(bots)/page_h})
+            return jsonify({"positions": positions})
+    except Exception as e:
+        return jsonify({"positions": [], "error": str(e)})
+
+@app.get("/api/documents/<int:doc_id>/batch-siblings")
+@require_auth
+def get_batch_siblings(doc_id):
+    """Επιστρέφει όλα τα docs που ανήκουν στο ίδιο batch (ίδιο original_filename)."""
+    doc = db.get_document(doc_id)
+    if not doc:
+        return jsonify({"error": "Not found"}), 404
+    original = doc.get("original_filename")
+    if not original:
+        return jsonify({"siblings": [dict(doc)], "original_filename": ""})
+    all_docs = db.list_documents()
+    siblings = [d for d in all_docs if d.get("original_filename") == original and d.get("filename") != original]
+    siblings.sort(key=lambda d: d["id"])
+    return jsonify({"siblings": siblings, "original_filename": original})
 
 # ── Export ────────────────────────────────────────────────────────────────────
 def _get_records_for_export(doc_ids=None):
@@ -453,3 +569,265 @@ def serve_template_builder(doc_id=None):
     if not token or not verify_token(token):
         return redirect("/ui/login")
     return send_file("/app/projects/static/index.html")
+
+@app.get("/ui/review/<int:doc_id>")
+def serve_review_page(doc_id):
+    """Standalone Review Page — PNG preview + canvas highlight + approve/reject."""
+    token = request.cookies.get(COOKIE_NAME)
+    if not token or not verify_token(token):
+        return redirect("/ui/login")
+
+    import json as _json, re as _re
+    all_pending = db.list_documents(status="pending_review")
+    pending_ids = [d["id"] for d in all_pending]
+    doc = db.get_document(doc_id)
+    if not doc:
+        return "<h2>Not found</h2>", 404
+    rd = {}
+    if doc.get("result_json"):
+        try: rd = _json.loads(doc["result_json"])
+        except: pass
+
+    page_num = 1
+    fp = doc.get("file_path", "")
+    m = _re.search(r"page_(\d+)", fp)
+    if m:
+        page_num = int(m.group(1))
+
+    from pathlib import Path as _Path
+    has_png = fp.lower().endswith(".png") and _Path(fp).exists()
+    img_url = "/api/documents/%s/file" % doc_id
+    original_filename = doc.get("original_filename") or doc.get("filename") or ""
+    pdf_url = "/api/documents/%s/original-pdf#page=%s" % (doc_id, page_num)
+
+    cur_pos = pending_ids.index(doc_id) if doc_id in pending_ids else 0
+    total   = len(pending_ids)
+    prev_id = pending_ids[cur_pos - 1] if cur_pos > 0 else None
+    next_id = pending_ids[cur_pos + 1] if cur_pos < total - 1 else None
+    pos_label = "%s / %s" % (cur_pos + 1, total) if total else "—"
+    after_action = ('window.location.href="/ui/review/'+str(next_id)+'"') if next_id else 'history.back()'
+
+    scalar_rows_html = ""
+    line_items_data = {}
+    for k, v in rd.items():
+        if k.startswith("_"): continue
+        if isinstance(v, list):
+            line_items_data[k] = v
+        else:
+            scalar_rows_html += '<div class="field"><div class="field-label">%s</div><input class="field-input" data-key="%s" value="%s" oninput="markDirty()"/></div>' % (k, k, str(v) if v is not None else "")
+
+    html = """<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Έγκριση — %(filename)s</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#0a0c10;color:#e0e0e0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:#111318;border-bottom:1px solid #1e2330;flex-shrink:0;gap:10px;flex-wrap:wrap;min-height:50px}
+.topbar-title{font-size:13px;font-weight:600;color:#fff;flex:1}
+.topbar-sub{font-size:10px;color:#666;font-family:monospace}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.pos-label{font-size:11px;color:#666;font-family:monospace;white-space:nowrap}
+.nav-btn{padding:5px 10px;border-radius:6px;background:#1e2330;border:1px solid #2a3040;color:#aaa;font-size:11px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.nav-btn:hover{border-color:#00e5a0;color:#00e5a0}
+.nav-btn.disabled{opacity:0.3;pointer-events:none}
+.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap}
+.btn-back{background:#1e2330;color:#aaa;border:1px solid #2a3040}
+.btn-back:hover{border-color:#aaa}
+.btn-tmpl{background:rgba(0,102,255,0.12);color:#4d94ff;border:1px solid rgba(0,102,255,0.4)}
+.btn-tmpl:hover{background:rgba(0,102,255,0.25)}
+.btn-reject{background:rgba(255,68,68,0.12);color:#ff4444;border:1px solid rgba(255,68,68,0.4)}
+.btn-reject:hover{background:#ff4444;color:#000}
+.btn-approve{background:#00e5a0;color:#000}
+.btn-approve:hover{background:#00ffb3}
+.dirty-badge{display:none;background:#f59e0b;color:#000;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px}
+.dirty-badge.show{display:inline}
+.split{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;min-height:0}
+.img-side{border-right:1px solid #1e2330;display:flex;flex-direction:column;overflow:hidden;position:relative;background:#111}
+.img-wrap{flex:1;overflow:auto;position:relative;cursor:crosshair}
+.img-wrap img{display:block;width:100%%;user-select:none;-webkit-user-drag:none}
+.img-wrap canvas{position:absolute;top:0;left:0;pointer-events:none}
+.img-bar{padding:6px 12px;background:#111318;border-bottom:1px solid #1e2330;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.img-bar-label{font-size:10px;color:#666;font-family:monospace}
+.img-bar a{font-size:10px;color:#00e5a0;text-decoration:none}
+.data-side{display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.scalar-section{flex-shrink:0;border-bottom:1px solid #1e2330}
+.scalar-header{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#111318;cursor:pointer;user-select:none}
+.scalar-header span{font-size:10px;color:#666;font-family:monospace;letter-spacing:1px;text-transform:uppercase}
+.toggle-icon{font-size:10px;color:#00e5a0}
+.scalar-fields{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px}
+.scalar-fields.collapsed{display:none}
+.field{display:flex;flex-direction:column;gap:3px;min-width:140px;flex:1}
+.field-label{font-size:9px;color:#666;font-family:monospace;letter-spacing:.8px;text-transform:uppercase}
+.field-input{background:#181c24;border:1px solid #1e2330;border-radius:6px;padding:6px 9px;color:#e0e0e0;font-size:12px;width:100%%;outline:none}
+.field-input:focus{border-color:#00e5a0}
+.field-input.modified{border-color:#f59e0b}
+.li-section{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.li-header{padding:6px 12px;background:#111318;border-bottom:1px solid #1e2330;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.li-header-title{font-size:10px;color:#00e5a0;font-family:monospace;letter-spacing:1px;text-transform:uppercase;flex:1}
+.li-nav{display:flex;align-items:center;gap:6px}
+.li-nav-btn{background:#1e2330;border:1px solid #2a3040;color:#aaa;border-radius:5px;padding:2px 9px;font-size:13px;cursor:pointer;line-height:1.4}
+.li-nav-btn:hover{border-color:#00e5a0;color:#00e5a0}
+.li-nav-label{font-size:11px;color:#666;font-family:monospace;min-width:80px}
+.li-add-btn{background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3);color:#00e5a0;border-radius:5px;padding:2px 10px;font-size:11px;cursor:pointer}
+.li-add-btn:hover{background:rgba(0,229,160,0.2)}
+.table-wrap{flex:1;overflow:auto}
+table{width:100%%;border-collapse:collapse;font-size:12px}
+th{background:#111318;padding:6px 8px;text-align:left;color:#666;font-family:monospace;font-size:9px;border-bottom:1px solid #1e2330;white-space:nowrap;text-transform:uppercase;letter-spacing:.8px}
+td{padding:6px 8px;border-bottom:1px solid #181c24;color:#ccc;min-width:50px}
+td[contenteditable]:focus{outline:1px solid #00e5a0;background:#0d1a0d}
+td.modified{background:#1a1500}
+tbody tr{cursor:pointer;transition:background .1s}
+tbody tr:hover td{background:#181c24}
+tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!important;outline:1px solid rgba(0,229,160,0.35)}
+.toast{position:fixed;bottom:20px;left:50%%;transform:translateX(-50%%);background:#1a1a2a;border:1px solid #333;padding:10px 22px;border-radius:8px;font-size:13px;display:none;z-index:9999}
+.toast.show{display:block}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="flex:1;min-width:0">
+    <div class="topbar-title">&#128196; %(filename)s <span class="dirty-badge" id="dirty-badge">&#9679; Αλλαγές</span></div>
+    <div class="topbar-sub">Template: %(schema)s &nbsp;·&nbsp; %(date)s</div>
+  </div>
+  <div class="topbar-right">
+    <span class="pos-label">%(pos_label)s</span>
+    %(prev_btn)s
+    %(next_btn)s
+    <button class="btn btn-back" onclick="%(after_back)s">&#8592; Επιστροφή</button>
+    <button class="btn btn-tmpl" onclick="window.open('/ui/template-builder/%(doc_id)s','_blank')">&#9998; Template Builder</button>
+    <button class="btn btn-reject" onclick="doReject()">&#10005; Απόρριψη</button>
+    <button class="btn btn-approve" onclick="doApprove()">&#10003; Έγκριση</button>
+  </div>
+</div>
+<div class="split">
+  <div class="img-side">
+    <div class="img-bar">
+      <span class="img-bar-label" id="img-bar-label">%(filename)s</span>
+      <a href="%(pdf_url)s" target="_blank">&#8599; Άνοιγμα PDF</a>
+    </div>
+    <div class="img-wrap" id="img-wrap">
+      <img id="doc-img" src="%(img_url)s" alt="%(filename)s" onload="onImgLoad()"/>
+      <canvas id="hl-canvas"></canvas>
+    </div>
+  </div>
+  <div class="data-side">
+    <div class="scalar-section">
+      <div class="scalar-header" onclick="toggleScalars()">
+        <span>Γενικά Στοιχεία</span>
+        <span class="toggle-icon" id="toggle-icon">&#9650; Απόκρυψη</span>
+      </div>
+      <div class="scalar-fields" id="scalar-fields">%(scalar_rows)s</div>
+    </div>
+    <div class="li-section" id="li-section" style="display:none">
+      <div class="li-header">
+        <span class="li-header-title" id="li-title">LINE ITEMS</span>
+        <div class="li-nav">
+          <button class="li-nav-btn" onclick="navRow(-1)" title="Προηγούμενη γραμμή">&#8593;</button>
+          <button class="li-nav-btn" onclick="navRow(1)" title="Επόμενη γραμμή">&#8595;</button>
+          <span class="li-nav-label" id="li-nav-label">—</span>
+          <button class="li-add-btn" onclick="addRow()">+ Γραμμή</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="li-table"><thead id="li-thead"><tr></tr></thead><tbody id="li-tbody"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const DOC_ID    = %(doc_id)s;
+const LINE_DATA = %(line_data_json)s;
+let dirty=false, curRow=-1, curArrKey=null, numRows=0, imgHeight=0;
+
+(async function init(){
+  await loadLinePositions();
+  const keys=Object.keys(LINE_DATA);
+  if(keys.length){curArrKey=keys[0];const rows=LINE_DATA[curArrKey];numRows=rows.length;renderTable(curArrKey,rows);document.getElementById('li-section').style.display='flex';document.getElementById('li-title').textContent='LINE ITEMS: '+curArrKey;updateNavLabel();}
+})();
+
+function toggleScalars(){const f=document.getElementById('scalar-fields');const i=document.getElementById('toggle-icon');f.classList.toggle('collapsed');i.textContent=f.classList.contains('collapsed')?'▼ Εμφάνιση':'▲ Απόκρυψη';}
+
+function renderTable(key,rows){
+  if(!rows.length)return;
+  const cols=Object.keys(rows[0]);
+  document.querySelector('#li-thead tr').innerHTML=cols.map(c=>'<th>'+c+'</th>').join('')+'<th style="width:30px"></th>';
+  document.getElementById('li-tbody').innerHTML=rows.map((row,ri)=>'<tr id="row-'+ri+'" onclick="selectRow('+ri+')">'+cols.map(c=>'<td contenteditable="true" data-key="'+key+'" data-col="'+c+'" data-ri="'+ri+'" oninput="markDirty()">'+(row[c]!=null?row[c]:'')+'</td>').join('')+'<td style="text-align:center"><button onclick="deleteRow('+ri+')" style="background:none;border:none;color:#666;cursor:pointer;font-size:14px;" title="Διαγραφή">✕</button></td></tr>').join('');
+}
+
+function selectRow(ri){curRow=ri;document.querySelectorAll('#li-tbody tr').forEach(r=>r.classList.remove('row-hl'));const row=document.getElementById('row-'+ri);if(row){row.classList.add('row-hl');row.scrollIntoView({block:'nearest'});}updateNavLabel();drawHighlight(ri);}
+function navRow(dir){if(numRows===0)return;const next=curRow+dir;if(next<0||next>=numRows)return;selectRow(next);}
+function updateNavLabel(){const lbl=document.getElementById('li-nav-label');if(curRow<0){lbl.textContent=numRows+' γραμμές';return;}lbl.textContent='Γραμμή '+(curRow+1)+' / '+numRows;}
+
+let linePositions=[];
+async function loadLinePositions(){try{const res=await fetch('/api/documents/'+DOC_ID+'/line-positions',{credentials:'include'});const data=await res.json();linePositions=data.positions||[];}catch(e){linePositions=[];}}
+
+function onImgLoad(){const img=document.getElementById('doc-img');const canvas=document.getElementById('hl-canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;canvas.style.width=img.clientWidth+'px';canvas.style.height=img.clientHeight+'px';imgHeight=img.naturalHeight;if(curRow>=0)drawHighlight(curRow);}
+
+function drawHighlight(ri){
+  const img=document.getElementById('doc-img');const canvas=document.getElementById('hl-canvas');
+  if(!img.complete||canvas.width===0)return;
+  canvas.style.width=img.clientWidth+'px';canvas.style.height=img.clientHeight+'px';
+  const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(ri<0||numRows===0)return;
+  let y,bandH;
+  if(linePositions.length>ri){const pos=linePositions[ri];y=canvas.height*pos.top_pct;bandH=canvas.height*(pos.bottom_pct-pos.top_pct);}
+  else{bandH=canvas.height/numRows;y=ri*bandH;}
+  ctx.fillStyle='rgba(0,229,160,0.25)';ctx.strokeStyle='rgba(0,229,160,0.80)';ctx.lineWidth=2;
+  ctx.fillRect(0,y,canvas.width,bandH);ctx.strokeRect(1,y+1,canvas.width-2,bandH-2);
+}
+
+window.addEventListener('resize',()=>{const img=document.getElementById('doc-img');const canvas=document.getElementById('hl-canvas');if(img&&canvas){canvas.style.width=img.clientWidth+'px';canvas.style.height=img.clientHeight+'px';}if(curRow>=0)drawHighlight(curRow);});
+document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.contentEditable==='true')return;if(e.key==='ArrowUp'){e.preventDefault();navRow(-1);}if(e.key==='ArrowDown'){e.preventDefault();navRow(1);}if(e.key==='Escape'){curRow=-1;document.querySelectorAll('#li-tbody tr').forEach(r=>r.classList.remove('row-hl'));drawHighlight(-1);updateNavLabel();}});
+
+function addRow(){if(!curArrKey)return;const rows=LINE_DATA[curArrKey];const cols=rows.length?Object.keys(rows[0]):[];const nr={};cols.forEach(c=>nr[c]='');rows.push(nr);numRows=rows.length;renderTable(curArrKey,rows);markDirty();selectRow(numRows-1);}
+function deleteRow(ri){if(!curArrKey)return;if(!confirm('Διαγραφή γραμμής '+(ri+1)+';'))return;LINE_DATA[curArrKey].splice(ri,1);numRows=LINE_DATA[curArrKey].length;renderTable(curArrKey,LINE_DATA[curArrKey]);markDirty();curRow=-1;updateNavLabel();drawHighlight(-1);}
+
+function markDirty(){dirty=true;document.getElementById('dirty-badge').classList.add('show');}
+
+function collectData(){
+  const data={};
+  document.querySelectorAll('.field-input').forEach(f=>{data[f.dataset.key]=f.value;});
+  Object.keys(LINE_DATA).forEach(key=>{const rows=[];document.querySelectorAll('#li-tbody tr').forEach(tr=>{const row={};tr.querySelectorAll('td[contenteditable]').forEach(td=>{if(td.dataset.col)row[td.dataset.col]=td.textContent.trim();});if(Object.keys(row).length)rows.push(row);});data[key]=rows;});
+  return data;
+}
+
+async function doApprove(){
+  if(dirty){const r=await fetch('/api/documents/'+DOC_ID+'/data',{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(collectData())});if(!r.ok){showToast('Σφάλμα αποθήκευσης','#ff4444');return;}}
+  const r=await fetch('/api/documents/'+DOC_ID+'/approve',{method:'POST',credentials:'include'});const j=await r.json();
+  if(j.success){showToast('Εγκρίθηκε!','#00e5a0');setTimeout(()=>{%(after_action)s;},1200);}
+  else showToast('Σφάλμα: '+j.error,'#ff4444');
+}
+
+async function doReject(){
+  if(!confirm('Απόρριψη εγγράφου;'))return;
+  const r=await fetch('/api/documents/'+DOC_ID+'/reject',{method:'POST',credentials:'include'});const j=await r.json();
+  if(j.success){showToast('Απορρίφθηκε','#ff4444');setTimeout(()=>{%(after_action)s;},1200);}
+  else showToast('Σφάλμα: '+j.error,'#ff4444');
+}
+
+function showToast(msg,color){const t=document.getElementById('toast');t.textContent=msg;t.style.borderColor=color||'#333';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+</script>
+</body>
+</html>""" % {
+        "filename":       doc["filename"],
+        "schema":         doc.get("schema_name", "—"),
+        "date":           (doc.get("created_at") or "").split("T")[0],
+        "pos_label":      pos_label,
+        "prev_btn":       ('<a href="/ui/review/%s" class="nav-btn">&#9664; Προηγ.</a>' % prev_id) if prev_id else '<span class="nav-btn disabled">&#9664; Προηγ.</span>',
+        "next_btn":       ('<a href="/ui/review/%s" class="nav-btn">Επόμ. &#9654;</a>' % next_id) if next_id else '<span class="nav-btn disabled">Επόμ. &#9654;</span>',
+        "after_back":     "if(window.opener||window.history.length<=1){window.close()}else{history.back()}",
+        "after_action":   after_action,
+        "doc_id":         doc_id,
+        "img_url":        img_url,
+        "pdf_url":        pdf_url,
+        "scalar_rows":    scalar_rows_html,
+        "line_data_json": _json.dumps(line_items_data, ensure_ascii=False),
+    }
+
+    resp = make_response(html)
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    return resp
