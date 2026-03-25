@@ -293,6 +293,9 @@ def get_line_positions(doc_id):
                 bots = [c[3] for c in cells if c]
                 if tops and bots:
                     positions.append({"top_pct": min(tops)/page_h, "bottom_pct": max(bots)/page_h})
+            # Skip header row — pdfplumber includes column headers but AI extraction returns only data rows
+            if len(positions) > 1:
+                positions = positions[1:]
             return jsonify({"positions": positions})
     except Exception as e:
         return jsonify({"positions": [], "error": str(e)})
@@ -1512,8 +1515,8 @@ function showToast(msg,color){const t=document.getElementById('toast');t.textCon
         "schema":         doc.get("schema_name", "—"),
         "date":           (doc.get("created_at") or "").split("T")[0],
         "pos_label":      pos_label,
-        "prev_btn":       ('<a href="/ui/review/%s" class="nav-btn">&#9664; Προηγ.</a>' % prev_id) if prev_id else '<span class="nav-btn disabled">&#9664; Προηγ.</span>',
-        "next_btn":       ('<a href="/ui/review/%s" class="nav-btn">Επόμ. &#9654;</a>' % next_id) if next_id else '<span class="nav-btn disabled">Επόμ. &#9654;</span>',
+        "prev_btn":       ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">&#9664; Προηγ.</span>' % prev_id) if prev_id else '<span class="nav-btn disabled">&#9664; Προηγ.</span>',
+        "next_btn":       ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">Επόμ. &#9654;</span>' % next_id) if next_id else '<span class="nav-btn disabled">Επόμ. &#9654;</span>',
         "after_back":     "if(window.opener||window.history.length<=1){window.close()}else{history.back()}",
         "after_action":   after_action,
         "doc_id":         doc_id,
