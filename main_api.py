@@ -1242,11 +1242,24 @@ def serve_review_page(doc_id):
         return redirect("/ui/login")
 
     import json as _json, re as _re
-    all_pending = db.list_documents(status="pending_review")
-    pending_ids = [d["id"] for d in all_pending]
     doc = db.get_document(doc_id)
     if not doc:
         return "<h2>Not found</h2>", 404
+
+    # Get ALL batch siblings (not just pending_review) for navigation
+    original = doc.get("original_filename")
+    if original:
+        all_docs = db.list_documents()
+        sibling_docs = [d for d in all_docs
+                        if d.get("original_filename") == original
+                        and d.get("filename") != original
+                        and d.get("result_json")]
+        sibling_docs.sort(key=lambda d: d["id"])
+    else:
+        sibling_docs = [doc] if doc.get("result_json") else []
+
+    sibling_ids = [d["id"] for d in sibling_docs]
+
     rd = {}
     if doc.get("result_json"):
         try: rd = _json.loads(doc["result_json"])
@@ -1264,10 +1277,10 @@ def serve_review_page(doc_id):
     original_filename = doc.get("original_filename") or doc.get("filename") or ""
     pdf_url = "/api/documents/%s/original-pdf#page=%s" % (doc_id, page_num)
 
-    cur_pos = pending_ids.index(doc_id) if doc_id in pending_ids else 0
-    total   = len(pending_ids)
-    prev_id = pending_ids[cur_pos - 1] if cur_pos > 0 else None
-    next_id = pending_ids[cur_pos + 1] if cur_pos < total - 1 else None
+    cur_pos = sibling_ids.index(doc_id) if doc_id in sibling_ids else 0
+    total   = len(sibling_ids)
+    prev_id = sibling_ids[cur_pos - 1] if cur_pos > 0 else None
+    next_id = sibling_ids[cur_pos + 1] if cur_pos < total - 1 else None
     pos_label = "%s / %s" % (cur_pos + 1, total) if total else "—"
     after_action = ('window.location.href="/ui/review/'+str(next_id)+'"') if next_id else 'history.back()'
 
@@ -1360,7 +1373,7 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
     <span class="pos-label">%(pos_label)s</span>
     %(prev_btn)s
     %(next_btn)s
-    <button class="btn btn-back" onclick="%(after_back)s">&#8592; Επιστροφή</button>
+    <button class="btn btn-back" onclick="goBackFromReview()">&#8592; Επιστροφή</button>
     <button class="btn btn-tmpl" onclick="window.open('/ui/template-builder/%(doc_id)s','_blank')">&#9998; Template Builder</button>
     <button class="btn btn-reject" onclick="doReject()">&#10005; Απόρριψη</button>
     <button class="btn btn-approve" onclick="doApprove()">&#10003; Έγκριση</button>
@@ -1373,7 +1386,8 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
       <a href="%(pdf_url)s" target="_blank">&#8599; Άνοιγμα PDF</a>
     </div>
     <div class="img-wrap" id="img-wrap">
-      <img id="doc-img" src="%(img_url)s" alt="%(filename)s" onload="onImgLoad()"/>
+      <iframe id="doc-iframe" src="%(pdf_url)s" style="width:100%%;height:100%%;border:none;display:none;"></iframe>
+      <img id="doc-img" src="%(img_url)s" alt="%(filename)s" onload="onImgLoad()" style="display:none;width:100%%"/>
       <canvas id="hl-canvas"></canvas>
     </div>
   </div>
@@ -1405,10 +1419,21 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
 <script>
 const DOC_ID    = %(doc_id)s;
 const LINE_DATA = %(line_data_json)s;
+const HAS_PNG   = %(has_png_js)s;
 let dirty=false, curRow=-1, curArrKey=null, numRows=0, imgHeight=0;
 
 (async function init(){
-  await loadLinePositions();
+  // Show either PNG image (with canvas highlight) or PDF iframe
+  const img=document.getElementById('doc-img');
+  const iframe=document.getElementById('doc-iframe');
+  if(HAS_PNG){
+    img.style.display='block';
+    iframe.style.display='none';
+    await loadLinePositions();
+  } else {
+    img.style.display='none';
+    iframe.style.display='block';
+  }
   const keys=Object.keys(LINE_DATA);
   if(keys.length){curArrKey=keys[0];const rows=LINE_DATA[curArrKey];numRows=rows.length;renderTable(curArrKey,rows);document.getElementById('li-section').style.display='flex';document.getElementById('li-title').textContent='LINE ITEMS: '+curArrKey;updateNavLabel();}
 })();
@@ -1473,6 +1498,12 @@ async function doReject(){
   else showToast('Σφάλμα: '+j.error,'#ff4444');
 }
 
+function goBackFromReview(){
+  if(document.referrer && document.referrer.includes('/ui/template-builder/')){history.back();return;}
+  if(window.opener&&!window.opener.closed){window.close();return;}
+  history.back();
+}
+
 function showToast(msg,color){const t=document.getElementById('toast');t.textContent=msg;t.style.borderColor=color||'#333';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
 </script>
 </body>
@@ -1490,6 +1521,7 @@ function showToast(msg,color){const t=document.getElementById('toast');t.textCon
         "pdf_url":        pdf_url,
         "scalar_rows":    scalar_rows_html,
         "line_data_json": _json.dumps(line_items_data, ensure_ascii=False),
+        "has_png_js":     "true" if has_png else "false",
     }
 
     resp = make_response(html)
