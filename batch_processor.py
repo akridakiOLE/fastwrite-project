@@ -305,16 +305,16 @@ class BatchProcessor:
                         seg_schema = self.schema_bld.build_from_list(tmpl["fields"])
                         seg_schema.pop("additionalProperties", None)
                         used_schema_name    = matched_name
-                        used_require_review = tmpl.get("require_review", False)
+                        used_require_review = tmpl.get("require_review", True)
                     else:
                         seg_schema          = default_schema
                         used_schema_name    = schema_name
-                        used_require_review = default_template.get("require_review", False)
+                        used_require_review = default_template.get("require_review", True)
                         detected_supplier   = "unknown"
                 else:
                     seg_schema          = default_schema
                     used_schema_name    = schema_name
-                    used_require_review = default_template.get("require_review", False)
+                    used_require_review = default_template.get("require_review", True)
                     detected_supplier   = None
 
                 result = extractor.extract(image_paths=segment.pages, schema=seg_schema)

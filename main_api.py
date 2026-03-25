@@ -432,8 +432,8 @@ def extract_document(doc_id):
     result    = extractor.extract(image_paths=processed.pages, schema=schema)
 
     if result.is_ok():
-        db.update_document_status(doc_id, status="Completed", result_json=json.dumps(result.extracted_data))
-        return jsonify({"success": True, "doc_id": doc_id, "data": result.extracted_data})
+        db.update_document_status(doc_id, status="pending_review", result_json=json.dumps(result.extracted_data))
+        return jsonify({"success": True, "doc_id": doc_id, "data": result.extracted_data, "status": "pending_review"})
     else:
         db.update_document_status(doc_id, status="Failed")
         return jsonify({"success": False, "error": result.error_message}), 500
@@ -1622,26 +1622,40 @@ function collectData() {
 }
 
 async function doApprove() {
-  if (dirty) {
-    const r = await fetch('/api/documents/' + DOC_ID + '/data', {
-      method:'PATCH', credentials:'include',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(collectData())
-    });
-    if (!r.ok) { showToast('Σφάλμα αποθήκευσης', '#ff4444'); return; }
+  try {
+    // Save edits first if any changes were made
+    if (dirty) {
+      const sr = await fetch('/api/documents/' + DOC_ID + '/data', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(collectData())
+      });
+      if (!sr.ok) { showToast('Σφάλμα αποθήκευσης: ' + sr.status, '#ff4444'); return; }
+    }
+    // Approve
+    const r = await fetch('/api/documents/' + DOC_ID + '/approve', {method:'POST'});
+    if (!r.ok) { showToast('HTTP Error: ' + r.status, '#ff4444'); return; }
+    const j = await r.json();
+    if (j.success) {
+      showToast('Εγκρίθηκε! (' + j.status + ')', '#00e5a0');
+      setTimeout(function(){ %(after_action)s; }, 1200);
+    } else {
+      showToast('Σφάλμα: ' + (j.error || 'Unknown'), '#ff4444');
+    }
+  } catch(err) {
+    showToast('JS Error: ' + err.message, '#ff4444');
   }
-  const r = await fetch('/api/documents/' + DOC_ID + '/approve', {method:'POST', credentials:'include'});
-  const j = await r.json();
-  if (j.success) { showToast('Εγκρίθηκε!', '#00e5a0'); setTimeout(function(){ %(after_action)s; }, 1200); }
-  else showToast('Σφάλμα: ' + j.error, '#ff4444');
 }
 
 async function doReject() {
   if (!confirm('Απόρριψη εγγράφου;')) return;
-  const r = await fetch('/api/documents/' + DOC_ID + '/reject', {method:'POST', credentials:'include'});
-  const j = await r.json();
-  if (j.success) { showToast('Απορρίφθηκε', '#ff4444'); setTimeout(function(){ %(after_action)s; }, 1200); }
-  else showToast('Σφάλμα: ' + j.error, '#ff4444');
+  try {
+    const r = await fetch('/api/documents/' + DOC_ID + '/reject', {method:'POST'});
+    const j = await r.json();
+    if (j.success) { showToast('Απορρίφθηκε', '#ff4444'); setTimeout(function(){ %(after_action)s; }, 1200); }
+    else showToast('Σφάλμα: ' + (j.error || 'Unknown'), '#ff4444');
+  } catch(err) {
+    showToast('JS Error: ' + err.message, '#ff4444');
+  }
 }
 
 function showToast(msg, color) {
