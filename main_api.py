@@ -550,6 +550,663 @@ async function doLogin(e){
 </body>
 </html>"""
 
+_TEMPLATE_BUILDER_HTML = r'''
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Template Builder — FastWrite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0a0c10;--bg2:#111318;--bg3:#181c24;--border:#1e2330;
+  --accent:#00e5a0;--accent2:#0066ff;--warn:#ffb300;--danger:#ff4444;
+  --text:#e8eaf0;--text2:#7c8299;--text3:#3d4259;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+/* ── Topbar ── */
+.topbar{padding:12px 24px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;height:56px;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:var(--text);}
+.logo span{color:var(--accent);}
+.doc-label{font-family:'DM Mono',monospace;font-size:13px;color:var(--text2);}
+
+/* ── Layout: PDF | Right ── */
+.layout{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;min-height:0;}
+
+/* ── PDF side ── */
+.pdf-side{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.pdf-viewer-wrap{flex:1;position:relative;min-height:0;overflow:hidden;}
+.pdf-viewer-wrap iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:#fff;}
+.panel-bar{padding:10px 20px;background:var(--bg2);border-bottom:1px solid var(--border);font-family:'Syne',sans-serif;font-size:11px;font-weight:600;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase;flex-shrink:0;}
+
+/* ── Supplier panel ── */
+.sup-panel{flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;border-bottom:2px solid var(--border);max-height:280px;transition:max-height .25s ease;}
+.sup-panel.collapsed{max-height:38px;}
+.sup-header{padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;cursor:pointer;user-select:none;}
+.sup-header-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:600;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;}
+.sup-chevron{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;}
+.sup-modes{display:flex;gap:6px;padding:7px 12px;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0;align-items:center;}
+.sup-search-wrap{padding:6px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sup-search{width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:'DM Mono',monospace;outline:none;}
+.sup-search:focus{border-color:var(--accent);}
+.sup-list{flex:1;overflow-y:auto;padding:6px 8px;}
+.sup-item{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;margin-bottom:3px;border-left:3px solid transparent;}
+.sup-item.no-tmpl{border-left-color:var(--warn);background:rgba(255,179,0,0.04);}
+.sup-item.has-tmpl{border-left-color:rgba(0,229,160,0.4);background:rgba(0,229,160,0.03);}
+.sup-item.needs-review{border-left-color:var(--accent2);background:rgba(0,102,255,0.05);}
+.sup-name{font-family:'DM Mono',monospace;font-size:11px;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sup-badge{font-size:9px;border-radius:4px;padding:1px 5px;white-space:nowrap;flex-shrink:0;}
+.sup-badge-notmpl{background:rgba(255,179,0,0.15);color:var(--warn);border:1px solid rgba(255,179,0,0.3);}
+.sup-badge-tmpl{background:rgba(0,229,160,0.10);color:var(--accent);border:1px solid rgba(0,229,160,0.25);}
+.sup-badge-review{background:rgba(0,102,255,0.12);color:var(--accent2);border:1px solid rgba(0,102,255,0.3);}
+.sup-copy-btn{background:none;border:1px solid var(--border);color:var(--text3);border-radius:4px;font-size:9px;padding:1px 6px;cursor:pointer;font-family:'DM Mono',monospace;flex-shrink:0;}
+.sup-copy-btn:hover{border-color:var(--accent);color:var(--accent);}
+.mode-btn{font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Mono',monospace;border:1px solid var(--border);background:var(--bg2);color:var(--text2);}
+.mode-btn:hover{border-color:var(--text3);}
+.mode-btn.active-warn{background:rgba(255,179,0,0.15);color:var(--warn);border-color:rgba(255,179,0,0.4);}
+.mode-btn.active-blue{background:rgba(0,102,255,0.15);color:var(--accent2);border-color:rgba(0,102,255,0.4);}
+.sup-stats{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-left:auto;}
+.pdf-bar{padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.pdf-bar-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);}
+
+/* ── Right column ── */
+.right-col{display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+.editor{flex:0 0 55%;overflow-y:auto;padding:20px;}
+.tmpl-section{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;border-top:2px solid var(--border);}
+.tmpl-section-header{padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);font-family:'Syne',sans-serif;font-size:11px;font-weight:600;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;flex-shrink:0;}
+.tmpl-search-wrap{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.tmpl-list{flex:1;overflow-y:auto;padding:8px;}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-primary:hover{background:#00ffb3;transform:translateY(-1px);}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--text3);}
+.btn-sm{padding:5px 12px;font-size:12px;}
+.btn-green{background:rgba(0,229,160,0.12);color:var(--accent);border:1px solid rgba(0,229,160,0.3);font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.btn-green:hover{background:rgba(0,229,160,0.22);}
+.btn-blue{background:rgba(0,102,255,0.12);color:var(--accent2);border:1px solid rgba(0,102,255,0.3);font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.btn-blue:hover{background:rgba(0,102,255,0.22);}
+
+/* ── Form ── */
+.form-group{margin-bottom:14px;}
+.form-label{display:block;font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px;font-family:'DM Mono',monospace;}
+.form-input{width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s;font-family:'DM Sans',sans-serif;}
+.form-input:focus{border-color:var(--accent);}
+.section-title{font-family:'Syne',sans-serif;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+
+/* ── Field rows ── */
+.field-row-wrap{margin-bottom:8px;}
+.field-row{display:grid;grid-template-columns:1fr 140px auto;gap:8px;align-items:center;}
+.field-remove{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:4px 8px;border-radius:4px;}
+.field-remove:hover{color:var(--danger);}
+.array-subfields{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:8px;}
+.array-subfields-title{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;margin-bottom:10px;text-transform:uppercase;letter-spacing:.8px;}
+.subfield-row{display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:center;margin-bottom:8px;}
+
+/* ── Template list items ── */
+.tmpl-item{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;transition:border-color .15s;}
+.tmpl-item:hover{border-color:var(--border);background:var(--bg2);}
+.tmpl-item.active{border-color:var(--accent);background:rgba(0,229,160,0.05);}
+.tmpl-name{font-family:'DM Mono',monospace;font-size:13px;color:var(--text);font-weight:500;}
+.tmpl-meta{display:flex;gap:6px;align-items:center;margin-top:3px;}
+.badge{font-size:10px;border-radius:4px;padding:1px 6px;}
+.badge-blue{background:rgba(0,102,255,0.12);color:var(--accent2);border:1px solid rgba(0,102,255,0.25);}
+.badge-warn{background:rgba(255,179,0,0.12);color:var(--warn);border:1px solid rgba(255,179,0,0.25);}
+.badge-gray{color:var(--text3);font-size:10px;}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:9999;animation:fadeUp .2s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div class="logo">Fast<span>Write</span></div>
+    <div class="doc-label" id="doc-label">Template Builder</div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-secondary btn-sm" onclick="goBack()">&larr; Επιστροφή στο Upload</button>
+    <button class="btn btn-secondary btn-sm" onclick="window.close()">x Κλείσιμο</button>
+    <button class="btn btn-primary" onclick="doSave()" id="save-btn">[Save] Αποθήκευση Template</button>
+  </div>
+</div>
+
+<!-- Main layout -->
+<div class="layout">
+
+  <!-- PDF left -->
+  <div class="pdf-side">
+
+    <!-- ── Supplier panel ── -->
+    <div class="sup-panel" id="sup-panel">
+      <div class="sup-header" onclick="toggleSupPanel()">
+        <span class="sup-header-title">[Suppliers] <span id="sup-batch-label" style="text-transform:none;font-weight:400;font-size:10px;color:var(--text2);">φόρτωση...</span></span>
+        <span class="sup-chevron" id="sup-chevron">&#9650;</span>
+      </div>
+      <div class="sup-modes">
+        <button class="mode-btn active-warn" id="mode-notmpl" onclick="setMode('notmpl')">&#9888; Χωρίς Template</button>
+        <button class="mode-btn" id="mode-review" onclick="setMode('review')">&#10003; Τιμολόγια Έγκριση</button>
+        <span class="sup-stats" id="sup-stats"></span>
+      </div>
+      <div class="sup-search-wrap">
+        <input class="sup-search" id="sup-search" placeholder="Αναζήτηση supplier — επικόλλησε όνομα..." oninput="onSupSearch(this.value)"/>
+      </div>
+      <div class="sup-list" id="sup-list">
+        <div style="color:var(--text2);font-size:12px;padding:10px;text-align:center;">Φόρτωση...</div>
+      </div>
+    </div>
+
+    <!-- PDF bar -->
+    <div class="pdf-bar">
+      <span class="pdf-bar-label" id="pdf-bar-label">[PDF] Προεπισκόπηση</span>
+      <a id="pdf-open-link" href="#" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none;font-family:'DM Mono',monospace;">&#8599; Νέο tab</a>
+    </div>
+
+    <!-- PDF / Image viewer -->
+    <div class="pdf-viewer-wrap">
+      <iframe id="pdf-iframe" src="" allowfullscreen style="display:none;"></iframe>
+      <div id="pdf-img-wrap" style="overflow:auto;width:100%;height:100%;display:none;position:absolute;top:0;left:0;">
+        <img id="pdf-img" src="" style="width:100%;display:block;" draggable="false"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right column -->
+  <div class="right-col">
+
+    <!-- Editor top -->
+    <div class="editor">
+      <div class="section-title">[Edit] Πεδία Template</div>
+
+      <div class="form-group">
+        <label class="form-label">Όνομα Template</label>
+        <input class="form-input" id="tmpl-name" placeholder="π.χ. invoice_dei, cosmote_receipt..."/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">[Co] Supplier Pattern <span style="color:var(--text3);font-weight:400;text-transform:none;">(λέξεις-κλειδιά auto-match, π.χ. ΔΕΗ, dei, cosmote)</span></label>
+        <input class="form-input" id="tmpl-supplier" placeholder="π.χ. cosmote, ote — πολλαπλές με κόμμα"/>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border-radius:8px;margin-bottom:16px;">
+        <input type="checkbox" id="tmpl-review" style="width:16px;height:16px;accent-color:var(--warn);cursor:pointer"/>
+        <div>
+          <div style="font-size:13px;color:var(--text);font-weight:500;">[!] Απαιτείται Έγκριση</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;">Τα έγγραφα θα περιμένουν έγκριση πριν ολοκληρωθούν</div>
+        </div>
+      </div>
+
+      <div class="section-title">[Copy] Πεδία Εξαγωγής</div>
+      <div id="tmpl-fields"></div>
+      <button class="btn btn-secondary btn-sm" onclick="addField()" style="margin-bottom:8px;">+ Προσθήκη Πεδίου</button>
+    </div>
+
+    <!-- Template list bottom — always visible -->
+    <div class="tmpl-section">
+      <div class="tmpl-section-header">[Dir] Υπάρχοντα Templates — Φόρτωση / Αντιγραφή</div>
+      <div class="tmpl-search-wrap">
+        <input class="form-input" id="tmpl-search" placeholder="[Search] Αναζήτηση template..." oninput="filterTemplates(this.value)" style="font-size:13px;"/>
+      </div>
+      <div class="tmpl-list" id="tmpl-list">
+        <div style="color:var(--text2);font-size:13px;padding:16px 8px;text-align:center;">Φόρτωση...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Globals ───────────────────────────────────────────────────────────────────
+const docId = new URLSearchParams(window.location.search).get('doc_id')
+           || window.location.pathname.split('/').pop();
+let allTemplates = [];
+
+// ── Supplier panel globals ────────────────────────────────────────────────────
+let allDocs      = [];
+let currentMode  = 'notmpl';
+let supCollapsed = false;
+
+function toggleSupPanel() {
+  supCollapsed = !supCollapsed;
+  document.getElementById('sup-panel').classList.toggle('collapsed', supCollapsed);
+  document.getElementById('sup-chevron').textContent = supCollapsed ? '\u25BC' : '\u25B2';
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-notmpl').className = 'mode-btn' + (mode==='notmpl' ? ' active-warn' : '');
+  document.getElementById('mode-review').className = 'mode-btn' + (mode==='review' ? ' active-blue' : '');
+  document.getElementById('sup-search').value = '';
+  renderSupList(allDocs, '');
+}
+
+function getSupplierName(doc) {
+  if (!doc.result_json) return null;
+  try {
+    const rd = JSON.parse(doc.result_json);
+    return rd._matched_supplier || rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || null;
+  } catch(e) { return null; }
+}
+
+function getMatchedTemplate(doc, templates) {
+  const supplier = (getSupplierName(doc) || '').toLowerCase().trim();
+  if (!supplier) return null;
+  for (const t of templates) {
+    if (!t.supplier_pattern) continue;
+    const patterns = t.supplier_pattern.split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+    for (const p of patterns) {
+      if (supplier.includes(p) || p.includes(supplier)) return t.name;
+    }
+  }
+  return null;
+}
+
+async function loadDocList(templates) {
+  try {
+    const res = await apiFetch('GET', '/api/documents/' + docId + '/batch-siblings');
+    allDocs = (res.siblings || []).map(d => ({
+      ...d,
+      _supplier: getSupplierName(d),
+      _matched:  getMatchedTemplate(d, templates)
+    }));
+    const lbl = document.getElementById('sup-batch-label');
+    if (lbl && res.original_filename) {
+      const n = res.original_filename;
+      lbl.textContent = n.length > 28 ? n.slice(0,26) + '...' : n;
+    }
+    renderSupList(allDocs, '');
+    loadPdf(docId);
+  } catch(e) {
+    document.getElementById('sup-list').innerHTML =
+      '<div style="color:var(--danger);font-size:12px;padding:8px;">Σφάλμα φόρτωσης</div>';
+  }
+}
+
+function loadPdf(id) {
+  const url = '/api/documents/' + id + '/file';
+  document.getElementById('pdf-open-link').href = url;
+  const doc = allDocs.find(d => String(d.id) === String(id));
+  const name = doc ? (doc.filename || ('Έγγραφο #' + id)) : ('Έγγραφο #' + id);
+  document.getElementById('pdf-bar-label').textContent = name;
+  document.getElementById('doc-label').textContent = 'Template Builder  |  ' + name;
+
+  const filePath = doc ? (doc.file_path || '') : '';
+  const isPng = filePath.toLowerCase().endsWith('.png') || filePath.toLowerCase().endsWith('.jpg');
+
+  const iframe  = document.getElementById('pdf-iframe');
+  const imgWrap = document.getElementById('pdf-img-wrap');
+
+  if (isPng) {
+    const pageMatch = filePath.match(/page_(\d+)/);
+    const pageNum   = pageMatch ? parseInt(pageMatch[1]) : 1;
+    const originalUrl = '/api/documents/' + id + '/original-pdf#page=' + pageNum;
+    imgWrap.style.display = 'none';
+    iframe.style.display  = 'block';
+    iframe.src = originalUrl;
+  } else {
+    imgWrap.style.display = 'none';
+    iframe.style.display  = 'block';
+    iframe.src = url;
+  }
+}
+
+function onSupSearch(q) {
+  renderSupList(allDocs, q);
+  if (q.trim()) {
+    const ql = q.toLowerCase();
+    const match = allDocs.find(d => (d._supplier||'').toLowerCase().includes(ql)
+      || (d.filename||'').toLowerCase().includes(ql));
+    if (match) {
+      loadPdf(match.id);
+      if (!match._matched) {
+        document.getElementById('tmpl-supplier').value = match._supplier || '';
+      }
+    }
+  }
+}
+
+function renderSupList(docs, q) {
+  const el = document.getElementById('sup-list');
+  const ql = (q||'').trim().toLowerCase();
+
+  let filtered = [...docs];
+  const seen = new Set();
+  filtered = filtered.filter(d => {
+    const key = (d._supplier || d.filename || String(d.id)).toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (currentMode === 'notmpl') {
+    filtered.sort((a,b) => (!a._matched ? 0 : 1) - (!b._matched ? 0 : 1));
+  } else if (currentMode === 'review') {
+    filtered.sort((a,b) => (b.status==='pending_review'?1:0) - (a.status==='pending_review'?1:0));
+  }
+  if (ql) filtered = filtered.filter(d =>
+    (d._supplier||'').toLowerCase().includes(ql) || (d.filename||'').toLowerCase().includes(ql));
+
+  const noTmpl = docs.filter(d => !d._matched).length;
+  const needsRv = docs.filter(d => d.status === 'pending_review').length;
+  document.getElementById('sup-stats').textContent = noTmpl + ' χωρίς · ' + needsRv + ' έγκριση';
+
+  if (!filtered.length) {
+    const msg = currentMode==='notmpl'
+      ? (ql ? 'Δεν βρέθηκε' : '\u2713 Όλα έχουν template!')
+      : (ql ? 'Δεν βρέθηκε' : '\u2713 Κανένα προς έγκριση');
+    el.innerHTML = '<div style="color:var(--accent);font-size:12px;padding:10px;text-align:center;">' + msg + '</div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map(d => {
+    const sup = d._supplier || d.filename || ('Doc #' + d.id);
+    const supShort = sup.length > 30 ? sup.slice(0,28) + '\u2026' : sup;
+    const supEscaped = sup.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const badge = !d._matched
+      ? '<span class="sup-badge sup-badge-notmpl">\u26A0 Χωρίς</span>'
+      : d.status==='pending_review'
+        ? '<span class="sup-badge sup-badge-review">\u23F3</span>'
+        : '<span class="sup-badge sup-badge-tmpl">\u2713 '+d._matched+'</span>';
+    const itemClass = !d._matched ? 'no-tmpl' : d.status==='pending_review' ? 'needs-review' : 'has-tmpl';
+    return '<div class="sup-item ' + itemClass + '" id="si-'+d.id+'">'
+         + '<span class="sup-name" title="'+sup+'">'+supShort+'</span>'
+         + badge
+         + '<button class="sup-copy-btn" onclick="copySupplier(\'' + supEscaped + '\')" title="Αντιγραφή">\u2398</button>'
+         + '<button class="sup-copy-btn" onclick="openDoc('+d.id+')" title="Άνοιγμα PDF" style="color:var(--accent2);">\u2192</button>'
+         + '<a href="/ui/review/'+d.id+'" target="_blank" class="sup-copy-btn" style="color:#00e5a0;text-decoration:none;" title="Άνοιγμα Έγκριση">\u2696</a>'
+         + '</div>';
+  }).join('');
+}
+
+function copySupplier(name) {
+  const inp = document.getElementById('sup-search');
+  inp.value = name;
+  renderSupList(allDocs, name);
+  const ql = name.toLowerCase();
+  const match = allDocs.find(d => (d._supplier||'').toLowerCase().includes(ql));
+  if (match) loadPdf(match.id);
+  navigator.clipboard.writeText(name).catch(()=>{});
+  showToast('Αντιγράφηκε: ' + name, 'success');
+}
+
+function openDoc(id) {
+  loadPdf(id);
+  const doc = allDocs.find(d => d.id === id);
+  if (doc && doc._supplier && !doc._matched) {
+    document.getElementById('tmpl-supplier').value = doc._supplier;
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async function init() {
+  addField(); addField(); addField();
+  await loadTemplates();
+  await loadDocList(allTemplates);
+})();
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function goBack() {
+  if (window.opener && !window.opener.closed) {
+    try { window.opener.showPage('upload'); } catch(e) {}
+    window.close();
+  } else {
+    window.location.href = '/ui#upload';
+  }
+}
+
+// ── API helper (with credentials for JWT) ────────────────────────────────────
+async function apiFetch(method, url, body) {
+  const opts = { method, headers: {}, credentials: 'include' };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(url, opts);
+  if (r.status === 401) { window.location.href = '/ui/login'; return {error:'Session expired'}; }
+  return r.json();
+}
+
+// ── Templates list ────────────────────────────────────────────────────────────
+async function loadTemplates(refreshDocList) {
+  const el = document.getElementById('tmpl-list');
+  try {
+    const res = await apiFetch('GET', '/api/templates');
+    allTemplates = res.templates || [];
+    renderTemplates(allTemplates);
+    if (refreshDocList && allDocs.length) {
+      allDocs = allDocs.map(d => ({...d, _matched: getMatchedTemplate(d, allTemplates)}));
+      renderSupList(allDocs, '');
+    }
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--danger);font-size:13px;padding:8px;">Σφάλμα: ' + e.message + '</div>';
+  }
+}
+
+function filterTemplates(q) {
+  const f = q.trim() === ''
+    ? allTemplates
+    : allTemplates.filter(t => t.name.toLowerCase().includes(q.toLowerCase())
+        || (t.supplier_pattern||'').toLowerCase().includes(q.toLowerCase()));
+  renderTemplates(f);
+}
+
+function renderTemplates(list) {
+  const el = document.getElementById('tmpl-list');
+  if (!list.length) {
+    el.innerHTML = allTemplates.length
+      ? '<div style="color:var(--text2);font-size:13px;padding:8px;">Δεν βρέθηκαν templates</div>'
+      : '<div style="color:var(--text2);font-size:13px;padding:8px;">Δεν υπάρχουν templates ακόμα</div>';
+    return;
+  }
+  el.innerHTML = list.map(t => {
+    const spBadge = t.supplier_pattern
+      ? '<span class="badge badge-blue">[Co] ' + t.supplier_pattern + '</span>' : '';
+    const rvBadge = t.require_review
+      ? '<span class="badge badge-warn">[!] review</span>' : '';
+    const cnt = (t.fields||[]).length;
+    const nameEsc = t.name.replace(/\\/g,'\\\\').replace(/`/g,'\\`');
+    return '<div class="tmpl-item" id="ti-' + t.name.replace(/[^a-zA-Z0-9]/g,'_') + '">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div class="tmpl-name">' + t.name + '</div>'
+      + '<div class="tmpl-meta">' + spBadge + rvBadge
+      + '<span class="badge-gray">' + cnt + ' πεδία</span></div>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:12px;">'
+      + '<button class="btn-green" onclick="loadTemplate(\'' + nameEsc + '\')">[In] Φόρτωση</button>'
+      + '<button class="btn-blue" onclick="copyTemplate(\'' + nameEsc + '\')">[Copy] Αντιγραφή</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+// ── Load template into editor ─────────────────────────────────────────────────
+async function loadTemplate(name) {
+  const tmpl = await apiFetch('GET', '/api/templates/' + encodeURIComponent(name));
+  if (!tmpl || tmpl.error) { showToast('Σφάλμα φόρτωσης', 'error'); return; }
+  document.getElementById('tmpl-name').value     = tmpl.name;
+  document.getElementById('tmpl-supplier').value  = tmpl.supplier_pattern || '';
+  document.getElementById('tmpl-review').checked  = !!tmpl.require_review;
+  document.getElementById('tmpl-fields').innerHTML = '';
+  (tmpl.fields||[]).forEach(f => {
+    addField();
+    const wraps  = document.querySelectorAll('#tmpl-fields .field-row-wrap');
+    const wrap   = wraps[wraps.length - 1];
+    const inputs = wrap.querySelectorAll('.field-row input, .field-row select');
+    inputs[0].value = f.name;
+    inputs[1].value = f.type;
+    if (f.type === 'array') {
+      onFieldTypeChange(inputs[1]);
+      if (f.items && f.items.length) {
+        const subList = wrap.querySelector('.subfield-list');
+        if (subList) {
+          subList.innerHTML = '';
+          f.items.forEach(item => {
+            const d = document.createElement('div');
+            d.innerHTML = defaultSubfieldRow(item.name, item.type);
+            subList.appendChild(d.firstElementChild);
+          });
+        }
+      }
+    }
+  });
+  document.querySelectorAll('.tmpl-item').forEach(el => el.classList.remove('active'));
+  const id = 'ti-' + name.replace(/[^a-zA-Z0-9]/g,'_');
+  const el = document.getElementById(id);
+  if (el) { el.classList.add('active'); el.scrollIntoView({block:'nearest'}); }
+  showToast('Φορτώθηκε: ' + name, 'success');
+}
+
+// ── Copy template ─────────────────────────────────────────────────────────────
+async function copyTemplate(name) {
+  const tmpl = await apiFetch('GET', '/api/templates/' + encodeURIComponent(name));
+  if (!tmpl || tmpl.error) return;
+  let newName = name + '(1)', i = 1;
+  while (allTemplates.find(x => x.name === newName)) { i++; newName = name + '(' + i + ')'; }
+  document.getElementById('tmpl-name').value     = newName;
+  document.getElementById('tmpl-supplier').value  = tmpl.supplier_pattern || '';
+  document.getElementById('tmpl-review').checked  = !!tmpl.require_review;
+  document.getElementById('tmpl-fields').innerHTML = '';
+  (tmpl.fields||[]).forEach(f => {
+    addField();
+    const wraps  = document.querySelectorAll('#tmpl-fields .field-row-wrap');
+    const wrap   = wraps[wraps.length - 1];
+    const inputs = wrap.querySelectorAll('.field-row input, .field-row select');
+    inputs[0].value = f.name;
+    inputs[1].value = f.type;
+    if (f.type === 'array') {
+      onFieldTypeChange(inputs[1]);
+      if (f.items && f.items.length) {
+        const subList = wrap.querySelector('.subfield-list');
+        if (subList) { subList.innerHTML = '';
+          f.items.forEach(item => {
+            const d = document.createElement('div');
+            d.innerHTML = defaultSubfieldRow(item.name, item.type);
+            subList.appendChild(d.firstElementChild);
+          });
+        }
+      }
+    }
+  });
+  showToast('Αντιγράφηκε ως: ' + newName, 'success');
+}
+
+// ── Field editor ──────────────────────────────────────────────────────────────
+function addField() {
+  const div = document.createElement('div');
+  div.className = 'field-row';
+  div.innerHTML = '<input class="form-input" placeholder="Όνομα πεδίου" style="font-size:13px"/>'
+    + '<select class="form-input" style="font-size:13px" onchange="onFieldTypeChange(this)">'
+    + '<option value="string">string</option><option value="number">number</option>'
+    + '<option value="date">date</option><option value="integer">integer</option>'
+    + '<option value="boolean">boolean</option><option value="array">array (line items)</option></select>'
+    + '<button class="field-remove" onclick="this.closest(\'.field-row-wrap\').remove()">x</button>';
+  const wrap = document.createElement('div');
+  wrap.className = 'field-row-wrap';
+  wrap.appendChild(div);
+  document.getElementById('tmpl-fields').appendChild(wrap);
+}
+
+function onFieldTypeChange(sel) {
+  const wrap = sel.closest('.field-row-wrap');
+  const existing = wrap.querySelector('.array-subfields');
+  if (existing) existing.remove();
+  if (sel.value === 'array') {
+    const panel = document.createElement('div');
+    panel.className = 'array-subfields';
+    panel.innerHTML = '<div class="array-subfields-title">[Copy] Στήλες Line Items</div>'
+      + '<div class="subfield-list">'
+      + defaultSubfieldRow('description','string')
+      + defaultSubfieldRow('quantity','number')
+      + defaultSubfieldRow('unit_price','number')
+      + defaultSubfieldRow('total','number')
+      + '</div>'
+      + '<button type="button" onclick="addSubfield(this)" style="font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;margin-top:4px;">+ Προσθήκη στήλης</button>';
+    wrap.appendChild(panel);
+  }
+}
+
+function defaultSubfieldRow(name, type) {
+  const types = ['string','number','integer','date','boolean'];
+  const opts = types.map(t=>'<option value="'+t+'" '+(t===type?'selected':'')+'>'+t+'</option>').join('');
+  return '<div class="subfield-row">'
+    + '<input class="form-input" value="'+name+'" placeholder="Όνομα στήλης" style="font-size:12px"/>'
+    + '<select class="form-input" style="font-size:12px">'+opts+'</select>'
+    + '<button type="button" onclick="this.closest(\'.subfield-row\').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:4px">x</button></div>';
+}
+
+function addSubfield(btn) {
+  const list = btn.previousElementSibling;
+  const d = document.createElement('div');
+  d.innerHTML = defaultSubfieldRow('', 'string');
+  list.appendChild(d.firstElementChild);
+}
+
+// ── Save template ─────────────────────────────────────────────────────────────
+async function doSave() {
+  const name = document.getElementById('tmpl-name').value.trim();
+  if (!name) { showToast('Εισήγαγε όνομα template', 'error'); return; }
+  const wraps = document.querySelectorAll('#tmpl-fields .field-row-wrap');
+  const fields = [];
+  wraps.forEach(wrap => {
+    const inputs = wrap.querySelectorAll('.field-row input, .field-row select');
+    const n = inputs[0].value.trim();
+    const t = inputs[1].value;
+    if (!n) return;
+    if (t === 'array') {
+      const subRows = wrap.querySelectorAll('.subfield-row');
+      const items = [];
+      subRows.forEach(sr => {
+        const si = sr.querySelectorAll('input, select');
+        const sn = si[0].value.trim();
+        if (sn) items.push({name: sn, type: si[1].value});
+      });
+      fields.push({name:n, type:'array', required:true, items: items.length ? items : [
+        {name:'description',type:'string'},{name:'quantity',type:'number'},
+        {name:'unit_price',type:'number'},{name:'total',type:'number'}
+      ]});
+    } else {
+      fields.push({name:n, type:t, required:true});
+    }
+  });
+  if (!fields.length) { showToast('Πρόσθεσε τουλάχιστον ένα πεδίο', 'error'); return; }
+  const supplier_pattern = document.getElementById('tmpl-supplier').value.trim();
+  const require_review   = document.getElementById('tmpl-review').checked;
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'Αποθήκευση...';
+  const res = await apiFetch('POST', '/api/templates', {name, fields, require_review, supplier_pattern});
+  btn.disabled = false; btn.textContent = '[Save] Αποθήκευση Template';
+  if (res.success) {
+    showToast('Template αποθηκεύτηκε: ' + name, 'success');
+    await loadTemplates(true);
+  } else {
+    showToast('Σφάλμα: ' + (res.error || 'άγνωστο'), 'error');
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  const ok = type === 'success';
+  t.style.cssText = 'background:' + (ok ? 'rgba(0,229,160,0.15)' : 'rgba(255,68,68,0.15)')
+    + ';border:1px solid ' + (ok ? '#00e5a0' : '#ff4444')
+    + ';color:' + (ok ? '#00e5a0' : '#ff4444');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+</script>
+</body>
+</html>
+'''
+
 @app.get("/ui/login")
 def serve_login():
     return LOGIN_HTML, 200, {"Content-Type": "text/html"}
@@ -568,7 +1225,14 @@ def serve_template_builder(doc_id=None):
     token = request.cookies.get(COOKIE_NAME)
     if not token or not verify_token(token):
         return redirect("/ui/login")
-    return send_file("/app/projects/static/index.html")
+    if not doc_id:
+        return redirect("/ui")
+    doc = db.get_document(doc_id)
+    if not doc:
+        return "<h2>Not found</h2>", 404
+    resp = make_response(_TEMPLATE_BUILDER_HTML.encode('utf-8'))
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    return resp
 
 @app.get("/ui/review/<int:doc_id>")
 def serve_review_page(doc_id):
