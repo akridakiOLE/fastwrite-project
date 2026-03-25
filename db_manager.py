@@ -45,16 +45,23 @@ class DatabaseManager:
             # Documents table: stores metadata about uploaded/processed files
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS documents (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    filename    TEXT    NOT NULL,
-                    file_path   TEXT,
-                    status      TEXT    NOT NULL DEFAULT 'Pending',
-                    created_at  TEXT    NOT NULL,
-                    updated_at  TEXT    NOT NULL,
-                    schema_name TEXT,
-                    result_json TEXT
+                    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                    filename          TEXT    NOT NULL,
+                    original_filename TEXT,
+                    file_path         TEXT,
+                    status            TEXT    NOT NULL DEFAULT 'Pending',
+                    created_at        TEXT    NOT NULL,
+                    updated_at        TEXT    NOT NULL,
+                    schema_name       TEXT,
+                    result_json       TEXT
                 )
             """)
+            # Migration: add original_filename column if missing
+            try:
+                self.conn.execute("ALTER TABLE documents ADD COLUMN original_filename TEXT")
+                self.conn.commit()
+            except Exception:
+                pass  # Column already exists
 
             # Settings table: key-value store for user preferences
             self.conn.execute("""
@@ -68,13 +75,27 @@ class DatabaseManager:
             # Templates / Schemas table: stores user-defined extraction schemas
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS templates (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name        TEXT    NOT NULL UNIQUE,
-                    fields_json TEXT    NOT NULL,
-                    created_at  TEXT    NOT NULL,
-                    updated_at  TEXT    NOT NULL
+                    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name             TEXT    NOT NULL UNIQUE,
+                    fields_json      TEXT    NOT NULL,
+                    require_review   INTEGER NOT NULL DEFAULT 0,
+                    supplier_pattern TEXT,
+                    created_at       TEXT    NOT NULL,
+                    updated_at       TEXT    NOT NULL
                 )
             """)
+            # Migration: add require_review column if missing (existing DBs)
+            try:
+                self.conn.execute("ALTER TABLE templates ADD COLUMN require_review INTEGER NOT NULL DEFAULT 0")
+                self.conn.commit()
+            except Exception:
+                pass  # Column already exists
+            # Migration: add supplier_pattern column if missing (existing DBs)
+            try:
+                self.conn.execute("ALTER TABLE templates ADD COLUMN supplier_pattern TEXT")
+                self.conn.commit()
+            except Exception:
+                pass  # Column already exists
 
             # Users table: authentication and authorization
             self.conn.execute("""
@@ -91,13 +112,16 @@ class DatabaseManager:
     # ─── DOCUMENTS ────────────────────────────────────────────────────────────
 
     def insert_document(self, filename: str, file_path: str = None,
-                         schema_name: str = None) -> int:
+                         schema_name: str = None,
+                         original_filename: str = None) -> int:
         """Insert a new document record. Returns the new row id."""
         now = datetime.utcnow().isoformat()
+        orig = original_filename or filename  # fallback: ίδιο με filename
         cursor = self.conn.execute(
-            """INSERT INTO documents (filename, file_path, status, created_at, updated_at, schema_name)
-               VALUES (?, ?, 'Pending', ?, ?, ?)""",
-            (filename, file_path, now, now, schema_name)
+            """INSERT INTO documents
+               (filename, original_filename, file_path, status, created_at, updated_at, schema_name)
+               VALUES (?, ?, ?, 'Pending', ?, ?, ?)""",
+            (filename, orig, file_path, now, now, schema_name)
         )
         self.conn.commit()
         return cursor.lastrowid
@@ -161,16 +185,21 @@ class DatabaseManager:
 
     # ─── TEMPLATES ────────────────────────────────────────────────────────────
 
-    def save_template(self, name: str, fields: List[Dict]) -> int:
+    def save_template(self, name: str, fields: List[Dict],
+                       require_review: bool = False,
+                       supplier_pattern: str = None) -> int:
         """Save (insert or replace) an extraction template."""
         now = datetime.utcnow().isoformat()
         cursor = self.conn.execute(
-            """INSERT INTO templates (name, fields_json, created_at, updated_at)
-               VALUES (?, ?, ?, ?)
+            """INSERT INTO templates (name, fields_json, require_review, supplier_pattern, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
                ON CONFLICT(name) DO UPDATE SET
                    fields_json=excluded.fields_json,
+                   require_review=excluded.require_review,
+                   supplier_pattern=excluded.supplier_pattern,
                    updated_at=excluded.updated_at""",
-            (name, json.dumps(fields), now, now)
+            (name, json.dumps(fields), int(require_review),
+             supplier_pattern.strip() if supplier_pattern else None, now, now)
         )
         self.conn.commit()
         return cursor.lastrowid
@@ -183,6 +212,8 @@ class DatabaseManager:
         if row:
             d = dict(row)
             d["fields"] = json.loads(d["fields_json"])
+            d["require_review"] = bool(d.get("require_review", 0))
+            d["supplier_pattern"] = d.get("supplier_pattern") or ""
             return d
         return None
 
@@ -195,8 +226,15 @@ class DatabaseManager:
         for r in rows:
             d = dict(r)
             d["fields"] = json.loads(d["fields_json"])
+            d["require_review"] = bool(d.get("require_review", 0))
+            d["supplier_pattern"] = d.get("supplier_pattern") or ""
             result.append(d)
         return result
+
+    def delete_template(self, name: str):
+        """Delete a template by name."""
+        self.conn.execute("DELETE FROM templates WHERE name=?", (name,))
+        self.conn.commit()
 
     # ─── USERS ────────────────────────────────────────────────────────────────
 

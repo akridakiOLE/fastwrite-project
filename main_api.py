@@ -103,7 +103,12 @@ def save_template():
     data = request.get_json(force=True)
     try:
         schema = schema_bld.build_from_list(data.get("fields", []))
-        db.save_template(data.get("name",""), data.get("fields",[]))
+        db.save_template(
+            data.get("name",""),
+            data.get("fields",[]),
+            require_review=bool(data.get("require_review", False)),
+            supplier_pattern=data.get("supplier_pattern")
+        )
         return jsonify({"success": True, "name": data.get("name"), "json_schema": schema})
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -128,6 +133,7 @@ def get_template(name):
 def delete_template(name):
     if not db.get_template(name):
         return jsonify({"error": f"Template '{name}' δεν βρέθηκε."}), 404
+    db.delete_template(name)
     return jsonify({"success": True, "message": f"Template '{name}' διαγράφηκε."})
 
 # ── Upload ────────────────────────────────────────────────────────────────────
@@ -300,11 +306,15 @@ def batch_upload():
     suffix = Path(f.filename).suffix.lower()
     if suffix != ".pdf":
         return jsonify({"error": "Μόνο PDF αρχεία γίνονται δεκτά."}), 400
-    schema_name = request.form.get("schema_name", "invoice")
+    schema_name    = request.form.get("schema_name", "invoice")
+    auto_match     = request.form.get("auto_match", "false").lower() == "true"
+    skip_completed = request.form.get("skip_completed", "false").lower() == "true"
     dest = UPLOAD_DIR / f.filename
     f.save(str(dest))
     job_id = batch_proc.submit(pdf_path=dest, schema_name=schema_name,
-                               original_filename=f.filename)
+                               original_filename=f.filename,
+                               auto_match=auto_match,
+                               skip_completed=skip_completed)
     return jsonify({"success": True, "job_id": job_id,
                     "filename": f.filename, "schema_name": schema_name})
 
