@@ -203,8 +203,13 @@ def approve_document(doc_id):
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    old_status = doc.get("status", "?")
     db.update_document_status(doc_id, status="Completed", result_json=doc.get("result_json"))
-    return jsonify({"success": True, "doc_id": doc_id, "status": "Completed"})
+    # Verify the update was applied
+    updated = db.get_document(doc_id)
+    new_status = updated.get("status", "?") if updated else "NOT_FOUND"
+    print(f"[APPROVE] doc #{doc_id}: {old_status} → {new_status}", flush=True)
+    return jsonify({"success": True, "doc_id": doc_id, "status": new_status})
 
 @app.post("/api/documents/<int:doc_id>/reject")
 @require_auth
@@ -934,7 +939,7 @@ function renderSupList(docs, q) {
          + badge
          + '<button class="sup-copy-btn" onclick="copySupplier(\'' + supEscaped + '\')" title="Αντιγραφή">\u2398</button>'
          + '<button class="sup-copy-btn" onclick="openDoc('+d.id+')" title="Άνοιγμα PDF" style="color:var(--accent2);">\u2192</button>'
-         + '<a href="/ui/review/'+d.id+'" target="_blank" class="sup-copy-btn" style="color:#00e5a0;text-decoration:none;" title="Άνοιγμα Έγκριση">\u2696</a>'
+         + '<a href="/ui/review/'+d.id+'" class="sup-copy-btn" style="color:#00e5a0;text-decoration:none;" title="Άνοιγμα Έγκριση">\u2696</a>'
          + '</div>';
   }).join('');
 }
@@ -1292,7 +1297,7 @@ def serve_review_page(doc_id):
     prev_id = sibling_ids[cur_pos - 1] if cur_pos > 0 else None
     next_id = sibling_ids[cur_pos + 1] if cur_pos < total - 1 else None
     pos_label = "%s / %s" % (cur_pos + 1, total) if total else "—"
-    after_action = ('window.location.href="/ui/review/'+str(next_id)+'"') if next_id else 'history.back()'
+    after_action = ('location.replace("/ui/review/'+str(next_id)+'")') if next_id else 'window.location.href="/ui#upload"'
 
     scalar_rows_html = ""
     line_items_data = {}
@@ -1637,7 +1642,7 @@ function showToast(msg, color) {
         "pos_label":      pos_label,
         "prev_btn":       ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">&#9664; Προηγ.</span>' % prev_id) if prev_id else '<span class="nav-btn disabled">&#9664; Προηγ.</span>',
         "next_btn":       ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">Επόμ. &#9654;</span>' % next_id) if next_id else '<span class="nav-btn disabled">Επόμ. &#9654;</span>',
-        "after_back":     "if(window.opener&&!window.opener.closed){window.close();}else{window.location.href='/ui';}",
+        "after_back":     "history.back()",
         "after_action":   after_action,
         "doc_id":         doc_id,
         "img_url":        img_url,

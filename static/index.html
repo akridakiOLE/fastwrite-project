@@ -649,11 +649,19 @@ function toast(msg, type='info') {
 }
 
 // ── Navigation ──────────────────────────────────────────────────────────────
-function showPage(name) {
+function showPage(name, fromEvent) {
   document.querySelectorAll('.page').forEach(p => p.style.display='none');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-'+name).style.display='block';
-  event.currentTarget.classList.add('active');
+  // Highlight nav button — works both from click and programmatic call
+  if (fromEvent !== false && typeof event !== 'undefined' && event && event.currentTarget) {
+    event.currentTarget.classList.add('active');
+  } else {
+    const pageNames = ['dashboard','upload','documents','batch','templates','settings'];
+    const idx = pageNames.indexOf(name);
+    const btns = document.querySelectorAll('.nav-item');
+    if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
+  }
   if (name==='dashboard') loadDashboard();
   if (name==='documents') loadDocuments();
   if (name==='templates') loadTemplates();
@@ -661,6 +669,11 @@ function showPage(name) {
   if (name==='upload')    loadSchemas();
   if (name==='batch')     loadBatchJobs();
 }
+// Handle URL hash on load (e.g. /ui#upload)
+(function(){
+  const h = window.location.hash.replace('#','');
+  if (h && document.getElementById('page-'+h)) { showPage(h, false); }
+})();
 
 // ── Dashboard ───────────────────────────────────────────────────────────────
 async function loadDashboard() {
