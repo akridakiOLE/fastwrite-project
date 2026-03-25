@@ -1443,6 +1443,16 @@ async function checkServer() {
 const uploadedDocIds = {};
 let lastBatchJobId = null;
 
+function openTemplateBuilderById(docId) {
+  // Καλείται όταν το tab ανοίγει απευθείας με /ui/template-builder/<id>
+  // Χρησιμοποιεί την υπάρχουσα loadTemplateBuilder function του SPA
+  if (typeof loadTemplateBuilder === 'function') {
+    loadTemplateBuilder(docId);
+  } else {
+    console.error('loadTemplateBuilder not found');
+  }
+}
+
 async function openTemplateBuilder(type) {
   if (type === 'batch') {
     if (lastBatchJobId) {
@@ -1485,8 +1495,22 @@ async function openTemplateBuilder(type) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 checkServer();
-loadDashboard();
 setInterval(checkServer, 30000);
+// URL-based routing: αν το URL είναι /ui/template-builder/<id>, άνοιξε το Template Builder
+(function() {
+  const m = window.location.pathname.match(/\/ui\/template-builder\/(\d+)/);
+  if (m) {
+    const docId = parseInt(m[1]);
+    // Κρύψε το sidebar και άνοιξε απευθείας το Template Builder
+    if (typeof openTemplateBuilderById === 'function') {
+      openTemplateBuilderById(docId);
+    } else {
+      window.location.href = '/ui/template-builder/' + docId;
+    }
+  } else {
+    loadDashboard();
+  }
+})();
 
 // ── Keyboard navigation for review rows ──────────────────────────────────────
 document.addEventListener('keydown', function(e) {
