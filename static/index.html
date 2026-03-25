@@ -513,6 +513,65 @@ select.form-input option{background:var(--bg2);}
       </div>
     </div>
 
+    <!-- TEMPLATE BUILDER -->
+    <div id="page-template-builder" class="page" style="display:none">
+      <div class="topbar">
+        <div class="page-title" id="tb-title">Template Builder</div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary btn-sm" onclick="window.close()">✕ Κλείσιμο</button>
+        </div>
+      </div>
+      <div class="content">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+          <!-- Left: Document Info -->
+          <div>
+            <div class="card" style="margin-bottom:16px;">
+              <div class="card-title">📄 Πληροφορίες Εγγράφου</div>
+              <div id="tb-doc-info" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
+            </div>
+
+            <div class="card" id="tb-results-card" style="display:none;">
+              <div class="card-title">📊 Εξαγόμενα Δεδομένα</div>
+              <div id="tb-results-body"></div>
+            </div>
+          </div>
+
+          <!-- Right: Template & Extract -->
+          <div>
+            <div class="card" style="margin-bottom:16px;">
+              <div class="card-title">🔧 Επιλογή Template & Εξαγωγή</div>
+              <div class="form-group">
+                <label class="form-label">Template</label>
+                <select class="form-input" id="tb-schema"></select>
+              </div>
+              <button class="btn btn-primary" style="width:100%" id="tb-extract-btn" onclick="doTemplateBuilderExtract()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Εξαγωγή Δεδομένων
+              </button>
+              <div id="tb-extract-result" style="margin-top:16px;display:none;"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">+ Δημιουργία Νέου Template</div>
+              <div class="form-group">
+                <label class="form-label">Όνομα Template</label>
+                <input class="form-input" id="tb-new-tmpl-name" placeholder="π.χ. invoice, receipt..."/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">🏢 Supplier Pattern</label>
+                <input class="form-input" id="tb-new-supplier-pattern" placeholder="π.χ. cosmote, ote — πολλαπλές με κόμμα"/>
+              </div>
+              <div id="tb-new-fields"></div>
+              <button class="btn btn-secondary btn-sm" onclick="tbAddField()" style="margin-bottom:16px;">+ Προσθήκη Πεδίου</button>
+              <button class="btn btn-primary" style="width:100%" onclick="tbSaveTemplate()">Αποθήκευση Template</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -573,6 +632,10 @@ async function api(method, path, body=null, isForm=false) {
   else if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
   opts.credentials = 'include';
   const r = await fetch(API + path, opts);
+  if (r.status === 401) {
+    window.location.href = '/ui/login';
+    return { error: 'Session expired' };
+  }
   return r.json();
 }
 
@@ -843,7 +906,8 @@ async function exportSelected(fmt) {
     const body = idsToExport.length > 0 ? {doc_ids: idsToExport} : {};
     const resp = await fetch(url, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      credentials:'include'
     });
     if (!resp.ok) { const e=await resp.json(); toast(e.error||'Σφάλμα','error'); return; }
     const blob = await resp.blob();
@@ -1443,13 +1507,155 @@ async function checkServer() {
 const uploadedDocIds = {};
 let lastBatchJobId = null;
 
-function openTemplateBuilderById(docId) {
-  // Καλείται όταν το tab ανοίγει απευθείας με /ui/template-builder/<id>
-  // Χρησιμοποιεί την υπάρχουσα loadTemplateBuilder function του SPA
-  if (typeof loadTemplateBuilder === 'function') {
-    loadTemplateBuilder(docId);
+let tbCurrentDocId = null;
+
+async function loadTemplateBuilder(docId) {
+  tbCurrentDocId = docId;
+
+  // Hide all pages, show template builder
+  document.querySelectorAll('.page').forEach(p => p.style.display='none');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-template-builder').style.display = 'block';
+
+  // Fetch document info
+  const doc = await api('GET', `/api/documents/${docId}`);
+  if (doc.error) {
+    document.getElementById('tb-doc-info').innerHTML = `<span style="color:var(--danger);">Σφάλμα: ${doc.error}</span>`;
+    return;
+  }
+
+  const rd = doc.result_data || {};
+  document.getElementById('tb-title').textContent = `Template Builder — ${doc.filename || 'Έγγραφο #'+docId}`;
+  document.getElementById('tb-doc-info').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div><strong>Αρχείο:</strong> ${doc.original_filename || doc.filename || '—'}</div>
+      <div><strong>ID:</strong> #${docId}</div>
+      <div><strong>Κατάσταση:</strong> ${badgeHtml(doc.status)}</div>
+      <div><strong>Template:</strong> ${doc.schema_name || '—'}</div>
+      <div><strong>Ημ/νία:</strong> ${doc.created_at?.split('T')[0] || '—'}</div>
+    </div>`;
+
+  // Show extracted data if available
+  const resultsCard = document.getElementById('tb-results-card');
+  if (doc.result_data && Object.keys(rd).length) {
+    const scalarEntries = Object.entries(rd).filter(([,v]) => !Array.isArray(v));
+    const arrayEntries  = Object.entries(rd).filter(([,v]) => Array.isArray(v));
+    const scalarHtml = scalarEntries.map(([k,v])=>`<div class="data-item"><div class="data-key">${k}</div><div class="data-val">${v??'—'}</div></div>`).join('');
+    const arraysHtml = arrayEntries.map(([k, rows]) => {
+      if (!rows.length) return '';
+      const cols = Object.keys(rows[0]);
+      return `<div class="line-items-label">📋 ${k}</div>
+        <div class="line-items-wrap">
+          <table class="line-items-table">
+            <thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map(row=>`<tr>${cols.map(c=>`<td>${row[c]??'—'}</td>`).join('')}</tr>`).join('')}</tbody>
+          </table>
+        </div>`;
+    }).join('');
+    resultsCard.style.display = 'block';
+    document.getElementById('tb-results-body').innerHTML =
+      `${scalarHtml ? `<div class="data-grid">${scalarHtml}</div>` : ''}${arraysHtml}`;
   } else {
-    console.error('loadTemplateBuilder not found');
+    resultsCard.style.display = 'none';
+  }
+
+  // Load templates into dropdown
+  const res = await api('GET', '/api/templates');
+  const templates = res.templates || [];
+  const opts = templates.map(t => `<option value="${t.name}" ${t.name===doc.schema_name?'selected':''}>${t.name}</option>`).join('');
+  document.getElementById('tb-schema').innerHTML = opts || '<option value="">— Δεν υπάρχουν templates —</option>';
+
+  // Reset extract result
+  document.getElementById('tb-extract-result').style.display = 'none';
+
+  // Reset new template form
+  document.getElementById('tb-new-tmpl-name').value = '';
+  document.getElementById('tb-new-supplier-pattern').value = '';
+  document.getElementById('tb-new-fields').innerHTML = '';
+  tbAddField(); tbAddField(); tbAddField();
+}
+
+function openTemplateBuilderById(docId) {
+  loadTemplateBuilder(docId);
+}
+
+async function doTemplateBuilderExtract() {
+  if (!tbCurrentDocId) { toast('Δεν βρέθηκε έγγραφο', 'error'); return; }
+  const schema = document.getElementById('tb-schema').value;
+  if (!schema) { toast('Επίλεξε template', 'error'); return; }
+
+  const btn = document.getElementById('tb-extract-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Εξαγωγή AI...';
+
+  const ex = await api('POST', `/api/extract/${tbCurrentDocId}`, {schema_name: schema});
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Εξαγωγή Δεδομένων';
+
+  const resEl = document.getElementById('tb-extract-result');
+  if (ex.success) {
+    toast('Εξαγωγή ολοκληρώθηκε!', 'success');
+    resEl.style.display = 'block';
+    resEl.innerHTML = '<div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);border-radius:10px;padding:12px;color:var(--accent);font-weight:600;font-size:13px;">✓ Επιτυχής εξαγωγή!</div>';
+    loadTemplateBuilder(tbCurrentDocId);
+  } else {
+    resEl.style.display = 'block';
+    resEl.innerHTML = `<div style="background:rgba(255,68,68,0.06);border:1px solid rgba(255,68,68,0.2);border-radius:10px;padding:12px;color:var(--danger);font-size:13px;">✕ ${ex.error}</div>`;
+    toast('Σφάλμα εξαγωγής', 'error');
+  }
+}
+
+function tbAddField() {
+  const div = document.createElement('div');
+  div.className = 'field-row';
+  div.innerHTML = `
+    <input class="form-input" placeholder="Όνομα πεδίου" style="font-size:13px"/>
+    <select class="form-input" style="font-size:13px" onchange="onFieldTypeChange(this)">
+      <option value="string">string</option>
+      <option value="number">number</option>
+      <option value="date">date</option>
+      <option value="integer">integer</option>
+      <option value="boolean">boolean</option>
+      <option value="array">array (line items)</option>
+    </select>
+    <button class="field-remove" onclick="this.closest('.field-row-wrap').remove()">✕</button>`;
+  const wrap = document.createElement('div');
+  wrap.className = 'field-row-wrap';
+  wrap.appendChild(div);
+  document.getElementById('tb-new-fields').appendChild(wrap);
+}
+
+async function tbSaveTemplate() {
+  const name = document.getElementById('tb-new-tmpl-name').value.trim();
+  if (!name) { toast('Δώσε όνομα template', 'error'); return; }
+  const supplierPattern = document.getElementById('tb-new-supplier-pattern').value.trim();
+  const fields = [];
+  document.querySelectorAll('#tb-new-fields .field-row-wrap').forEach(wrap => {
+    const inputs = wrap.querySelectorAll('.field-row input, .field-row select');
+    const fName = inputs[0].value.trim();
+    const fType = inputs[1].value;
+    if (!fName) return;
+    const field = { name: fName, type: fType };
+    if (fType === 'array') {
+      field.items = [];
+      wrap.querySelectorAll('.subfield-row').forEach(sr => {
+        const si = sr.querySelectorAll('input, select');
+        if (si[0].value.trim()) field.items.push({ name: si[0].value.trim(), type: si[1].value });
+      });
+    }
+    fields.push(field);
+  });
+  if (!fields.length) { toast('Πρόσθεσε τουλάχιστον ένα πεδίο', 'error'); return; }
+  const body = { name, fields };
+  if (supplierPattern) body.supplier_pattern = supplierPattern;
+  const r = await api('POST', '/api/templates', body);
+  if (r.success) {
+    toast('Template αποθηκεύτηκε!', 'success');
+    const res = await api('GET', '/api/templates');
+    const opts = (res.templates||[]).map(t => `<option value="${t.name}" ${t.name===name?'selected':''}>${t.name}</option>`).join('');
+    document.getElementById('tb-schema').innerHTML = opts;
+  } else {
+    toast(r.error || 'Σφάλμα αποθήκευσης', 'error');
   }
 }
 
@@ -1463,16 +1669,27 @@ async function openTemplateBuilder(type) {
         return;
       }
     }
+    // Reuse existing upload if available
+    if (uploadedDocIds['batch']) {
+      window.open('/ui/template-builder/' + uploadedDocIds['batch'], '_blank');
+      return;
+    }
     // Batch δεν έχει τρέξει — ανέβασε το αρχείο ως preview
     const file = document.getElementById('batch-file').files[0];
     if (!file) { toast('Επέλεξε αρχείο πρώτα', 'error'); return; }
     toast('Ανέβασμα για προεπισκόπηση...', 'info');
     const fd = new FormData();
     fd.append('file', file);
-    const r = await fetch('/api/upload', {method:'POST', body:fd});
+    const r = await fetch('/api/upload', {method:'POST', body:fd, credentials:'include'});
     const data = await r.json();
     if (!data.doc_id) { toast('Σφάλμα ανεβάσματος', 'error'); return; }
+    uploadedDocIds['batch'] = data.doc_id;
     window.open('/ui/template-builder/' + data.doc_id, '_blank');
+    return;
+  }
+  // Reuse existing upload if available
+  if (uploadedDocIds[type]) {
+    window.open('/ui/template-builder/' + uploadedDocIds[type], '_blank');
     return;
   }
   // First upload the file if not already uploaded
@@ -1484,7 +1701,7 @@ async function openTemplateBuilder(type) {
   const fd = new FormData();
   fd.append('file', file);
   // No schema_name needed for preview
-  const r = await fetch('/api/upload', {method:'POST', body:fd});
+  const r = await fetch('/api/upload', {method:'POST', body:fd, credentials:'include'});
   const data = await r.json();
   if (!data.doc_id) { toast('Σφάλμα ανεβάσματος', 'error'); return; }
 

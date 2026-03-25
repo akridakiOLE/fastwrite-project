@@ -183,6 +183,19 @@ def delete_document(doc_id):
     db.delete_document(doc_id)
     return jsonify({"success": True, "message": f"Έγγραφο #{doc_id} διαγράφηκε."})
 
+@app.post("/api/documents/cleanup-pending")
+@require_auth
+def cleanup_pending():
+    """Delete all Pending documents that have no result_json (unprocessed uploads)."""
+    docs = db.list_documents(status="Pending")
+    deleted = 0
+    for d in docs:
+        if not d.get("result_json"):
+            db.delete_document(d["id"])
+            deleted += 1
+    return jsonify({"success": True, "deleted": deleted,
+                    "message": f"Διαγράφηκαν {deleted} εκκρεμή έγγραφα."})
+
 # ── Export ────────────────────────────────────────────────────────────────────
 def _get_records_for_export(doc_ids=None):
     all_docs = db.list_documents()

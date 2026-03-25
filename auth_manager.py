@@ -6,12 +6,39 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from pathlib import Path
 
 import jwt
 import bcrypt
 from flask import request, jsonify, redirect
 
-JWT_SECRET = os.environ.get("FASTWRITE_SECRET", secrets.token_hex(32))
+# ── JWT Secret: persist to file so it survives restarts ──────────────────────
+_SECRET_FILE = Path("/app/projects/secrets/jwt_secret.key")
+
+def _load_or_create_secret() -> str:
+    """Load JWT secret from env, file, or create a new one and save it."""
+    # 1. Environment variable takes priority
+    env_secret = os.environ.get("FASTWRITE_SECRET")
+    if env_secret:
+        return env_secret
+    # 2. Try to load from file
+    try:
+        if _SECRET_FILE.exists():
+            stored = _SECRET_FILE.read_text().strip()
+            if stored:
+                return stored
+    except Exception:
+        pass
+    # 3. Generate new secret and save to file
+    new_secret = secrets.token_hex(32)
+    try:
+        _SECRET_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _SECRET_FILE.write_text(new_secret)
+    except Exception:
+        pass  # Fallback: use ephemeral secret
+    return new_secret
+
+JWT_SECRET = _load_or_create_secret()
 JWT_ALGORITHM = "HS256"
 TOKEN_EXPIRY_HOURS = 24
 COOKIE_NAME = "fw_token"
