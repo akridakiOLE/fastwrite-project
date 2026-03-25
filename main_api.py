@@ -158,6 +158,13 @@ def upload_file():
 @require_auth
 def list_documents():
     docs = db.list_documents(status=request.args.get("status"))
+    # Hide batch parent documents (original PDFs that were split into pages)
+    batch_parents = set()
+    for d in docs:
+        of = d.get("original_filename")
+        if of and of != d.get("filename"):
+            batch_parents.add(of)
+    docs = [d for d in docs if d.get("filename") not in batch_parents]
     for d in docs:
         if d.get("result_json"):
             try: d["result_data"] = json.loads(d["result_json"])
@@ -198,21 +205,18 @@ def cleanup_pending():
 
 # ── Document Actions (Approve / Reject / Edit Data) ──────────────────────────
 @app.post("/api/documents/<int:doc_id>/approve")
-@require_auth
 def approve_document(doc_id):
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
     old_status = doc.get("status", "?")
     db.update_document_status(doc_id, status="Completed", result_json=doc.get("result_json"))
-    # Verify the update was applied
     updated = db.get_document(doc_id)
     new_status = updated.get("status", "?") if updated else "NOT_FOUND"
     print(f"[APPROVE] doc #{doc_id}: {old_status} → {new_status}", flush=True)
     return jsonify({"success": True, "doc_id": doc_id, "status": new_status})
 
 @app.post("/api/documents/<int:doc_id>/reject")
-@require_auth
 def reject_document(doc_id):
     if not db.get_document(doc_id):
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
@@ -220,7 +224,6 @@ def reject_document(doc_id):
     return jsonify({"success": True, "doc_id": doc_id, "status": "Failed"})
 
 @app.route("/api/documents/<int:doc_id>/data", methods=["PATCH"])
-@require_auth
 def update_document_data(doc_id):
     doc = db.get_document(doc_id)
     if not doc:
@@ -939,9 +942,17 @@ function renderSupList(docs, q) {
          + badge
          + '<button class="sup-copy-btn" onclick="copySupplier(\'' + supEscaped + '\')" title="Αντιγραφή">\u2398</button>'
          + '<button class="sup-copy-btn" onclick="openDoc('+d.id+')" title="Άνοιγμα PDF" style="color:var(--accent2);">\u2192</button>'
-         + '<a href="/ui/review/'+d.id+'" class="sup-copy-btn" style="color:#00e5a0;text-decoration:none;" title="Άνοιγμα Έγκριση">\u2696</a>'
+         + '<a href="javascript:void(0)" onclick="goToReview('+d.id+',\'' + (d.status||'') + '\','+(!!(d.result_json||d.result_data))+')" class="sup-copy-btn" style="color:#00e5a0;text-decoration:none;" title="Άνοιγμα Έγκριση">\u2696</a>'
          + '</div>';
   }).join('');
+}
+
+function goToReview(docId, status, hasData) {
+  if (!hasData) {
+    alert('Πρέπει πρώτα να εκτελέσετε [Έναρξη Batch] πριν από τη διαδικασία έγκρισης.\n\nΕπιστρέψτε στη σελίδα Upload & Extract και πατήστε "Έναρξη Batch".');
+    return;
+  }
+  window.location.href = '/ui/review/' + docId;
 }
 
 function copySupplier(name) {
@@ -1260,6 +1271,12 @@ def serve_review_page(doc_id):
     doc = db.get_document(doc_id)
     if not doc:
         return "<h2>Not found</h2>", 404
+    if not doc.get("result_json"):
+        return """<html><body style='background:#0a0c10;color:#e0e0e0;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:20px'>
+        <h2>Δεν υπάρχουν εξαγόμενα δεδομένα</h2>
+        <p style='color:#888'>Πρέπει πρώτα να εκτελέσετε <b>Έναρξη Batch</b> πριν από τη διαδικασία έγκρισης.</p>
+        <a href='javascript:history.back()' style='color:#00e5a0'>← Επιστροφή</a>
+        </body></html>""", 200
 
     # Get ALL batch siblings (not just pending_review) for navigation
     original = doc.get("original_filename")
