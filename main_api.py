@@ -259,44 +259,51 @@ def serve_original_pdf(doc_id):
 @app.get("/api/documents/<int:doc_id>/line-positions")
 @require_auth
 def get_line_positions(doc_id):
-    """Επιστρέφει τις y-θέσεις γραμμών πίνακα (ως % ύψους σελίδας) μέσω pdfplumber."""
+    """Επιστρέφει τις y-θέσεις των γραμμών του πίνακα (ως % ύψους σελίδας)."""
     import re as _re
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
-    fp = doc.get("file_path", "")
-    page_num = 0
-    m = _re.search(r"page_(\d+)", fp)
-    if m:
-        page_num = int(m.group(1)) - 1
-    original = doc.get("original_filename") or doc.get("filename", "")
+
+    original = doc.get("original_filename") or doc.get("filename") or ""
     pdf_path = UPLOAD_DIR / original
     if not pdf_path.exists() or not str(pdf_path).lower().endswith(".pdf"):
         return jsonify({"positions": []})
+
+    # Get page number from file_path
+    fp = doc.get("file_path", "")
+    m = _re.search(r"page_(\d+)", fp)
+    page_num = int(m.group(1)) if m else 1
+
     try:
         import pdfplumber
+        positions = []
         with pdfplumber.open(str(pdf_path)) as pdf:
-            if page_num >= len(pdf.pages):
+            if page_num > len(pdf.pages):
                 return jsonify({"positions": []})
-            page = pdf.pages[page_num]
+            page = pdf.pages[page_num - 1]
+            page_h = page.height
+
+            # Find the table with most rows (the line items table)
             tables = page.find_tables()
-            if not tables:
-                return jsonify({"positions": []})
-            tbl = tables[0]
-            page_h = float(page.height)
-            positions = []
-            for row in tbl.rows:
-                cells = row.cells
-                if not cells:
-                    continue
-                tops = [c[1] for c in cells if c]
-                bots = [c[3] for c in cells if c]
-                if tops and bots:
-                    positions.append({"top_pct": min(tops)/page_h, "bottom_pct": max(bots)/page_h})
-            # Skip header row — pdfplumber includes column headers but AI extraction returns only data rows
-            if len(positions) > 1:
-                positions = positions[1:]
-            return jsonify({"positions": positions})
+            best = None
+            for t in tables:
+                rows = t.extract()
+                if best is None or len(rows) > len(best.extract()):
+                    best = t
+
+            if best:
+                rows = best.rows
+                for ri, row in enumerate(rows):
+                    if ri == 0: continue  # skip header
+                    if not row.cells or not row.cells[0]: continue
+                    y_top = row.cells[0][1]
+                    y_bot = row.cells[0][3]
+                    positions.append({
+                        "top_pct":    round(y_top / page_h, 4),
+                        "bottom_pct": round(y_bot / page_h, 4)
+                    })
+        return jsonify({"positions": positions, "page": page_num})
     except Exception as e:
         return jsonify({"positions": [], "error": str(e)})
 
@@ -1376,7 +1383,7 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
     <span class="pos-label">%(pos_label)s</span>
     %(prev_btn)s
     %(next_btn)s
-    <button class="btn btn-back" onclick="goBackFromReview()">&#8592; Επιστροφή</button>
+    <button class="btn btn-back" onclick="%(after_back)s">&#8592; Επιστροφή</button>
     <button class="btn btn-tmpl" onclick="window.open('/ui/template-builder/%(doc_id)s','_blank')">&#9998; Template Builder</button>
     <button class="btn btn-reject" onclick="doReject()">&#10005; Απόρριψη</button>
     <button class="btn btn-approve" onclick="doApprove()">&#10003; Έγκριση</button>
@@ -1389,8 +1396,7 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
       <a href="%(pdf_url)s" target="_blank">&#8599; Άνοιγμα PDF</a>
     </div>
     <div class="img-wrap" id="img-wrap">
-      <iframe id="doc-iframe" src="%(pdf_url)s" style="width:100%%;height:100%%;border:none;display:none;"></iframe>
-      <img id="doc-img" src="%(img_url)s" alt="%(filename)s" onload="onImgLoad()" style="display:none;width:100%%"/>
+      <img id="doc-img" src="%(img_url)s" alt="%(filename)s" onload="onImgLoad()"/>
       <canvas id="hl-canvas"></canvas>
     </div>
   </div>
@@ -1406,8 +1412,8 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
       <div class="li-header">
         <span class="li-header-title" id="li-title">LINE ITEMS</span>
         <div class="li-nav">
-          <button class="li-nav-btn" onclick="navRow(-1)" title="Προηγούμενη γραμμή">&#8593;</button>
-          <button class="li-nav-btn" onclick="navRow(1)" title="Επόμενη γραμμή">&#8595;</button>
+          <button class="li-nav-btn" onclick="navRow(-1)" title="Προηγούμενη γραμμή (&#8593;)">&#8593;</button>
+          <button class="li-nav-btn" onclick="navRow(1)" title="Επόμενη γραμμή (&#8595;)">&#8595;</button>
           <span class="li-nav-label" id="li-nav-label">—</span>
           <button class="li-add-btn" onclick="addRow()">+ Γραμμή</button>
         </div>
@@ -1422,92 +1428,206 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
 <script>
 const DOC_ID    = %(doc_id)s;
 const LINE_DATA = %(line_data_json)s;
-const HAS_PNG   = %(has_png_js)s;
-let dirty=false, curRow=-1, curArrKey=null, numRows=0, imgHeight=0;
+let dirty       = false;
+let curRow      = -1;
+let curArrKey   = null;
+let numRows     = 0;
+let imgHeight   = 0;
 
-(async function init(){
-  // Show either PNG image (with canvas highlight) or PDF iframe
-  const img=document.getElementById('doc-img');
-  const iframe=document.getElementById('doc-iframe');
-  if(HAS_PNG){
-    img.style.display='block';
-    iframe.style.display='none';
-    await loadLinePositions();
-  } else {
-    img.style.display='none';
-    iframe.style.display='block';
+(async function init() {
+  await loadLinePositions();
+  const keys = Object.keys(LINE_DATA);
+  if (keys.length) {
+    curArrKey = keys[0];
+    const rows = LINE_DATA[curArrKey];
+    numRows = rows.length;
+    renderTable(curArrKey, rows);
+    document.getElementById('li-section').style.display = 'flex';
+    document.getElementById('li-title').textContent = 'LINE ITEMS: ' + curArrKey;
+    updateNavLabel();
   }
-  const keys=Object.keys(LINE_DATA);
-  if(keys.length){curArrKey=keys[0];const rows=LINE_DATA[curArrKey];numRows=rows.length;renderTable(curArrKey,rows);document.getElementById('li-section').style.display='flex';document.getElementById('li-title').textContent='LINE ITEMS: '+curArrKey;updateNavLabel();}
 })();
 
-function toggleScalars(){const f=document.getElementById('scalar-fields');const i=document.getElementById('toggle-icon');f.classList.toggle('collapsed');i.textContent=f.classList.contains('collapsed')?'▼ Εμφάνιση':'▲ Απόκρυψη';}
-
-function renderTable(key,rows){
-  if(!rows.length)return;
-  const cols=Object.keys(rows[0]);
-  document.querySelector('#li-thead tr').innerHTML=cols.map(c=>'<th>'+c+'</th>').join('')+'<th style="width:30px"></th>';
-  document.getElementById('li-tbody').innerHTML=rows.map((row,ri)=>'<tr id="row-'+ri+'" onclick="selectRow('+ri+')">'+cols.map(c=>'<td contenteditable="true" data-key="'+key+'" data-col="'+c+'" data-ri="'+ri+'" oninput="markDirty()">'+(row[c]!=null?row[c]:'')+'</td>').join('')+'<td style="text-align:center"><button onclick="deleteRow('+ri+')" style="background:none;border:none;color:#666;cursor:pointer;font-size:14px;" title="Διαγραφή">✕</button></td></tr>').join('');
+function toggleScalars() {
+  const f = document.getElementById('scalar-fields');
+  const i = document.getElementById('toggle-icon');
+  f.classList.toggle('collapsed');
+  i.textContent = f.classList.contains('collapsed') ? '\\u25bc Εμφάνιση' : '\\u25b2 Απόκρυψη';
 }
 
-function selectRow(ri){curRow=ri;document.querySelectorAll('#li-tbody tr').forEach(r=>r.classList.remove('row-hl'));const row=document.getElementById('row-'+ri);if(row){row.classList.add('row-hl');row.scrollIntoView({block:'nearest'});}updateNavLabel();drawHighlight(ri);}
-function navRow(dir){if(numRows===0)return;const next=curRow+dir;if(next<0||next>=numRows)return;selectRow(next);}
-function updateNavLabel(){const lbl=document.getElementById('li-nav-label');if(curRow<0){lbl.textContent=numRows+' γραμμές';return;}lbl.textContent='Γραμμή '+(curRow+1)+' / '+numRows;}
-
-let linePositions=[];
-async function loadLinePositions(){try{const res=await fetch('/api/documents/'+DOC_ID+'/line-positions',{credentials:'include'});const data=await res.json();linePositions=data.positions||[];}catch(e){linePositions=[];}}
-
-function onImgLoad(){const img=document.getElementById('doc-img');const canvas=document.getElementById('hl-canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;canvas.style.width=img.clientWidth+'px';canvas.style.height=img.clientHeight+'px';imgHeight=img.naturalHeight;if(curRow>=0)drawHighlight(curRow);}
-
-function drawHighlight(ri){
-  const img=document.getElementById('doc-img');const canvas=document.getElementById('hl-canvas');
-  if(!img.complete||canvas.width===0)return;
-  canvas.style.width=img.clientWidth+'px';canvas.style.height=img.clientHeight+'px';
-  const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);
-  if(ri<0||numRows===0)return;
-  let y,bandH;
-  if(linePositions.length>ri){const pos=linePositions[ri];y=canvas.height*pos.top_pct;bandH=canvas.height*(pos.bottom_pct-pos.top_pct);}
-  else{bandH=canvas.height/numRows;y=ri*bandH;}
-  ctx.fillStyle='rgba(0,229,160,0.25)';ctx.strokeStyle='rgba(0,229,160,0.80)';ctx.lineWidth=2;
-  ctx.fillRect(0,y,canvas.width,bandH);ctx.strokeRect(1,y+1,canvas.width-2,bandH-2);
+function renderTable(key, rows) {
+  if (!rows.length) return;
+  const cols = Object.keys(rows[0]);
+  document.querySelector('#li-thead tr').innerHTML = cols.map(c => '<th>' + c + '</th>').join('') + '<th style="width:30px"></th>';
+  document.getElementById('li-tbody').innerHTML = rows.map((row, ri) =>
+    '<tr id="row-'+ri+'" onclick="selectRow('+ri+')">' +
+    cols.map(c => '<td contenteditable="true" data-key="'+key+'" data-col="'+c+'" data-ri="'+ri+'" oninput="markDirty()">'+(row[c]!=null?row[c]:'')+'</td>').join('') +
+    '<td style="text-align:center"><button onclick="deleteRow('+ri+')" style="background:none;border:none;color:#666;cursor:pointer;font-size:14px;" title="Διαγραφή">\\u2715</button></td>' +
+    '</tr>'
+  ).join('');
 }
 
-window.addEventListener('resize',()=>{const img=document.getElementById('doc-img');const canvas=document.getElementById('hl-canvas');if(img&&canvas){canvas.style.width=img.clientWidth+'px';canvas.style.height=img.clientHeight+'px';}if(curRow>=0)drawHighlight(curRow);});
-document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.contentEditable==='true')return;if(e.key==='ArrowUp'){e.preventDefault();navRow(-1);}if(e.key==='ArrowDown'){e.preventDefault();navRow(1);}if(e.key==='Escape'){curRow=-1;document.querySelectorAll('#li-tbody tr').forEach(r=>r.classList.remove('row-hl'));drawHighlight(-1);updateNavLabel();}});
+function selectRow(ri) {
+  curRow = ri;
+  document.querySelectorAll('#li-tbody tr').forEach(r => r.classList.remove('row-hl'));
+  const row = document.getElementById('row-' + ri);
+  if (row) { row.classList.add('row-hl'); row.scrollIntoView({block:'nearest'}); }
+  updateNavLabel();
+  drawHighlight(ri);
+}
 
-function addRow(){if(!curArrKey)return;const rows=LINE_DATA[curArrKey];const cols=rows.length?Object.keys(rows[0]):[];const nr={};cols.forEach(c=>nr[c]='');rows.push(nr);numRows=rows.length;renderTable(curArrKey,rows);markDirty();selectRow(numRows-1);}
-function deleteRow(ri){if(!curArrKey)return;if(!confirm('Διαγραφή γραμμής '+(ri+1)+';'))return;LINE_DATA[curArrKey].splice(ri,1);numRows=LINE_DATA[curArrKey].length;renderTable(curArrKey,LINE_DATA[curArrKey]);markDirty();curRow=-1;updateNavLabel();drawHighlight(-1);}
+function navRow(dir) {
+  if (numRows === 0) return;
+  const next = curRow + dir;
+  if (next < 0 || next >= numRows) return;
+  selectRow(next);
+}
 
-function markDirty(){dirty=true;document.getElementById('dirty-badge').classList.add('show');}
+function updateNavLabel() {
+  const lbl = document.getElementById('li-nav-label');
+  if (curRow < 0) { lbl.textContent = numRows + ' γραμμές'; return; }
+  lbl.textContent = 'Γραμμή ' + (curRow + 1) + ' / ' + numRows;
+}
 
-function collectData(){
-  const data={};
-  document.querySelectorAll('.field-input').forEach(f=>{data[f.dataset.key]=f.value;});
-  Object.keys(LINE_DATA).forEach(key=>{const rows=[];document.querySelectorAll('#li-tbody tr').forEach(tr=>{const row={};tr.querySelectorAll('td[contenteditable]').forEach(td=>{if(td.dataset.col)row[td.dataset.col]=td.textContent.trim();});if(Object.keys(row).length)rows.push(row);});data[key]=rows;});
+let linePositions = [];
+async function loadLinePositions() {
+  try {
+    const res = await fetch('/api/documents/' + DOC_ID + '/line-positions', {credentials:'include'});
+    const data = await res.json();
+    linePositions = data.positions || [];
+    console.log('Line positions loaded:', linePositions.length);
+  } catch(e) { linePositions = []; }
+}
+
+function onImgLoad() {
+  const img    = document.getElementById('doc-img');
+  const canvas = document.getElementById('hl-canvas');
+  canvas.width  = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  canvas.style.width  = img.clientWidth  + 'px';
+  canvas.style.height = img.clientHeight + 'px';
+  imgHeight = img.naturalHeight;
+  if (curRow >= 0) drawHighlight(curRow);
+}
+
+function drawHighlight(ri) {
+  const img    = document.getElementById('doc-img');
+  const canvas = document.getElementById('hl-canvas');
+  if (!img.complete || canvas.width === 0) return;
+  canvas.style.width  = img.clientWidth  + 'px';
+  canvas.style.height = img.clientHeight + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (ri < 0 || numRows === 0) return;
+  let y, bandH;
+  if (linePositions.length > ri) {
+    const pos = linePositions[ri];
+    y     = canvas.height * pos.top_pct;
+    bandH = canvas.height * (pos.bottom_pct - pos.top_pct);
+  } else {
+    bandH = canvas.height / numRows;
+    y     = ri * bandH;
+  }
+  ctx.fillStyle   = 'rgba(0, 229, 160, 0.25)';
+  ctx.strokeStyle = 'rgba(0, 229, 160, 0.80)';
+  ctx.lineWidth   = 2;
+  ctx.fillRect(0, y, canvas.width, bandH);
+  ctx.strokeRect(1, y + 1, canvas.width - 2, bandH - 2);
+}
+
+window.addEventListener('resize', function() {
+  const img    = document.getElementById('doc-img');
+  const canvas = document.getElementById('hl-canvas');
+  if (img && canvas) {
+    canvas.style.width  = img.clientWidth  + 'px';
+    canvas.style.height = img.clientHeight + 'px';
+  }
+  if (curRow >= 0) drawHighlight(curRow);
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.contentEditable === 'true') return;
+  if (e.key === 'ArrowUp')   { e.preventDefault(); navRow(-1); }
+  if (e.key === 'ArrowDown') { e.preventDefault(); navRow(1);  }
+  if (e.key === 'Escape')    { curRow = -1; document.querySelectorAll('#li-tbody tr').forEach(function(r){r.classList.remove('row-hl');}); drawHighlight(-1); updateNavLabel(); }
+});
+
+function addRow() {
+  if (!curArrKey) return;
+  const rows = LINE_DATA[curArrKey];
+  const cols = rows.length ? Object.keys(rows[0]) : [];
+  const newRow = {};
+  cols.forEach(function(c){ newRow[c] = ''; });
+  rows.push(newRow);
+  numRows = rows.length;
+  renderTable(curArrKey, rows);
+  markDirty();
+  selectRow(numRows - 1);
+}
+
+function deleteRow(ri) {
+  if (!curArrKey) return;
+  if (!confirm('Διαγραφή γραμμής ' + (ri+1) + ';')) return;
+  LINE_DATA[curArrKey].splice(ri, 1);
+  numRows = LINE_DATA[curArrKey].length;
+  renderTable(curArrKey, LINE_DATA[curArrKey]);
+  markDirty();
+  curRow = -1;
+  updateNavLabel();
+  drawHighlight(-1);
+}
+
+function markDirty() {
+  dirty = true;
+  document.getElementById('dirty-badge').classList.add('show');
+}
+
+function collectData() {
+  const data = {};
+  document.querySelectorAll('.field-input').forEach(function(f){ data[f.dataset.key] = f.value; });
+  Object.keys(LINE_DATA).forEach(function(key) {
+    const rows = [];
+    document.querySelectorAll('#li-tbody tr').forEach(function(tr) {
+      const row = {};
+      tr.querySelectorAll('td[contenteditable]').forEach(function(td) {
+        if (td.dataset.col) row[td.dataset.col] = td.textContent.trim();
+      });
+      if (Object.keys(row).length) rows.push(row);
+    });
+    data[key] = rows;
+  });
   return data;
 }
 
-async function doApprove(){
-  if(dirty){const r=await fetch('/api/documents/'+DOC_ID+'/data',{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(collectData())});if(!r.ok){showToast('Σφάλμα αποθήκευσης','#ff4444');return;}}
-  const r=await fetch('/api/documents/'+DOC_ID+'/approve',{method:'POST',credentials:'include'});const j=await r.json();
-  if(j.success){showToast('Εγκρίθηκε!','#00e5a0');setTimeout(()=>{%(after_action)s;},1200);}
-  else showToast('Σφάλμα: '+j.error,'#ff4444');
+async function doApprove() {
+  if (dirty) {
+    const r = await fetch('/api/documents/' + DOC_ID + '/data', {
+      method:'PATCH', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(collectData())
+    });
+    if (!r.ok) { showToast('Σφάλμα αποθήκευσης', '#ff4444'); return; }
+  }
+  const r = await fetch('/api/documents/' + DOC_ID + '/approve', {method:'POST', credentials:'include'});
+  const j = await r.json();
+  if (j.success) { showToast('Εγκρίθηκε!', '#00e5a0'); setTimeout(function(){ %(after_action)s; }, 1200); }
+  else showToast('Σφάλμα: ' + j.error, '#ff4444');
 }
 
-async function doReject(){
-  if(!confirm('Απόρριψη εγγράφου;'))return;
-  const r=await fetch('/api/documents/'+DOC_ID+'/reject',{method:'POST',credentials:'include'});const j=await r.json();
-  if(j.success){showToast('Απορρίφθηκε','#ff4444');setTimeout(()=>{%(after_action)s;},1200);}
-  else showToast('Σφάλμα: '+j.error,'#ff4444');
+async function doReject() {
+  if (!confirm('Απόρριψη εγγράφου;')) return;
+  const r = await fetch('/api/documents/' + DOC_ID + '/reject', {method:'POST', credentials:'include'});
+  const j = await r.json();
+  if (j.success) { showToast('Απορρίφθηκε', '#ff4444'); setTimeout(function(){ %(after_action)s; }, 1200); }
+  else showToast('Σφάλμα: ' + j.error, '#ff4444');
 }
 
-function goBackFromReview(){
-  if(document.referrer && document.referrer.includes('/ui/template-builder/')){history.back();return;}
-  if(window.opener&&!window.opener.closed){window.close();return;}
-  history.back();
+function showToast(msg, color) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.borderColor = color || '#333';
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 3000);
 }
-
-function showToast(msg,color){const t=document.getElementById('toast');t.textContent=msg;t.style.borderColor=color||'#333';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
 </script>
 </body>
 </html>""" % {
@@ -1517,14 +1637,13 @@ function showToast(msg,color){const t=document.getElementById('toast');t.textCon
         "pos_label":      pos_label,
         "prev_btn":       ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">&#9664; Προηγ.</span>' % prev_id) if prev_id else '<span class="nav-btn disabled">&#9664; Προηγ.</span>',
         "next_btn":       ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">Επόμ. &#9654;</span>' % next_id) if next_id else '<span class="nav-btn disabled">Επόμ. &#9654;</span>',
-        "after_back":     "if(window.opener||window.history.length<=1){window.close()}else{history.back()}",
+        "after_back":     "if(window.opener&&!window.opener.closed){window.close();}else{window.location.href='/ui';}",
         "after_action":   after_action,
         "doc_id":         doc_id,
         "img_url":        img_url,
         "pdf_url":        pdf_url,
         "scalar_rows":    scalar_rows_html,
         "line_data_json": _json.dumps(line_items_data, ensure_ascii=False),
-        "has_png_js":     "true" if has_png else "false",
     }
 
     resp = make_response(html)
