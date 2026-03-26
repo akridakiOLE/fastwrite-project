@@ -34,7 +34,11 @@ class DatabaseManager:
         """Establish the SQLite connection."""
         if self.db_path != ":memory:":
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self.conn = sqlite3.connect(
+            self.db_path,
+            check_same_thread=False,
+            isolation_level=None          # ← TRUE autocommit: κάθε SELECT βλέπει τα τελευταία δεδομένα
+        )
         self.conn.row_factory = sqlite3.Row  # Return rows as dict-like objects
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.conn.execute("PRAGMA foreign_keys=ON;")
