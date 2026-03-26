@@ -1634,7 +1634,7 @@ async function doApprove() {
       if (!sr.ok) { showToast('Σφάλμα αποθήκευσης: ' + sr.status, '#ff4444'); return; }
     }
     // Approve
-    const r = await fetch('/api/documents/' + DOC_ID + '/approve', {method:'POST'});
+    const r = await fetch('/api/documents/' + DOC_ID + '/approve', {method:'POST', credentials:'include'});
     if (!r.ok) { showToast('HTTP Error: ' + r.status, '#ff4444'); return; }
     const j = await r.json();
     if (j.success) {
@@ -1651,7 +1651,7 @@ async function doApprove() {
 async function doReject() {
   if (!confirm('Απόρριψη εγγράφου;')) return;
   try {
-    const r = await fetch('/api/documents/' + DOC_ID + '/reject', {method:'POST'});
+    const r = await fetch('/api/documents/' + DOC_ID + '/reject', {method:'POST', credentials:'include'});
     const j = await r.json();
     if (j.success) { showToast('Απορρίφθηκε', '#ff4444'); setTimeout(function(){ %(after_action)s; }, 1200); }
     else showToast('Σφάλμα: ' + (j.error || 'Unknown'), '#ff4444');
