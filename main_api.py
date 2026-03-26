@@ -46,6 +46,8 @@ def add_cors(response):
     response.headers["Access-Control-Allow-Methods"]    = "GET,POST,DELETE,PATCH,OPTIONS"
     response.headers["Access-Control-Allow-Headers"]    = "Content-Type,Authorization"
     response.headers["Access-Control-Allow-Credentials"]= "true"
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
     return response
 
 @app.route("/api/<path:p>", methods=["OPTIONS"])
