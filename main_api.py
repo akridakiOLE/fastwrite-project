@@ -155,6 +155,99 @@ def upload_file():
     return jsonify({"success":True,"doc_id":doc_id,"filename":f.filename,
                     "file_path":str(dest),"schema_name":schema_name,"status":"Pending"})
 
+@app.post("/api/upload/pre-check")
+@require_auth
+def upload_pre_check():
+    """
+    Pre-check για μεμονωμένο αρχείο: ανιχνεύει τον προμηθευτή και ελέγχει αν
+    υπάρχει αντίστοιχο template.
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "Δεν βρέθηκε αρχείο."}), 400
+    f = request.files["file"]
+    suffix = Path(f.filename).suffix.lower()
+    if suffix not in ALLOWED_EXTENSIONS:
+        return jsonify({"error": f"Μη αποδεκτός τύπος: '{suffix}'."}), 400
+
+    dest = UPLOAD_DIR / f.filename
+    f.save(str(dest))
+
+    try:
+        from ai_extractor import AIExtractor
+        from batch_processor import SUPPLIER_DETECT_PROMPT
+        api_key = key_mgr.get_key("gemini")
+        if not api_key:
+            return jsonify({"error": "Gemini API key δεν βρέθηκε."}), 500
+
+        # Μετατροπή σε εικόνα
+        processed = processor.process(dest)
+        if not processed.is_ok():
+            return jsonify({"error": f"Σφάλμα επεξεργασίας: {processed.error_message}"}), 500
+
+        extractor = AIExtractor(api_key=api_key)
+        supplier_schema = {
+            "type": "object",
+            "properties": {"supplier_name": {"type": "string"}},
+            "required": ["supplier_name"]
+        }
+
+        detected_supplier = "unknown"
+        matched_template = None
+        first_page = processed.pages[0] if processed.pages else None
+
+        if first_page:
+            try:
+                sup_result = extractor.extract(
+                    image_paths=[first_page],
+                    schema=supplier_schema,
+                    extra_instructions=SUPPLIER_DETECT_PROMPT
+                )
+                if sup_result.is_ok():
+                    detected_supplier = (sup_result.extracted_data.get("supplier_name") or "").strip()
+                    if not detected_supplier or detected_supplier.upper() == "UNKNOWN":
+                        detected_supplier = "unknown"
+            except:
+                pass
+
+        # Template matching
+        templates = db.list_templates()
+        if detected_supplier and detected_supplier != "unknown":
+            detected_lower = detected_supplier.lower()
+            for tmpl in templates:
+                pattern = (tmpl.get("supplier_pattern") or "").strip().lower()
+                if not pattern:
+                    continue
+                keywords = [k.strip() for k in pattern.split(",") if k.strip()]
+                for kw in keywords:
+                    if kw and kw in detected_lower:
+                        matched_template = tmpl["name"]
+                        break
+                if matched_template:
+                    break
+
+        # Έλεγχος require_review
+        needs_approval = False
+        if matched_template:
+            templates_dict = {t["name"]: t for t in templates}
+            tmpl = templates_dict.get(matched_template, {})
+            needs_approval = bool(tmpl.get("require_review"))
+
+        return jsonify({
+            "success": True,
+            "filename": f.filename,
+            "total_invoices": 1,
+            "supplier": detected_supplier,
+            "matched_template": matched_template,
+            "without_template": 0 if matched_template else 1,
+            "with_template": 1 if matched_template else 0,
+            "needs_approval": 1 if needs_approval else 0,
+            "no_approval": 1 if (matched_template and not needs_approval) else 0
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"Σφάλμα pre-check: {str(e)}"}), 500
+
+
 # ── Documents ─────────────────────────────────────────────────────────────────
 @app.get("/api/documents")
 @require_auth
@@ -445,6 +538,167 @@ from batch_processor import BatchProcessor
 
 batch_proc = BatchProcessor(db=db, key_mgr=key_mgr,
                              processor=processor, schema_bld=schema_bld)
+
+@app.post("/api/batch/pre-check")
+@require_auth
+def batch_pre_check():
+    """
+    Pre-check: Κάνει segmentation + supplier detection + template matching.
+    Επιστρέφει στατιστικά πριν ξεκινήσει το batch.
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "Δεν βρέθηκε αρχείο."}), 400
+    f = request.files["file"]
+    suffix = Path(f.filename).suffix.lower()
+    if suffix != ".pdf":
+        return jsonify({"error": "Μόνο PDF αρχεία γίνονται δεκτά."}), 400
+
+    dest = UPLOAD_DIR / f.filename
+    f.save(str(dest))
+
+    try:
+        # Pass 1: Μετατροπή σελίδων σε εικόνες
+        processed = processor.process(dest)
+        if not processed.is_ok():
+            return jsonify({"error": f"Σφάλμα επεξεργασίας: {processed.error_message}"}), 500
+        all_pages = processed.pages
+        total_pages = len(all_pages)
+
+        # Pass 2: Segmentation — εντοπισμός ορίων τιμολογίων
+        from ai_extractor import AIExtractor
+        api_key = key_mgr.get_key("gemini")
+        if not api_key:
+            return jsonify({"error": "Gemini API key δεν βρέθηκε."}), 500
+
+        extractor = AIExtractor(api_key=api_key)
+        seg_schema = {
+            "type": "object",
+            "properties": {
+                "pages": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "page":    {"type": "integer"},
+                            "new_doc": {"type": "boolean"},
+                        },
+                        "required": ["page", "new_doc"],
+                    }
+                }
+            },
+            "required": ["pages"],
+        }
+
+        from batch_processor import SEGMENTATION_PROMPT, SUPPLIER_DETECT_PROMPT, BATCH_SIZE
+        page_labels = {}
+        for batch_start in range(0, len(all_pages), BATCH_SIZE):
+            batch_pages = all_pages[batch_start: batch_start + BATCH_SIZE]
+            result = extractor.extract(image_paths=batch_pages, schema=seg_schema,
+                                        extra_instructions=SEGMENTATION_PROMPT)
+            if result.is_ok():
+                for item in result.extracted_data.get("pages", []):
+                    local_page  = item.get("page", 0)
+                    global_page = batch_start + local_page
+                    page_labels[global_page] = item.get("new_doc", False)
+            else:
+                for i in range(len(batch_pages)):
+                    page_labels[batch_start + i + 1] = True
+        page_labels[1] = True
+
+        # Δημιουργία segments
+        segments = []
+        current_seg = None
+        for i, page_path in enumerate(all_pages):
+            page_num = i + 1
+            is_new   = page_labels.get(page_num, True)
+            if is_new or current_seg is None:
+                current_seg = {"pages": [], "page_nums": []}
+                segments.append(current_seg)
+            current_seg["pages"].append(str(page_path))
+            current_seg["page_nums"].append(page_num)
+
+        total_invoices = len(segments)
+
+        # Pass 3: Supplier detection + template matching για κάθε segment
+        supplier_schema = {
+            "type": "object",
+            "properties": {"supplier_name": {"type": "string"}},
+            "required": ["supplier_name"]
+        }
+        templates = db.list_templates()
+        invoices_info = []
+
+        for idx, seg in enumerate(segments):
+            first_page = seg["pages"][0]
+            detected_supplier = "unknown"
+            matched_template = None
+
+            try:
+                sup_result = extractor.extract(
+                    image_paths=[first_page],
+                    schema=supplier_schema,
+                    extra_instructions=SUPPLIER_DETECT_PROMPT
+                )
+                if sup_result.is_ok():
+                    detected_supplier = (sup_result.extracted_data.get("supplier_name") or "").strip()
+                    if not detected_supplier or detected_supplier.upper() == "UNKNOWN":
+                        detected_supplier = "unknown"
+            except:
+                pass
+
+            # Template matching
+            if detected_supplier and detected_supplier != "unknown":
+                detected_lower = detected_supplier.lower()
+                for tmpl in templates:
+                    pattern = (tmpl.get("supplier_pattern") or "").strip().lower()
+                    if not pattern:
+                        continue
+                    keywords = [k.strip() for k in pattern.split(",") if k.strip()]
+                    for kw in keywords:
+                        if kw and kw in detected_lower:
+                            matched_template = tmpl["name"]
+                            break
+                    if matched_template:
+                        break
+
+            invoices_info.append({
+                "index": idx + 1,
+                "pages": seg["page_nums"],
+                "supplier": detected_supplier,
+                "matched_template": matched_template
+            })
+
+        # Υπολογισμός στατιστικών
+        without_template = sum(1 for inv in invoices_info if not inv["matched_template"])
+        with_template = sum(1 for inv in invoices_info if inv["matched_template"])
+        # Τιμολόγια που χρειάζονται έγκριση = αυτά που ΕΧΟΥΝtemplate ΚΑΙ
+        # το template τους έχει require_review=True
+        templates_dict = {t["name"]: t for t in templates}
+        needs_approval = 0
+        no_approval = 0
+        for inv in invoices_info:
+            if inv["matched_template"]:
+                tmpl = templates_dict.get(inv["matched_template"], {})
+                if tmpl.get("require_review"):
+                    needs_approval += 1
+                else:
+                    no_approval += 1
+
+        return jsonify({
+            "success": True,
+            "filename": f.filename,
+            "total_pages": total_pages,
+            "total_invoices": total_invoices,
+            "without_template": without_template,
+            "with_template": with_template,
+            "needs_approval": needs_approval,
+            "no_approval": no_approval,
+            "invoices": invoices_info
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"Σφάλμα pre-check: {str(e)}"}), 500
+
 
 @app.post("/api/batch")
 @require_auth

@@ -326,7 +326,7 @@ select.form-input option{background:var(--bg2);}
               <label class="form-label">Template</label>
               <select class="form-input" id="single-schema"></select>
             </div>
-            <button class="btn btn-secondary" style="width:100%;margin-bottom:10px" id="single-preview-btn" onclick="openTemplateBuilder('single')" disabled>
+            <button class="btn btn-secondary" style="width:100%;margin-bottom:10px" id="single-preview-btn" onclick="doPreCheck('single')" disabled>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               🔍 Επεξεργασία & Δημιουργία / Template
             </button>
@@ -374,7 +374,7 @@ select.form-input option{background:var(--bg2);}
                 <div style="font-size:11px;color:var(--text2);margin-top:2px;">Παράλειψη εγγράφων που έχουν ήδη εξαχθεί επιτυχώς</div>
               </div>
             </div>
-            <button class="btn btn-secondary" style="width:100%;margin-bottom:10px" id="batch-preview-btn" onclick="openTemplateBuilder('batch')" disabled>
+            <button class="btn btn-secondary" style="width:100%;margin-bottom:10px" id="batch-preview-btn" onclick="doPreCheck('batch')" disabled>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               🔍 Επεξεργασία & Δημιουργία / Template
             </button>
@@ -614,6 +614,17 @@ select.form-input option{background:var(--bg2);}
       </div>
     </div>
     <button class="btn btn-primary" id="tmpl-save-btn" style="width:100%" onclick="saveTemplate()">Αποθήκευση Template</button>
+  </div>
+</div>
+
+<!-- ── Pre-Check Modal ── -->
+<div class="modal-overlay" id="precheck-modal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <div class="modal-title" id="precheck-modal-title">Ανάλυση Αρχείου</div>
+      <button class="modal-close" onclick="closeModal('precheck-modal')">✕</button>
+    </div>
+    <div id="precheck-modal-body" style="padding:16px;"></div>
   </div>
 </div>
 
@@ -993,6 +1004,10 @@ function fileSelected(type) {
   const previewBtn = document.getElementById(type+'-preview-btn');
   if (previewBtn) previewBtn.disabled = false;
   document.getElementById(type+'-selected').style.display = 'block';
+  // Reset pre-check όταν αλλάζει αρχείο
+  preCheckDone[type] = false;
+  preCheckResult[type] = null;
+  uploadedDocIds[type] = null;
 }
 
 function clearFile(type) {
@@ -1000,9 +1015,34 @@ function clearFile(type) {
   document.getElementById(type+'-selected').style.display='none';
   const previewBtn = document.getElementById(type+'-preview-btn');
   if (previewBtn) previewBtn.disabled = true;
+  // Reset pre-check
+  preCheckDone[type] = false;
+  preCheckResult[type] = null;
+  uploadedDocIds[type] = null;
 }
 
 async function doSingleExtract() {
+  // Έλεγχος: ο χρήστης πρέπει να περάσει πρώτα από pre-check αν υπάρχουν τιμολόγια χωρίς template
+  if (!preCheckDone['single']) {
+    const modal = document.getElementById('precheck-modal');
+    const body  = document.getElementById('precheck-modal-body');
+    const title = document.getElementById('precheck-modal-title');
+    title.textContent = 'Απαιτείται Έλεγχος';
+    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία / Template</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
+    modal.classList.add('open');
+    return;
+  }
+  const pcRes = preCheckResult['single'];
+  if (pcRes && (pcRes.without_template || 0) > 0) {
+    const modal = document.getElementById('precheck-modal');
+    const body  = document.getElementById('precheck-modal-body');
+    const title = document.getElementById('precheck-modal-title');
+    title.textContent = 'Απαιτείται Δημιουργία Template';
+    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Δεν βρέθηκε template για τον προμηθευτή αυτού του τιμολογίου.<br>Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία / Template</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
+    modal.classList.add('open');
+    return;
+  }
+
   const inp    = document.getElementById('single-file');
   const schema = document.getElementById('single-schema').value;
   if (!inp.files.length) { toast('Επίλεξε αρχείο πρώτα','error'); return; }
@@ -1052,6 +1092,29 @@ async function doSingleExtract() {
 }
 
 async function doBatchUpload() {
+  // Έλεγχος: ο χρήστης πρέπει να περάσει πρώτα από pre-check αν υπάρχουν τιμολόγια χωρίς template
+  if (!preCheckDone['batch']) {
+    // Δεν έχει κάνει pre-check καθόλου → ενημέρωση
+    const modal = document.getElementById('precheck-modal');
+    const body  = document.getElementById('precheck-modal-body');
+    const title = document.getElementById('precheck-modal-title');
+    title.textContent = 'Απαιτείται Έλεγχος';
+    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία / Template</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
+    modal.classList.add('open');
+    return;
+  }
+  // Αν πέρασε pre-check αλλά υπάρχουν ακόμα χωρίς template
+  const pcRes = preCheckResult['batch'];
+  if (pcRes && (pcRes.without_template || 0) > 0) {
+    const modal = document.getElementById('precheck-modal');
+    const body  = document.getElementById('precheck-modal-body');
+    const title = document.getElementById('precheck-modal-title');
+    title.textContent = 'Απαιτείται Δημιουργία Template';
+    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Υπάρχουν ακόμα <b>' + pcRes.without_template + '</b> τιμολόγια χωρίς template.<br>Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία / Template</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
+    modal.classList.add('open');
+    return;
+  }
+
   const inp           = document.getElementById('batch-file');
   const schemaRaw     = document.getElementById('batch-schema').value;
   const autoMatch     = document.getElementById('batch-auto-match').checked;
@@ -1520,6 +1583,102 @@ async function checkServer() {
 // uploadedDocIds: tracks doc_id after upload for preview
 const uploadedDocIds = {};
 let lastBatchJobId = null;
+// Pre-check flags: ελέγχει αν ο χρήστης πέρασε από τη διαδικασία pre-check
+let preCheckDone = { single: false, batch: false };
+let preCheckResult = { single: null, batch: null };
+
+// ── Pre-Check: Ανάλυση αρχείου πριν το template builder ─────────────────────
+async function doPreCheck(type) {
+  const fileInput = document.getElementById(type + '-file');
+  if (!fileInput || !fileInput.files.length) {
+    toast('Επίλεξε αρχείο πρώτα', 'error'); return;
+  }
+
+  const file = fileInput.files[0];
+  const modal = document.getElementById('precheck-modal');
+  const body  = document.getElementById('precheck-modal-body');
+  const title = document.getElementById('precheck-modal-title');
+
+  title.textContent = 'Ανάλυση Αρχείου';
+  body.innerHTML = '<div style="text-align:center;padding:30px;"><span class="spinner" style="display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;"></span><div style="margin-top:12px;color:var(--text2);font-size:13px;">Ανάλυση αρχείου σε εξέλιξη...<br><span style="font-size:11px;color:var(--text3);">Segmentation & ανίχνευση προμηθευτών</span></div></div>';
+  modal.classList.add('open');
+
+  // Κλήση API
+  const fd = new FormData();
+  fd.append('file', file);
+  const endpoint = type === 'batch' ? '/api/batch/pre-check' : '/api/upload/pre-check';
+  const res = await api('POST', endpoint, fd, true);
+
+  if (!res || res.error) {
+    body.innerHTML = '<div style="color:var(--danger);padding:16px;font-size:13px;">Σφάλμα: ' + (res?.error || 'Άγνωστο σφάλμα') + '</div><div style="text-align:right;margin-top:16px;"><button class="btn btn-secondary btn-sm" onclick="closeModal(\'precheck-modal\')">Κλείσιμο</button></div>';
+    return;
+  }
+
+  preCheckResult[type] = res;
+  preCheckDone[type] = true;
+
+  const total     = res.total_invoices || 0;
+  const noTmpl    = res.without_template || 0;
+  const withTmpl  = res.with_template || 0;
+  const needsAppr = res.needs_approval || 0;
+  const noAppr    = total - needsAppr;
+
+  // Δημιουργία πίνακα στοιχείων
+  let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + total + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Χωρίς Template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + noTmpl + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent2);">Τιμολόγια Έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent2);">' + needsAppr + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;color:var(--accent);">Τιμολόγια χωρίς έγκριση</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--accent);">' + noAppr + '</td></tr>';
+  html += '</table>';
+
+  // Μηνύματα + κουμπιά ανάλογα με αποτέλεσμα
+  if (noTmpl > 0) {
+    // Υπάρχουν τιμολόγια ΧΩΡΙΣ template
+    html += '<div style="margin-top:20px;padding:12px;background:rgba(255,179,0,0.08);border:1px solid rgba(255,179,0,0.25);border-radius:8px;font-size:13px;color:var(--warn);">';
+    html += 'Για να συνεχίσετε την διαδικασία Επεξεργασία & Δημιουργία / Template πατήστε <b>ΝΑΙ</b>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
+    html += '<button class="btn btn-secondary btn-sm" onclick="closeModal(\'precheck-modal\')">Ακύρωση</button>';
+    html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\'); openTemplateBuilder(\'' + type + '\')">ΝΑΙ</button>';
+    html += '</div>';
+  } else {
+    // ΟΛΑ τα τιμολόγια έχουν template
+    html += '<div style="margin-top:20px;padding:12px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);border-radius:8px;font-size:13px;color:var(--accent);">';
+    html += 'Όλα τα τιμολόγια έχουν template. Θέλετε να επεξεργαστείτε template;';
+    html += '</div>';
+    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
+    html += '<button class="btn btn-secondary btn-sm" onclick="closePreCheckWithMessage()">ΟΧΙ</button>';
+    html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\'); openTemplateBuilder(\'' + type + '\')">ΝΑΙ</button>';
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+function closePreCheckWithMessage() {
+  const body = document.getElementById('precheck-modal-body');
+  body.innerHTML = '<div style="padding:16px;text-align:center;"><div style="font-size:14px;color:var(--accent);margin-bottom:16px;">Μπορείτε να συνεχίσετε με την διαδικασία, Έναρξη Batch</div><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div>';
+}
+
+// ── Batch guard: Έλεγχος αν ο χρήστης πέρασε από pre-check ────────────────
+function canStartBatch() {
+  // Αν ο χρήστης ΔΕΝ πέρασε από pre-check
+  if (!preCheckDone['batch']) {
+    return false;
+  }
+  // Αν πέρασε και δεν υπάρχουν χωρίς template → ΟΚ
+  const res = preCheckResult['batch'];
+  if (res && (res.without_template || 0) === 0) return true;
+  // Αν πέρασε αλλά υπάρχουν χωρίς template → μπλοκ
+  return false;
+}
+
+function canStartSingle() {
+  if (!preCheckDone['single']) return false;
+  const res = preCheckResult['single'];
+  if (res && (res.without_template || 0) === 0) return true;
+  return false;
+}
 
 let tbCurrentDocId = null;
 
