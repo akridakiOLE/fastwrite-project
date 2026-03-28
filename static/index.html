@@ -1212,25 +1212,23 @@ function pollBatchJob(job_id) {
 async function showBatchCompletionModal(st) {
   const docIds = st.doc_ids || [];
 
-  // Χρήση pre-check δεδομένων για ακριβή αριθμό "χωρίς template"
+  // Χρήση pre-check δεδομένων για ΟΛΟΥΣ τους αριθμούς (ακριβής ανάλυση)
   const pc = batchPreCheckData;
+  const totalInvoices   = pc ? (pc.total_invoices || 0) : (st.processed || 0);
   const withoutTemplate = pc ? (pc.without_template || 0) : 0;
+  const needsApproval   = pc ? (pc.needs_approval || 0) : 0;
+  const noApproval      = pc ? (pc.no_approval || 0) : 0;
 
-  // Φόρτωσε τα documents για να βρεις πόσα χρειάζονται/δεν χρειάζονται έγκριση
-  let noApproval      = 0;   // Completed (χωρίς έγκριση)
-  let needsApproval   = 0;   // pending_review (με έγκριση)
-  let firstReviewId   = null;
-
-  if (docIds.length) {
+  // Βρες το πρώτο review doc για πλοήγηση
+  let firstReviewId = null;
+  if (needsApproval > 0 && docIds.length) {
     const docsRes = await api('GET', '/api/documents');
     if (docsRes && docsRes.documents) {
       const batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
       for (const d of batchDocs) {
         if (d.status === 'pending_review') {
-          needsApproval++;
-          if (!firstReviewId) firstReviewId = d.id;
-        } else if (d.status === 'Completed') {
-          noApproval++;
+          firstReviewId = d.id;
+          break;
         }
       }
     }
@@ -1246,6 +1244,7 @@ async function showBatchCompletionModal(st) {
   title.textContent = 'Ανάλυση Αρχείου';
 
   let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + totalInvoices + '</td></tr>';
   html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Τιμολόγια χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTemplate + '</td></tr>';
   html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Τιμολόγια χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noApproval + '</td></tr>';
   html += '<tr><td style="padding:8px 12px;color:var(--accent2);">Τιμολόγια με έγκριση</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--accent2);">' + needsApproval + '</td></tr>';
@@ -1695,7 +1694,7 @@ async function doPreCheck(type) {
   const noTmpl    = res.without_template || 0;
   const withTmpl  = res.with_template || 0;
   const needsAppr = res.needs_approval || 0;
-  const noAppr    = total - needsAppr;
+  const noAppr    = res.no_approval || 0;
 
   // Δημιουργία πίνακα στοιχείων
   let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
