@@ -301,11 +301,11 @@ select.form-input option{background:var(--bg2);}
     <div id="page-upload" class="page" style="display:none">
       <div class="topbar"><div class="page-title">Upload & Extract</div></div>
       <div class="content">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:stretch;height:calc(100vh - 140px);">
 
           <!-- Activity History -->
-          <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 140px);">
-            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
               <span>📋 Ιστορικό Δραστηριοτήτων</span>
               <button class="btn btn-secondary btn-sm" onclick="loadActivityHistory()" style="font-size:11px;padding:3px 10px;">↻</button>
             </div>
@@ -315,7 +315,7 @@ select.form-input option{background:var(--bg2);}
           </div>
 
           <!-- Batch -->
-          <div class="card">
+          <div class="card" style="display:flex;flex-direction:column;overflow-y:auto;">
             <div class="card-title">📦 Batch (Πολλαπλά Τιμολόγια)</div>
             <div class="upload-zone" id="batch-zone" onclick="document.getElementById('batch-file').click()" ondragover="dragOver(event,'batch-zone')" ondragleave="dragLeave('batch-zone')" ondrop="dropFile(event,'batch')">
               <input type="file" id="batch-file" accept=".pdf" onchange="fileSelected('batch')"/>
@@ -1280,16 +1280,18 @@ async function loadActivityHistory() {
     el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Δεν υπάρχει ιστορικό δραστηριοτήτων</div>';
     return;
   }
-  el.innerHTML = items.map(a => {
+  el.innerHTML = items.map((a, idx) => {
+    const num = items.length - idx;
     const date = a.created_at ? a.created_at.replace('T',' ').slice(0,16) : '—';
     const icon = a.action === 'pre-check' ? '🔍' : '▶';
     const label = a.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Template' : 'Έναρξη Batch';
     const color = a.action === 'pre-check' ? 'var(--accent2)' : 'var(--accent)';
-    return `<div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+    return `<div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+      <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;min-width:28px;text-align:right;">#${num}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:12px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${a.filename}">${icon} ${a.filename}</div>
         <div style="font-size:11px;color:${color};margin-top:2px;">${label}</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:2px;">${date} · Έγγραφα: ${a.total_invoices}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px;">${date} · Έγγραφα: ${a.total_invoices}</div>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="showActivityDetail(${a.id})" style="font-size:10px;padding:3px 8px;" title="Αποτελέσματα">📊</button>
     </div>`;
