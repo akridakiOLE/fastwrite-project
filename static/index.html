@@ -1026,33 +1026,44 @@ function deselectHistoryEntry() {
   chk2.style.display = 'none'; chk2.checked = false; chk2.disabled = true;
 }
 
-// Helper: find doc_ids from selected activity or related batch activities
-async function findDocIdsForActivity(data) {
+// Helper: find documents for the selected activity
+// Πρώτα ψάχνει doc_ids στο result_json, μετά στο documents API μέσω original_filename
+async function findDocsForActivity(data) {
+  // 1) Δοκίμασε doc_ids από result_json αυτού ή σχετικών batch activities
   let docIds = null;
-  // Try result_json of this activity
   if (data.result_json) {
     try {
       const rj = typeof data.result_json === 'string' ? JSON.parse(data.result_json) : data.result_json;
       if (rj.doc_ids && rj.doc_ids.length) docIds = rj.doc_ids;
     } catch(e) {}
   }
-  // If no doc_ids, search batch activities with same filename
-  if (!docIds) {
-    const allRes = await api('GET', '/api/activity?limit=100');
-    const items = (allRes && allRes.activities) || [];
-    for (const a of items) {
-      if (a.filename === data.filename && a.action === 'batch' && a.id !== data.id) {
-        const detail = await api('GET', '/api/activity/' + a.id);
-        if (detail && detail.result_json) {
-          try {
-            const rj = typeof detail.result_json === 'string' ? JSON.parse(detail.result_json) : detail.result_json;
-            if (rj.doc_ids && rj.doc_ids.length) { docIds = rj.doc_ids; break; }
-          } catch(e) {}
-        }
+  // 2) Αν δεν βρέθηκαν, ψάξε στα documents μέσω original_filename
+  const docsRes = await api('GET', '/api/documents');
+  const allDocs = (docsRes && docsRes.documents) || [];
+  if (docIds && docIds.length) {
+    // Filter documents by doc_ids
+    return allDocs.filter(d => docIds.includes(d.id));
+  }
+  // Fallback: βρες documents με original_filename === activity filename
+  const matchedDocs = allDocs.filter(d => d.original_filename === data.filename);
+  if (matchedDocs.length) return matchedDocs;
+  // Τελευταία προσπάθεια: ψάξε batch activities με ίδιο filename για doc_ids
+  const allRes = await api('GET', '/api/activity?limit=100');
+  const items = (allRes && allRes.activities) || [];
+  for (const a of items) {
+    if (a.filename === data.filename && a.action === 'batch' && a.id !== data.id) {
+      const detail = await api('GET', '/api/activity/' + a.id);
+      if (detail && detail.result_json) {
+        try {
+          const rj = typeof detail.result_json === 'string' ? JSON.parse(detail.result_json) : detail.result_json;
+          if (rj.doc_ids && rj.doc_ids.length) {
+            return allDocs.filter(d => rj.doc_ids.includes(d.id));
+          }
+        } catch(e) {}
       }
     }
   }
-  return docIds;
+  return [];
 }
 
 // Click handler for "Επεξεργασία & Δημιουργία / Template" button
@@ -1060,11 +1071,11 @@ async function handlePreCheckClick() {
   const repeatChk = document.getElementById('repeat-precheck-chk');
   if (repeatChk.checked && selectedActivityData) {
     // Repeat mode: navigate to Template Builder
-    const docIds = await findDocIdsForActivity(selectedActivityData);
-    if (!docIds || !docIds.length) {
+    const docs = await findDocsForActivity(selectedActivityData);
+    if (!docs.length) {
       toast('Δεν βρέθηκαν έγγραφα — εκτελέστε πρώτα Batch', 'error'); return;
     }
-    window.location.href = '/ui/template-builder/' + docIds[0];
+    window.location.href = '/ui/template-builder/' + docs[0].id;
   } else {
     // Normal mode: run pre-check
     doPreCheck('batch');
@@ -1076,25 +1087,14 @@ async function handleBatchClick() {
   const repeatChk = document.getElementById('repeat-batch-chk');
   if (repeatChk.checked && selectedActivityData) {
     // Repeat mode: navigate to Review/Approval page
-    const docIds = await findDocIdsForActivity(selectedActivityData);
-    if (!docIds || !docIds.length) {
+    const docs = await findDocsForActivity(selectedActivityData);
+    if (!docs.length) {
       toast('Δεν βρέθηκαν έγγραφα — εκτελέστε πρώτα Batch', 'error'); return;
     }
-    // Find first pending_review doc
-    const docsRes = await api('GET', '/api/documents');
-    if (docsRes && docsRes.documents) {
-      const batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
-      const reviewDoc = batchDocs.find(d => d.status === 'pending_review');
-      if (reviewDoc) {
-        window.location.href = '/ui/review/' + reviewDoc.id;
-        return;
-      }
-      if (batchDocs.length) {
-        window.location.href = '/ui/review/' + batchDocs[0].id;
-        return;
-      }
-    }
-    toast('Δεν βρέθηκαν έγγραφα για έγκριση', 'error');
+    // Find first pending_review doc, otherwise first doc
+    const reviewDoc = docs.find(d => d.status === 'pending_review');
+    const targetDoc = reviewDoc || docs[0];
+    window.location.href = '/ui/review/' + targetDoc.id;
   } else {
     // Normal mode: run batch
     doBatchUpload();
