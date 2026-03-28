@@ -1564,10 +1564,11 @@ def serve_review_page(doc_id):
     original_filename = doc.get("original_filename") or doc.get("filename") or ""
     pdf_url = "/api/documents/%s/original-pdf#page=%s" % (doc_id, page_num)
 
-    cur_pos = sibling_ids.index(doc_id) if doc_id in sibling_ids else 0
-    total   = len(sibling_ids)
-    prev_id = sibling_ids[cur_pos - 1] if cur_pos > 0 else None
-    next_id = sibling_ids[cur_pos + 1] if cur_pos < total - 1 else None
+    cur_pos  = sibling_ids.index(doc_id) if doc_id in sibling_ids else 0
+    total    = len(sibling_ids)
+    first_id = sibling_ids[0] if total > 0 else None
+    prev_id  = sibling_ids[cur_pos - 1] if cur_pos > 0 else None
+    next_id  = sibling_ids[cur_pos + 1] if cur_pos < total - 1 else None
     pos_label = "%s / %s" % (cur_pos + 1, total) if total else "—"
     after_action = ('location.replace("/ui/review/'+str(next_id)+'")') if next_id else 'window.location.href="/ui#upload"'
 
@@ -1658,6 +1659,7 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
   </div>
   <div class="topbar-right">
     <span class="pos-label">%(pos_label)s</span>
+    %(first_btn)s
     %(prev_btn)s
     %(next_btn)s
     <button class="btn btn-back" onclick="%(after_back)s">&#8592; Επιστροφή</button>
@@ -1926,9 +1928,10 @@ function showToast(msg, color) {
         "schema":         doc.get("schema_name", "—"),
         "date":           (doc.get("created_at") or "").split("T")[0],
         "pos_label":      pos_label,
+        "first_btn":      ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">&#9198; Αρχή</span>' % first_id) if (first_id and cur_pos > 0) else '<span class="nav-btn disabled">&#9198; Αρχή</span>',
         "prev_btn":       ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">&#9664; Προηγ.</span>' % prev_id) if prev_id else '<span class="nav-btn disabled">&#9664; Προηγ.</span>',
         "next_btn":       ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">Επόμ. &#9654;</span>' % next_id) if next_id else '<span class="nav-btn disabled">Επόμ. &#9654;</span>',
-        "after_back":     "history.back()",
+        "after_back":     "window.location.href='/ui#upload'",
         "after_action":   after_action,
         "doc_id":         doc_id,
         "img_url":        img_url,
