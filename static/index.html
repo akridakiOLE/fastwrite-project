@@ -356,14 +356,14 @@ select.form-input option{background:var(--bg2);}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 🔍 Επεξεργασία & Δημιουργία / Template
               </button>
-              <input type="checkbox" id="repeat-precheck-chk" class="repeat-chk" disabled title="Επανάληψη: μετάβαση στη σελίδα Template Builder" style="width:18px;height:18px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
+              <input type="checkbox" id="repeat-precheck-chk" class="repeat-chk" disabled onchange="onRepeatCheckChange('precheck')" title="Επανάληψη: μετάβαση στη σελίδα Template Builder" style="width:18px;height:18px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
               <button class="btn btn-primary" style="flex:1;" onclick="handleBatchClick()" id="batch-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 Έναρξη Batch
               </button>
-              <input type="checkbox" id="repeat-batch-chk" class="repeat-chk" disabled title="Επανάληψη: μετάβαση στη σελίδα Έγκρισης" style="width:18px;height:18px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
+              <input type="checkbox" id="repeat-batch-chk" class="repeat-chk" disabled onchange="onRepeatCheckChange('batch')" title="Επανάληψη: μετάβαση στη σελίδα Έγκρισης" style="width:18px;height:18px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
             </div>
             <div id="batch-progress" style="margin-top:16px;display:none;">
               <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px;">
@@ -1008,11 +1008,18 @@ async function selectHistoryEntry(activityId) {
   const res = await api('GET', '/api/activity/' + activityId);
   if (!res || res.error) { toast('Σφάλμα φόρτωσης', 'error'); deselectHistoryEntry(); return; }
   selectedActivityData = res;
-  // Show & enable repeat checkboxes
+  // Template Builder checkbox: εμφανίζεται ΠΑΝΤΑ
   const chk1 = document.getElementById('repeat-precheck-chk');
+  chk1.style.display = ''; chk1.disabled = false; chk1.checked = false;
+  // Batch/Review checkbox: εμφανίζεται ΜΟΝΟ για batch entries (μόνο αυτά έχουν extracted data)
   const chk2 = document.getElementById('repeat-batch-chk');
-  chk1.style.display = ''; chk1.disabled = false;
-  chk2.style.display = ''; chk2.disabled = false;
+  if (res.action === 'batch') {
+    chk2.style.display = ''; chk2.disabled = false; chk2.checked = false;
+  } else {
+    chk2.style.display = 'none'; chk2.disabled = true; chk2.checked = false;
+  }
+  // Enable pre-check button (ώστε να μπορεί να χρησιμοποιηθεί σε repeat mode)
+  document.getElementById('batch-preview-btn').disabled = false;
 }
 
 function deselectHistoryEntry() {
@@ -1024,6 +1031,22 @@ function deselectHistoryEntry() {
   const chk2 = document.getElementById('repeat-batch-chk');
   chk1.style.display = 'none'; chk1.checked = false; chk1.disabled = true;
   chk2.style.display = 'none'; chk2.checked = false; chk2.disabled = true;
+  // Restore pre-check button disabled state if no file selected
+  const inp = document.getElementById('batch-file');
+  if (!inp || !inp.files.length) {
+    document.getElementById('batch-preview-btn').disabled = true;
+  }
+}
+
+// Mutual exclusion: only one checkbox at a time
+function onRepeatCheckChange(which) {
+  const chk1 = document.getElementById('repeat-precheck-chk');
+  const chk2 = document.getElementById('repeat-batch-chk');
+  if (which === 'precheck' && chk1.checked) {
+    chk2.checked = false;
+  } else if (which === 'batch' && chk2.checked) {
+    chk1.checked = false;
+  }
 }
 
 // Helper: find documents for the selected activity
