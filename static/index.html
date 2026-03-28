@@ -1092,29 +1092,6 @@ async function doSingleExtract() {
 }
 
 async function doBatchUpload() {
-  // Έλεγχος: ο χρήστης πρέπει να περάσει πρώτα από pre-check αν υπάρχουν τιμολόγια χωρίς template
-  if (!preCheckDone['batch']) {
-    // Δεν έχει κάνει pre-check καθόλου → ενημέρωση
-    const modal = document.getElementById('precheck-modal');
-    const body  = document.getElementById('precheck-modal-body');
-    const title = document.getElementById('precheck-modal-title');
-    title.textContent = 'Απαιτείται Έλεγχος';
-    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία / Template</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
-    modal.classList.add('open');
-    return;
-  }
-  // Αν πέρασε pre-check αλλά υπάρχουν ακόμα χωρίς template
-  const pcRes = preCheckResult['batch'];
-  if (pcRes && (pcRes.without_template || 0) > 0) {
-    const modal = document.getElementById('precheck-modal');
-    const body  = document.getElementById('precheck-modal-body');
-    const title = document.getElementById('precheck-modal-title');
-    title.textContent = 'Απαιτείται Δημιουργία Template';
-    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Υπάρχουν ακόμα <b>' + pcRes.without_template + '</b> τιμολόγια χωρίς template.<br>Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία / Template</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
-    modal.classList.add('open');
-    return;
-  }
-
   const inp           = document.getElementById('batch-file');
   const schemaRaw     = document.getElementById('batch-schema').value;
   const autoMatch     = document.getElementById('batch-auto-match').checked;
@@ -1212,21 +1189,22 @@ function pollBatchJob(job_id) {
 }
 
 async function showBatchCompletionModal(st) {
-  const total     = st.processed || 0;
-  const failed    = st.failed || 0;
-  const docIds    = st.doc_ids || [];
+  const docIds = st.doc_ids || [];
 
-  // Φόρτωσε τα documents για να βρεις πόσα χρειάζονται έγκριση
-  let needsApproval = 0;
-  let noApproval    = 0;
-  let firstReviewId = null;
+  // Φόρτωσε τα documents για ανάλυση αποτελεσμάτων
+  let withoutTemplate = 0;
+  let noApproval      = 0;   // Completed (χωρίς έγκριση)
+  let needsApproval   = 0;   // pending_review (με έγκριση)
+  let firstReviewId   = null;
 
   if (docIds.length) {
     const docsRes = await api('GET', '/api/documents');
     if (docsRes && docsRes.documents) {
       const batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
       for (const d of batchDocs) {
-        if (d.status === 'pending_review') {
+        if (d.status === 'Failed') {
+          withoutTemplate++;
+        } else if (d.status === 'pending_review') {
           needsApproval++;
           if (!firstReviewId) firstReviewId = d.id;
         } else if (d.status === 'Completed') {
@@ -1240,28 +1218,37 @@ async function showBatchCompletionModal(st) {
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  title.textContent = 'Ολοκλήρωση Batch';
+  title.textContent = 'Ανάλυση Αρχείου';
 
   let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Επεξεργάστηκαν συνολικά τιμολόγια</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + total + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Τιμολόγια χωρίς απαίτηση έγκρισης</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noApproval + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;color:var(--accent2);">Τιμολόγια με απαίτηση έγκρισης</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--accent2);">' + needsApproval + '</td></tr>';
-  if (failed > 0) {
-    html += '<tr><td style="padding:8px 12px;border-top:1px solid var(--border);color:var(--danger);">Αποτυχίες</td><td style="padding:8px 12px;border-top:1px solid var(--border);font-weight:600;text-align:right;color:var(--danger);">' + failed + '</td></tr>';
-  }
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Τιμολόγια χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTemplate + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Τιμολόγια χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noApproval + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;color:var(--accent2);">Τιμολόγια με έγκριση</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--accent2);">' + needsApproval + '</td></tr>';
   html += '</table>';
 
-  if (needsApproval > 0 && firstReviewId) {
+  // ΣΕΝΑΡΙΟ 1: Υπάρχουν τιμολόγια χωρίς template → μήνυμα + OK
+  if (withoutTemplate > 0) {
+    html += '<div style="margin-top:20px;padding:12px;background:rgba(255,165,0,0.08);border:1px solid rgba(255,165,0,0.25);border-radius:8px;font-size:13px;color:var(--warn);">';
+    html += 'Παρακαλώ ελέγξτε και επαναλάβετε την διαδικασία επεξεργασίας και δημιουργίας template';
+    html += '</div>';
+    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
+    html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">OK</button>';
+    html += '</div>';
+  }
+  // ΣΕΝΑΡΙΟ 2: Δεν υπάρχουν χωρίς template ΚΑΙ υπάρχουν με έγκριση → Αργότερα / ΝΑΙ
+  else if (needsApproval > 0 && firstReviewId) {
     html += '<div style="margin-top:20px;padding:12px;background:rgba(0,102,255,0.08);border:1px solid rgba(0,102,255,0.25);border-radius:8px;font-size:13px;color:var(--accent2);">';
-    html += 'Ακολουθήστε την διαδικασία έγκρισης για κάθε τιμολόγιο ξεχωριστά';
+    html += 'Έχετε ολοκληρώσει την διαδικασία έναρξη batch παρακαλώ προχωρήστε στην διαδικασία έγκρισης για κάθε τιμολόγιο που απαιτείται';
     html += '</div>';
     html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
     html += '<button class="btn btn-secondary btn-sm" onclick="closeModal(\'precheck-modal\')">Αργότερα</button>';
     html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\'); window.open(\'/ui/review/' + firstReviewId + '\', \'_blank\')">ΝΑΙ</button>';
     html += '</div>';
-  } else {
+  }
+  // ΣΕΝΑΡΙΟ 3: Όλα χωρίς έγκριση (Completed) → επιτυχία
+  else {
     html += '<div style="margin-top:20px;padding:12px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);border-radius:8px;font-size:13px;color:var(--accent);">';
-    html += 'Έχετε ολοκληρώσει με επιτυχία την διαδικασία Έναρξης Batch.<br>Μπορείτε τώρα να εξάγετε τα δεδομένα από το σύστημα.';
+    html += 'Έχετε ολοκληρώσει με επιτυχία την διαδικασία Έναρξης Batch.';
     html += '</div>';
     html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
     html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">OK</button>';
