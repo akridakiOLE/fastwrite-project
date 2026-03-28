@@ -351,20 +351,20 @@ select.form-input option{background:var(--bg2);}
                 <div style="font-size:10px;color:var(--text2);margin-top:1px;">Παράλειψη εγγράφων που έχουν ήδη εξαχθεί</div>
               </div>
             </div>
-            <button class="btn btn-secondary" style="width:100%;margin-bottom:10px" id="batch-preview-btn" onclick="doPreCheck('batch')" disabled>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              🔍 Επεξεργασία & Δημιουργία / Template
-            </button>
-            <button class="btn btn-secondary" style="width:100%;margin-bottom:10px;display:none;border-color:var(--accent2);color:var(--accent2);" id="repeat-precheck-btn" onclick="repeatTemplateBuilder()">
-              🔄 Επανάληψη διαδικασίας
-            </button>
-            <button class="btn btn-primary" style="width:100%" onclick="doBatchUpload()" id="batch-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              Έναρξη Batch
-            </button>
-            <button class="btn btn-primary" style="width:100%;margin-top:10px;display:none;background:var(--accent2);border-color:var(--accent2);" id="repeat-batch-btn" onclick="repeatBatchReview()">
-              🔄 Επανάληψη διαδικασίας
-            </button>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <button class="btn btn-secondary" style="flex:1;" id="batch-preview-btn" onclick="handlePreCheckClick()" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                🔍 Επεξεργασία & Δημιουργία / Template
+              </button>
+              <input type="checkbox" id="repeat-precheck-chk" class="repeat-chk" disabled title="Επανάληψη: μετάβαση στη σελίδα Template Builder" style="width:18px;height:18px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="btn btn-primary" style="flex:1;" onclick="handleBatchClick()" id="batch-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Έναρξη Batch
+              </button>
+              <input type="checkbox" id="repeat-batch-chk" class="repeat-chk" disabled title="Επανάληψη: μετάβαση στη σελίδα Έγκρισης" style="width:18px;height:18px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
+            </div>
             <div id="batch-progress" style="margin-top:16px;display:none;">
               <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px;">
                 <span id="batch-status-text">Επεξεργασία...</span>
@@ -994,7 +994,7 @@ let selectedActivityId   = null;
 let selectedActivityData = null;
 
 async function selectHistoryEntry(activityId) {
-  // Deselect previous
+  // Toggle: deselect if already selected
   if (selectedActivityId === activityId) {
     deselectHistoryEntry();
     return;
@@ -1008,31 +1008,35 @@ async function selectHistoryEntry(activityId) {
   const res = await api('GET', '/api/activity/' + activityId);
   if (!res || res.error) { toast('Σφάλμα φόρτωσης', 'error'); deselectHistoryEntry(); return; }
   selectedActivityData = res;
-  // Show repeat buttons
-  document.getElementById('repeat-precheck-btn').style.display = '';
-  document.getElementById('repeat-batch-btn').style.display = '';
+  // Show & enable repeat checkboxes
+  const chk1 = document.getElementById('repeat-precheck-chk');
+  const chk2 = document.getElementById('repeat-batch-chk');
+  chk1.style.display = ''; chk1.disabled = false;
+  chk2.style.display = ''; chk2.disabled = false;
 }
 
 function deselectHistoryEntry() {
   selectedActivityId = null;
   selectedActivityData = null;
   document.querySelectorAll('.history-radio').forEach(r => r.checked = false);
-  document.getElementById('repeat-precheck-btn').style.display = 'none';
-  document.getElementById('repeat-batch-btn').style.display = 'none';
+  // Hide & uncheck repeat checkboxes
+  const chk1 = document.getElementById('repeat-precheck-chk');
+  const chk2 = document.getElementById('repeat-batch-chk');
+  chk1.style.display = 'none'; chk1.checked = false; chk1.disabled = true;
+  chk2.style.display = 'none'; chk2.checked = false; chk2.disabled = true;
 }
 
-async function repeatTemplateBuilder() {
-  if (!selectedActivityData) { toast('Επίλεξε αρχείο από το ιστορικό', 'error'); return; }
-  const data = selectedActivityData;
+// Helper: find doc_ids from selected activity or related batch activities
+async function findDocIdsForActivity(data) {
   let docIds = null;
-  // Try to get doc_ids from this activity
+  // Try result_json of this activity
   if (data.result_json) {
     try {
       const rj = typeof data.result_json === 'string' ? JSON.parse(data.result_json) : data.result_json;
       if (rj.doc_ids && rj.doc_ids.length) docIds = rj.doc_ids;
     } catch(e) {}
   }
-  // If no doc_ids, search other batch activities with the same filename
+  // If no doc_ids, search batch activities with same filename
   if (!docIds) {
     const allRes = await api('GET', '/api/activity?limit=100');
     const items = (allRes && allRes.activities) || [];
@@ -1048,56 +1052,53 @@ async function repeatTemplateBuilder() {
       }
     }
   }
-  if (!docIds || !docIds.length) {
-    toast('Δεν βρέθηκαν έγγραφα — εκτελέστε πρώτα Batch', 'error'); return;
-  }
-  window.location.href = '/ui/template-builder/' + docIds[0];
+  return docIds;
 }
 
-async function repeatBatchReview() {
-  if (!selectedActivityData) { toast('Επίλεξε αρχείο από το ιστορικό', 'error'); return; }
-  const data = selectedActivityData;
-  let docIds = null;
-  if (data.result_json) {
-    try {
-      const rj = typeof data.result_json === 'string' ? JSON.parse(data.result_json) : data.result_json;
-      if (rj.doc_ids && rj.doc_ids.length) docIds = rj.doc_ids;
-    } catch(e) {}
+// Click handler for "Επεξεργασία & Δημιουργία / Template" button
+async function handlePreCheckClick() {
+  const repeatChk = document.getElementById('repeat-precheck-chk');
+  if (repeatChk.checked && selectedActivityData) {
+    // Repeat mode: navigate to Template Builder
+    const docIds = await findDocIdsForActivity(selectedActivityData);
+    if (!docIds || !docIds.length) {
+      toast('Δεν βρέθηκαν έγγραφα — εκτελέστε πρώτα Batch', 'error'); return;
+    }
+    window.location.href = '/ui/template-builder/' + docIds[0];
+  } else {
+    // Normal mode: run pre-check
+    doPreCheck('batch');
   }
-  if (!docIds) {
-    const allRes = await api('GET', '/api/activity?limit=100');
-    const items = (allRes && allRes.activities) || [];
-    for (const a of items) {
-      if (a.filename === data.filename && a.action === 'batch' && a.id !== data.id) {
-        const detail = await api('GET', '/api/activity/' + a.id);
-        if (detail && detail.result_json) {
-          try {
-            const rj = typeof detail.result_json === 'string' ? JSON.parse(detail.result_json) : detail.result_json;
-            if (rj.doc_ids && rj.doc_ids.length) { docIds = rj.doc_ids; break; }
-          } catch(e) {}
-        }
+}
+
+// Click handler for "Έναρξη Batch" button
+async function handleBatchClick() {
+  const repeatChk = document.getElementById('repeat-batch-chk');
+  if (repeatChk.checked && selectedActivityData) {
+    // Repeat mode: navigate to Review/Approval page
+    const docIds = await findDocIdsForActivity(selectedActivityData);
+    if (!docIds || !docIds.length) {
+      toast('Δεν βρέθηκαν έγγραφα — εκτελέστε πρώτα Batch', 'error'); return;
+    }
+    // Find first pending_review doc
+    const docsRes = await api('GET', '/api/documents');
+    if (docsRes && docsRes.documents) {
+      const batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
+      const reviewDoc = batchDocs.find(d => d.status === 'pending_review');
+      if (reviewDoc) {
+        window.location.href = '/ui/review/' + reviewDoc.id;
+        return;
+      }
+      if (batchDocs.length) {
+        window.location.href = '/ui/review/' + batchDocs[0].id;
+        return;
       }
     }
+    toast('Δεν βρέθηκαν έγγραφα για έγκριση', 'error');
+  } else {
+    // Normal mode: run batch
+    doBatchUpload();
   }
-  if (!docIds || !docIds.length) {
-    toast('Δεν βρέθηκαν έγγραφα — εκτελέστε πρώτα Batch', 'error'); return;
-  }
-  // Find first pending_review doc
-  const docsRes = await api('GET', '/api/documents');
-  if (docsRes && docsRes.documents) {
-    const batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
-    const reviewDoc = batchDocs.find(d => d.status === 'pending_review');
-    if (reviewDoc) {
-      window.location.href = '/ui/review/' + reviewDoc.id;
-      return;
-    }
-    // No pending_review, go to first doc
-    if (batchDocs.length) {
-      window.location.href = '/ui/review/' + batchDocs[0].id;
-      return;
-    }
-  }
-  toast('Δεν βρέθηκαν έγγραφα για έγκριση', 'error');
 }
 
 async function doSingleExtract() {
