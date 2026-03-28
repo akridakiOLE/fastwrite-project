@@ -1203,11 +1203,73 @@ function pollBatchJob(job_id) {
       clearInterval(interval);
       if (st.status === 'completed') {
         toast(`✓ Batch ολοκληρώθηκε: ${st.processed} τιμολόγια`, 'success');
+        showBatchCompletionModal(st);
       } else {
         toast('✕ Batch απέτυχε', 'error');
       }
     }
   }, 1500);
+}
+
+async function showBatchCompletionModal(st) {
+  const total     = st.processed || 0;
+  const failed    = st.failed || 0;
+  const docIds    = st.doc_ids || [];
+
+  // Φόρτωσε τα documents για να βρεις πόσα χρειάζονται έγκριση
+  let needsApproval = 0;
+  let noApproval    = 0;
+  let firstReviewId = null;
+
+  if (docIds.length) {
+    const docsRes = await api('GET', '/api/documents');
+    if (docsRes && docsRes.documents) {
+      const batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
+      for (const d of batchDocs) {
+        if (d.status === 'pending_review') {
+          needsApproval++;
+          if (!firstReviewId) firstReviewId = d.id;
+        } else if (d.status === 'Completed') {
+          noApproval++;
+        }
+      }
+    }
+  }
+
+  const modal = document.getElementById('precheck-modal');
+  const title = document.getElementById('precheck-modal-title');
+  const body  = document.getElementById('precheck-modal-body');
+
+  title.textContent = 'Ολοκλήρωση Batch';
+
+  let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Επεξεργάστηκαν συνολικά τιμολόγια</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + total + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Τιμολόγια χωρίς απαίτηση έγκρισης</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noApproval + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;color:var(--accent2);">Τιμολόγια με απαίτηση έγκρισης</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--accent2);">' + needsApproval + '</td></tr>';
+  if (failed > 0) {
+    html += '<tr><td style="padding:8px 12px;border-top:1px solid var(--border);color:var(--danger);">Αποτυχίες</td><td style="padding:8px 12px;border-top:1px solid var(--border);font-weight:600;text-align:right;color:var(--danger);">' + failed + '</td></tr>';
+  }
+  html += '</table>';
+
+  if (needsApproval > 0 && firstReviewId) {
+    html += '<div style="margin-top:20px;padding:12px;background:rgba(0,102,255,0.08);border:1px solid rgba(0,102,255,0.25);border-radius:8px;font-size:13px;color:var(--accent2);">';
+    html += 'Ακολουθήστε την διαδικασία έγκρισης για κάθε τιμολόγιο ξεχωριστά';
+    html += '</div>';
+    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
+    html += '<button class="btn btn-secondary btn-sm" onclick="closeModal(\'precheck-modal\')">Αργότερα</button>';
+    html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\'); window.open(\'/ui/review/' + firstReviewId + '\', \'_blank\')">ΝΑΙ</button>';
+    html += '</div>';
+  } else {
+    html += '<div style="margin-top:20px;padding:12px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);border-radius:8px;font-size:13px;color:var(--accent);">';
+    html += 'Έχετε ολοκληρώσει με επιτυχία την διαδικασία Έναρξης Batch.<br>Μπορείτε τώρα να εξάγετε τα δεδομένα από το σύστημα.';
+    html += '</div>';
+    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
+    html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">OK</button>';
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+  modal.classList.add('open');
 }
 
 // ── Batch Jobs Page ──────────────────────────────────────────────────────────

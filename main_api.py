@@ -1198,7 +1198,6 @@ function renderSupList(docs, q) {
          + badge
          + '<button class="sup-copy-btn" onclick="copySupplier(\'' + supEscaped + '\')" title="Αντιγραφή">\u2398</button>'
          + '<button class="sup-copy-btn" onclick="openDoc('+d.id+')" title="Άνοιγμα PDF" style="color:var(--accent2);">\u2192</button>'
-         + '<a href="javascript:void(0)" onclick="goToReview('+d.id+',\'' + (d.status||'') + '\','+(!!(d.result_json||d.result_data))+')" class="sup-copy-btn" style="color:#00e5a0;text-decoration:none;" title="Άνοιγμα Έγκριση">\u2696</a>'
          + '</div>';
   }).join('');
 }
