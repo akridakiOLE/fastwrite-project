@@ -234,10 +234,7 @@ select.form-input option{background:var(--bg2);}
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         Έγγραφα
       </button>
-      <button class="nav-item" onclick="showPage('batch')">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/><circle cx="17" cy="17" r="3"/><path d="M17 15v2l1 1"/></svg>
-        Batch Processing
-      </button>
+      <!-- Batch Processing page αφαιρέθηκε — ιστορικό μεταφέρθηκε στο Upload & Extract -->
       <div class="nav-section">Ρυθμίσεις</div>
       <button class="nav-item" onclick="showPage('templates')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
@@ -306,35 +303,15 @@ select.form-input option{background:var(--bg2);}
       <div class="content">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
 
-          <!-- Single -->
-          <div class="card">
-            <div class="card-title">📄 Μεμονωμένο Έγγραφο</div>
-            <div class="upload-zone" id="single-zone" onclick="document.getElementById('single-file').click()" ondragover="dragOver(event,'single-zone')" ondragleave="dragLeave('single-zone')" ondrop="dropFile(event,'single')">
-              <input type="file" id="single-file" accept=".pdf,.png,.jpg,.jpeg" onchange="fileSelected('single')"/>
-              <div class="upload-icon">📄</div>
-              <div class="upload-title">Σύρε ή κάνε κλικ</div>
-              <div class="upload-sub">PDF, PNG, JPG έως 20MB</div>
+          <!-- Activity History -->
+          <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 140px);">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+              <span>📋 Ιστορικό Δραστηριοτήτων</span>
+              <button class="btn btn-secondary btn-sm" onclick="loadActivityHistory()" style="font-size:11px;padding:3px 10px;">↻</button>
             </div>
-            <div id="single-selected" style="display:none;margin-top:12px;">
-              <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:13px;">
-                <span>📎</span>
-                <span id="single-filename" style="flex:1;color:var(--text)"></span>
-                <button onclick="clearFile('single')" style="background:none;border:none;color:var(--text2);cursor:pointer;">✕</button>
-              </div>
+            <div id="activity-list" style="flex:1;overflow-y:auto;font-size:12px;">
+              <div style="text-align:center;padding:30px;color:var(--text3);">Φόρτωση...</div>
             </div>
-            <div class="form-group" style="margin-top:16px;">
-              <label class="form-label">Template</label>
-              <select class="form-input" id="single-schema"></select>
-            </div>
-            <button class="btn btn-secondary" style="width:100%;margin-bottom:10px" id="single-preview-btn" onclick="doPreCheck('single')" disabled>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              🔍 Επεξεργασία & Δημιουργία / Template
-            </button>
-            <button class="btn btn-primary" style="width:100%" onclick="doSingleExtract()" id="single-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              Εξαγωγή Δεδομένων
-            </button>
-            <div id="single-result" style="margin-top:16px;display:none;"></div>
           </div>
 
           <!-- Batch -->
@@ -451,20 +428,7 @@ select.form-input option{background:var(--bg2);}
       </div>
     </div>
 
-    <!-- BATCH PAGE -->
-    <div id="page-batch" class="page" style="display:none">
-      <div class="topbar">
-        <div class="page-title">Batch Processing</div>
-        <div class="topbar-actions">
-          <button class="btn btn-secondary btn-sm" onclick="loadBatchJobs()">↻ Ανανέωση</button>
-        </div>
-      </div>
-      <div class="content">
-        <div id="batch-jobs-list">
-          <div class="empty"><div class="empty-icon">📦</div><div class="empty-title">Δεν υπάρχουν batch jobs</div><div class="empty-sub">Ανέβασε ένα PDF από το Upload & Extract</div></div>
-        </div>
-      </div>
-    </div>
+    <!-- BATCH PAGE αφαιρέθηκε — ιστορικό μεταφέρθηκε στο Upload & Extract -->
 
 
     <!-- TEMPLATES -->
@@ -669,7 +633,7 @@ function showPage(name, fromEvent) {
   if (fromEvent !== false && typeof event !== 'undefined' && event && event.currentTarget) {
     event.currentTarget.classList.add('active');
   } else {
-    const pageNames = ['dashboard','upload','documents','batch','templates','settings'];
+    const pageNames = ['dashboard','upload','documents','templates','settings'];
     const idx = pageNames.indexOf(name);
     const btns = document.querySelectorAll('.nav-item');
     if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
@@ -678,8 +642,7 @@ function showPage(name, fromEvent) {
   if (name==='documents') loadDocuments();
   if (name==='templates') loadTemplates();
   if (name==='settings')  loadSettings();
-  if (name==='upload')    loadSchemas();
-  if (name==='batch')     loadBatchJobs();
+  if (name==='upload')    { loadSchemas(); loadActivityHistory(); }
 }
 // Handle URL hash on load (e.g. /ui#upload)
 (function(){
@@ -956,7 +919,6 @@ async function exportLineItems() { return exportSelected('line-items'); }
 async function loadSchemas() {
   const res = await api('GET','/api/templates');
   const opts = (res.templates||[]).map(t=>`<option value="${t.name}">${t.name}</option>`).join('');
-  document.getElementById('single-schema').innerHTML = opts || '<option value="">— Δεν υπάρχουν templates —</option>';
   // Batch: προσθέτουμε επιλογή "Χωρίς Fallback" για Auto Match
   const noFallback = '<option value="__none__">— Χωρίς Fallback (μόνο Auto Match) —</option>';
   document.getElementById('batch-schema').innerHTML = noFallback + (opts || '');
@@ -1234,6 +1196,15 @@ async function showBatchCompletionModal(st) {
     }
   }
 
+  // Αποθήκευση στο ιστορικό
+  const batchFilename = pc ? (pc.filename || 'unknown') : 'unknown';
+  saveActivity(batchFilename, 'batch', {
+    total_invoices: totalInvoices,
+    without_template: withoutTemplate,
+    needs_approval: needsApproval,
+    no_approval: noApproval
+  });
+
   // Καθαρισμός pre-check data
   batchPreCheckData = null;
 
@@ -1284,32 +1255,75 @@ async function showBatchCompletionModal(st) {
 }
 
 // ── Batch Jobs Page ──────────────────────────────────────────────────────────
-async function loadBatchJobs() {
-  const res = await api('GET','/api/batch');
-  const jobs = (res.jobs||[]).reverse();
-  const el = document.getElementById('batch-jobs-list');
-  if (!jobs.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📦</div><div class="empty-title">Δεν υπάρχουν batch jobs</div><div class="empty-sub">Ανέβασε ένα PDF από το Upload & Extract</div></div>';
+// ── Activity History ─────────────────────────────────────────────────────────
+async function saveActivity(filename, action, data) {
+  try {
+    await api('POST', '/api/activity', {
+      filename: filename,
+      action: action,
+      total_invoices: data.total_invoices || 0,
+      without_template: data.without_template || 0,
+      needs_approval: data.needs_approval || 0,
+      no_approval: data.no_approval || 0,
+      result_data: data
+    });
+    loadActivityHistory();
+  } catch(e) { console.error('Activity save error:', e); }
+}
+
+async function loadActivityHistory() {
+  const el = document.getElementById('activity-list');
+  if (!el) return;
+  const res = await api('GET', '/api/activity?limit=50');
+  const items = res.activities || [];
+  if (!items.length) {
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Δεν υπάρχει ιστορικό δραστηριοτήτων</div>';
     return;
   }
-  el.innerHTML = jobs.map(j=>`
-    <div class="job-card">
-      <div class="job-header">
-        <div>
-          <span class="job-id">${j.job_id.slice(0,16)}...</span>
-          <span style="margin-left:10px">${badgeHtml(j.status==='completed'?'Completed':j.status==='failed'?'Failed':'Pending')}</span>
-        </div>
-        <span style="font-size:12px;color:var(--text2)">${j.started_at?.split('T')[0]||''}</span>
+  el.innerHTML = items.map(a => {
+    const date = a.created_at ? a.created_at.replace('T',' ').slice(0,16) : '—';
+    const icon = a.action === 'pre-check' ? '🔍' : '▶';
+    const label = a.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Template' : 'Έναρξη Batch';
+    const color = a.action === 'pre-check' ? 'var(--accent2)' : 'var(--accent)';
+    return `<div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${a.filename}">${icon} ${a.filename}</div>
+        <div style="font-size:11px;color:${color};margin-top:2px;">${label}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">${date} · Έγγραφα: ${a.total_invoices}</div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px;color:var(--text2);margin-bottom:10px">
-        <div>Σελίδες: <b style="color:var(--text)">${j.total_pages}</b></div>
-        <div>Τιμολόγια: <b style="color:var(--text)">${j.total_invoices}</b></div>
-        <div>Επιτυχία: <b style="color:var(--accent)">${j.processed}</b></div>
-        <div>Αποτυχία: <b style="color:var(--danger)">${j.failed}</b></div>
-      </div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${j.progress_pct}%"></div></div>
-      ${j.errors?.length ? `<div style="margin-top:8px;font-size:11px;color:var(--danger)">${j.errors.slice(0,2).join(' | ')}</div>` : ''}
-    </div>`).join('');
+      <button class="btn btn-secondary btn-sm" onclick="showActivityDetail(${a.id})" style="font-size:10px;padding:3px 8px;" title="Αποτελέσματα">📊</button>
+    </div>`;
+  }).join('');
+}
+
+async function showActivityDetail(activityId) {
+  const res = await api('GET', '/api/activity/' + activityId);
+  if (!res || res.error) { toast('Σφάλμα φόρτωσης', 'error'); return; }
+
+  const modal = document.getElementById('precheck-modal');
+  const title = document.getElementById('precheck-modal-title');
+  const body  = document.getElementById('precheck-modal-body');
+
+  const label = res.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Template' : 'Έναρξη Batch';
+  const date  = res.created_at ? res.created_at.replace('T',' ').slice(0,16) : '—';
+
+  title.textContent = 'Αποτελέσματα — ' + label;
+
+  let html = '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">';
+  html += '<b>' + res.filename + '</b><br>' + date;
+  html += '</div>';
+  html += '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + (res.total_invoices || 0) + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Τιμολόγια χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + (res.without_template || 0) + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Τιμολόγια χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + (res.no_approval || 0) + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;color:var(--accent2);">Τιμολόγια με έγκριση</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--accent2);">' + (res.needs_approval || 0) + '</td></tr>';
+  html += '</table>';
+  html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
+  html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">OK</button>';
+  html += '</div>';
+
+  body.innerHTML = html;
+  modal.classList.add('open');
 }
 
 // ── Templates ────────────────────────────────────────────────────────────────
@@ -1689,6 +1703,10 @@ async function doPreCheck(type) {
 
   preCheckResult[type] = res;
   preCheckDone[type] = true;
+
+  // Αποθήκευση στο ιστορικό
+  const pcFilename = file.name || 'unknown';
+  saveActivity(pcFilename, 'pre-check', res);
 
   const total     = res.total_invoices || 0;
   const noTmpl    = res.without_template || 0;

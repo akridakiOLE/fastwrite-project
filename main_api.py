@@ -734,6 +734,44 @@ def batch_status(job_id):
 def batch_list():
     return jsonify({"jobs": batch_proc.list_jobs()})
 
+# ── Activity Log Endpoints ────────────────────────────────────────────────────
+@app.post("/api/activity")
+@require_auth
+def activity_create():
+    """Save a new activity log entry."""
+    data = request.get_json(force=True)
+    filename = data.get("filename", "")
+    action = data.get("action", "")
+    if not filename or not action:
+        return jsonify({"error": "filename and action required"}), 400
+    aid = db.insert_activity(
+        filename=filename,
+        action=action,
+        total_invoices=data.get("total_invoices", 0),
+        without_template=data.get("without_template", 0),
+        needs_approval=data.get("needs_approval", 0),
+        no_approval=data.get("no_approval", 0),
+        result_json=json.dumps(data.get("result_data")) if data.get("result_data") else None
+    )
+    return jsonify({"success": True, "id": aid})
+
+@app.get("/api/activity")
+@require_auth
+def activity_list():
+    """Return recent activity log entries."""
+    limit = request.args.get("limit", 50, type=int)
+    activities = db.list_activities(limit=limit)
+    return jsonify({"activities": activities})
+
+@app.get("/api/activity/<int:activity_id>")
+@require_auth
+def activity_get(activity_id):
+    """Fetch a single activity log entry."""
+    a = db.get_activity(activity_id)
+    if not a:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(a)
+
 # ── Auth Endpoints ────────────────────────────────────────────────────────────
 @app.post("/api/auth/login")
 def auth_login():

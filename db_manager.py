@@ -101,6 +101,21 @@ class DatabaseManager:
             except Exception:
                 pass  # Column already exists
 
+            # Activity Log table: ιστορικό δραστηριοτήτων Upload & Extract
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS activity_log (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    filename        TEXT    NOT NULL,
+                    action          TEXT    NOT NULL,
+                    total_invoices  INTEGER NOT NULL DEFAULT 0,
+                    without_template INTEGER NOT NULL DEFAULT 0,
+                    needs_approval  INTEGER NOT NULL DEFAULT 0,
+                    no_approval     INTEGER NOT NULL DEFAULT 0,
+                    result_json     TEXT,
+                    created_at      TEXT    NOT NULL
+                )
+            """)
+
             # Users table: authentication and authorization
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -239,6 +254,40 @@ class DatabaseManager:
         """Delete a template by name."""
         self.conn.execute("DELETE FROM templates WHERE name=?", (name,))
         self.conn.commit()
+
+    # ─── ACTIVITY LOG ──────────────────────────────────────────────────────────
+
+    def insert_activity(self, filename: str, action: str,
+                        total_invoices: int = 0, without_template: int = 0,
+                        needs_approval: int = 0, no_approval: int = 0,
+                        result_json: str = None) -> int:
+        """Insert a new activity log entry. Returns the new row id."""
+        now = datetime.utcnow().isoformat()
+        cursor = self.conn.execute(
+            """INSERT INTO activity_log
+               (filename, action, total_invoices, without_template,
+                needs_approval, no_approval, result_json, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (filename, action, total_invoices, without_template,
+             needs_approval, no_approval, result_json, now)
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def list_activities(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Return recent activity log entries."""
+        rows = self.conn.execute(
+            "SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_activity(self, activity_id: int) -> Optional[Dict[str, Any]]:
+        """Fetch a single activity log entry by ID."""
+        row = self.conn.execute(
+            "SELECT * FROM activity_log WHERE id = ?", (activity_id,)
+        ).fetchone()
+        return dict(row) if row else None
 
     # ─── USERS ────────────────────────────────────────────────────────────────
 
