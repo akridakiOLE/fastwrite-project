@@ -315,40 +315,54 @@ select.form-input option{background:var(--bg2);}
           </div>
 
           <!-- Batch -->
-          <div class="card" style="display:flex;flex-direction:column;overflow-y:auto;">
+          <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
             <div class="card-title">📦 Batch (Πολλαπλά Τιμολόγια)</div>
-            <div class="upload-zone" id="batch-zone" onclick="document.getElementById('batch-file').click()" ondragover="dragOver(event,'batch-zone')" ondragleave="dragLeave('batch-zone')" ondrop="dropFile(event,'batch')">
-              <input type="file" id="batch-file" accept=".pdf" onchange="fileSelected('batch')"/>
-              <div class="upload-icon">📦</div>
-              <div class="upload-title">PDF με πολλαπλά τιμολόγια</div>
-              <div class="upload-sub">Έως 200 τιμολόγια ανά αρχείο</div>
+            <!-- Πηγή αρχείου: Upload ή Ιστορικό -->
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+              <button class="btn btn-secondary btn-sm" id="src-upload-btn" onclick="setFileSource('upload')" style="flex:1;font-size:11px;border-color:var(--accent);color:var(--accent);">📁 Ανέβασμα αρχείου</button>
+              <button class="btn btn-secondary btn-sm" id="src-history-btn" onclick="setFileSource('history')" style="flex:1;font-size:11px;">📋 Από Ιστορικό</button>
             </div>
-            <div id="batch-selected" style="display:none;margin-top:12px;">
-              <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:13px;">
+            <!-- Upload zone -->
+            <div id="batch-source-upload">
+              <div class="upload-zone" id="batch-zone" onclick="document.getElementById('batch-file').click()" ondragover="dragOver(event,'batch-zone')" ondragleave="dragLeave('batch-zone')" ondrop="dropFile(event,'batch')" style="padding:16px 12px;">
+                <input type="file" id="batch-file" accept=".pdf" onchange="fileSelected('batch')"/>
+                <div class="upload-icon" style="font-size:24px;">📦</div>
+                <div class="upload-title" style="font-size:12px;">PDF με πολλαπλά τιμολόγια</div>
+                <div class="upload-sub" style="font-size:10px;">Έως 200 τιμολόγια ανά αρχείο</div>
+              </div>
+            </div>
+            <!-- History source -->
+            <div id="batch-source-history" style="display:none;">
+              <select class="form-input" id="batch-history-select" onchange="onHistoryFileSelect()" style="font-size:12px;">
+                <option value="">— Επιλέξτε αρχείο από ιστορικό —</option>
+              </select>
+            </div>
+            <div id="batch-selected" style="display:none;margin-top:8px;">
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg3);border-radius:8px;font-size:12px;">
                 <span>📎</span>
-                <span id="batch-filename" style="flex:1;color:var(--text)"></span>
-                <button onclick="clearFile('batch')" style="background:none;border:none;color:var(--text2);cursor:pointer;">✕</button>
+                <span id="batch-filename" style="flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+                <button onclick="clearFile('batch')" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:11px;">✕</button>
               </div>
             </div>
-            <div class="form-group" style="margin-top:16px;">
-              <label class="form-label" id="batch-schema-label">Template (Fallback για Auto Match)</label>
-              <select class="form-input" id="batch-schema"></select>
-              <div id="batch-schema-hint" style="font-size:11px;color:var(--text2);margin-top:5px;display:none;">
-                ℹ Χρησιμοποιείται μόνο αν το Auto Match δεν βρει template για κάποιο τιμολόγιο
+            <div class="form-group" style="margin-top:10px;">
+              <label class="form-label" id="batch-schema-label" style="font-size:11px;">Template Fallback (για Auto Match)</label>
+              <select class="form-input" id="batch-schema" style="font-size:12px;padding:7px 10px;"></select>
+              <div id="batch-schema-hint" style="font-size:10px;color:var(--text2);margin-top:4px;display:none;">
+                ℹ Χρησιμοποιείται μόνο αν το Auto Match δεν βρει template
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg3);border-radius:8px;margin-bottom:12px;margin-top:4px;">
-              <input type="checkbox" id="batch-auto-match" style="width:16px;height:16px;accent-color:var(--accent2);cursor:pointer" onchange="onAutoMatchChange()"/>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg3);border-radius:8px;margin-bottom:8px;margin-top:4px;">
+              <input type="checkbox" id="batch-auto-match" style="width:15px;height:15px;accent-color:var(--accent2);cursor:pointer" onchange="onAutoMatchChange()"/>
               <div>
-                <div style="font-size:13px;color:var(--text);font-weight:500;">🔍 Auto Template Matching</div>
-                <div style="font-size:11px;color:var(--text2);margin-top:2px;">Αυτόματη επιλογή template ανά τιμολόγιο βάσει προμηθευτή</div>
+                <div style="font-size:12px;color:var(--text);font-weight:500;">🔍 Auto Template Matching</div>
+                <div style="font-size:10px;color:var(--text2);margin-top:1px;">Αυτόματη επιλογή template ανά τιμολόγιο</div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg3);border-radius:8px;margin-bottom:12px;">
-              <input type="checkbox" id="batch-skip-completed" style="width:16px;height:16px;accent-color:var(--warn);cursor:pointer"/>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg3);border-radius:8px;margin-bottom:10px;">
+              <input type="checkbox" id="batch-skip-completed" style="width:15px;height:15px;accent-color:var(--warn);cursor:pointer"/>
               <div>
-                <div style="font-size:13px;color:var(--text);font-weight:500;">⏭ Παράλειψη Ολοκληρωμένων</div>
-                <div style="font-size:11px;color:var(--text2);margin-top:2px;">Παράλειψη εγγράφων που έχουν ήδη εξαχθεί επιτυχώς</div>
+                <div style="font-size:12px;color:var(--text);font-weight:500;">⏭ Παράλειψη Ολοκληρωμένων</div>
+                <div style="font-size:10px;color:var(--text2);margin-top:1px;">Παράλειψη εγγράφων που έχουν ήδη εξαχθεί</div>
               </div>
             </div>
             <button class="btn btn-secondary" style="width:100%;margin-bottom:10px" id="batch-preview-btn" onclick="doPreCheck('batch')" disabled>
@@ -981,6 +995,87 @@ function clearFile(type) {
   preCheckDone[type] = false;
   preCheckResult[type] = null;
   uploadedDocIds[type] = null;
+  // Reset history selection
+  if (type === 'batch') {
+    historyFilePath = null; historyFileName = null;
+    const sel = document.getElementById('batch-history-select');
+    if (sel) sel.value = '';
+  }
+}
+
+// ── File Source: Upload vs History ───────────────────────────────────────────
+let currentFileSource = 'upload';   // 'upload' | 'history'
+let historyFilePath   = null;       // server-side file_path from selected history entry
+let historyFileName   = null;       // display name
+
+function setFileSource(source) {
+  currentFileSource = source;
+  const uplBtn  = document.getElementById('src-upload-btn');
+  const hisBtn  = document.getElementById('src-history-btn');
+  const uplDiv  = document.getElementById('batch-source-upload');
+  const hisDiv  = document.getElementById('batch-source-history');
+
+  if (source === 'upload') {
+    uplBtn.style.borderColor = 'var(--accent)'; uplBtn.style.color = 'var(--accent)';
+    hisBtn.style.borderColor = '';               hisBtn.style.color = '';
+    uplDiv.style.display = ''; hisDiv.style.display = 'none';
+    // Reset history selection
+    historyFilePath = null; historyFileName = null;
+    document.getElementById('batch-history-select').value = '';
+    document.getElementById('batch-selected').style.display = 'none';
+  } else {
+    hisBtn.style.borderColor = 'var(--accent)'; hisBtn.style.color = 'var(--accent)';
+    uplBtn.style.borderColor = '';               uplBtn.style.color = '';
+    uplDiv.style.display = 'none'; hisDiv.style.display = '';
+    // Clear file input
+    document.getElementById('batch-file').value = '';
+    document.getElementById('batch-selected').style.display = 'none';
+    // Load history files in dropdown
+    loadHistoryFiles();
+  }
+  // Reset pre-check state
+  preCheckDone['batch'] = false; preCheckResult['batch'] = null;
+  const prevBtn = document.getElementById('batch-preview-btn');
+  if (prevBtn) prevBtn.disabled = true;
+}
+
+async function loadHistoryFiles() {
+  const sel = document.getElementById('batch-history-select');
+  sel.innerHTML = '<option value="">— Επιλέξτε αρχείο από ιστορικό —</option>';
+  const res = await api('GET', '/api/activity?limit=100');
+  const items = (res && res.activities) || [];
+  // Keep unique file_paths (most recent first, already sorted)
+  const seen = new Set();
+  for (const a of items) {
+    if (a.file_path && !seen.has(a.file_path)) {
+      seen.add(a.file_path);
+      const opt = document.createElement('option');
+      opt.value = a.file_path;
+      opt.textContent = a.filename + ' (' + (a.created_at || '').replace('T',' ').slice(0,16) + ')';
+      sel.appendChild(opt);
+    }
+  }
+}
+
+function onHistoryFileSelect() {
+  const sel = document.getElementById('batch-history-select');
+  const fp  = sel.value;
+  if (!fp) {
+    historyFilePath = null; historyFileName = null;
+    document.getElementById('batch-selected').style.display = 'none';
+    const prevBtn = document.getElementById('batch-preview-btn');
+    if (prevBtn) prevBtn.disabled = true;
+    return;
+  }
+  historyFilePath = fp;
+  // Extract filename from path
+  historyFileName = fp.split('/').pop() || fp;
+  document.getElementById('batch-filename').textContent = historyFileName;
+  document.getElementById('batch-selected').style.display = 'block';
+  const prevBtn = document.getElementById('batch-preview-btn');
+  if (prevBtn) prevBtn.disabled = false;
+  // Reset pre-check
+  preCheckDone['batch'] = false; preCheckResult['batch'] = null;
 }
 
 async function doSingleExtract() {
@@ -1061,7 +1156,8 @@ async function doBatchUpload() {
   const schemaRaw     = document.getElementById('batch-schema').value;
   const autoMatch     = document.getElementById('batch-auto-match').checked;
   const skipCompleted = document.getElementById('batch-skip-completed').checked;
-  if (!inp.files.length) { toast('Επίλεξε PDF πρώτα','error'); return; }
+  const useHistory    = currentFileSource === 'history' && historyFilePath;
+  if (!useHistory && !inp.files.length) { toast('Επίλεξε PDF πρώτα','error'); return; }
   // Αν είναι __none__ (χωρίς fallback) χρειάζεται ενεργό Auto Match
   if (schemaRaw === '__none__' && !autoMatch) {
     toast('Επίλεξε template ή ενεργοποίησε το Auto Template Matching','error'); return;
@@ -1077,7 +1173,11 @@ async function doBatchUpload() {
 
   // ΒΗΜΑ 1: Pre-check — ίδια διαδικασία με "Επεξεργασία & Δημιουργία Template"
   const pcFd = new FormData();
-  pcFd.append('file', inp.files[0]);
+  if (useHistory) {
+    pcFd.append('file_path', historyFilePath);
+  } else {
+    pcFd.append('file', inp.files[0]);
+  }
   const pcRes = await api('POST', '/api/batch/pre-check', pcFd, true);
 
   if (!pcRes || pcRes.error) {
@@ -1094,7 +1194,11 @@ async function doBatchUpload() {
   btn.innerHTML='<span class="spinner"></span> Ανέβασμα...';
 
   const fd = new FormData();
-  fd.append('file', inp.files[0]);
+  if (useHistory) {
+    fd.append('file_path', historyFilePath);
+  } else {
+    fd.append('file', inp.files[0]);
+  }
   fd.append('schema_name', schema);
   fd.append('auto_match',     autoMatch     ? 'true' : 'false');
   fd.append('skip_completed', skipCompleted ? 'true' : 'false');
@@ -1202,7 +1306,8 @@ async function showBatchCompletionModal(st) {
     total_invoices: totalInvoices,
     without_template: withoutTemplate,
     needs_approval: needsApproval,
-    no_approval: noApproval
+    no_approval: noApproval,
+    file_path: pc ? (pc.file_path || null) : null
   });
 
   // Καθαρισμός pre-check data
@@ -1265,7 +1370,8 @@ async function saveActivity(filename, action, data) {
       without_template: data.without_template || 0,
       needs_approval: data.needs_approval || 0,
       no_approval: data.no_approval || 0,
-      result_data: data
+      result_data: data,
+      file_path: data.file_path || null
     });
     loadActivityHistory();
   } catch(e) { console.error('Activity save error:', e); }
@@ -1678,12 +1784,13 @@ let preCheckResult = { single: null, batch: null };
 
 // ── Pre-Check: Ανάλυση αρχείου πριν το template builder ─────────────────────
 async function doPreCheck(type) {
+  const useHistory = (type === 'batch') && currentFileSource === 'history' && historyFilePath;
   const fileInput = document.getElementById(type + '-file');
-  if (!fileInput || !fileInput.files.length) {
+  if (!useHistory && (!fileInput || !fileInput.files.length)) {
     toast('Επίλεξε αρχείο πρώτα', 'error'); return;
   }
 
-  const file = fileInput.files[0];
+  const file = useHistory ? null : fileInput.files[0];
   const modal = document.getElementById('precheck-modal');
   const body  = document.getElementById('precheck-modal-body');
   const title = document.getElementById('precheck-modal-title');
@@ -1694,7 +1801,11 @@ async function doPreCheck(type) {
 
   // Κλήση API
   const fd = new FormData();
-  fd.append('file', file);
+  if (useHistory) {
+    fd.append('file_path', historyFilePath);
+  } else {
+    fd.append('file', file);
+  }
   const endpoint = type === 'batch' ? '/api/batch/pre-check' : '/api/upload/pre-check';
   const res = await api('POST', endpoint, fd, true);
 
@@ -1707,7 +1818,7 @@ async function doPreCheck(type) {
   preCheckDone[type] = true;
 
   // Αποθήκευση στο ιστορικό
-  const pcFilename = file.name || 'unknown';
+  const pcFilename = useHistory ? historyFileName : (file.name || 'unknown');
   saveActivity(pcFilename, 'pre-check', res);
 
   const total     = res.total_invoices || 0;

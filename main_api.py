@@ -545,16 +545,23 @@ def batch_pre_check():
     """
     Pre-check: Κάνει segmentation + supplier detection + template matching.
     Επιστρέφει στατιστικά πριν ξεκινήσει το batch.
+    Δέχεται file upload Ή file_path (για αρχεία από ιστορικό).
     """
-    if "file" not in request.files:
+    # Πηγή αρχείου: upload ή file_path από ιστορικό
+    file_path_param = request.form.get("file_path", "").strip()
+    if file_path_param and Path(file_path_param).exists():
+        dest = Path(file_path_param)
+        original_filename = dest.name
+    elif "file" in request.files:
+        f = request.files["file"]
+        suffix = Path(f.filename).suffix.lower()
+        if suffix != ".pdf":
+            return jsonify({"error": "Μόνο PDF αρχεία γίνονται δεκτά."}), 400
+        dest = UPLOAD_DIR / f.filename
+        f.save(str(dest))
+        original_filename = f.filename
+    else:
         return jsonify({"error": "Δεν βρέθηκε αρχείο."}), 400
-    f = request.files["file"]
-    suffix = Path(f.filename).suffix.lower()
-    if suffix != ".pdf":
-        return jsonify({"error": "Μόνο PDF αρχεία γίνονται δεκτά."}), 400
-
-    dest = UPLOAD_DIR / f.filename
-    f.save(str(dest))
 
     try:
         # Pass 1: Μετατροπή σελίδων σε εικόνες
@@ -686,7 +693,8 @@ def batch_pre_check():
 
         return jsonify({
             "success": True,
-            "filename": f.filename,
+            "filename": original_filename,
+            "file_path": str(dest),
             "total_pages": total_pages,
             "total_invoices": total_invoices,
             "without_template": without_template,
@@ -703,23 +711,30 @@ def batch_pre_check():
 @app.post("/api/batch")
 @require_auth
 def batch_upload():
-    if "file" not in request.files:
+    """Δέχεται file upload Ή file_path (για αρχεία από ιστορικό)."""
+    file_path_param = request.form.get("file_path", "").strip()
+    if file_path_param and Path(file_path_param).exists():
+        dest = Path(file_path_param)
+        original_filename = dest.name
+    elif "file" in request.files:
+        f      = request.files["file"]
+        suffix = Path(f.filename).suffix.lower()
+        if suffix != ".pdf":
+            return jsonify({"error": "Μόνο PDF αρχεία γίνονται δεκτά."}), 400
+        dest = UPLOAD_DIR / f.filename
+        f.save(str(dest))
+        original_filename = f.filename
+    else:
         return jsonify({"error": "Δεν βρέθηκε αρχείο."}), 400
-    f      = request.files["file"]
-    suffix = Path(f.filename).suffix.lower()
-    if suffix != ".pdf":
-        return jsonify({"error": "Μόνο PDF αρχεία γίνονται δεκτά."}), 400
     schema_name    = request.form.get("schema_name", "invoice")
     auto_match     = request.form.get("auto_match", "false").lower() == "true"
     skip_completed = request.form.get("skip_completed", "false").lower() == "true"
-    dest = UPLOAD_DIR / f.filename
-    f.save(str(dest))
     job_id = batch_proc.submit(pdf_path=dest, schema_name=schema_name,
-                               original_filename=f.filename,
+                               original_filename=original_filename,
                                auto_match=auto_match,
                                skip_completed=skip_completed)
     return jsonify({"success": True, "job_id": job_id,
-                    "filename": f.filename, "schema_name": schema_name})
+                    "filename": original_filename, "schema_name": schema_name})
 
 @app.get("/api/batch/<job_id>/status")
 @require_auth
@@ -751,7 +766,8 @@ def activity_create():
         without_template=data.get("without_template", 0),
         needs_approval=data.get("needs_approval", 0),
         no_approval=data.get("no_approval", 0),
-        result_json=json.dumps(data.get("result_data")) if data.get("result_data") else None
+        result_json=json.dumps(data.get("result_data")) if data.get("result_data") else None,
+        file_path=data.get("file_path")
     )
     return jsonify({"success": True, "id": aid})
 

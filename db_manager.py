@@ -106,6 +106,7 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS activity_log (
                     id              INTEGER PRIMARY KEY AUTOINCREMENT,
                     filename        TEXT    NOT NULL,
+                    file_path       TEXT,
                     action          TEXT    NOT NULL,
                     total_invoices  INTEGER NOT NULL DEFAULT 0,
                     without_template INTEGER NOT NULL DEFAULT 0,
@@ -115,6 +116,12 @@ class DatabaseManager:
                     created_at      TEXT    NOT NULL
                 )
             """)
+            # Migration: add file_path column if missing
+            try:
+                self.conn.execute("ALTER TABLE activity_log ADD COLUMN file_path TEXT")
+                self.conn.commit()
+            except Exception:
+                pass
 
             # Users table: authentication and authorization
             self.conn.execute("""
@@ -260,15 +267,15 @@ class DatabaseManager:
     def insert_activity(self, filename: str, action: str,
                         total_invoices: int = 0, without_template: int = 0,
                         needs_approval: int = 0, no_approval: int = 0,
-                        result_json: str = None) -> int:
+                        result_json: str = None, file_path: str = None) -> int:
         """Insert a new activity log entry. Returns the new row id."""
         now = datetime.utcnow().isoformat()
         cursor = self.conn.execute(
             """INSERT INTO activity_log
-               (filename, action, total_invoices, without_template,
+               (filename, file_path, action, total_invoices, without_template,
                 needs_approval, no_approval, result_json, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (filename, action, total_invoices, without_template,
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (filename, file_path, action, total_invoices, without_template,
              needs_approval, no_approval, result_json, now)
         )
         self.conn.commit()
