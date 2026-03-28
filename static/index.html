@@ -1091,6 +1091,9 @@ async function doSingleExtract() {
   }
 }
 
+// Μεταβλητή για αποθήκευση pre-check αποτελεσμάτων κατά το batch
+let batchPreCheckData = null;
+
 async function doBatchUpload() {
   const inp           = document.getElementById('batch-file');
   const schemaRaw     = document.getElementById('batch-schema').value;
@@ -1108,7 +1111,25 @@ async function doBatchUpload() {
   if (!schema) { toast('Δεν υπάρχουν templates. Δημιούργησε πρώτα ένα template.','error'); return; }
 
   const btn = document.getElementById('batch-btn');
-  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Ανέβασμα...';
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Ανάλυση αρχείου...';
+
+  // ΒΗΜΑ 1: Pre-check — ίδια διαδικασία με "Επεξεργασία & Δημιουργία Template"
+  const pcFd = new FormData();
+  pcFd.append('file', inp.files[0]);
+  const pcRes = await api('POST', '/api/batch/pre-check', pcFd, true);
+
+  if (!pcRes || pcRes.error) {
+    btn.disabled=false;
+    btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Έναρξη Batch';
+    toast(pcRes?.error || 'Σφάλμα ανάλυσης αρχείου', 'error');
+    return;
+  }
+
+  // Αποθήκευση pre-check δεδομένων για χρήση στο completion modal
+  batchPreCheckData = pcRes;
+
+  // ΒΗΜΑ 2: Ξεκινάμε batch extraction
+  btn.innerHTML='<span class="spinner"></span> Ανέβασμα...';
 
   const fd = new FormData();
   fd.append('file', inp.files[0]);
@@ -1191,8 +1212,11 @@ function pollBatchJob(job_id) {
 async function showBatchCompletionModal(st) {
   const docIds = st.doc_ids || [];
 
-  // Φόρτωσε τα documents για ανάλυση αποτελεσμάτων
-  let withoutTemplate = 0;
+  // Χρήση pre-check δεδομένων για ακριβή αριθμό "χωρίς template"
+  const pc = batchPreCheckData;
+  const withoutTemplate = pc ? (pc.without_template || 0) : 0;
+
+  // Φόρτωσε τα documents για να βρεις πόσα χρειάζονται/δεν χρειάζονται έγκριση
   let noApproval      = 0;   // Completed (χωρίς έγκριση)
   let needsApproval   = 0;   // pending_review (με έγκριση)
   let firstReviewId   = null;
@@ -1202,9 +1226,7 @@ async function showBatchCompletionModal(st) {
     if (docsRes && docsRes.documents) {
       const batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
       for (const d of batchDocs) {
-        if (d.status === 'Failed') {
-          withoutTemplate++;
-        } else if (d.status === 'pending_review') {
+        if (d.status === 'pending_review') {
           needsApproval++;
           if (!firstReviewId) firstReviewId = d.id;
         } else if (d.status === 'Completed') {
@@ -1213,6 +1235,9 @@ async function showBatchCompletionModal(st) {
       }
     }
   }
+
+  // Καθαρισμός pre-check data
+  batchPreCheckData = null;
 
   const modal = document.getElementById('precheck-modal');
   const title = document.getElementById('precheck-modal-title');
