@@ -323,7 +323,8 @@ select.form-input option{background:var(--bg2);}
                 <option value="pre-check">Επεξεργασία</option>
                 <option value="batch">Batch</option>
               </select>
-              <input type="date" id="af-date" onchange="applyActivityFilters()" style="padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;" title="Ημερομηνία"/>
+              <input type="date" id="af-date-from" onchange="applyActivityFilters()" style="padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;max-width:115px;" title="Από"/>
+              <input type="date" id="af-date-to" onchange="applyActivityFilters()" style="padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;max-width:115px;" title="Μέχρι"/>
               <button class="af-btn" onclick="clearActivityFilters()" title="Καθαρισμός">✕</button>
             </div>
             <div id="activity-list" style="flex:1;overflow-y:auto;font-size:12px;">
@@ -1499,7 +1500,8 @@ function applyActivityFilters() {
   const needsAp = document.getElementById('af-needs-appr').classList.contains('active');
   const noAp    = document.getElementById('af-no-appr').classList.contains('active');
   const action  = document.getElementById('af-action').value;
-  const dateVal = document.getElementById('af-date').value; // YYYY-MM-DD
+  const dateFrom = document.getElementById('af-date-from').value; // YYYY-MM-DD
+  const dateTo   = document.getElementById('af-date-to').value;   // YYYY-MM-DD
 
   const filtered = allActivityItems.filter(a => {
     if (fname && !(a.filename || '').toLowerCase().includes(fname)) return false;
@@ -1507,9 +1509,10 @@ function applyActivityFilters() {
     if (needsAp && (a.needs_approval || 0) < 1) return false;
     if (noAp && (a.no_approval || 0) < 1) return false;
     if (action && a.action !== action) return false;
-    if (dateVal && a.created_at) {
+    if ((dateFrom || dateTo) && a.created_at) {
       const localDate = formatLocalDate(a.created_at).substring(0, 10);
-      if (localDate !== dateVal) return false;
+      if (dateFrom && localDate < dateFrom) return false;
+      if (dateTo   && localDate > dateTo)   return false;
     }
     return true;
   });
@@ -1522,7 +1525,8 @@ function clearActivityFilters() {
   document.getElementById('af-needs-appr').classList.remove('active');
   document.getElementById('af-no-appr').classList.remove('active');
   document.getElementById('af-action').value = '';
-  document.getElementById('af-date').value = '';
+  document.getElementById('af-date-from').value = '';
+  document.getElementById('af-date-to').value = '';
   renderActivityList(allActivityItems);
 }
 

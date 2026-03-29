@@ -123,9 +123,27 @@ def save_template():
         return jsonify({"error": str(e)}), 400
 
 
+def _match_supplier_to_template(supplier, templates):
+    """Match a supplier name against template supplier_patterns.
+    Returns template name or None."""
+    if not supplier or supplier.lower() == "unknown":
+        return None
+    sup_lower = supplier.lower()
+    for tmpl in templates:
+        pattern = (tmpl.get("supplier_pattern") or "").strip().lower()
+        if not pattern:
+            continue
+        keywords = [k.strip() for k in pattern.split(",") if k.strip()]
+        for kw in keywords:
+            if kw and kw in sup_lower:
+                return tmpl["name"]
+    return None
+
+
 def _recalc_activities_after_template_change():
     """Re-match suppliers in ALL activity entries against current templates.
-    Updates counts (without_template, needs_approval, no_approval) when changed.
+    Handles both pre-check entries (with invoices array) and batch entries
+    (with doc_ids — looks up actual documents in the database).
     Returns list of activity IDs that were updated."""
     templates = db.list_templates()
     templates_dict = {t["name"]: t for t in templates}
@@ -142,48 +160,78 @@ def _recalc_activities_after_template_change():
             continue
 
         invoices = result_data.get("invoices")
-        if not invoices or not isinstance(invoices, list):
-            continue
+        doc_ids  = result_data.get("doc_ids")
 
-        # Re-match each invoice supplier against current templates
         new_without = 0
         new_needs   = 0
         new_no_appr = 0
-        changed = False
+        changed     = False
+        total_count = 0
 
-        for inv in invoices:
-            supplier = (inv.get("supplier") or "").strip()
-            old_match = inv.get("matched_template")
-            new_match = None
+        if invoices and isinstance(invoices, list):
+            # ── Pre-check entries: have per-invoice supplier info ──
+            total_count = len(invoices)
+            for inv in invoices:
+                supplier  = (inv.get("supplier") or "").strip()
+                old_match = inv.get("matched_template")
+                new_match = _match_supplier_to_template(supplier, templates)
 
-            if supplier and supplier.lower() != "unknown":
-                sup_lower = supplier.lower()
-                for tmpl in templates:
-                    pattern = (tmpl.get("supplier_pattern") or "").strip().lower()
-                    if not pattern:
-                        continue
-                    keywords = [k.strip() for k in pattern.split(",") if k.strip()]
-                    for kw in keywords:
-                        if kw and kw in sup_lower:
-                            new_match = tmpl["name"]
-                            break
-                    if new_match:
-                        break
+                if new_match != old_match:
+                    inv["matched_template"] = new_match
+                    changed = True
 
-            # Update invoice record in result_data
-            if new_match != old_match:
-                inv["matched_template"] = new_match
-                changed = True
-
-            # Count statistics
-            if not new_match:
-                new_without += 1
-            else:
-                tmpl_info = templates_dict.get(new_match, {})
-                if tmpl_info.get("require_review"):
-                    new_needs += 1
+                if not new_match:
+                    new_without += 1
                 else:
-                    new_no_appr += 1
+                    tmpl_info = templates_dict.get(new_match, {})
+                    if tmpl_info.get("require_review"):
+                        new_needs += 1
+                    else:
+                        new_no_appr += 1
+
+        elif doc_ids and isinstance(doc_ids, list):
+            # ── Batch entries: look up actual documents by doc_ids ──
+            total_count = len(doc_ids)
+            inv_list = []  # Build invoices array for future recalcs
+            for did in doc_ids:
+                doc = db.get_document(did)
+                if not doc:
+                    total_count -= 1
+                    continue
+                # Extract supplier from document result_data
+                doc_result = {}
+                if doc.get("result_json"):
+                    try:
+                        doc_result = json.loads(doc["result_json"])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                supplier = (doc_result.get("supplier_name") or
+                            doc_result.get("vendor_name") or
+                            doc_result.get("company") or "").strip()
+                old_schema = doc.get("schema_name") or ""
+                new_match  = _match_supplier_to_template(supplier, templates)
+
+                inv_list.append({
+                    "doc_id": did,
+                    "supplier": supplier,
+                    "matched_template": new_match
+                })
+
+                if not new_match:
+                    new_without += 1
+                else:
+                    tmpl_info = templates_dict.get(new_match, {})
+                    if tmpl_info.get("require_review"):
+                        new_needs += 1
+                    else:
+                        new_no_appr += 1
+
+            # Store invoices array in result_data for future recalcs
+            if inv_list:
+                result_data["invoices"] = inv_list
+                changed = True
+        else:
+            continue  # No data to recalculate
 
         # Check if counts actually changed
         if (new_without != (act.get("without_template") or 0) or
@@ -192,7 +240,7 @@ def _recalc_activities_after_template_change():
             changed):
 
             result_data["without_template"] = new_without
-            result_data["with_template"]    = len(invoices) - new_without
+            result_data["with_template"]    = total_count - new_without
             result_data["needs_approval"]   = new_needs
             result_data["no_approval"]      = new_no_appr
 
