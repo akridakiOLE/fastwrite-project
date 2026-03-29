@@ -1803,17 +1803,39 @@ def serve_review_page(doc_id):
         <a href='javascript:history.back()' style='color:#00e5a0'>← Επιστροφή</a>
         </body></html>""", 200
 
-    # Get ALL batch siblings (not just pending_review) for navigation
-    original = doc.get("original_filename")
-    if original:
-        all_docs = db.list_documents()
+    # Find the batch activity that contains this doc_id → use its doc_ids
+    # This ensures we only show siblings from the SAME batch run
+    batch_doc_ids = set()
+    activities = db.list_activities(limit=200)
+    for act in activities:
+        rj = act.get("result_json")
+        if not rj:
+            continue
+        try:
+            rd_act = _json.loads(rj)
+        except:
+            continue
+        dids = rd_act.get("doc_ids", [])
+        if doc_id in dids:
+            batch_doc_ids = set(dids)
+            break
+
+    all_docs = db.list_documents()
+    if batch_doc_ids:
         sibling_docs = [d for d in all_docs
-                        if d.get("original_filename") == original
-                        and d.get("filename") != original
+                        if d["id"] in batch_doc_ids
                         and d.get("result_json")]
-        sibling_docs.sort(key=lambda d: d["id"])
     else:
-        sibling_docs = [doc] if doc.get("result_json") else []
+        # Fallback: match by original_filename
+        original = doc.get("original_filename")
+        if original:
+            sibling_docs = [d for d in all_docs
+                            if d.get("original_filename") == original
+                            and d.get("filename") != original
+                            and d.get("result_json")]
+        else:
+            sibling_docs = [doc] if doc.get("result_json") else []
+    sibling_docs.sort(key=lambda d: d["id"])
 
     sibling_ids = [d["id"] for d in sibling_docs]
 
