@@ -575,7 +575,10 @@ select.form-input option{background:var(--bg2);}
       <input class="form-input" id="tmpl-supplier-pattern" placeholder="π.χ. cosmote, ote, κοσμοτε — πολλαπλές με κόμμα"/>
     </div>
     <div id="tmpl-fields"></div>
-    <button class="btn btn-secondary btn-sm" onclick="addField()" style="margin-bottom:16px;">+ Προσθήκη Πεδίου</button>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button class="btn btn-secondary btn-sm" onclick="addField()">+ Προσθήκη Πεδίου</button>
+      <button class="btn btn-secondary btn-sm" id="tmpl-paste-btn" onclick="pasteTemplateFromClipboard()" style="display:none;">📋 Επικόλληση</button>
+    </div>
     <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg3);border-radius:8px;margin-bottom:16px;">
       <input type="checkbox" id="tmpl-require-review" style="width:16px;height:16px;accent-color:var(--warn);cursor:pointer"/>
       <div>
@@ -1499,7 +1502,7 @@ async function loadTemplates() {
         <div class="card-title" style="margin:0">${t.name}</div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-secondary btn-sm" onclick="editTemplate('${t.name}')">✏️ Επεξεργασία</button>
-          <button class="btn btn-secondary btn-sm" onclick="copyTemplateToNew('${t.name}')" title="Αντιγραφή template">📋 Αντιγραφή</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyTemplateToClipboard('${t.name}')" title="Αντιγραφή template">📋 Αντιγραφή</button>
           <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${t.name}')">Διαγραφή</button>
         </div>
       </div>
@@ -1523,6 +1526,9 @@ function openTemplateModal() {
   document.getElementById('tmpl-require-review').checked=false;
   document.querySelector('#tmpl-modal .modal-title').textContent='Νέο Template';
   document.getElementById('tmpl-save-btn').textContent='Αποθήκευση Template';
+  // Εμφάνιση κουμπιού Επικόλληση μόνο αν υπάρχει αντιγραμμένο template
+  const pasteBtn = document.getElementById('tmpl-paste-btn');
+  if (pasteBtn) pasteBtn.style.display = copiedTemplateData ? '' : 'none';
   addField(); addField(); addField();
   openModal('tmpl-modal');
 }
@@ -1568,23 +1574,21 @@ async function editTemplate(name) {
   openModal('tmpl-modal');
 }
 
-async function copyTemplateToNew(name) {
+// ── Clipboard για αντιγραφή template ──
+let copiedTemplateData = null;
+
+async function copyTemplateToClipboard(name) {
   const tmpl = await api('GET', `/api/templates/${encodeURIComponent(name)}`);
   if (!tmpl || tmpl.error) { toast('Σφάλμα φόρτωσης template','error'); return; }
+  copiedTemplateData = tmpl;
+  toast('📋 Αντιγράφηκε: ' + name, 'success');
+}
 
-  // Βρες μοναδικό όνομα
-  const allRes = await api('GET', '/api/templates');
-  const allNames = (allRes.templates||[]).map(t => t.name);
-  let newName = name + ' (1)', i = 1;
-  while (allNames.includes(newName)) { i++; newName = name + ' (' + i + ')'; }
-
-  document.getElementById('tmpl-name').value = newName;
-  document.getElementById('tmpl-name').readOnly = false;
-  document.getElementById('tmpl-original-name').value = '';  // Νέο template, δεν υπάρχει original
-  document.querySelector('#tmpl-modal .modal-title').textContent = '📋 Αντιγραφή: ' + name;
-  document.getElementById('tmpl-save-btn').textContent = 'Αποθήκευση Template';
-  document.getElementById('tmpl-require-review').checked = !!tmpl.require_review;
+function pasteTemplateFromClipboard() {
+  if (!copiedTemplateData) { toast('Δεν υπάρχει αντιγραμμένο template','error'); return; }
+  const tmpl = copiedTemplateData;
   document.getElementById('tmpl-supplier-pattern').value = tmpl.supplier_pattern || '';
+  document.getElementById('tmpl-require-review').checked = !!tmpl.require_review;
   document.getElementById('tmpl-fields').innerHTML = '';
 
   (tmpl.fields||[]).forEach(f => {
@@ -1609,8 +1613,7 @@ async function copyTemplateToNew(name) {
       }
     }
   });
-
-  openModal('tmpl-modal');
+  toast('📋 Επικολλήθηκε: ' + tmpl.name, 'success');
 }
 
 function addField() {
