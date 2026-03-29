@@ -1817,6 +1817,23 @@ def serve_review_page(doc_id):
 
     sibling_ids = [d["id"] for d in sibling_docs]
 
+    # Build sibling info for the invoice list panel
+    sibling_info = []
+    for sd in sibling_docs:
+        sd_result = {}
+        if sd.get("result_json"):
+            try: sd_result = _json.loads(sd["result_json"])
+            except: pass
+        supplier = (sd_result.get("vendor_name") or sd_result.get("supplier_name") or
+                     sd_result.get("company") or sd.get("filename") or "Doc #%s" % sd["id"])
+        inv_num = sd_result.get("invoice_number") or sd_result.get("INVOICE_NUMBER") or ""
+        sibling_info.append({
+            "id": sd["id"],
+            "status": sd.get("status", ""),
+            "supplier": supplier,
+            "invoice": inv_num
+        })
+
     rd = {}
     if doc.get("result_json"):
         try: rd = _json.loads(doc["result_json"])
@@ -1839,8 +1856,7 @@ def serve_review_page(doc_id):
     first_id = sibling_ids[0] if total > 0 else None
     prev_id  = sibling_ids[cur_pos - 1] if cur_pos > 0 else None
     next_id  = sibling_ids[cur_pos + 1] if cur_pos < total - 1 else None
-    pos_label = "%s / %s" % (cur_pos + 1, total) if total else "—"
-    after_action = ('location.replace("/ui/review/'+str(next_id)+'")') if next_id else 'window.location.href="/ui#upload"'
+    # Navigation is now handled by the invoice list panel in JS
 
     scalar_rows_html = ""
     line_items_data = {}
@@ -1919,6 +1935,22 @@ tbody tr:hover td{background:#181c24}
 tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!important;outline:1px solid rgba(0,229,160,0.35)}
 .toast{position:fixed;bottom:20px;left:50%%;transform:translateX(-50%%);background:#1a1a2a;border:1px solid #333;padding:10px 22px;border-radius:8px;font-size:13px;display:none;z-index:9999}
 .toast.show{display:block}
+.inv-panel{flex-shrink:0;border-bottom:1px solid #1e2330;background:#0d0f14}
+.inv-header{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;cursor:pointer;user-select:none}
+.inv-header:hover{background:#111318}
+.inv-header-title{font-size:10px;color:#666;font-family:monospace;letter-spacing:.8px;text-transform:uppercase}
+.inv-chevron{font-size:10px;color:#00e5a0;transition:transform .2s}
+.inv-list{max-height:180px;overflow-y:auto;padding:4px 6px}
+.inv-list.collapsed{display:none}
+.inv-item{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:5px;margin-bottom:2px;border-left:3px solid transparent;cursor:pointer;font-size:11px;transition:background .1s}
+.inv-item:hover{background:#181c24}
+.inv-item.current{background:rgba(0,229,160,0.08);border-left-color:#00e5a0}
+.inv-item.pending{border-left-color:#f59e0b}
+.inv-item.completed{border-left-color:rgba(0,229,160,0.4)}
+.inv-item .inv-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ccc}
+.inv-item .inv-badge{font-size:9px;padding:1px 6px;border-radius:4px;white-space:nowrap;font-weight:600}
+.inv-badge.b-pending{background:rgba(255,179,0,0.12);color:#f59e0b}
+.inv-badge.b-done{background:rgba(0,229,160,0.1);color:#00e5a0}
 </style>
 </head>
 <body>
@@ -1928,10 +1960,6 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
     <div class="topbar-sub">Template: %(schema)s &nbsp;·&nbsp; %(date)s</div>
   </div>
   <div class="topbar-right">
-    <span class="pos-label">%(pos_label)s</span>
-    %(first_btn)s
-    %(prev_btn)s
-    %(next_btn)s
     <button class="btn btn-back" onclick="%(after_back)s">&#8592; Επιστροφή</button>
     <button class="btn btn-tmpl" onclick="window.open('/ui/template-builder/%(doc_id)s','_blank')">&#9998; Template Builder</button>
     <button class="btn btn-reject" onclick="doReject()">&#10005; Απόρριψη</button>
@@ -1939,6 +1967,13 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
 </div>
 <div class="split">
   <div class="img-side">
+    <div class="inv-panel">
+      <div class="inv-header" onclick="toggleInvPanel()">
+        <span class="inv-header-title">&#128196; Τιμολόγια <span id="inv-count-label" style="color:#aaa;font-weight:400;"></span></span>
+        <span class="inv-chevron" id="inv-chevron">&#9650;</span>
+      </div>
+      <div class="inv-list" id="inv-list"></div>
+    </div>
     <div class="img-bar">
       <span class="img-bar-label" id="img-bar-label">%(filename)s</span>
       <a href="%(pdf_url)s" target="_blank">&#8599; Άνοιγμα PDF</a>
@@ -1975,10 +2010,11 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
 </div>
 <div class="toast" id="toast"></div>
 <script>
-const DOC_ID      = %(doc_id)s;
-const DOC_STATUS  = '%(doc_status)s';
-const SIBLING_IDS = %(sibling_ids_json)s;
-const LINE_DATA   = %(line_data_json)s;
+const DOC_ID       = %(doc_id)s;
+const DOC_STATUS   = '%(doc_status)s';
+const SIBLING_IDS  = %(sibling_ids_json)s;
+const SIBLING_INFO = %(sibling_info_json)s;
+const LINE_DATA    = %(line_data_json)s;
 let dirty         = false;
 let curRow      = -1;
 let curArrKey   = null;
@@ -2150,28 +2186,6 @@ function collectData() {
   return data;
 }
 
-async function findNextPendingReview() {
-  // Find the next sibling doc with status pending_review
-  const curIdx = SIBLING_IDS.indexOf(DOC_ID);
-  try {
-    const r = await fetch('/api/documents', {credentials:'include'});
-    if (!r.ok) return null;
-    const data = await r.json();
-    const docs = data.documents || [];
-    const statusMap = {};
-    docs.forEach(function(d) { statusMap[d.id] = d.status; });
-    // Look for next pending_review after current position
-    for (var i = curIdx + 1; i < SIBLING_IDS.length; i++) {
-      if (statusMap[SIBLING_IDS[i]] === 'pending_review') return SIBLING_IDS[i];
-    }
-    // Wrap around: look from beginning up to current
-    for (var i = 0; i < curIdx; i++) {
-      if (statusMap[SIBLING_IDS[i]] === 'pending_review') return SIBLING_IDS[i];
-    }
-  } catch(e) { console.error(e); }
-  return null;
-}
-
 async function doApprove() {
   // Immediately disable to prevent double-click
   updateApproveBar('approving');
@@ -2190,15 +2204,11 @@ async function doApprove() {
     const j = await r.json();
     if (j.success) {
       updateApproveBar('Completed');
-      showToast('Εγκρίθηκε! (' + j.status + ')', '#00e5a0');
-      // Find next pending_review sibling
-      const nextId = await findNextPendingReview();
-      if (nextId) {
-        setTimeout(function(){ location.replace('/ui/review/' + nextId); }, 1200);
-      } else {
-        showToast('Ολοκληρώθηκαν όλες οι εγκρίσεις!', '#00e5a0');
-        // Stay on current page — user can click Επιστροφή when ready
-      }
+      // Update local sibling info to reflect the approval
+      var si = SIBLING_INFO.find(function(s){ return s.id === DOC_ID; });
+      if (si) si.status = 'Completed';
+      renderInvList();
+      showToast('Εγκρίθηκε!', '#00e5a0');
     } else {
       showToast('Σφάλμα: ' + (j.error || 'Unknown'), '#ff4444');
       updateApproveBar('pending_review');
@@ -2216,18 +2226,49 @@ async function doReject() {
     const j = await r.json();
     if (j.success) {
       showToast('Απορρίφθηκε', '#ff4444');
-      const nextId = await findNextPendingReview();
-      if (nextId) {
-        setTimeout(function(){ location.replace('/ui/review/' + nextId); }, 1200);
-      } else {
-        showToast('Δεν υπάρχουν άλλα προς έγκριση', '#ff4444');
-      }
+      updateApproveBar('Failed');
+      var si = SIBLING_INFO.find(function(s){ return s.id === DOC_ID; });
+      if (si) si.status = 'Failed';
+      renderInvList();
     }
     else showToast('Σφάλμα: ' + (j.error || 'Unknown'), '#ff4444');
   } catch(err) {
     showToast('JS Error: ' + err.message, '#ff4444');
   }
 }
+
+// ── Invoice list panel ──
+function renderInvList() {
+  const el = document.getElementById('inv-list');
+  const pending = SIBLING_INFO.filter(s => s.status === 'pending_review').length;
+  const total = SIBLING_INFO.length;
+  document.getElementById('inv-count-label').textContent = pending + ' προς έγκριση / ' + total + ' σύνολο';
+  el.innerHTML = SIBLING_INFO.map(function(s) {
+    const isCurrent = s.id === DOC_ID;
+    const isPending = s.status === 'pending_review';
+    const cls = 'inv-item' + (isCurrent ? ' current' : '') + (isPending ? ' pending' : ' completed');
+    const name = s.supplier ? (s.supplier.length > 25 ? s.supplier.slice(0,23) + '...' : s.supplier) : 'Doc #' + s.id;
+    const inv = s.invoice ? ' — ' + s.invoice : '';
+    const badge = isPending
+      ? '<span class="inv-badge b-pending">Προς Έγκριση</span>'
+      : '<span class="inv-badge b-done">\\u2713</span>';
+    return '<div class="' + cls + '" onclick="goToInvoice(' + s.id + ')" title="' + (s.supplier||'') + inv + '">'
+         + '<span class="inv-name">' + name + inv + '</span>'
+         + badge
+         + '</div>';
+  }).join('');
+}
+function goToInvoice(id) {
+  if (id === DOC_ID) return;
+  location.replace('/ui/review/' + id);
+}
+function toggleInvPanel() {
+  const list = document.getElementById('inv-list');
+  const chev = document.getElementById('inv-chevron');
+  list.classList.toggle('collapsed');
+  chev.textContent = list.classList.contains('collapsed') ? '\\u25bc' : '\\u25b2';
+}
+renderInvList();
 
 function updateApproveBar(status) {
   const bar = document.getElementById('approve-bar');
@@ -2256,18 +2297,14 @@ function showToast(msg, color) {
         "filename":       doc["filename"],
         "schema":         doc.get("schema_name", "—"),
         "date":           (doc.get("created_at") or "").split("T")[0],
-        "pos_label":      pos_label,
-        "first_btn":      ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">&#9198; Αρχή</span>' % first_id) if (first_id and cur_pos > 0) else '<span class="nav-btn disabled">&#9198; Αρχή</span>',
-        "prev_btn":       ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">&#9664; Προηγ.</span>' % prev_id) if prev_id else '<span class="nav-btn disabled">&#9664; Προηγ.</span>',
-        "next_btn":       ('<span class="nav-btn" onclick="location.replace(\'/ui/review/%s\')" style="cursor:pointer">Επόμ. &#9654;</span>' % next_id) if next_id else '<span class="nav-btn disabled">Επόμ. &#9654;</span>',
         "after_back":     "window.location.href='/ui#upload'",
-        "after_action":   after_action,
         "doc_id":         doc_id,
         "img_url":        img_url,
         "pdf_url":        pdf_url,
         "scalar_rows":    scalar_rows_html,
         "line_data_json":    _json.dumps(line_items_data, ensure_ascii=False),
-        "sibling_ids_json": _json.dumps(sibling_ids),
+        "sibling_ids_json":  _json.dumps(sibling_ids),
+        "sibling_info_json": _json.dumps(sibling_info, ensure_ascii=False),
         "doc_status":        doc.get("status", ""),
     }
 
