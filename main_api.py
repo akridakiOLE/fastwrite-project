@@ -1935,7 +1935,6 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
     <button class="btn btn-back" onclick="%(after_back)s">&#8592; Επιστροφή</button>
     <button class="btn btn-tmpl" onclick="window.open('/ui/template-builder/%(doc_id)s','_blank')">&#9998; Template Builder</button>
     <button class="btn btn-reject" onclick="doReject()">&#10005; Απόρριψη</button>
-    <button class="btn btn-approve" onclick="doApprove()">&#10003; Έγκριση</button>
   </div>
 </div>
 <div class="split">
@@ -2174,6 +2173,8 @@ async function findNextPendingReview() {
 }
 
 async function doApprove() {
+  // Immediately disable to prevent double-click
+  updateApproveBar('approving');
   try {
     // Save edits first if any changes were made
     if (dirty) {
@@ -2200,9 +2201,11 @@ async function doApprove() {
       }
     } else {
       showToast('Σφάλμα: ' + (j.error || 'Unknown'), '#ff4444');
+      updateApproveBar('pending_review');
     }
   } catch(err) {
     showToast('JS Error: ' + err.message, '#ff4444');
+    updateApproveBar('pending_review');
   }
 }
 
@@ -2231,6 +2234,9 @@ function updateApproveBar(status) {
   if (status === 'Completed') {
     bar.style.background = 'rgba(0,229,160,0.06)';
     bar.innerHTML = '<div style="text-align:center;padding:6px;font-size:12px;color:#00e5a0;font-weight:600;">\\u2713 Εγκρίθηκε</div>';
+  } else if (status === 'approving') {
+    bar.style.background = 'rgba(0,229,160,0.04)';
+    bar.innerHTML = '<div style="text-align:center;padding:10px;font-size:13px;color:#666;font-weight:600;">Έγκριση...</div>';
   } else {
     bar.style.background = 'rgba(0,229,160,0.08)';
     bar.innerHTML = '<button class="btn btn-approve" onclick="doApprove()" style="width:100%%;padding:10px;font-size:13px;font-weight:700;border-radius:8px;">\\u2713 Έγκριση Τιμολογίου</button>';
