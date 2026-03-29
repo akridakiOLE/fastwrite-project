@@ -180,8 +180,19 @@ def _recalc_activities_after_template_change():
                     inv["matched_template"] = new_match
                     changed = True
 
+                # Check if this invoice has a linked doc_id with status
+                doc_status = None
+                did = inv.get("doc_id")
+                if did:
+                    linked_doc = db.get_document(did)
+                    if linked_doc:
+                        doc_status = (linked_doc.get("status") or "").strip()
+
                 if not new_match:
                     new_without += 1
+                elif doc_status == "Completed":
+                    # Already approved → counts as no_approval
+                    new_no_appr += 1
                 else:
                     tmpl_info = templates_dict.get(new_match, {})
                     if tmpl_info.get("require_review"):
@@ -198,6 +209,7 @@ def _recalc_activities_after_template_change():
                 if not doc:
                     total_count -= 1
                     continue
+                doc_status = (doc.get("status") or "").strip()
                 # Extract supplier from document result_data
                 doc_result = {}
                 if doc.get("result_json"):
@@ -219,6 +231,9 @@ def _recalc_activities_after_template_change():
 
                 if not new_match:
                     new_without += 1
+                elif doc_status == "Completed":
+                    # Already approved → counts as no_approval
+                    new_no_appr += 1
                 else:
                     tmpl_info = templates_dict.get(new_match, {})
                     if tmpl_info.get("require_review"):
@@ -455,7 +470,11 @@ def approve_document(doc_id):
     updated = db.get_document(doc_id)
     new_status = updated.get("status", "?") if updated else "NOT_FOUND"
     print(f"[APPROVE] doc #{doc_id}: {old_status} → {new_status}", flush=True)
-    return jsonify({"success": True, "doc_id": doc_id, "status": new_status})
+    # Recalc activity history results (needs_approval → no_approval)
+    updated_activities = _recalc_activities_after_template_change()
+    print(f"[APPROVE] recalc updated {len(updated_activities)} activities", flush=True)
+    return jsonify({"success": True, "doc_id": doc_id, "status": new_status,
+                     "updated_activities": len(updated_activities)})
 
 @app.post("/api/documents/<int:doc_id>/reject")
 def reject_document(doc_id):
