@@ -209,6 +209,9 @@ select.form-input option{background:var(--bg2);}
   .sidebar{display:none;}
   .stats-grid{grid-template-columns:repeat(2,1fr);}
 }
+.af-btn{padding:4px 7px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;line-height:1;transition:all 0.15s;}
+.af-btn:hover{background:var(--bg2);border-color:var(--text3);}
+.af-btn.active{background:rgba(0,229,160,0.12);border-color:var(--accent);color:var(--accent);}
 </style>
 </head>
 <body>
@@ -308,6 +311,20 @@ select.form-input option{background:var(--bg2);}
             <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
               <span>📋 Ιστορικό Δραστηριοτήτων</span>
               <button class="btn btn-secondary btn-sm" onclick="loadActivityHistory()" style="font-size:11px;padding:3px 10px;">↻</button>
+            </div>
+            <!-- Search/Filter bar -->
+            <div id="activity-filter-bar" style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+              <input type="text" id="af-filename" placeholder="🔍 Όνομα αρχείου..." oninput="applyActivityFilters()" style="flex:1;min-width:120px;padding:4px 8px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
+              <button class="af-btn" id="af-no-tmpl" onclick="toggleAF(this)" title="Χωρίς template ≥1">🚫T</button>
+              <button class="af-btn" id="af-needs-appr" onclick="toggleAF(this)" title="Με έγκριση ≥1">✅</button>
+              <button class="af-btn" id="af-no-appr" onclick="toggleAF(this)" title="Χωρίς έγκριση ≥1">⏳</button>
+              <select id="af-action" onchange="applyActivityFilters()" style="padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;">
+                <option value="">Όλες</option>
+                <option value="pre-check">Επεξεργασία</option>
+                <option value="batch">Batch</option>
+              </select>
+              <input type="date" id="af-date" onchange="applyActivityFilters()" style="padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;" title="Ημερομηνία"/>
+              <button class="af-btn" onclick="clearActivityFilters()" title="Καθαρισμός">✕</button>
             </div>
             <div id="activity-list" style="flex:1;overflow-y:auto;font-size:12px;">
               <div style="text-align:center;padding:30px;color:var(--text3);">Φόρτωση...</div>
@@ -446,6 +463,12 @@ select.form-input option{background:var(--bg2);}
         </div>
       </div>
       <div class="content">
+        <!-- Templates Search Bar -->
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;">
+          <input type="text" id="tf-name" placeholder="🔍 Όνομα Template..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
+          <input type="text" id="tf-supplier" placeholder="🏢 Supplier Pattern..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
+          <button class="af-btn" onclick="clearTemplateFilters()" title="Καθαρισμός">✕ Καθαρισμός</button>
+        </div>
         <div id="templates-list"></div>
       </div>
     </div>
@@ -1428,17 +1451,25 @@ function formatLocalDate(isoStr) {
   return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
+let allActivityItems = [];
+
 async function loadActivityHistory() {
   const el = document.getElementById('activity-list');
   if (!el) return;
   const res = await api('GET', '/api/activity?limit=50');
-  const items = res.activities || [];
+  allActivityItems = res.activities || [];
+  renderActivityList(allActivityItems);
+}
+
+function renderActivityList(items) {
+  const el = document.getElementById('activity-list');
+  if (!el) return;
   if (!items.length) {
-    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Δεν υπάρχει ιστορικό δραστηριοτήτων</div>';
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Δεν βρέθηκαν αποτελέσματα</div>';
     return;
   }
   el.innerHTML = items.map((a, idx) => {
-    const num = items.length - idx;
+    const num = allActivityItems.length - allActivityItems.indexOf(a);
     const date = formatLocalDate(a.created_at);
     const icon = a.action === 'pre-check' ? '🔍' : '▶';
     const label = a.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Template' : 'Έναρξη Batch';
@@ -1455,6 +1486,44 @@ async function loadActivityHistory() {
       <button class="btn btn-secondary btn-sm" onclick="showActivityDetail(${a.id})" style="font-size:10px;padding:3px 8px;" title="Αποτελέσματα">📊</button>
     </div>`;
   }).join('');
+}
+
+function toggleAF(btn) {
+  btn.classList.toggle('active');
+  applyActivityFilters();
+}
+
+function applyActivityFilters() {
+  const fname   = (document.getElementById('af-filename').value || '').trim().toLowerCase();
+  const noTmpl  = document.getElementById('af-no-tmpl').classList.contains('active');
+  const needsAp = document.getElementById('af-needs-appr').classList.contains('active');
+  const noAp    = document.getElementById('af-no-appr').classList.contains('active');
+  const action  = document.getElementById('af-action').value;
+  const dateVal = document.getElementById('af-date').value; // YYYY-MM-DD
+
+  const filtered = allActivityItems.filter(a => {
+    if (fname && !(a.filename || '').toLowerCase().includes(fname)) return false;
+    if (noTmpl && (a.without_template || 0) < 1) return false;
+    if (needsAp && (a.needs_approval || 0) < 1) return false;
+    if (noAp && (a.no_approval || 0) < 1) return false;
+    if (action && a.action !== action) return false;
+    if (dateVal && a.created_at) {
+      const localDate = formatLocalDate(a.created_at).substring(0, 10);
+      if (localDate !== dateVal) return false;
+    }
+    return true;
+  });
+  renderActivityList(filtered);
+}
+
+function clearActivityFilters() {
+  document.getElementById('af-filename').value = '';
+  document.getElementById('af-no-tmpl').classList.remove('active');
+  document.getElementById('af-needs-appr').classList.remove('active');
+  document.getElementById('af-no-appr').classList.remove('active');
+  document.getElementById('af-action').value = '';
+  document.getElementById('af-date').value = '';
+  renderActivityList(allActivityItems);
 }
 
 async function showActivityDetail(activityId) {
@@ -1488,12 +1557,18 @@ async function showActivityDetail(activityId) {
 }
 
 // ── Templates ────────────────────────────────────────────────────────────────
+let allTemplatesData = [];
+
 async function loadTemplates() {
   const res = await api('GET','/api/templates');
-  const templates = res.templates||[];
+  allTemplatesData = res.templates||[];
+  renderTemplatesList(allTemplatesData);
+}
+
+function renderTemplatesList(templates) {
   const el = document.getElementById('templates-list');
   if (!templates.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Δεν υπάρχουν templates</div><div class="empty-sub">Δημιούργησε το πρώτο σου template</div></div>';
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Δεν βρέθηκαν templates</div><div class="empty-sub">Δημιούργησε το πρώτο σου template</div></div>';
     return;
   }
   el.innerHTML = templates.map(t=>`
@@ -1515,6 +1590,23 @@ async function loadTemplates() {
         ${t.supplier_pattern ? `<span style="background:rgba(0,102,255,0.1);border:1px solid rgba(0,102,255,0.3);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent2)">🏢 ${t.supplier_pattern}</span>` : ''}
       </div>
     </div>`).join('');
+}
+
+function applyTemplateFilters() {
+  const nameQ     = (document.getElementById('tf-name').value || '').trim().toLowerCase();
+  const supplierQ = (document.getElementById('tf-supplier').value || '').trim().toLowerCase();
+  const filtered = allTemplatesData.filter(t => {
+    if (nameQ && !t.name.toLowerCase().includes(nameQ)) return false;
+    if (supplierQ && !(t.supplier_pattern || '').toLowerCase().includes(supplierQ)) return false;
+    return true;
+  });
+  renderTemplatesList(filtered);
+}
+
+function clearTemplateFilters() {
+  document.getElementById('tf-name').value = '';
+  document.getElementById('tf-supplier').value = '';
+  renderTemplatesList(allTemplatesData);
 }
 
 function openTemplateModal() {
