@@ -333,13 +333,13 @@ select.form-input option{background:var(--bg2);}
           </div>
 
           <!-- Batch -->
-          <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
-            <div class="card-title">📦 Batch (Πολλαπλά Τιμολόγια)</div>
-            <div class="upload-zone" id="batch-zone" onclick="document.getElementById('batch-file').click()" ondragover="dragOver(event,'batch-zone')" ondragleave="dragLeave('batch-zone')" ondrop="dropFile(event,'batch')" style="padding:16px 12px;">
+          <div class="card" style="display:flex;flex-direction:column;overflow:hidden;padding:12px;">
+            <div class="card-title" style="margin-bottom:6px;font-size:14px;">📦 Batch (Πολλαπλά Τιμολόγια)</div>
+            <div class="upload-zone" id="batch-zone" onclick="document.getElementById('batch-file').click()" ondragover="dragOver(event,'batch-zone')" ondragleave="dragLeave('batch-zone')" ondrop="dropFile(event,'batch')" style="padding:10px 12px;">
               <input type="file" id="batch-file" accept=".pdf" onchange="fileSelected('batch')"/>
-              <div class="upload-icon" style="font-size:24px;">📦</div>
-              <div class="upload-title" style="font-size:12px;">PDF με πολλαπλά τιμολόγια</div>
-              <div class="upload-sub" style="font-size:10px;">Έως 200 τιμολόγια ανά αρχείο</div>
+              <div class="upload-icon" style="font-size:20px;margin:0;">📦</div>
+              <div class="upload-title" style="font-size:11px;margin:2px 0 0;">PDF με πολλαπλά τιμολόγια</div>
+              <div class="upload-sub" style="font-size:9px;margin:0;">Έως 200 τιμολόγια ανά αρχείο</div>
             </div>
             <div id="batch-selected" style="display:none;margin-top:8px;">
               <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg3);border-radius:8px;font-size:12px;">
@@ -348,37 +348,37 @@ select.form-input option{background:var(--bg2);}
                 <button onclick="clearFile('batch')" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:11px;">✕</button>
               </div>
             </div>
-            <div class="form-group" style="margin-top:10px;">
-              <label class="form-label" id="batch-schema-label" style="font-size:11px;">Template Fallback (για Auto Match)</label>
-              <select class="form-input" id="batch-schema" style="font-size:12px;padding:7px 10px;"></select>
-              <div id="batch-schema-hint" style="font-size:10px;color:var(--text2);margin-top:4px;display:none;">
+            <div class="form-group" style="margin-top:6px;">
+              <label class="form-label" id="batch-schema-label" style="font-size:10px;">Template Fallback (για Auto Match)</label>
+              <select class="form-input" id="batch-schema" style="font-size:11px;padding:5px 8px;"></select>
+              <div id="batch-schema-hint" style="font-size:9px;color:var(--text2);margin-top:3px;display:none;">
                 ℹ Χρησιμοποιείται μόνο αν το Auto Match δεν βρει template
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg3);border-radius:8px;margin-bottom:8px;margin-top:4px;">
-              <input type="checkbox" id="batch-auto-match" style="width:15px;height:15px;accent-color:var(--accent2);cursor:pointer" onchange="onAutoMatchChange()"/>
+            <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:6px;margin-top:4px;">
+              <input type="checkbox" id="batch-auto-match" style="width:14px;height:14px;accent-color:var(--accent2);cursor:pointer" onchange="onAutoMatchChange()"/>
               <div>
-                <div style="font-size:12px;color:var(--text);font-weight:500;">🔍 Auto Template Matching</div>
-                <div style="font-size:10px;color:var(--text2);margin-top:1px;">Αυτόματη επιλογή template ανά τιμολόγιο</div>
+                <div style="font-size:11px;color:var(--text);font-weight:500;">🔍 Auto Template Matching</div>
+                <div style="font-size:9px;color:var(--text2);margin-top:1px;">Αυτόματη επιλογή template ανά τιμολόγιο</div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg3);border-radius:8px;margin-bottom:10px;">
-              <input type="checkbox" id="batch-skip-completed" style="width:15px;height:15px;accent-color:var(--warn);cursor:pointer"/>
+            <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px;">
+              <input type="checkbox" id="batch-skip-completed" style="width:14px;height:14px;accent-color:var(--warn);cursor:pointer"/>
               <div>
-                <div style="font-size:12px;color:var(--text);font-weight:500;">⏭ Παράλειψη Ολοκληρωμένων</div>
-                <div style="font-size:10px;color:var(--text2);margin-top:1px;">Παράλειψη εγγράφων που έχουν ήδη εξαχθεί</div>
+                <div style="font-size:11px;color:var(--text);font-weight:500;">⏭ Παράλειψη Ολοκληρωμένων</div>
+                <div style="font-size:9px;color:var(--text2);margin-top:1px;">Παράλειψη εγγράφων που έχουν ήδη εξαχθεί</div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <button class="btn btn-secondary" style="flex:1;" id="batch-preview-btn" onclick="handlePreCheckClick()" disabled>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              <button class="btn btn-secondary" style="flex:1;padding:6px 8px;font-size:12px;" id="batch-preview-btn" onclick="handlePreCheckClick()" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 🔍 Επεξεργασία & Δημιουργία / Template
               </button>
-              <input type="checkbox" id="repeat-precheck-chk" class="repeat-chk" disabled onchange="onRepeatCheckChange('precheck')" title="Επανάληψη: μετάβαση στη σελίδα Template Builder" style="width:18px;height:18px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
+              <input type="checkbox" id="repeat-precheck-chk" class="repeat-chk" disabled onchange="onRepeatCheckChange('precheck')" title="Επανάληψη: μετάβαση στη σελίδα Template Builder" style="width:16px;height:16px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <button class="btn btn-primary" style="flex:1;" onclick="handleBatchClick()" id="batch-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button class="btn btn-primary" style="flex:1;padding:6px 8px;font-size:12px;" onclick="handleBatchClick()" id="batch-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 Έναρξη Batch
               </button>
               <input type="checkbox" id="repeat-batch-chk" class="repeat-chk" disabled onchange="onRepeatCheckChange('batch')" title="Επανάληψη: μετάβαση στη σελίδα Έγκρισης" style="width:18px;height:18px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
