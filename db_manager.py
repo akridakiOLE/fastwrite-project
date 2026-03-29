@@ -122,6 +122,12 @@ class DatabaseManager:
                 self.conn.commit()
             except Exception:
                 pass
+            # Migration: add updated_at column if missing
+            try:
+                self.conn.execute("ALTER TABLE activity_log ADD COLUMN updated_at TEXT")
+                self.conn.commit()
+            except Exception:
+                pass
 
             # Users table: authentication and authorization
             self.conn.execute("""
@@ -273,13 +279,31 @@ class DatabaseManager:
         cursor = self.conn.execute(
             """INSERT INTO activity_log
                (filename, file_path, action, total_invoices, without_template,
-                needs_approval, no_approval, result_json, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                needs_approval, no_approval, result_json, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (filename, file_path, action, total_invoices, without_template,
-             needs_approval, no_approval, result_json, now)
+             needs_approval, no_approval, result_json, now, now)
         )
         self.conn.commit()
         return cursor.lastrowid
+
+    def update_activity(self, activity_id: int, **kwargs) -> bool:
+        """Update an activity log entry. Accepted kwargs: total_invoices,
+        without_template, needs_approval, no_approval, result_json.
+        Automatically sets updated_at to current UTC time."""
+        allowed = {'total_invoices', 'without_template', 'needs_approval',
+                   'no_approval', 'result_json'}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return False
+        fields['updated_at'] = datetime.utcnow().isoformat()
+        set_clause = ', '.join(f"{k} = ?" for k in fields)
+        values = list(fields.values()) + [activity_id]
+        self.conn.execute(
+            f"UPDATE activity_log SET {set_clause} WHERE id = ?", values
+        )
+        self.conn.commit()
+        return True
 
     def list_activities(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Return recent activity log entries."""

@@ -111,9 +111,101 @@ def save_template():
             require_review=bool(data.get("require_review", False)),
             supplier_pattern=data.get("supplier_pattern")
         )
-        return jsonify({"success": True, "name": data.get("name"), "json_schema": schema})
+        # ── Auto-update activity history results ──────────────────────────
+        updated_activities = _recalc_activities_after_template_change()
+        return jsonify({
+            "success": True,
+            "name": data.get("name"),
+            "json_schema": schema,
+            "updated_activities": updated_activities
+        })
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+
+
+def _recalc_activities_after_template_change():
+    """Re-match suppliers in ALL activity entries against current templates.
+    Updates counts (without_template, needs_approval, no_approval) when changed.
+    Returns list of activity IDs that were updated."""
+    templates = db.list_templates()
+    templates_dict = {t["name"]: t for t in templates}
+    activities = db.list_activities(limit=500)
+    updated_ids = []
+
+    for act in activities:
+        rj = act.get("result_json")
+        if not rj:
+            continue
+        try:
+            result_data = json.loads(rj)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+        invoices = result_data.get("invoices")
+        if not invoices or not isinstance(invoices, list):
+            continue
+
+        # Re-match each invoice supplier against current templates
+        new_without = 0
+        new_needs   = 0
+        new_no_appr = 0
+        changed = False
+
+        for inv in invoices:
+            supplier = (inv.get("supplier") or "").strip()
+            old_match = inv.get("matched_template")
+            new_match = None
+
+            if supplier and supplier.lower() != "unknown":
+                sup_lower = supplier.lower()
+                for tmpl in templates:
+                    pattern = (tmpl.get("supplier_pattern") or "").strip().lower()
+                    if not pattern:
+                        continue
+                    keywords = [k.strip() for k in pattern.split(",") if k.strip()]
+                    for kw in keywords:
+                        if kw and kw in sup_lower:
+                            new_match = tmpl["name"]
+                            break
+                    if new_match:
+                        break
+
+            # Update invoice record in result_data
+            if new_match != old_match:
+                inv["matched_template"] = new_match
+                changed = True
+
+            # Count statistics
+            if not new_match:
+                new_without += 1
+            else:
+                tmpl_info = templates_dict.get(new_match, {})
+                if tmpl_info.get("require_review"):
+                    new_needs += 1
+                else:
+                    new_no_appr += 1
+
+        # Check if counts actually changed
+        if (new_without != (act.get("without_template") or 0) or
+            new_needs   != (act.get("needs_approval") or 0) or
+            new_no_appr != (act.get("no_approval") or 0) or
+            changed):
+
+            result_data["without_template"] = new_without
+            result_data["with_template"]    = len(invoices) - new_without
+            result_data["needs_approval"]   = new_needs
+            result_data["no_approval"]      = new_no_appr
+
+            db.update_activity(
+                act["id"],
+                without_template=new_without,
+                needs_approval=new_needs,
+                no_approval=new_no_appr,
+                result_json=json.dumps(result_data)
+            )
+            updated_ids.append(act["id"])
+
+    return updated_ids
 
 @app.get("/api/templates")
 @require_auth
@@ -1518,7 +1610,11 @@ async function doSave() {
   const res = await apiFetch('POST', '/api/templates', {name, fields, require_review, supplier_pattern});
   btn.disabled = false; btn.textContent = '[Save] Αποθήκευση Template';
   if (res.success) {
-    showToast('Template αποθηκεύτηκε: ' + name, 'success');
+    if (res.updated_activities && res.updated_activities.length > 0) {
+      showToast('Template αποθηκεύτηκε: ' + name + ' — Ενημερώθηκαν ' + res.updated_activities.length + ' εγγραφές ιστορικού', 'success');
+    } else {
+      showToast('Template αποθηκεύτηκε: ' + name, 'success');
+    }
     await loadTemplates(true);
   } else {
     showToast('Σφάλμα: ' + (res.error || 'άγνωστο'), 'error');

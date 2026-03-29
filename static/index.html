@@ -1415,6 +1415,16 @@ async function saveActivity(filename, action, data) {
   } catch(e) { console.error('Activity save error:', e); }
 }
 
+function formatLocalDate(isoStr) {
+  if (!isoStr) return '—';
+  // Server stores UTC — convert to user's local timezone
+  const utc = isoStr.endsWith('Z') ? isoStr : isoStr + 'Z';
+  const d = new Date(utc);
+  if (isNaN(d.getTime())) return isoStr.replace('T',' ').slice(0,16);
+  const pad = n => String(n).padStart(2,'0');
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
 async function loadActivityHistory() {
   const el = document.getElementById('activity-list');
   if (!el) return;
@@ -1426,7 +1436,7 @@ async function loadActivityHistory() {
   }
   el.innerHTML = items.map((a, idx) => {
     const num = items.length - idx;
-    const date = a.created_at ? a.created_at.replace('T',' ').slice(0,16) : '—';
+    const date = formatLocalDate(a.updated_at || a.created_at);
     const icon = a.action === 'pre-check' ? '🔍' : '▶';
     const label = a.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Template' : 'Έναρξη Batch';
     const color = a.action === 'pre-check' ? 'var(--accent2)' : 'var(--accent)';
@@ -1453,12 +1463,12 @@ async function showActivityDetail(activityId) {
   const body  = document.getElementById('precheck-modal-body');
 
   const label = res.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Template' : 'Έναρξη Batch';
-  const date  = res.created_at ? res.created_at.replace('T',' ').slice(0,16) : '—';
+  const date  = formatLocalDate(res.updated_at || res.created_at);
 
   title.textContent = 'Αποτελέσματα — ' + label;
 
   let html = '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">';
-  html += '<b>' + res.filename + '</b><br>' + date;
+  html += '<b>' + res.filename + '</b><br>' + date + ' <span style="color:var(--accent);font-size:11px;">(τελευταία ενημέρωση)</span>';
   html += '</div>';
   html += '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
   html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + (res.total_invoices || 0) + '</td></tr>';
@@ -1659,6 +1669,11 @@ async function saveTemplate() {
       toast('Template μετονομάστηκε σε "' + name + '"!', 'success');
     } else {
       toast(isEdit ? 'Template ενημερώθηκε!' : 'Template αποθηκεύτηκε!', 'success');
+    }
+    // Auto-update: ανανέωση ιστορικού αν ενημερώθηκαν αποτελέσματα
+    if (res.updated_activities && res.updated_activities.length > 0) {
+      toast('Ενημερώθηκαν ' + res.updated_activities.length + ' εγγραφές ιστορικού', 'success');
+      loadActivityHistory();
     }
     closeModal('tmpl-modal');
     loadTemplates();
@@ -2062,7 +2077,11 @@ async function tbSaveTemplate() {
   if (supplierPattern) body.supplier_pattern = supplierPattern;
   const r = await api('POST', '/api/templates', body);
   if (r.success) {
-    toast('Template αποθηκεύτηκε!', 'success');
+    if (r.updated_activities && r.updated_activities.length > 0) {
+      toast('Template αποθηκεύτηκε! Ενημερώθηκαν ' + r.updated_activities.length + ' εγγραφές ιστορικού', 'success');
+    } else {
+      toast('Template αποθηκεύτηκε!', 'success');
+    }
     const res = await api('GET', '/api/templates');
     const opts = (res.templates||[]).map(t => `<option value="${t.name}" ${t.name===name?'selected':''}>${t.name}</option>`).join('');
     document.getElementById('tb-schema').innerHTML = opts;
