@@ -1976,10 +1976,11 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
 </div>
 <div class="toast" id="toast"></div>
 <script>
-const DOC_ID     = %(doc_id)s;
-const DOC_STATUS = '%(doc_status)s';
-const LINE_DATA  = %(line_data_json)s;
-let dirty        = false;
+const DOC_ID      = %(doc_id)s;
+const DOC_STATUS  = '%(doc_status)s';
+const SIBLING_IDS = %(sibling_ids_json)s;
+const LINE_DATA   = %(line_data_json)s;
+let dirty         = false;
 let curRow      = -1;
 let curArrKey   = null;
 let numRows     = 0;
@@ -2150,6 +2151,28 @@ function collectData() {
   return data;
 }
 
+async function findNextPendingReview() {
+  // Find the next sibling doc with status pending_review
+  const curIdx = SIBLING_IDS.indexOf(DOC_ID);
+  try {
+    const r = await fetch('/api/documents', {credentials:'include'});
+    if (!r.ok) return null;
+    const data = await r.json();
+    const docs = data.documents || [];
+    const statusMap = {};
+    docs.forEach(function(d) { statusMap[d.id] = d.status; });
+    // Look for next pending_review after current position
+    for (var i = curIdx + 1; i < SIBLING_IDS.length; i++) {
+      if (statusMap[SIBLING_IDS[i]] === 'pending_review') return SIBLING_IDS[i];
+    }
+    // Wrap around: look from beginning up to current
+    for (var i = 0; i < curIdx; i++) {
+      if (statusMap[SIBLING_IDS[i]] === 'pending_review') return SIBLING_IDS[i];
+    }
+  } catch(e) { console.error(e); }
+  return null;
+}
+
 async function doApprove() {
   try {
     // Save edits first if any changes were made
@@ -2167,7 +2190,14 @@ async function doApprove() {
     if (j.success) {
       updateApproveBar('Completed');
       showToast('Εγκρίθηκε! (' + j.status + ')', '#00e5a0');
-      setTimeout(function(){ %(after_action)s; }, 1200);
+      // Find next pending_review sibling
+      const nextId = await findNextPendingReview();
+      if (nextId) {
+        setTimeout(function(){ location.replace('/ui/review/' + nextId); }, 1200);
+      } else {
+        showToast('Ολοκληρώθηκαν όλες οι εγκρίσεις!', '#00e5a0');
+        // Stay on current page — user can click Επιστροφή when ready
+      }
     } else {
       showToast('Σφάλμα: ' + (j.error || 'Unknown'), '#ff4444');
     }
@@ -2181,7 +2211,15 @@ async function doReject() {
   try {
     const r = await fetch('/api/documents/' + DOC_ID + '/reject', {method:'POST', credentials:'include'});
     const j = await r.json();
-    if (j.success) { showToast('Απορρίφθηκε', '#ff4444'); setTimeout(function(){ %(after_action)s; }, 1200); }
+    if (j.success) {
+      showToast('Απορρίφθηκε', '#ff4444');
+      const nextId = await findNextPendingReview();
+      if (nextId) {
+        setTimeout(function(){ location.replace('/ui/review/' + nextId); }, 1200);
+      } else {
+        showToast('Δεν υπάρχουν άλλα προς έγκριση', '#ff4444');
+      }
+    }
     else showToast('Σφάλμα: ' + (j.error || 'Unknown'), '#ff4444');
   } catch(err) {
     showToast('JS Error: ' + err.message, '#ff4444');
@@ -2222,8 +2260,9 @@ function showToast(msg, color) {
         "img_url":        img_url,
         "pdf_url":        pdf_url,
         "scalar_rows":    scalar_rows_html,
-        "line_data_json": _json.dumps(line_items_data, ensure_ascii=False),
-        "doc_status":     doc.get("status", ""),
+        "line_data_json":    _json.dumps(line_items_data, ensure_ascii=False),
+        "sibling_ids_json": _json.dumps(sibling_ids),
+        "doc_status":        doc.get("status", ""),
     }
 
     resp = make_response(html)
