@@ -144,11 +144,20 @@ def _recalc_activities_after_template_change():
     """Re-match suppliers in ALL activity entries against current templates.
     Handles both pre-check entries (with invoices array) and batch entries
     (with doc_ids — looks up actual documents in the database).
+    Also checks document status: Completed docs count as no_approval.
     Returns list of activity IDs that were updated."""
     templates = db.list_templates()
     templates_dict = {t["name"]: t for t in templates}
     activities = db.list_activities(limit=500)
     updated_ids = []
+
+    # Build a map of original_filename → list of documents for pre-check lookups
+    all_docs = db.list_documents()
+    docs_by_filename = {}
+    for d in all_docs:
+        ofn = d.get("original_filename") or ""
+        if ofn:
+            docs_by_filename.setdefault(ofn, []).append(d)
 
     for act in activities:
         rj = act.get("result_json")
@@ -171,6 +180,25 @@ def _recalc_activities_after_template_change():
         if invoices and isinstance(invoices, list):
             # ── Pre-check entries: have per-invoice supplier info ──
             total_count = len(invoices)
+
+            # Build doc status map from linked doc_ids or from filename match
+            doc_status_map = {}  # supplier → status (best effort)
+            act_filename = act.get("filename") or ""
+            sibling_docs = docs_by_filename.get(act_filename, [])
+            # Map each sibling doc to its supplier for status lookup
+            for sd in sibling_docs:
+                sd_result = {}
+                if sd.get("result_json"):
+                    try:
+                        sd_result = json.loads(sd["result_json"])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                sd_supplier = (sd_result.get("supplier_name") or
+                               sd_result.get("vendor_name") or
+                               sd_result.get("company") or "").strip().lower()
+                if sd_supplier:
+                    doc_status_map[sd_supplier] = sd.get("status", "")
+
             for inv in invoices:
                 supplier  = (inv.get("supplier") or "").strip()
                 old_match = inv.get("matched_template")
@@ -180,13 +208,15 @@ def _recalc_activities_after_template_change():
                     inv["matched_template"] = new_match
                     changed = True
 
-                # Check if this invoice has a linked doc_id with status
+                # Check document status: linked doc_id or filename-based lookup
                 doc_status = None
                 did = inv.get("doc_id")
                 if did:
                     linked_doc = db.get_document(did)
                     if linked_doc:
                         doc_status = (linked_doc.get("status") or "").strip()
+                elif supplier:
+                    doc_status = doc_status_map.get(supplier.lower(), None)
 
                 if not new_match:
                     new_without += 1
@@ -1941,13 +1971,15 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
         <table id="li-table"><thead id="li-thead"><tr></tr></thead><tbody id="li-tbody"></tbody></table>
       </div>
     </div>
+    <div id="approve-bar" style="flex-shrink:0;padding:8px 12px;border-top:1px solid rgba(0,229,160,0.3);"></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 <script>
-const DOC_ID    = %(doc_id)s;
-const LINE_DATA = %(line_data_json)s;
-let dirty       = false;
+const DOC_ID     = %(doc_id)s;
+const DOC_STATUS = '%(doc_status)s';
+const LINE_DATA  = %(line_data_json)s;
+let dirty        = false;
 let curRow      = -1;
 let curArrKey   = null;
 let numRows     = 0;
@@ -2133,6 +2165,7 @@ async function doApprove() {
     if (!r.ok) { showToast('HTTP Error: ' + r.status, '#ff4444'); return; }
     const j = await r.json();
     if (j.success) {
+      updateApproveBar('Completed');
       showToast('Εγκρίθηκε! (' + j.status + ')', '#00e5a0');
       setTimeout(function(){ %(after_action)s; }, 1200);
     } else {
@@ -2154,6 +2187,18 @@ async function doReject() {
     showToast('JS Error: ' + err.message, '#ff4444');
   }
 }
+
+function updateApproveBar(status) {
+  const bar = document.getElementById('approve-bar');
+  if (status === 'Completed') {
+    bar.style.background = 'rgba(0,229,160,0.06)';
+    bar.innerHTML = '<div style="text-align:center;padding:6px;font-size:12px;color:#00e5a0;font-weight:600;">\\u2713 Εγκρίθηκε</div>';
+  } else {
+    bar.style.background = 'rgba(0,229,160,0.08)';
+    bar.innerHTML = '<button class="btn btn-approve" onclick="doApprove()" style="width:100%%;padding:10px;font-size:13px;font-weight:700;border-radius:8px;">\\u2713 Έγκριση Τιμολογίου</button>';
+  }
+}
+updateApproveBar(DOC_STATUS);
 
 function showToast(msg, color) {
   const t = document.getElementById('toast');
@@ -2178,6 +2223,7 @@ function showToast(msg, color) {
         "pdf_url":        pdf_url,
         "scalar_rows":    scalar_rows_html,
         "line_data_json": _json.dumps(line_items_data, ensure_ascii=False),
+        "doc_status":     doc.get("status", ""),
     }
 
     resp = make_response(html)
