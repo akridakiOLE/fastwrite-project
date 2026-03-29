@@ -1436,7 +1436,7 @@ async function loadActivityHistory() {
   }
   el.innerHTML = items.map((a, idx) => {
     const num = items.length - idx;
-    const date = formatLocalDate(a.updated_at || a.created_at);
+    const date = formatLocalDate(a.created_at);
     const icon = a.action === 'pre-check' ? '🔍' : '▶';
     const label = a.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Template' : 'Έναρξη Batch';
     const color = a.action === 'pre-check' ? 'var(--accent2)' : 'var(--accent)';
@@ -1499,6 +1499,7 @@ async function loadTemplates() {
         <div class="card-title" style="margin:0">${t.name}</div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-secondary btn-sm" onclick="editTemplate('${t.name}')">✏️ Επεξεργασία</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyTemplateToNew('${t.name}')" title="Αντιγραφή template">📋 Αντιγραφή</button>
           <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${t.name}')">Διαγραφή</button>
         </div>
       </div>
@@ -1560,6 +1561,51 @@ async function editTemplate(name) {
           div.innerHTML = defaultSubfieldRow(item.name, item.type);
           subList.appendChild(div.firstElementChild);
         });
+      }
+    }
+  });
+
+  openModal('tmpl-modal');
+}
+
+async function copyTemplateToNew(name) {
+  const tmpl = await api('GET', `/api/templates/${encodeURIComponent(name)}`);
+  if (!tmpl || tmpl.error) { toast('Σφάλμα φόρτωσης template','error'); return; }
+
+  // Βρες μοναδικό όνομα
+  const allRes = await api('GET', '/api/templates');
+  const allNames = (allRes.templates||[]).map(t => t.name);
+  let newName = name + ' (1)', i = 1;
+  while (allNames.includes(newName)) { i++; newName = name + ' (' + i + ')'; }
+
+  document.getElementById('tmpl-name').value = newName;
+  document.getElementById('tmpl-name').readOnly = false;
+  document.getElementById('tmpl-original-name').value = '';  // Νέο template, δεν υπάρχει original
+  document.querySelector('#tmpl-modal .modal-title').textContent = '📋 Αντιγραφή: ' + name;
+  document.getElementById('tmpl-save-btn').textContent = 'Αποθήκευση Template';
+  document.getElementById('tmpl-require-review').checked = !!tmpl.require_review;
+  document.getElementById('tmpl-supplier-pattern').value = tmpl.supplier_pattern || '';
+  document.getElementById('tmpl-fields').innerHTML = '';
+
+  (tmpl.fields||[]).forEach(f => {
+    addField();
+    const wraps = document.querySelectorAll('#tmpl-fields .field-row-wrap');
+    const lastWrap = wraps[wraps.length-1];
+    const inputs = lastWrap.querySelectorAll('.field-row input, .field-row select');
+    inputs[0].value = f.name;
+    inputs[1].value = f.type;
+    if (f.type === 'array') {
+      onFieldTypeChange(inputs[1]);
+      if (f.items && f.items.length) {
+        const subList = lastWrap.querySelector('.subfield-list');
+        if (subList) {
+          subList.innerHTML = '';
+          f.items.forEach(item => {
+            const div = document.createElement('div');
+            div.innerHTML = defaultSubfieldRow(item.name, item.type);
+            subList.appendChild(div.firstElementChild);
+          });
+        }
       }
     }
   });
