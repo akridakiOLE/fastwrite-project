@@ -228,7 +228,13 @@ def delete_template(name):
     if not db.get_template(name):
         return jsonify({"error": f"Template '{name}' δεν βρέθηκε."}), 404
     db.delete_template(name)
-    return jsonify({"success": True, "message": f"Template '{name}' διαγράφηκε."})
+    # Re-calc activity results μετά τη διαγραφή
+    updated_activities = _recalc_activities_after_template_change()
+    return jsonify({
+        "success": True,
+        "message": f"Template '{name}' διαγράφηκε.",
+        "updated_activities": updated_activities
+    })
 
 # ── Upload ────────────────────────────────────────────────────────────────────
 @app.post("/api/upload")
@@ -1052,6 +1058,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 .btn-green:hover{background:rgba(0,229,160,0.22);}
 .btn-blue{background:rgba(0,102,255,0.12);color:var(--accent2);border:1px solid rgba(0,102,255,0.3);font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
 .btn-blue:hover{background:rgba(0,102,255,0.22);}
+.btn-red{background:rgba(255,59,48,0.12);color:#ff3b30;border:1px solid rgba(255,59,48,0.3);font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.btn-red:hover{background:rgba(255,59,48,0.22);}
 
 /* ── Form ── */
 .form-group{margin-bottom:14px;}
@@ -1449,6 +1457,7 @@ function renderTemplates(list) {
       + '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:12px;">'
       + '<button class="btn-green" onclick="loadTemplate(\'' + nameEsc + '\')">[In] Φόρτωση</button>'
       + '<button class="btn-blue" onclick="copyTemplate(\'' + nameEsc + '\')">[Copy] Αντιγραφή</button>'
+      + '<button class="btn-red" onclick="deleteTemplateTB(\'' + nameEsc + '\')">[Del] Διαγραφή</button>'
       + '</div></div>';
   }).join('');
 }
@@ -1522,6 +1531,20 @@ async function copyTemplate(name) {
     }
   });
   showToast('Αντιγράφηκε ως: ' + newName, 'success');
+}
+
+async function deleteTemplateTB(name) {
+  if (!confirm('Διαγραφή template "' + name + '"; Θα ενημερωθούν τα αποτελέσματα του ιστορικού.')) return;
+  const res = await apiFetch('DELETE', '/api/templates/' + encodeURIComponent(name));
+  if (res.success) {
+    showToast('Διαγράφηκε: ' + name, 'success');
+    if (res.updated_activities && res.updated_activities.length > 0) {
+      showToast('Ενημερώθηκαν ' + res.updated_activities.length + ' εγγραφές ιστορικού', 'success');
+    }
+    await loadTemplates(true);
+  } else {
+    showToast('Σφάλμα: ' + (res.error || 'άγνωστο'), 'error');
+  }
 }
 
 // ── Field editor ──────────────────────────────────────────────────────────────
