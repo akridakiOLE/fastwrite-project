@@ -1847,7 +1847,8 @@ def serve_review_page(doc_id):
             try: sd_result = _json.loads(sd["result_json"])
             except: pass
         supplier = (sd_result.get("vendor_name") or sd_result.get("supplier_name") or
-                     sd_result.get("company") or sd.get("filename") or "Doc #%s" % sd["id"])
+                     sd_result.get("company") or sd_result.get("_matched_supplier") or
+                     sd.get("filename") or "Doc #%s" % sd["id"])
         inv_num = sd_result.get("invoice_number") or sd_result.get("INVOICE_NUMBER") or ""
         has_template = bool(sd.get("schema_name")) and sd.get("status") != "no_template"
         sibling_info.append({
@@ -1974,10 +1975,10 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
 .inv-item.completed{border-left-color:rgba(0,229,160,0.4)}
 .inv-item .inv-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ccc}
 .inv-item .inv-badge{font-size:9px;padding:1px 6px;border-radius:4px;white-space:nowrap;font-weight:600}
-.inv-badge.b-pending{background:rgba(255,179,0,0.12);color:#f59e0b}
-.inv-badge.b-done{background:rgba(0,229,160,0.1);color:#00e5a0}
-.inv-badge.b-no-tmpl{background:rgba(255,68,68,0.1);color:#ff6b6b}
-.inv-item.no-template{border-left-color:rgba(255,68,68,0.4)}
+.inv-badge.b-pending{background:rgba(255,179,0,0.15);color:#ffb300;border:1px solid rgba(255,179,0,0.3)}
+.inv-badge.b-done{background:rgba(0,229,160,0.10);color:#00e5a0;border:1px solid rgba(0,229,160,0.25)}
+.inv-badge.b-no-tmpl{background:rgba(255,179,0,0.15);color:#ffb300;border:1px solid rgba(255,179,0,0.3)}
+.inv-item.no-template{border-left-color:rgba(255,179,0,0.6)}
 </style>
 </head>
 <body>
@@ -2309,7 +2310,10 @@ renderInvList();
 
 function updateApproveBar(status) {
   const bar = document.getElementById('approve-bar');
-  if (status === 'Completed') {
+  if (status === 'no_template') {
+    bar.style.background = 'rgba(255,179,0,0.06)';
+    bar.innerHTML = '<div style="text-align:center;padding:10px;font-size:12px;color:#ffb300;font-weight:600;">\\u26a0 Δεν υπάρχει Template — Δεν είναι δυνατή η έγκριση</div>';
+  } else if (status === 'Completed') {
     bar.style.background = 'rgba(0,229,160,0.06)';
     bar.innerHTML = '<div style="text-align:center;padding:6px;font-size:12px;color:#00e5a0;font-weight:600;">\\u2713 Εγκρίθηκε</div>';
   } else if (status === 'approving') {
