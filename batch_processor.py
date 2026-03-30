@@ -272,12 +272,13 @@ class BatchProcessor:
                 if best_match:
                     break
 
-            matched = best_match or default_schema_name
-            return matched, detected
+            if best_match:
+                return best_match, detected, True   # True = real match
+            return default_schema_name, detected, False  # False = fallback
 
         except Exception as e:
             job.errors.append(f"Template matching error: {e}. Χρήση default.")
-            return default_schema_name, "unknown"
+            return default_schema_name, "unknown", False
 
     def _extract_parallel(self, segments, schema_name, original_filename, job,
                           auto_match=False, skip_completed=False):
@@ -297,20 +298,33 @@ class BatchProcessor:
 
                 # ── Auto Template Matching ──────────────────────────────────
                 if auto_match:
-                    matched_name, detected_supplier = self._match_template(
+                    matched_name, detected_supplier, is_real_match = self._match_template(
                         extractor, segment.pages, schema_name, job)
-                    tmpl = self.db.get_template(matched_name)
-                    if tmpl:
-                        import copy
-                        seg_schema = self.schema_bld.build_from_list(tmpl["fields"])
-                        seg_schema.pop("additionalProperties", None)
-                        used_schema_name    = matched_name
-                        used_require_review = tmpl.get("require_review", True)
+                    if is_real_match:
+                        tmpl = self.db.get_template(matched_name)
+                        if tmpl:
+                            seg_schema = self.schema_bld.build_from_list(tmpl["fields"])
+                            seg_schema.pop("additionalProperties", None)
+                            used_schema_name    = matched_name
+                            used_require_review = tmpl.get("require_review", True)
+                        else:
+                            # Template name matched αλλά δεν βρέθηκε στη βάση
+                            self.db.update_document_status(
+                                doc_id, status="no_template",
+                                result_json=json.dumps({"_skipped": True,
+                                    "_reason": "Template δεν βρέθηκε στη βάση",
+                                    "_matched_supplier": detected_supplier or "unknown"}))
+                            return {"success": True, "doc_id": doc_id,
+                                    "matched_template": None, "skipped": True}
                     else:
-                        seg_schema          = default_schema
-                        used_schema_name    = schema_name
-                        used_require_review = default_template.get("require_review", True)
-                        detected_supplier   = "unknown"
+                        # Δεν βρέθηκε template match — SKIP τιμολόγιο
+                        self.db.update_document_status(
+                            doc_id, status="no_template",
+                            result_json=json.dumps({"_skipped": True,
+                                "_reason": "Δεν βρέθηκε template για αυτό το τιμολόγιο",
+                                "_matched_supplier": detected_supplier or "unknown"}))
+                        return {"success": True, "doc_id": doc_id,
+                                "matched_template": None, "skipped": True}
                 else:
                     seg_schema          = default_schema
                     used_schema_name    = schema_name

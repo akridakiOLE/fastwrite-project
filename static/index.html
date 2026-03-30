@@ -313,19 +313,25 @@ select.form-input option{background:var(--bg2);}
               <button class="btn btn-secondary btn-sm" onclick="loadActivityHistory()" style="font-size:11px;padding:3px 10px;">↻</button>
             </div>
             <!-- Search/Filter bar -->
-            <div id="activity-filter-bar" style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
-              <input type="text" id="af-filename" placeholder="🔍 Όνομα αρχείου..." oninput="applyActivityFilters()" style="flex:1;min-width:120px;padding:4px 8px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
-              <button class="af-btn" id="af-no-tmpl" onclick="toggleAF(this)" title="Χωρίς template ≥1">🚫T</button>
-              <button class="af-btn" id="af-needs-appr" onclick="toggleAF(this)" title="Με έγκριση ≥1">✅</button>
-              <button class="af-btn" id="af-no-appr" onclick="toggleAF(this)" title="Χωρίς έγκριση ≥1">⏳</button>
-              <select id="af-action" onchange="applyActivityFilters()" style="padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;">
-                <option value="">Όλες</option>
-                <option value="pre-check">Επεξεργασία</option>
-                <option value="batch">Batch</option>
-              </select>
-              <input type="date" id="af-date-from" onchange="applyActivityFilters()" style="padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;max-width:115px;" title="Από"/>
-              <input type="date" id="af-date-to" onchange="applyActivityFilters()" style="padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;max-width:115px;" title="Μέχρι"/>
-              <button class="af-btn" onclick="clearActivityFilters()" title="Καθαρισμός">✕</button>
+            <div id="activity-filter-bar" style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:4px;">
+              <!-- Row 1: Search + icon buttons -->
+              <div style="display:flex;gap:4px;align-items:center;">
+                <input type="text" id="af-filename" placeholder="🔍 Όνομα αρχείου..." oninput="applyActivityFilters()" style="flex:1;min-width:120px;padding:4px 8px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
+                <button class="af-btn" id="af-no-tmpl" onclick="toggleAF(this)" title="Χωρίς template ≥1">🚫T</button>
+                <button class="af-btn" id="af-needs-appr" onclick="toggleAF(this)" title="Με έγκριση ≥1">✅</button>
+                <button class="af-btn" id="af-no-appr" onclick="toggleAF(this)" title="Χωρίς έγκριση ≥1">⏳</button>
+                <button class="af-btn" onclick="clearActivityFilters()" title="Καθαρισμός">✕</button>
+              </div>
+              <!-- Row 2: Action select + Date range -->
+              <div style="display:flex;gap:4px;align-items:center;">
+                <select id="af-action" onchange="applyActivityFilters()" style="padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;">
+                  <option value="">Όλες</option>
+                  <option value="pre-check">Επεξεργασία</option>
+                  <option value="batch">Batch</option>
+                </select>
+                <input type="date" id="af-date-from" onchange="applyActivityFilters()" style="flex:1;padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;" title="Από"/>
+                <input type="date" id="af-date-to" onchange="applyActivityFilters()" style="flex:1;padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;" title="Μέχρι"/>
+              </div>
             </div>
             <div id="activity-list" style="flex:1;overflow-y:auto;font-size:12px;">
               <div style="text-align:center;padding:30px;color:var(--text3);">Φόρτωση...</div>

@@ -1849,11 +1849,14 @@ def serve_review_page(doc_id):
         supplier = (sd_result.get("vendor_name") or sd_result.get("supplier_name") or
                      sd_result.get("company") or sd.get("filename") or "Doc #%s" % sd["id"])
         inv_num = sd_result.get("invoice_number") or sd_result.get("INVOICE_NUMBER") or ""
+        has_template = bool(sd.get("schema_name")) and sd.get("status") != "no_template"
         sibling_info.append({
             "id": sd["id"],
             "status": sd.get("status", ""),
             "supplier": supplier,
-            "invoice": inv_num
+            "invoice": inv_num,
+            "has_template": has_template,
+            "schema_name": sd.get("schema_name", "")
         })
 
     rd = {}
@@ -1973,6 +1976,8 @@ tbody tr.row-hl td{background:rgba(0,229,160,0.12)!important;color:#fff!importan
 .inv-item .inv-badge{font-size:9px;padding:1px 6px;border-radius:4px;white-space:nowrap;font-weight:600}
 .inv-badge.b-pending{background:rgba(255,179,0,0.12);color:#f59e0b}
 .inv-badge.b-done{background:rgba(0,229,160,0.1);color:#00e5a0}
+.inv-badge.b-no-tmpl{background:rgba(255,68,68,0.1);color:#ff6b6b}
+.inv-item.no-template{border-left-color:rgba(255,68,68,0.4)}
 </style>
 </head>
 <body>
@@ -2263,17 +2268,27 @@ async function doReject() {
 function renderInvList() {
   const el = document.getElementById('inv-list');
   const pending = SIBLING_INFO.filter(s => s.status === 'pending_review').length;
+  const noTmpl = SIBLING_INFO.filter(s => s.status === 'no_template' || !s.has_template).length;
   const total = SIBLING_INFO.length;
   document.getElementById('inv-count-label').textContent = pending + ' προς έγκριση / ' + total + ' σύνολο';
   el.innerHTML = SIBLING_INFO.map(function(s) {
     const isCurrent = s.id === DOC_ID;
     const isPending = s.status === 'pending_review';
-    const cls = 'inv-item' + (isCurrent ? ' current' : '') + (isPending ? ' pending' : ' completed');
+    const isNoTemplate = s.status === 'no_template' || !s.has_template;
+    var cls = 'inv-item' + (isCurrent ? ' current' : '');
+    if (isNoTemplate) cls += ' no-template';
+    else if (isPending) cls += ' pending';
+    else cls += ' completed';
     const name = s.supplier ? (s.supplier.length > 25 ? s.supplier.slice(0,23) + '...' : s.supplier) : 'Doc #' + s.id;
     const inv = s.invoice ? ' — ' + s.invoice : '';
-    const badge = isPending
-      ? '<span class="inv-badge b-pending">Προς Έγκριση</span>'
-      : '<span class="inv-badge b-done">\\u2713</span>';
+    var badge;
+    if (isNoTemplate) {
+      badge = '<span class="inv-badge b-no-tmpl">\\u26a0 No Template</span>';
+    } else if (isPending) {
+      badge = '<span class="inv-badge b-pending">Προς Έγκριση</span>';
+    } else {
+      badge = '<span class="inv-badge b-done">\\u2713</span>';
+    }
     return '<div class="' + cls + '" onclick="goToInvoice(' + s.id + ')" title="' + (s.supplier||'') + inv + '">'
          + '<span class="inv-name">' + name + inv + '</span>'
          + badge
