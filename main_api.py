@@ -2274,19 +2274,15 @@ function renderInvList() {
   document.getElementById('inv-count-label').textContent = pending + ' προς έγκριση / ' + total + ' σύνολο';
   el.innerHTML = SIBLING_INFO.map(function(s) {
     const isCurrent = s.id === DOC_ID;
-    const isPending = s.status === 'pending_review';
     const isNoTemplate = s.status === 'no_template' || !s.has_template;
     var cls = 'inv-item' + (isCurrent ? ' current' : '');
     if (isNoTemplate) cls += ' no-template';
-    else if (isPending) cls += ' pending';
     else cls += ' completed';
     const name = s.supplier ? (s.supplier.length > 25 ? s.supplier.slice(0,23) + '...' : s.supplier) : 'Doc #' + s.id;
     const inv = s.invoice ? ' — ' + s.invoice : '';
     var badge;
     if (isNoTemplate) {
       badge = '<span class="inv-badge b-no-tmpl">\\u26a0 No Template</span>';
-    } else if (isPending) {
-      badge = '<span class="inv-badge b-pending">Προς Έγκριση</span>';
     } else {
       badge = '<span class="inv-badge b-done">\\u2713</span>';
     }
