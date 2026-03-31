@@ -249,7 +249,8 @@ def _recalc_activities_after_template_change():
                         pass
                 supplier = (doc_result.get("supplier_name") or
                             doc_result.get("vendor_name") or
-                            doc_result.get("company") or "").strip()
+                            doc_result.get("company") or
+                            doc_result.get("_matched_supplier") or "").strip()
                 old_schema = doc.get("schema_name") or ""
                 new_match  = _match_supplier_to_template(supplier, templates)
 
