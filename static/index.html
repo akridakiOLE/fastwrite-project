@@ -394,7 +394,6 @@ select.form-input option{background:var(--bg2);}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 Διαδικασία Έγκρισης
               </button>
-              <input type="checkbox" id="repeat-approval-chk" class="repeat-chk" disabled onchange="onRepeatCheckChange('approval')" title="Μετάβαση στη σελίδα Έγκρισης" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;display:none;"/>
             </div>
             <div id="batch-progress" style="margin-top:16px;display:none;">
               <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px;">
@@ -1053,14 +1052,10 @@ async function selectHistoryEntry(activityId) {
   chk1.style.display = ''; chk1.disabled = false; chk1.checked = false;
   // Batch checkbox: εμφανίζεται ΜΟΝΟ για batch entries (επανεκτέλεση batch)
   const chk2 = document.getElementById('repeat-batch-chk');
-  // Approval checkbox: εμφανίζεται ΜΟΝΟ για batch entries (μετάβαση στη σελίδα έγκρισης)
-  const chk3 = document.getElementById('repeat-approval-chk');
   if (res.action === 'batch') {
     chk2.style.display = ''; chk2.disabled = false; chk2.checked = false;
-    chk3.style.display = ''; chk3.disabled = false; chk3.checked = false;
   } else {
     chk2.style.display = 'none'; chk2.disabled = true; chk2.checked = false;
-    chk3.style.display = 'none'; chk3.disabled = true; chk3.checked = false;
   }
   // Enable pre-check button (ώστε να μπορεί να χρησιμοποιηθεί σε repeat mode)
   document.getElementById('batch-preview-btn').disabled = false;
@@ -1073,10 +1068,8 @@ function deselectHistoryEntry() {
   // Hide & uncheck repeat checkboxes
   const chk1 = document.getElementById('repeat-precheck-chk');
   const chk2 = document.getElementById('repeat-batch-chk');
-  const chk3 = document.getElementById('repeat-approval-chk');
   chk1.style.display = 'none'; chk1.checked = false; chk1.disabled = true;
   chk2.style.display = 'none'; chk2.checked = false; chk2.disabled = true;
-  chk3.style.display = 'none'; chk3.checked = false; chk3.disabled = true;
   // Restore pre-check button disabled state if no file selected
   const inp = document.getElementById('batch-file');
   if (!inp || !inp.files.length) {
@@ -1088,16 +1081,10 @@ function deselectHistoryEntry() {
 function onRepeatCheckChange(which) {
   const chk1 = document.getElementById('repeat-precheck-chk');
   const chk2 = document.getElementById('repeat-batch-chk');
-  const chk3 = document.getElementById('repeat-approval-chk');
   if (which === 'precheck' && chk1.checked) {
     chk2.checked = false;
-    chk3.checked = false;
   } else if (which === 'batch' && chk2.checked) {
     chk1.checked = false;
-    chk3.checked = false;
-  } else if (which === 'approval' && chk3.checked) {
-    chk1.checked = false;
-    chk2.checked = false;
   }
 }
 
@@ -1162,18 +1149,20 @@ async function handleBatchClick() {
   const repeatChk = document.getElementById('repeat-batch-chk');
   if (repeatChk.checked && selectedActivityData) {
     // Repeat mode: re-run batch using file_path from history
-    const rj = selectedActivityData.result_json;
     let filePath = null;
+    // Ψάξε file_path στο result_json ή στο file_path του activity
+    const rj = selectedActivityData.result_json;
     if (rj) {
       try {
         const parsed = typeof rj === 'string' ? JSON.parse(rj) : rj;
         filePath = parsed.file_path || null;
       } catch(e) {}
     }
+    if (!filePath) filePath = selectedActivityData.file_path || null;
     if (!filePath) {
       toast('Δεν βρέθηκε αρχείο στο ιστορικό — ανεβάστε νέο αρχείο', 'error'); return;
     }
-    // Re-run batch with same file_path
+    // Re-run batch with same file_path using FormData (API requires form data)
     const btn = document.getElementById('batch-btn');
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Επανεκτέλεση Batch...';
     const schema = document.getElementById('batch-schema').value;
@@ -1182,12 +1171,12 @@ async function handleBatchClick() {
     const schemaToSend = (schema === '__none__')
       ? (document.getElementById('batch-schema').options[1]?.value || '')
       : schema;
-    const res = await api('POST', '/api/batch', {
-      file_path: filePath,
-      schema_name: schemaToSend,
-      auto_match: autoMatch,
-      skip_completed: skipCompleted
-    });
+    const fd = new FormData();
+    fd.append('file_path', filePath);
+    fd.append('schema_name', schemaToSend);
+    fd.append('auto_match', autoMatch ? 'true' : 'false');
+    fd.append('skip_completed', skipCompleted ? 'true' : 'false');
+    const res = await api('POST', '/api/batch', fd, true);
     btn.disabled = false;
     btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Έναρξη Batch';
     if (!res.success) { toast(res.error || 'Σφάλμα', 'error'); return; }
@@ -1202,22 +1191,20 @@ async function handleBatchClick() {
 }
 
 // Click handler for "Διαδικασία Έγκρισης" button
+// Λειτουργεί ΜΟΝΟ με επιλεγμένη εγγραφή από το Ιστορικό Δραστηριοτήτων
 async function handleApprovalClick() {
-  const repeatChk = document.getElementById('repeat-approval-chk');
-  if (repeatChk.checked && selectedActivityData) {
-    // Repeat/History mode: navigate to Review page for selected activity's docs
-    const docs = await findDocsForActivity(selectedActivityData);
-    if (!docs.length) {
-      toast('Δεν βρέθηκαν έγγραφα — εκτελέστε πρώτα Batch', 'error'); return;
-    }
-    // Find first pending_review doc, otherwise first doc
-    const reviewDoc = docs.find(d => d.status === 'pending_review');
-    const targetDoc = reviewDoc || docs[0];
-    window.location.href = '/ui/review/' + targetDoc.id;
-  } else {
-    // Normal mode (no history selected): show message to select from history
+  if (!selectedActivityData) {
     toast('Επιλέξτε πρώτα μια εγγραφή από το Ιστορικό Δραστηριοτήτων', 'error');
+    return;
   }
+  const docs = await findDocsForActivity(selectedActivityData);
+  if (!docs.length) {
+    toast('Δεν βρέθηκαν έγγραφα — εκτελέστε πρώτα Batch', 'error'); return;
+  }
+  // Find first pending_review doc, otherwise first doc
+  const reviewDoc = docs.find(d => d.status === 'pending_review');
+  const targetDoc = reviewDoc || docs[0];
+  window.location.href = '/ui/review/' + targetDoc.id;
 }
 
 async function doSingleExtract() {
