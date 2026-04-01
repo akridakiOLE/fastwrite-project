@@ -3,6 +3,7 @@ Module 8: Τοπικός Διακομιστής (Flask) & Σύνδεση με Fr
 Domain: fastwrite.duckdns.org
 """
 import json
+import sys
 import logging
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file, make_response, redirect
@@ -14,6 +15,12 @@ from schema_builder import SchemaBuilder
 from validator      import InvoiceValidator
 from exporter       import DocumentExporter
 
+# ── Logging setup — εξασφαλίζει ότι τα logs φτάνουν στο journalctl ──
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    stream=sys.stderr
+)
 logger = logging.getLogger(__name__)
 
 BASE_DIR      = Path("/app/projects")

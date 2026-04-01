@@ -290,6 +290,10 @@ class BatchProcessor:
         from ai_extractor import AIExtractor
         api_key  = self.key_mgr.get_key("gemini")
 
+        print(f"[_extract_parallel] START: original_filename='{original_filename}', "
+              f"skip_completed={skip_completed}, auto_match={auto_match}, "
+              f"segments={len(segments)}", flush=True)
+
         default_template = self.db.get_template(schema_name)
         if not default_template:
             self._fail_job(job, f"Template '{schema_name}' δεν βρέθηκε.")
@@ -386,6 +390,8 @@ class BatchProcessor:
 
         if skip_completed:
             existing = self.db.list_documents()
+            print(f"[skip_completed] === START === original_filename='{original_filename}', "
+                  f"total docs in DB: {len(existing)}", flush=True)
             logger.info("[skip_completed] === START === original_filename='%s', "
                         "total docs in DB: %d", original_filename, len(existing))
 
@@ -426,6 +432,9 @@ class BatchProcessor:
 
             stable_keys = [k for k in all_docs_by_lookup if '::' in k]
             page_keys = list(docs_by_ofn_page.keys())
+            print(f"[skip_completed] Lookup: {len(all_docs_by_lookup)} entries, "
+                  f"{completed_count} completed docs, "
+                  f"stable_keys={stable_keys[:10]}, page_keys={page_keys[:10]}", flush=True)
             logger.info("[skip_completed] Lookup: %d entries, %d completed docs, "
                         "stable_keys=%s, page_keys=%s",
                         len(all_docs_by_lookup), completed_count,
@@ -440,36 +449,39 @@ class BatchProcessor:
             skip_match = None
             match_method = "none"
             if skip_completed:
+                seg_fp = str(segment.pages[0])
+                seg_page_basename = segment.pages[0].name
+                stable_key = f"{original_filename}::{seg_page_basename}"
+                page_num = segment.page_nums[0] if segment.page_nums else 0
+                page_key = f"{original_filename}::page{page_num}"
+
+                print(f"[skip_completed] Invoice {idx+1}: checking "
+                      f"filename='{filename}', stable_key='{stable_key}', "
+                      f"page_key='{page_key}', seg_fp='{seg_fp}'", flush=True)
+
                 # Method 1: exact filename
                 if filename in all_docs_by_lookup:
                     skip_match = all_docs_by_lookup[filename]
                     match_method = "filename"
+                # Method 2: exact file_path
+                elif seg_fp in all_docs_by_lookup:
+                    skip_match = all_docs_by_lookup[seg_fp]
+                    match_method = "file_path"
+                # Method 3: original_filename + page basename
+                elif stable_key in all_docs_by_lookup:
+                    skip_match = all_docs_by_lookup[stable_key]
+                    match_method = "stable_key"
+                # Method 4: original_filename + page NUMBER
+                elif page_key in docs_by_ofn_page:
+                    skip_match = docs_by_ofn_page[page_key]
+                    match_method = "page_number"
                 else:
-                    # Method 2: exact file_path
-                    seg_fp = str(segment.pages[0])
-                    if seg_fp in all_docs_by_lookup:
-                        skip_match = all_docs_by_lookup[seg_fp]
-                        match_method = "file_path"
-                    else:
-                        # Method 3: original_filename + page basename
-                        seg_page_basename = segment.pages[0].name
-                        stable_key = f"{original_filename}::{seg_page_basename}"
-                        if stable_key in all_docs_by_lookup:
-                            skip_match = all_docs_by_lookup[stable_key]
-                            match_method = "stable_key"
-                        else:
-                            # Method 4: original_filename + page NUMBER
-                            page_num = segment.page_nums[0] if segment.page_nums else 0
-                            page_key = f"{original_filename}::page{page_num}"
-                            if page_key in docs_by_ofn_page:
-                                skip_match = docs_by_ofn_page[page_key]
-                                match_method = "page_number"
-                            else:
-                                logger.info("[skip_completed] Invoice %d NO MATCH: "
-                                            "filename='%s', stable_key='%s', "
-                                            "page_key='%s', seg_fp='%s'",
-                                            idx+1, filename, stable_key,
-                                            page_key, seg_fp)
+                    print(f"[skip_completed] Invoice {idx+1} NO MATCH!", flush=True)
+                    logger.info("[skip_completed] Invoice %d NO MATCH: "
+                                "filename='%s', stable_key='%s', "
+                                "page_key='%s', seg_fp='%s'",
+                                idx+1, filename, stable_key,
+                                page_key, seg_fp)
 
             if skip_match:
                 # Υπάρχει ήδη — παράλειψη
@@ -477,6 +489,8 @@ class BatchProcessor:
                 skipped_map[idx] = existing_id
                 job.doc_ids.append(existing_id)
                 job.skipped += 1
+                print(f"[skip_completed] Invoice {idx+1} SKIPPED via {match_method}: "
+                      f"doc_id={existing_id}, status={skip_match.get('status','?')}", flush=True)
                 logger.info("[skip_completed] Invoice %d SKIPPED via %s: doc_id=%d, "
                             "status=%s, filename='%s'",
                             idx+1, match_method, existing_id,
