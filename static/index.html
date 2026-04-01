@@ -1363,8 +1363,9 @@ function pollBatchJob(job_id) {
     // Status text με animation indicator
     const processing = !done && pct < 100;
     const dots = processing ? ' ⟳' : '';
+    const skippedTxt = (st.skipped || 0) > 0 ? ` (${st.skipped} παραλείφθηκαν)` : '';
     document.getElementById('batch-status-text').textContent =
-      `${st.processed||0}/${st.total_invoices||0} έγγραφα${dots}`;
+      `${st.processed||0}/${st.total_invoices||0} έγγραφα${skippedTxt}${dots}`;
 
     // Detail line
     const errTxt = st.failed > 0 ? ` | Αποτυχίες: ${st.failed}` : '';
@@ -1536,7 +1537,9 @@ async function showBatchCompletionModal(st) {
   const statusEl = document.getElementById('batch-status-text');
   const pctEl = document.getElementById('batch-pct');
   const fillEl = document.getElementById('batch-fill');
-  if (statusEl) statusEl.textContent = batchCompleted + '/' + totalInvoices + ' έγγραφα';
+  const skippedCount = st.skipped || 0;
+  const skippedInfo = skippedCount > 0 ? ` (${skippedCount} παραλείφθηκαν)` : '';
+  if (statusEl) statusEl.textContent = batchCompleted + '/' + totalInvoices + ' έγγραφα' + skippedInfo;
   if (pctEl) pctEl.textContent = pctReal + '%';
   if (fillEl) fillEl.style.width = pctReal + '%';
 }

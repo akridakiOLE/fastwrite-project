@@ -8,12 +8,15 @@ Pass 2 → Parallel Extraction (ThreadPoolExecutor, workers=4)
 import json
 import time
 import uuid
+import logging
 import threading
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 BATCH_SIZE            = 10
 MAX_WORKERS           = 4
@@ -82,6 +85,7 @@ class BatchJobStatus:
     total_invoices: int  = 0
     processed     : int  = 0
     failed        : int  = 0
+    skipped       : int  = 0
     doc_ids       : list = None
     errors        : list = None
     started_at    : str  = ""
@@ -95,6 +99,7 @@ class BatchJobStatus:
             "job_id": self.job_id, "status": self.status,
             "total_pages": self.total_pages, "total_invoices": self.total_invoices,
             "processed": self.processed, "failed": self.failed,
+            "skipped": self.skipped,
             "doc_ids": self.doc_ids, "errors": self.errors,
             "started_at": self.started_at, "completed_at": self.completed_at,
             "progress_pct": self.progress_pct,
@@ -398,6 +403,15 @@ class BatchProcessor:
                             stable_key = f"{ofn}::{page_basename}"
                             all_docs_by_lookup[stable_key] = d
 
+        if skip_completed:
+            logger.info("[skip_completed] Lookup built with %d entries for %d existing docs "
+                        "(original_filename='%s')",
+                        len(all_docs_by_lookup), len(existing) if skip_completed else 0,
+                        original_filename)
+            # Log some keys for debugging
+            stable_keys = [k for k in all_docs_by_lookup if '::' in k]
+            logger.info("[skip_completed] Stable keys in lookup: %s", stable_keys[:10])
+
         for idx, segment in enumerate(segments):
             pages_str = ",".join(str(p) for p in segment.page_nums)
             stem      = Path(original_filename).stem if original_filename else "batch"
@@ -419,15 +433,21 @@ class BatchProcessor:
                         stable_key = f"{original_filename}::{seg_page_basename}"
                         if stable_key in all_docs_by_lookup:
                             skip_match = all_docs_by_lookup[stable_key]
+                        else:
+                            logger.info("[skip_completed] Invoice %d NO MATCH: "
+                                        "filename='%s', seg_fp='%s', stable_key='%s'",
+                                        idx+1, filename, seg_fp, stable_key)
 
             if skip_match:
                 # Υπάρχει ήδη — παράλειψη
                 existing_id = skip_match["id"]
                 skipped_map[idx] = existing_id
                 job.doc_ids.append(existing_id)
-                job.processed += 1
+                job.skipped += 1
+                logger.info("[skip_completed] Invoice %d SKIPPED: doc_id=%d, status=%s, match_key used",
+                            idx+1, existing_id, skip_match.get("status", "?"))
                 job.errors.append(
-                    f"Invoice {idx+1} ({filename}): παραλείφθηκε (ήδη Completed).")
+                    f"Invoice {idx+1} ({filename}): παραλείφθηκε (ήδη {skip_match.get('status', 'Completed')}).")
             else:
                 doc_id = self.db.insert_document(
                     filename=filename,
@@ -436,10 +456,12 @@ class BatchProcessor:
                     original_filename=original_filename or filename)
                 doc_id_map[idx] = doc_id
 
-        # Ενημέρωση progress για skipped
+        # Ενημέρωση progress — skipped μετράνε ως ολοκληρωμένα στο progress
         total = job.total_invoices or 1
-        job.progress_pct = round((job.processed + job.failed) / total * 100, 1)
+        job.progress_pct = round((job.processed + job.failed + job.skipped) / total * 100, 1)
         self._update_job(job)
+        logger.info("[batch] Pre-extraction: total=%d, skipped=%d, to_extract=%d",
+                    job.total_invoices, job.skipped, len(doc_id_map))
 
         # Αν δεν υπάρχουν segments για extraction, τελειώνουμε
         if not doc_id_map:
@@ -460,7 +482,7 @@ class BatchProcessor:
                     if "doc_id" in res:
                         job.doc_ids.append(res["doc_id"])
                 total = job.total_invoices or 1
-                job.progress_pct = round((job.processed + job.failed) / total * 100, 1)
+                job.progress_pct = round((job.processed + job.failed + job.skipped) / total * 100, 1)
                 self._update_job(job)
 
     def _get_job(self, job_id):
