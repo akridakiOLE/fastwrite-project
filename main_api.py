@@ -1046,6 +1046,51 @@ def activity_get(activity_id):
         return jsonify({"error": "Not found"}), 404
     return jsonify(a)
 
+
+@app.post("/api/documents/cleanup")
+@require_auth
+def documents_cleanup():
+    """Remove duplicate documents, keeping only the LATEST per original_filename + page.
+    Useful when multiple batch runs created duplicates."""
+    all_docs = db.list_documents()
+    # Group by (original_filename, page_basename)
+    groups = {}
+    for d in all_docs:
+        ofn = d.get("original_filename") or ""
+        fp = d.get("file_path") or ""
+        if ofn and fp:
+            page_basename = Path(fp).name
+            key = f"{ofn}::{page_basename}"
+        else:
+            # Docs without ofn — skip cleanup, keep them
+            continue
+        groups.setdefault(key, []).append(d)
+
+    deleted_count = 0
+    kept_ids = []
+    for key, docs in groups.items():
+        if len(docs) <= 1:
+            if docs:
+                kept_ids.append(docs[0]["id"])
+            continue
+        # Sort by id DESC (newest first)
+        docs.sort(key=lambda x: x["id"], reverse=True)
+        # Keep the newest, delete rest
+        kept_ids.append(docs[0]["id"])
+        for old_doc in docs[1:]:
+            db.delete_document(old_doc["id"])
+            deleted_count += 1
+
+    logger.info("[cleanup] Deleted %d duplicate documents, kept %d unique",
+                deleted_count, len(kept_ids))
+    return jsonify({
+        "success": True,
+        "deleted": deleted_count,
+        "remaining": len(kept_ids),
+        "message": f"Διαγράφηκαν {deleted_count} διπλότυπα, παρέμειναν {len(kept_ids)} μοναδικά έγγραφα"
+    })
+
+
 # ── Auth Endpoints ────────────────────────────────────────────────────────────
 @app.post("/api/auth/login")
 def auth_login():

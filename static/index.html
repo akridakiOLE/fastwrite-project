@@ -1468,17 +1468,19 @@ async function showBatchCompletionModal(st) {
   };
 
   if (repeatBatchActivityId) {
-    // Repeat mode: ενημέρωσε την υπάρχουσα εγγραφή αντί να δημιουργήσεις νέα
-    try {
-      await api('PUT', '/api/activity/' + repeatBatchActivityId, {
-        total_invoices: totalInvoices,
-        without_template: withoutTemplate,
-        needs_approval: needsApproval,
-        no_approval: noApproval,
-        result_data: activityData
-      });
-      loadActivityHistory();
-    } catch(e) { console.error('Activity update error:', e); }
+    // Repeat mode: ενημέρωσε ΜΟΝΟ αν υπάρχουν νέα επεξεργασμένα
+    if (!allSkipped) {
+      try {
+        await api('PUT', '/api/activity/' + repeatBatchActivityId, {
+          total_invoices: totalInvoices,
+          without_template: withoutTemplate,
+          needs_approval: needsApproval,
+          no_approval: noApproval,
+          result_data: activityData
+        });
+        loadActivityHistory();
+      } catch(e) { console.error('Activity update error:', e); }
+    }
     repeatBatchActivityId = null;  // Reset
   } else {
     // Πρώτη εκτέλεση: δημιούργησε νέα εγγραφή
@@ -1492,13 +1494,37 @@ async function showBatchCompletionModal(st) {
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  title.textContent = 'Αποτελέσματα — Έναρξης Batch';
+  const skippedCount = st.skipped || 0;
+  const processedCount = st.processed || 0;
+  const failedCount = st.failed || 0;
+  const allSkipped = skippedCount > 0 && processedCount === 0 && failedCount === 0;
 
-  let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
+  title.textContent = allSkipped
+    ? 'Αποτελέσματα — Όλα ήδη ολοκληρωμένα'
+    : 'Αποτελέσματα — Έναρξης Batch';
+
+  let html = '';
+
+  // Αν ΟΛΑ παραλείφθηκαν, δείξε ξεκάθαρο μήνυμα
+  if (allSkipped) {
+    html += '<div style="padding:16px;text-align:center;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.3);border-radius:8px;margin-bottom:12px;">';
+    html += '<div style="font-size:24px;margin-bottom:8px;">✓</div>';
+    html += '<div style="font-size:14px;color:var(--accent);font-weight:600;">Όλα τα έγγραφα είναι ήδη ολοκληρωμένα</div>';
+    html += '<div style="font-size:12px;color:var(--text2);margin-top:4px;">' + skippedCount + ' έγγραφα παραλείφθηκαν — δεν χρειάζεται επανεπεξεργασία</div>';
+    html += '</div>';
+  }
+
+  html += '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
   html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + totalInvoices + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Έγγραφα χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTemplate + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Έγγραφα χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noApproval + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent2);">Έγγραφα με έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent2);">' + needsApproval + '</td></tr>';
+  if (skippedCount > 0) {
+    html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">⏭ Παραλείφθηκαν (ήδη ολοκληρωμένα)</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + skippedCount + '</td></tr>';
+    html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);">Νέα επεξεργασμένα</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + processedCount + '</td></tr>';
+  }
+  if (!allSkipped) {
+    html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Έγγραφα χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTemplate + '</td></tr>';
+    html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Έγγραφα χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noApproval + '</td></tr>';
+    html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent2);">Έγγραφα με έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent2);">' + needsApproval + '</td></tr>';
+  }
   html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:500;">Ολοκληρωμένα Batch</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + batchCompleted + '</td></tr>';
   html += '<tr><td style="padding:8px 12px;color:var(--warn);font-weight:500;">Μη Ολοκληρωμένα Batch</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--warn);">' + batchPending + '</td></tr>';
   html += '</table>';
@@ -1538,15 +1564,19 @@ async function showBatchCompletionModal(st) {
   body.innerHTML = html;
   modal.classList.add('open');
 
-  // Ενημέρωση progress bar με ακριβή αριθμό ολοκληρωμένων batch
-  const pctReal = totalInvoices > 0 ? Math.round(batchCompleted / totalInvoices * 1000) / 10 : 100;
+  // Ενημέρωση progress bar — δείχνει πόσα ΝΕΙΑ επεξεργάστηκαν
   const statusEl = document.getElementById('batch-status-text');
   const pctEl = document.getElementById('batch-pct');
   const fillEl = document.getElementById('batch-fill');
-  const skippedCount = st.skipped || 0;
   const skippedInfo = skippedCount > 0 ? ` (${skippedCount} παραλείφθηκαν)` : '';
-  if (statusEl) statusEl.textContent = batchCompleted + '/' + totalInvoices + ' έγγραφα' + skippedInfo;
-  if (pctEl) pctEl.textContent = pctReal + '%';
+  if (allSkipped) {
+    if (statusEl) statusEl.textContent = '0/' + totalInvoices + ' νέα — όλα ήδη ολοκληρωμένα';
+    if (pctEl) pctEl.textContent = '100%';
+  } else {
+    const pctReal = totalInvoices > 0 ? Math.round(batchCompleted / totalInvoices * 1000) / 10 : 100;
+    if (statusEl) statusEl.textContent = processedCount + '/' + totalInvoices + ' νέα έγγραφα' + skippedInfo;
+    if (pctEl) pctEl.textContent = pctReal + '%';
+  }
   if (fillEl) fillEl.style.width = pctReal + '%';
 }
 
