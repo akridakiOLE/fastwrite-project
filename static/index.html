@@ -1362,7 +1362,7 @@ function pollBatchJob(job_id) {
     const processing = !done && pct < 100;
     const dots = processing ? ' ⟳' : '';
     document.getElementById('batch-status-text').textContent =
-      `${st.processed||0}/${st.total_invoices||0} τιμολόγια${dots}`;
+      `${st.processed||0}/${st.total_invoices||0} έγγραφα${dots}`;
 
     // Detail line
     const errTxt = st.failed > 0 ? ` | Αποτυχίες: ${st.failed}` : '';
@@ -1386,7 +1386,7 @@ function pollBatchJob(job_id) {
     if (done) {
       clearInterval(interval);
       if (st.status === 'completed') {
-        toast(`✓ Batch ολοκληρώθηκε: ${st.processed} τιμολόγια`, 'success');
+        toast(`✓ Batch ολοκληρώθηκε: ${st.processed} έγγραφα`, 'success');
         showBatchCompletionModal(st);
       } else {
         toast('✕ Batch απέτυχε', 'error');
@@ -1398,26 +1398,46 @@ function pollBatchJob(job_id) {
 async function showBatchCompletionModal(st) {
   const docIds = st.doc_ids || [];
 
-  // Χρήση pre-check δεδομένων για ΟΛΟΥΣ τους αριθμούς (ακριβής ανάλυση)
+  // Χρήση pre-check δεδομένων για βασικούς αριθμούς
   const pc = batchPreCheckData;
-  const totalInvoices   = pc ? (pc.total_invoices || 0) : (st.processed || 0);
+  const totalInvoices   = pc ? (pc.total_invoices || 0) : (st.total_invoices || st.processed || 0);
   const withoutTemplate = pc ? (pc.without_template || 0) : 0;
-  const needsApproval   = pc ? (pc.needs_approval || 0) : 0;
-  const noApproval      = pc ? (pc.no_approval || 0) : 0;
 
-  // Βρες το πρώτο review doc για πλοήγηση
+  // Φέρε τα πραγματικά documents για ακριβή υπολογισμό στατιστικών
+  let batchDocs = [];
   let firstReviewId = null;
-  if (needsApproval > 0 && docIds.length) {
+  let firstTemplateId = null;
+  if (docIds.length) {
     const docsRes = await api('GET', '/api/documents');
     if (docsRes && docsRes.documents) {
-      const batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
-      for (const d of batchDocs) {
-        if (d.status === 'pending_review') {
-          firstReviewId = d.id;
-          break;
-        }
-      }
+      batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
     }
+  }
+
+  // Υπολογισμός στατιστικών από τα πραγματικά documents
+  let needsApproval = 0;   // pending_review
+  let noApproval = 0;      // Completed (δεν χρειάζεται έγκριση)
+  let batchCompleted = 0;  // Completed + pending_review (πέρασαν batch)
+  let batchPending = 0;    // no_template (ΔΕΝ πέρασαν batch)
+  for (const d of batchDocs) {
+    if (d.status === 'pending_review') {
+      needsApproval++;
+      batchCompleted++;
+      if (!firstReviewId) firstReviewId = d.id;
+    } else if (d.status === 'Completed') {
+      noApproval++;
+      batchCompleted++;
+    } else if (d.status === 'no_template') {
+      batchPending++;
+      if (!firstTemplateId) firstTemplateId = d.id;
+    }
+  }
+  // Αν δεν βρήκαμε docs, χρησιμοποίησε pre-check data
+  if (!batchDocs.length && pc) {
+    needsApproval = pc.needs_approval || 0;
+    noApproval = pc.no_approval || 0;
+    batchCompleted = needsApproval + noApproval;
+    batchPending = withoutTemplate;
   }
 
   // Αποθήκευση στο ιστορικό
@@ -1427,6 +1447,8 @@ async function showBatchCompletionModal(st) {
     without_template: withoutTemplate,
     needs_approval: needsApproval,
     no_approval: noApproval,
+    batch_completed: batchCompleted,
+    batch_pending: batchPending,
     file_path: pc ? (pc.file_path || null) : null,
     doc_ids: docIds
   });
@@ -1438,46 +1460,60 @@ async function showBatchCompletionModal(st) {
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  title.textContent = 'Ανάλυση Αρχείου';
+  title.textContent = 'Αποτελέσματα — Έναρξης Batch';
 
   let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
   html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + totalInvoices + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Τιμολόγια χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTemplate + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Τιμολόγια χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noApproval + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;color:var(--accent2);">Τιμολόγια με έγκριση</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--accent2);">' + needsApproval + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Έγγραφα χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTemplate + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Έγγραφα χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noApproval + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent2);">Έγγραφα με έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent2);">' + needsApproval + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:500;">Ολοκληρωμένα Batch</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + batchCompleted + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;color:var(--warn);font-weight:500;">Μη Ολοκληρωμένα Batch</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--warn);">' + batchPending + '</td></tr>';
   html += '</table>';
 
-  // ΣΕΝΑΡΙΟ 1: Υπάρχουν τιμολόγια χωρίς template → μήνυμα + OK
-  if (withoutTemplate > 0) {
-    html += '<div style="margin-top:20px;padding:12px;background:rgba(255,165,0,0.08);border:1px solid rgba(255,165,0,0.25);border-radius:8px;font-size:13px;color:var(--warn);">';
-    html += 'Παρακαλώ ελέγξτε και επαναλάβετε την διαδικασία επεξεργασίας και δημιουργίας template';
-    html += '</div>';
-    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
-    html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">OK</button>';
-    html += '</div>';
+  // 3 Επιλογές δράσης
+  html += '<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">';
+
+  // Επιλογή 1: Επεξεργασία & Δημιουργία Template
+  html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.2);border-radius:8px;">';
+  html += '<div style="flex:1;font-size:12px;color:var(--warn);">Αν θέλετε να ελέγξετε και επαναλάβετε την διαδικασία επεξεργασίας και δημιουργίας template</div>';
+  if (firstTemplateId || (docIds.length > 0)) {
+    const tbId = firstTemplateId || docIds[0];
+    html += '<button class="btn btn-sm" style="background:var(--warn);color:#000;white-space:nowrap;" onclick="closeModal(\'precheck-modal\'); window.location.href=\'/ui/template-builder/' + tbId + '\'">ΝΑΙ</button>';
+  } else {
+    html += '<button class="btn btn-sm" style="background:var(--warn);color:#000;opacity:0.4;" disabled>ΝΑΙ</button>';
   }
-  // ΣΕΝΑΡΙΟ 2: Δεν υπάρχουν χωρίς template ΚΑΙ υπάρχουν με έγκριση → Αργότερα / ΝΑΙ
-  else if (needsApproval > 0 && firstReviewId) {
-    html += '<div style="margin-top:20px;padding:12px;background:rgba(0,102,255,0.08);border:1px solid rgba(0,102,255,0.25);border-radius:8px;font-size:13px;color:var(--accent2);">';
-    html += 'Έχετε ολοκληρώσει την διαδικασία έναρξη batch παρακαλώ προχωρήστε στην διαδικασία έγκρισης για κάθε τιμολόγιο που απαιτείται';
-    html += '</div>';
-    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
-    html += '<button class="btn btn-secondary btn-sm" onclick="closeModal(\'precheck-modal\')">Αργότερα</button>';
-    html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\'); window.open(\'/ui/review/' + firstReviewId + '\', \'_blank\')">ΝΑΙ</button>';
-    html += '</div>';
+  html += '</div>';
+
+  // Επιλογή 2: Διαδικασία Έγκρισης
+  html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(0,102,255,0.06);border:1px solid rgba(0,102,255,0.2);border-radius:8px;">';
+  html += '<div style="flex:1;font-size:12px;color:var(--accent2);">Αν θέλετε να συνεχίσετε την διαδικασία έγκρισης</div>';
+  if (firstReviewId) {
+    html += '<button class="btn btn-sm" style="background:var(--accent2);color:#fff;white-space:nowrap;" onclick="closeModal(\'precheck-modal\'); window.location.href=\'/ui/review/' + firstReviewId + '\'">ΝΑΙ</button>';
+  } else {
+    html += '<button class="btn btn-sm" style="background:var(--accent2);color:#fff;opacity:0.4;" disabled>ΝΑΙ</button>';
   }
-  // ΣΕΝΑΡΙΟ 3: Όλα χωρίς έγκριση (Completed) → επιτυχία
-  else {
-    html += '<div style="margin-top:20px;padding:12px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);border-radius:8px;font-size:13px;color:var(--accent);">';
-    html += 'Έχετε ολοκληρώσει με επιτυχία την διαδικασία Έναρξης Batch.';
-    html += '</div>';
-    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
-    html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">OK</button>';
-    html += '</div>';
-  }
+  html += '</div>';
+
+  // Επιλογή 3: Αργότερα
+  html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;">';
+  html += '<div style="flex:1;font-size:12px;color:var(--text2);">Εναλλακτικά μπορείτε να ακολουθήσετε οποιαδήποτε διαδικασία θέλετε αργότερα</div>';
+  html += '<button class="btn btn-sm btn-secondary" style="white-space:nowrap;" onclick="closeModal(\'precheck-modal\')">OK</button>';
+  html += '</div>';
+
+  html += '</div>';
 
   body.innerHTML = html;
   modal.classList.add('open');
+
+  // Ενημέρωση progress bar με ακριβή αριθμό ολοκληρωμένων batch
+  const pctReal = totalInvoices > 0 ? Math.round(batchCompleted / totalInvoices * 1000) / 10 : 100;
+  const statusEl = document.getElementById('batch-status-text');
+  const pctEl = document.getElementById('batch-pct');
+  const fillEl = document.getElementById('batch-fill');
+  if (statusEl) statusEl.textContent = batchCompleted + '/' + totalInvoices + ' έγγραφα';
+  if (pctEl) pctEl.textContent = pctReal + '%';
+  if (fillEl) fillEl.style.width = pctReal + '%';
 }
 
 // ── Batch Jobs Page ──────────────────────────────────────────────────────────
@@ -1599,14 +1635,45 @@ async function showActivityDetail(activityId) {
 
   title.textContent = 'Αποτελέσματα — ' + label;
 
+  // Φέρε live data από τα documents αν υπάρχουν doc_ids
+  let liveStats = null;
+  let rj = res.result_json;
+  if (rj) {
+    try {
+      const parsed = typeof rj === 'string' ? JSON.parse(rj) : rj;
+      const docIds = parsed.doc_ids || [];
+      if (docIds.length) {
+        const docsRes = await api('GET', '/api/documents');
+        if (docsRes && docsRes.documents) {
+          const batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
+          liveStats = { needsApproval: 0, noApproval: 0, withoutTemplate: 0, batchCompleted: 0, batchPending: 0 };
+          for (const d of batchDocs) {
+            if (d.status === 'pending_review') { liveStats.needsApproval++; liveStats.batchCompleted++; }
+            else if (d.status === 'Completed') { liveStats.noApproval++; liveStats.batchCompleted++; }
+            else if (d.status === 'no_template') { liveStats.withoutTemplate++; liveStats.batchPending++; }
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
+  const totalInv = res.total_invoices || 0;
+  const withoutTmpl = liveStats ? liveStats.withoutTemplate : (res.without_template || 0);
+  const noAppr = liveStats ? liveStats.noApproval : (res.no_approval || 0);
+  const needsAppr = liveStats ? liveStats.needsApproval : (res.needs_approval || 0);
+  const batchComp = liveStats ? liveStats.batchCompleted : (res.batch_completed || (needsAppr + noAppr));
+  const batchPend = liveStats ? liveStats.batchPending : (res.batch_pending || withoutTmpl);
+
   let html = '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">';
   html += '<b>' + res.filename + '</b><br>' + date + ' <span style="color:var(--accent);font-size:11px;">(τελευταία ενημέρωση)</span>';
   html += '</div>';
   html += '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + (res.total_invoices || 0) + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Τιμολόγια χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + (res.without_template || 0) + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Τιμολόγια χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + (res.no_approval || 0) + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;color:var(--accent2);">Τιμολόγια με έγκριση</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--accent2);">' + (res.needs_approval || 0) + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + totalInv + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Έγγραφα χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTmpl + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Έγγραφα χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noAppr + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent2);">Έγγραφα με έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent2);">' + needsAppr + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:500;">Ολοκληρωμένα Batch</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + batchComp + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;color:var(--warn);font-weight:500;">Μη Ολοκληρωμένα Batch</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--warn);">' + batchPend + '</td></tr>';
   html += '</table>';
   html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
   html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">OK</button>';
