@@ -1403,12 +1403,14 @@ async function showBatchCompletionModal(st) {
   let batchDocs = [];
   let firstReviewId = null;
   let firstTemplateId = null;
-  if (docIds.length) {
-    const docsRes = await api('GET', '/api/documents');
-    if (docsRes && docsRes.documents) {
-      batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
+  try {
+    if (docIds.length) {
+      const docsRes = await api('GET', '/api/documents');
+      if (docsRes && docsRes.documents) {
+        batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
+      }
     }
-  }
+  } catch(e) { console.error('showBatchCompletionModal docs fetch error:', e); }
 
   // Υπολογισμός στατιστικών από τα πραγματικά documents (ΠΑΝΤΑ live)
   const totalInvoices = st.total_invoices || batchDocs.length || (pc ? pc.total_invoices : 0) || 0;
@@ -1431,11 +1433,13 @@ async function showBatchCompletionModal(st) {
       if (!firstTemplateId) firstTemplateId = d.id;
     }
   }
-  // Fallback αν δεν βρήκαμε docs — χρησιμοποίησε pre-check data
-  if (!batchDocs.length && pc) {
-    withoutTemplate = pc.without_template || 0;
-    needsApproval = pc.needs_approval || 0;
-    noApproval = pc.no_approval || 0;
+  // Fallback: pre-check data ή batch status
+  if (!batchDocs.length) {
+    if (pc) {
+      withoutTemplate = pc.without_template || 0;
+      needsApproval = pc.needs_approval || 0;
+      noApproval = pc.no_approval || 0;
+    }
     batchCompleted = needsApproval + noApproval;
     batchPending = withoutTemplate;
   }
