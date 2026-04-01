@@ -378,10 +378,16 @@ class BatchProcessor:
         all_docs_by_filename = {}
         if skip_completed:
             # Φτιάχνουμε index filename → doc για γρήγορο lookup
+            # Ψάχνουμε ΚΑΙ στο filename ΚΑΙ στο original_filename
+            # γιατί μετά το extraction, το filename μπορεί να αλλάξει (smart filename)
             existing = self.db.list_documents()
             for d in existing:
-                if d.get("status") in ("Completed", "pending_review"):
+                if d.get("status") in ("Completed", "pending_review", "no_template"):
                     all_docs_by_filename[d["filename"]] = d["id"]
+                    # Επίσης index by original_filename αν υπάρχει
+                    orig = d.get("original_filename") or ""
+                    if orig and orig != d["filename"]:
+                        all_docs_by_filename[orig] = d["id"]
 
         for idx, segment in enumerate(segments):
             pages_str = ",".join(str(p) for p in segment.page_nums)
@@ -401,7 +407,7 @@ class BatchProcessor:
                     filename=filename,
                     file_path=str(segment.pages[0]),
                     schema_name=schema_name,
-                    original_filename=original_filename or filename)
+                    original_filename=filename)
                 doc_id_map[idx] = doc_id
 
         # Ενημέρωση progress για skipped

@@ -1636,7 +1636,10 @@ async function showActivityDetail(activityId) {
   title.textContent = 'Αποτελέσματα — ' + label;
 
   // Φέρε live data από τα documents αν υπάρχουν doc_ids
-  let liveStats = null;
+  // Τα counts (without_template, needs_approval, no_approval) ενημερώνονται
+  // αυτόματα μέσω _recalc στο backend, αλλά χρειαζόμαστε live doc status
+  // για τα batch_completed / batch_pending
+  let batchCompleted = 0, batchPending = 0;
   let rj = res.result_json;
   if (rj) {
     try {
@@ -1646,11 +1649,12 @@ async function showActivityDetail(activityId) {
         const docsRes = await api('GET', '/api/documents');
         if (docsRes && docsRes.documents) {
           const batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
-          liveStats = { needsApproval: 0, noApproval: 0, withoutTemplate: 0, batchCompleted: 0, batchPending: 0 };
           for (const d of batchDocs) {
-            if (d.status === 'pending_review') { liveStats.needsApproval++; liveStats.batchCompleted++; }
-            else if (d.status === 'Completed') { liveStats.noApproval++; liveStats.batchCompleted++; }
-            else if (d.status === 'no_template') { liveStats.withoutTemplate++; liveStats.batchPending++; }
+            if (d.status === 'Completed' || d.status === 'pending_review') {
+              batchCompleted++;
+            } else if (d.status === 'no_template' || d.status === 'Pending' || d.status === 'Failed') {
+              batchPending++;
+            }
           }
         }
       }
@@ -1658,11 +1662,12 @@ async function showActivityDetail(activityId) {
   }
 
   const totalInv = res.total_invoices || 0;
-  const withoutTmpl = liveStats ? liveStats.withoutTemplate : (res.without_template || 0);
-  const noAppr = liveStats ? liveStats.noApproval : (res.no_approval || 0);
-  const needsAppr = liveStats ? liveStats.needsApproval : (res.needs_approval || 0);
-  const batchComp = liveStats ? liveStats.batchCompleted : (res.batch_completed || (needsAppr + noAppr));
-  const batchPend = liveStats ? liveStats.batchPending : (res.batch_pending || withoutTmpl);
+  // Χρησιμοποιούμε τα recalculated counts από το activity (ενημερωμένα μέσω _recalc)
+  const withoutTmpl = res.without_template || 0;
+  const noAppr = res.no_approval || 0;
+  const needsAppr = res.needs_approval || 0;
+  const batchComp = batchCompleted || (noAppr + needsAppr);
+  const batchPend = batchPending || withoutTmpl;
 
   let html = '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">';
   html += '<b>' + res.filename + '</b><br>' + date + ' <span style="color:var(--accent);font-size:11px;">(τελευταία ενημέρωση)</span>';
