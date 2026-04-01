@@ -1397,11 +1397,7 @@ function pollBatchJob(job_id) {
 
 async function showBatchCompletionModal(st) {
   const docIds = st.doc_ids || [];
-
-  // Χρήση pre-check δεδομένων για βασικούς αριθμούς
   const pc = batchPreCheckData;
-  const totalInvoices   = pc ? (pc.total_invoices || 0) : (st.total_invoices || st.processed || 0);
-  const withoutTemplate = pc ? (pc.without_template || 0) : 0;
 
   // Φέρε τα πραγματικά documents για ακριβή υπολογισμό στατιστικών
   let batchDocs = [];
@@ -1414,7 +1410,9 @@ async function showBatchCompletionModal(st) {
     }
   }
 
-  // Υπολογισμός στατιστικών από τα πραγματικά documents
+  // Υπολογισμός στατιστικών από τα πραγματικά documents (ΠΑΝΤΑ live)
+  const totalInvoices = st.total_invoices || batchDocs.length || (pc ? pc.total_invoices : 0) || 0;
+  let withoutTemplate = 0;
   let needsApproval = 0;   // pending_review
   let noApproval = 0;      // Completed (δεν χρειάζεται έγκριση)
   let batchCompleted = 0;  // Completed + pending_review (πέρασαν batch)
@@ -1428,12 +1426,14 @@ async function showBatchCompletionModal(st) {
       noApproval++;
       batchCompleted++;
     } else if (d.status === 'no_template') {
+      withoutTemplate++;
       batchPending++;
       if (!firstTemplateId) firstTemplateId = d.id;
     }
   }
-  // Αν δεν βρήκαμε docs, χρησιμοποίησε pre-check data
+  // Fallback αν δεν βρήκαμε docs — χρησιμοποίησε pre-check data
   if (!batchDocs.length && pc) {
+    withoutTemplate = pc.without_template || 0;
     needsApproval = pc.needs_approval || 0;
     noApproval = pc.no_approval || 0;
     batchCompleted = needsApproval + noApproval;
@@ -1441,7 +1441,8 @@ async function showBatchCompletionModal(st) {
   }
 
   // Αποθήκευση στο ιστορικό
-  const batchFilename = pc ? (pc.filename || 'unknown') : 'unknown';
+  const batchFilename = pc ? (pc.filename || 'unknown')
+    : (selectedActivityData ? (selectedActivityData.filename || 'unknown') : 'unknown');
   saveActivity(batchFilename, 'batch', {
     total_invoices: totalInvoices,
     without_template: withoutTemplate,
@@ -1960,8 +1961,9 @@ async function deleteTemplate(name) {
   toast('Template διαγράφηκε','success');
   if (res.updated_activities && res.updated_activities.length > 0) {
     toast('Ενημερώθηκαν ' + res.updated_activities.length + ' εγγραφές ιστορικού', 'success');
-    loadActivityHistory();
   }
+  // Πάντα ενημέρωσε ιστορικό και templates μετά τη διαγραφή
+  loadActivityHistory();
   loadTemplates();
 }
 

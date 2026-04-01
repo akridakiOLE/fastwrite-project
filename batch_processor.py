@@ -375,28 +375,40 @@ class BatchProcessor:
         doc_id_map  = {}   # idx → doc_id  (για extraction)
         skipped_map = {}   # idx → doc_id  (ήδη Completed, skip)
 
-        all_docs_by_filename = {}
+        all_docs_by_lookup = {}
         if skip_completed:
-            # Φτιάχνουμε index filename → doc για γρήγορο lookup
-            # Ψάχνουμε ΚΑΙ στο filename ΚΑΙ στο original_filename
-            # γιατί μετά το extraction, το filename μπορεί να αλλάξει (smart filename)
+            # Φτιάχνουμε index για γρήγορο lookup
+            # Ψάχνουμε με filename, file_path, ΚΑΙ pattern matching
+            # γιατί μετά extraction, filename αλλάζει (smart filename)
             existing = self.db.list_documents()
             for d in existing:
                 if d.get("status") in ("Completed", "pending_review", "no_template"):
-                    all_docs_by_filename[d["filename"]] = d["id"]
-                    # Επίσης index by original_filename αν υπάρχει
-                    orig = d.get("original_filename") or ""
-                    if orig and orig != d["filename"]:
-                        all_docs_by_filename[orig] = d["id"]
+                    # Index by current filename
+                    all_docs_by_lookup[d["filename"]] = d
+                    # Index by file_path (σταθερό — page image path)
+                    fp = d.get("file_path") or ""
+                    if fp:
+                        all_docs_by_lookup[fp] = d
 
         for idx, segment in enumerate(segments):
             pages_str = ",".join(str(p) for p in segment.page_nums)
             stem      = Path(original_filename).stem if original_filename else "batch"
             filename  = f"{stem}_inv{idx+1:03d}_pages{pages_str}.pdf"
 
-            if skip_completed and filename in all_docs_by_filename:
+            # Check skip: by filename ΗΛΙ by file_path (page image path)
+            skip_match = None
+            if skip_completed:
+                if filename in all_docs_by_lookup:
+                    skip_match = all_docs_by_lookup[filename]
+                else:
+                    # Ψάξε by file_path (page image path — σταθερό)
+                    seg_fp = str(segment.pages[0])
+                    if seg_fp in all_docs_by_lookup:
+                        skip_match = all_docs_by_lookup[seg_fp]
+
+            if skip_match:
                 # Υπάρχει ήδη — παράλειψη
-                existing_id = all_docs_by_filename[filename]
+                existing_id = skip_match["id"]
                 skipped_map[idx] = existing_id
                 job.doc_ids.append(existing_id)
                 job.processed += 1
@@ -407,7 +419,7 @@ class BatchProcessor:
                     filename=filename,
                     file_path=str(segment.pages[0]),
                     schema_name=schema_name,
-                    original_filename=filename)
+                    original_filename=original_filename or filename)
                 doc_id_map[idx] = doc_id
 
         # Ενημέρωση progress για skipped
