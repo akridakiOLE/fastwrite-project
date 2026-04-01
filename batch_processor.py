@@ -381,62 +381,95 @@ class BatchProcessor:
         skipped_map = {}   # idx → doc_id  (ήδη Completed, skip)
 
         all_docs_by_lookup = {}
-        if skip_completed:
-            # Φτιάχνουμε πολλαπλά indexes για γρήγορο lookup:
-            # 1. By current filename (πριν ή μετά smart rename)
-            # 2. By file_path (page image path — αλλάζει κάθε run)
-            # 3. By original_filename + page basename (ΣΤΑΘΕΡΟ — κύρια μέθοδος)
-            #    π.χ. "myfile.pdf::page_0001.png" — ίδιο ανεξαρτήτως run
-            existing = self.db.list_documents()
-            for d in existing:
-                if d.get("status") in ("Completed", "pending_review"):
-                    # Index by current filename
-                    all_docs_by_lookup[d["filename"]] = d
-                    # Index by file_path
-                    fp = d.get("file_path") or ""
-                    if fp:
-                        all_docs_by_lookup[fp] = d
-                        # Index by original_filename + page basename
-                        ofn = d.get("original_filename") or ""
-                        if ofn:
-                            page_basename = Path(fp).name  # e.g. "page_0001.png"
-                            stable_key = f"{ofn}::{page_basename}"
-                            all_docs_by_lookup[stable_key] = d
+        # Ξεχωριστό index: original_filename → {page_number → doc}
+        docs_by_ofn_page = {}
 
         if skip_completed:
-            logger.info("[skip_completed] Lookup built with %d entries for %d existing docs "
-                        "(original_filename='%s')",
-                        len(all_docs_by_lookup), len(existing) if skip_completed else 0,
-                        original_filename)
-            # Log some keys for debugging
+            existing = self.db.list_documents()
+            logger.info("[skip_completed] === START === original_filename='%s', "
+                        "total docs in DB: %d", original_filename, len(existing))
+
+            completed_count = 0
+            for d in existing:
+                d_status = d.get("status", "")
+                d_ofn = d.get("original_filename") or ""
+                d_fp = d.get("file_path") or ""
+
+                if d_status in ("Completed", "pending_review"):
+                    completed_count += 1
+                    # Method 1: by current filename
+                    all_docs_by_lookup[d["filename"]] = d
+                    # Method 2: by exact file_path
+                    if d_fp:
+                        all_docs_by_lookup[d_fp] = d
+                    # Method 3: by original_filename + page basename
+                    if d_ofn and d_fp:
+                        page_basename = Path(d_fp).name
+                        stable_key = f"{d_ofn}::{page_basename}"
+                        all_docs_by_lookup[stable_key] = d
+                    # Method 4: by original_filename + page NUMBER (πιο ανεκτικό)
+                    if d_ofn and d_fp:
+                        try:
+                            # Extract page number: "page_0001.png" → 1
+                            page_num_str = Path(d_fp).stem.replace("page_", "")
+                            page_num = int(page_num_str)
+                            page_key = f"{d_ofn}::page{page_num}"
+                            docs_by_ofn_page[page_key] = d
+                        except (ValueError, IndexError):
+                            pass
+
+                    logger.info("[skip_completed]   Completed doc id=%d: status='%s', "
+                                "ofn='%s', fp_basename='%s', filename='%s'",
+                                d.get("id", 0), d_status, d_ofn,
+                                Path(d_fp).name if d_fp else "NONE",
+                                d.get("filename", ""))
+
             stable_keys = [k for k in all_docs_by_lookup if '::' in k]
-            logger.info("[skip_completed] Stable keys in lookup: %s", stable_keys[:10])
+            page_keys = list(docs_by_ofn_page.keys())
+            logger.info("[skip_completed] Lookup: %d entries, %d completed docs, "
+                        "stable_keys=%s, page_keys=%s",
+                        len(all_docs_by_lookup), completed_count,
+                        stable_keys[:10], page_keys[:10])
 
         for idx, segment in enumerate(segments):
             pages_str = ",".join(str(p) for p in segment.page_nums)
             stem      = Path(original_filename).stem if original_filename else "batch"
             filename  = f"{stem}_inv{idx+1:03d}_pages{pages_str}.pdf"
 
-            # Check skip: by filename, file_path, ή original_filename+page_basename
+            # Check skip: 4 μέθοδοι αντιστοίχισης, κατά σειρά
             skip_match = None
+            match_method = "none"
             if skip_completed:
+                # Method 1: exact filename
                 if filename in all_docs_by_lookup:
                     skip_match = all_docs_by_lookup[filename]
+                    match_method = "filename"
                 else:
+                    # Method 2: exact file_path
                     seg_fp = str(segment.pages[0])
                     if seg_fp in all_docs_by_lookup:
                         skip_match = all_docs_by_lookup[seg_fp]
+                        match_method = "file_path"
                     else:
-                        # Κύρια μέθοδος: original_filename + page basename
-                        # Σταθερό ανεξαρτήτως πότε έγινε process
-                        seg_page_basename = segment.pages[0].name  # e.g. "page_0001.png"
+                        # Method 3: original_filename + page basename
+                        seg_page_basename = segment.pages[0].name
                         stable_key = f"{original_filename}::{seg_page_basename}"
                         if stable_key in all_docs_by_lookup:
                             skip_match = all_docs_by_lookup[stable_key]
+                            match_method = "stable_key"
                         else:
-                            logger.info("[skip_completed] Invoice %d NO MATCH: "
-                                        "filename='%s', seg_fp='%s', stable_key='%s'",
-                                        idx+1, filename, seg_fp, stable_key)
+                            # Method 4: original_filename + page NUMBER
+                            page_num = segment.page_nums[0] if segment.page_nums else 0
+                            page_key = f"{original_filename}::page{page_num}"
+                            if page_key in docs_by_ofn_page:
+                                skip_match = docs_by_ofn_page[page_key]
+                                match_method = "page_number"
+                            else:
+                                logger.info("[skip_completed] Invoice %d NO MATCH: "
+                                            "filename='%s', stable_key='%s', "
+                                            "page_key='%s', seg_fp='%s'",
+                                            idx+1, filename, stable_key,
+                                            page_key, seg_fp)
 
             if skip_match:
                 # Υπάρχει ήδη — παράλειψη
@@ -444,8 +477,11 @@ class BatchProcessor:
                 skipped_map[idx] = existing_id
                 job.doc_ids.append(existing_id)
                 job.skipped += 1
-                logger.info("[skip_completed] Invoice %d SKIPPED: doc_id=%d, status=%s, match_key used",
-                            idx+1, existing_id, skip_match.get("status", "?"))
+                logger.info("[skip_completed] Invoice %d SKIPPED via %s: doc_id=%d, "
+                            "status=%s, filename='%s'",
+                            idx+1, match_method, existing_id,
+                            skip_match.get("status", "?"),
+                            skip_match.get("filename", "?"))
                 job.errors.append(
                     f"Invoice {idx+1} ({filename}): παραλείφθηκε (ήδη {skip_match.get('status', 'Completed')}).")
             else:

@@ -1342,7 +1342,11 @@ function pollBatchJob(job_id) {
   const fill = document.getElementById('batch-fill');
   if (fill) fill.style.transition = 'width 0.5s ease';
 
+  let batchDoneHandled = false;  // Guard: αποτρέπει διπλή κλήση showBatchCompletionModal
+
   const interval = setInterval(async () => {
+    if (batchDoneHandled) return;  // Ήδη ολοκληρώθηκε, αγνόησε
+
     const st = await api('GET',`/api/batch/${job_id}/status`);
     if (!st || st.error) return;
 
@@ -1388,6 +1392,8 @@ function pollBatchJob(job_id) {
 
     if (done) {
       clearInterval(interval);
+      if (batchDoneHandled) return;  // Διπλός έλεγχος μετά το clearInterval
+      batchDoneHandled = true;
       if (st.status === 'completed') {
         toast(`✓ Batch ολοκληρώθηκε: ${st.processed} έγγραφα`, 'success');
         showBatchCompletionModal(st);
