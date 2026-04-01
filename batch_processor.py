@@ -377,34 +377,48 @@ class BatchProcessor:
 
         all_docs_by_lookup = {}
         if skip_completed:
-            # Φτιάχνουμε index για γρήγορο lookup
-            # Ψάχνουμε με filename, file_path, ΚΑΙ pattern matching
-            # γιατί μετά extraction, filename αλλάζει (smart filename)
+            # Φτιάχνουμε πολλαπλά indexes για γρήγορο lookup:
+            # 1. By current filename (πριν ή μετά smart rename)
+            # 2. By file_path (page image path — αλλάζει κάθε run)
+            # 3. By original_filename + page basename (ΣΤΑΘΕΡΟ — κύρια μέθοδος)
+            #    π.χ. "myfile.pdf::page_0001.png" — ίδιο ανεξαρτήτως run
             existing = self.db.list_documents()
             for d in existing:
-                if d.get("status") in ("Completed", "pending_review", "no_template"):
+                if d.get("status") in ("Completed", "pending_review"):
                     # Index by current filename
                     all_docs_by_lookup[d["filename"]] = d
-                    # Index by file_path (σταθερό — page image path)
+                    # Index by file_path
                     fp = d.get("file_path") or ""
                     if fp:
                         all_docs_by_lookup[fp] = d
+                        # Index by original_filename + page basename
+                        ofn = d.get("original_filename") or ""
+                        if ofn:
+                            page_basename = Path(fp).name  # e.g. "page_0001.png"
+                            stable_key = f"{ofn}::{page_basename}"
+                            all_docs_by_lookup[stable_key] = d
 
         for idx, segment in enumerate(segments):
             pages_str = ",".join(str(p) for p in segment.page_nums)
             stem      = Path(original_filename).stem if original_filename else "batch"
             filename  = f"{stem}_inv{idx+1:03d}_pages{pages_str}.pdf"
 
-            # Check skip: by filename ΗΛΙ by file_path (page image path)
+            # Check skip: by filename, file_path, ή original_filename+page_basename
             skip_match = None
             if skip_completed:
                 if filename in all_docs_by_lookup:
                     skip_match = all_docs_by_lookup[filename]
                 else:
-                    # Ψάξε by file_path (page image path — σταθερό)
                     seg_fp = str(segment.pages[0])
                     if seg_fp in all_docs_by_lookup:
                         skip_match = all_docs_by_lookup[seg_fp]
+                    else:
+                        # Κύρια μέθοδος: original_filename + page basename
+                        # Σταθερό ανεξαρτήτως πότε έγινε process
+                        seg_page_basename = segment.pages[0].name  # e.g. "page_0001.png"
+                        stable_key = f"{original_filename}::{seg_page_basename}"
+                        if stable_key in all_docs_by_lookup:
+                            skip_match = all_docs_by_lookup[stable_key]
 
             if skip_match:
                 # Υπάρχει ήδη — παράλειψη

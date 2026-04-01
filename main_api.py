@@ -984,6 +984,33 @@ def activity_create():
     )
     return jsonify({"success": True, "id": aid})
 
+@app.put("/api/activity/<int:activity_id>")
+@require_auth
+def activity_update(activity_id):
+    """Update an existing activity log entry (for repeat batch)."""
+    a = db.get_activity(activity_id)
+    if not a:
+        return jsonify({"error": "Activity not found"}), 404
+    data = request.get_json(force=True)
+    # Merge result_data into existing result_json
+    existing_rj = {}
+    if a.get("result_json"):
+        try:
+            existing_rj = json.loads(a["result_json"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    new_result_data = data.get("result_data", {})
+    existing_rj.update(new_result_data)
+    db.update_activity(
+        activity_id,
+        total_invoices=data.get("total_invoices", a.get("total_invoices", 0)),
+        without_template=data.get("without_template", a.get("without_template", 0)),
+        needs_approval=data.get("needs_approval", a.get("needs_approval", 0)),
+        no_approval=data.get("no_approval", a.get("no_approval", 0)),
+        result_json=json.dumps(existing_rj)
+    )
+    return jsonify({"success": True, "id": activity_id})
+
 @app.get("/api/activity")
 @require_auth
 def activity_list():

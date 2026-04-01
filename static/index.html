@@ -1182,10 +1182,12 @@ async function handleBatchClick() {
     if (!res.success) { toast(res.error || 'Σφάλμα', 'error'); return; }
     toast('Batch ξεκίνησε (επανεκτέλεση)!', 'success');
     lastBatchJobId = res.job_id;
+    repeatBatchActivityId = selectedActivityData.id;  // Σημειώνει ότι είναι repeat
     pollBatchJob(res.job_id);
     document.getElementById('batch-progress').style.display = 'block';
   } else {
     // Normal mode: run batch
+    repeatBatchActivityId = null;  // Reset
     doBatchUpload();
   }
 }
@@ -1444,19 +1446,37 @@ async function showBatchCompletionModal(st) {
     batchPending = withoutTemplate;
   }
 
-  // Αποθήκευση στο ιστορικό
+  // Αποθήκευση / Ενημέρωση ιστορικού
   const batchFilename = pc ? (pc.filename || 'unknown')
     : (selectedActivityData ? (selectedActivityData.filename || 'unknown') : 'unknown');
-  saveActivity(batchFilename, 'batch', {
+  const activityData = {
     total_invoices: totalInvoices,
     without_template: withoutTemplate,
     needs_approval: needsApproval,
     no_approval: noApproval,
     batch_completed: batchCompleted,
     batch_pending: batchPending,
-    file_path: pc ? (pc.file_path || null) : null,
+    file_path: pc ? (pc.file_path || null) : (selectedActivityData ? (selectedActivityData.file_path || null) : null),
     doc_ids: docIds
-  });
+  };
+
+  if (repeatBatchActivityId) {
+    // Repeat mode: ενημέρωσε την υπάρχουσα εγγραφή αντί να δημιουργήσεις νέα
+    try {
+      await api('PUT', '/api/activity/' + repeatBatchActivityId, {
+        total_invoices: totalInvoices,
+        without_template: withoutTemplate,
+        needs_approval: needsApproval,
+        no_approval: noApproval,
+        result_data: activityData
+      });
+      loadActivityHistory();
+    } catch(e) { console.error('Activity update error:', e); }
+    repeatBatchActivityId = null;  // Reset
+  } else {
+    // Πρώτη εκτέλεση: δημιούργησε νέα εγγραφή
+    saveActivity(batchFilename, 'batch', activityData);
+  }
 
   // Καθαρισμός pre-check data
   batchPreCheckData = null;
@@ -2125,6 +2145,7 @@ async function checkServer() {
 // uploadedDocIds: tracks doc_id after upload for preview
 const uploadedDocIds = {};
 let lastBatchJobId = null;
+let repeatBatchActivityId = null;  // Αν είναι repeat batch, αποθηκεύει το activity ID
 // Pre-check flags: ελέγχει αν ο χρήστης πέρασε από τη διαδικασία pre-check
 let preCheckDone = { single: false, batch: false };
 let preCheckResult = { single: null, batch: null };
