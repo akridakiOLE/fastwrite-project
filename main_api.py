@@ -3,6 +3,7 @@ Module 8: Τοπικός Διακομιστής (Flask) & Σύνδεση με Fr
 Domain: fastwrite.duckdns.org
 """
 import json
+import logging
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file, make_response, redirect
 from db_manager     import DatabaseManager
@@ -12,6 +13,8 @@ from file_processor import FileProcessor
 from schema_builder import SchemaBuilder
 from validator      import InvoiceValidator
 from exporter       import DocumentExporter
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR      = Path("/app/projects")
 DB_PATH       = BASE_DIR / "data"    / "app.db"
@@ -151,6 +154,9 @@ def _recalc_activities_after_template_change():
     activities = db.list_activities(limit=500)
     updated_ids = []
 
+    logger.info("[_recalc] START — %d templates, %d activities",
+                len(templates), len(activities))
+
     # Build a map of original_filename → list of documents for pre-check lookups
     all_docs = db.list_documents()
     docs_by_filename = {}
@@ -160,6 +166,7 @@ def _recalc_activities_after_template_change():
             docs_by_filename.setdefault(ofn, []).append(d)
 
     for act in activities:
+      try:
         rj = act.get("result_json")
         if not rj:
             continue
@@ -174,11 +181,10 @@ def _recalc_activities_after_template_change():
         new_without = 0
         new_needs   = 0
         new_no_appr = 0
-        changed     = False
         total_count = 0
 
         if invoices and isinstance(invoices, list):
-            # ── Pre-check entries: have per-invoice supplier info ──
+            # ── Pre-check entries (or batch with cached invoices): per-invoice supplier info ──
             total_count = len(invoices)
 
             # Build doc status map from linked doc_ids or from filename match
@@ -201,12 +207,10 @@ def _recalc_activities_after_template_change():
 
             for inv in invoices:
                 supplier  = (inv.get("supplier") or "").strip()
-                old_match = inv.get("matched_template")
                 new_match = _match_supplier_to_template(supplier, templates)
 
-                if new_match != old_match:
-                    inv["matched_template"] = new_match
-                    changed = True
+                # Always update the matched_template to current state
+                inv["matched_template"] = new_match
 
                 # Check document status: linked doc_id or filename-based lookup
                 doc_status = None
@@ -251,7 +255,6 @@ def _recalc_activities_after_template_change():
                             doc_result.get("vendor_name") or
                             doc_result.get("company") or
                             doc_result.get("_matched_supplier") or "").strip()
-                old_schema = doc.get("schema_name") or ""
                 new_match  = _match_supplier_to_template(supplier, templates)
 
                 inv_list.append({
@@ -275,30 +278,38 @@ def _recalc_activities_after_template_change():
             # Store invoices array in result_data for future recalcs
             if inv_list:
                 result_data["invoices"] = inv_list
-                changed = True
         else:
             continue  # No data to recalculate
 
-        # Check if counts actually changed
-        if (new_without != (act.get("without_template") or 0) or
-            new_needs   != (act.get("needs_approval") or 0) or
-            new_no_appr != (act.get("no_approval") or 0) or
-            changed):
+        # ALWAYS update: αφαιρέθηκε ο έλεγχος "changed" για αξιοπιστία
+        result_data["without_template"] = new_without
+        result_data["with_template"]    = total_count - new_without
+        result_data["needs_approval"]   = new_needs
+        result_data["no_approval"]      = new_no_appr
 
-            result_data["without_template"] = new_without
-            result_data["with_template"]    = total_count - new_without
-            result_data["needs_approval"]   = new_needs
-            result_data["no_approval"]      = new_no_appr
+        old_w = act.get("without_template") or 0
+        old_n = act.get("needs_approval") or 0
+        old_a = act.get("no_approval") or 0
 
-            db.update_activity(
-                act["id"],
-                without_template=new_without,
-                needs_approval=new_needs,
-                no_approval=new_no_appr,
-                result_json=json.dumps(result_data)
-            )
-            updated_ids.append(act["id"])
+        db.update_activity(
+            act["id"],
+            without_template=new_without,
+            needs_approval=new_needs,
+            no_approval=new_no_appr,
+            result_json=json.dumps(result_data)
+        )
+        updated_ids.append(act["id"])
 
+        if (new_without != old_w or new_needs != old_n or new_no_appr != old_a):
+            logger.info("[_recalc] Activity #%d CHANGED: without %d→%d, needs %d→%d, no_appr %d→%d",
+                        act["id"], old_w, new_without, old_n, new_needs, old_a, new_no_appr)
+
+      except Exception as e:
+        logger.error("[_recalc] Error processing activity #%s: %s",
+                     act.get("id", "?"), str(e), exc_info=True)
+
+    logger.info("[_recalc] DONE — updated %d activities: %s",
+                len(updated_ids), updated_ids)
     return updated_ids
 
 @app.get("/api/templates")
@@ -322,8 +333,14 @@ def delete_template(name):
     if not db.get_template(name):
         return jsonify({"error": f"Template '{name}' δεν βρέθηκε."}), 404
     db.delete_template(name)
+    logger.info("[delete_template] Template '%s' deleted, running _recalc...", name)
     # Re-calc activity results μετά τη διαγραφή
-    updated_activities = _recalc_activities_after_template_change()
+    try:
+        updated_activities = _recalc_activities_after_template_change()
+    except Exception as e:
+        logger.error("[delete_template] _recalc failed: %s", str(e), exc_info=True)
+        updated_activities = []
+    logger.info("[delete_template] _recalc done, updated %d activities", len(updated_activities))
     return jsonify({
         "success": True,
         "message": f"Template '{name}' διαγράφηκε.",

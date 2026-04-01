@@ -1961,14 +1961,23 @@ async function saveTemplate() {
 
 async function deleteTemplate(name) {
   if (!confirm('Διαγραφή template "'+name+'"; Θα ενημερωθούν τα αποτελέσματα του ιστορικού.')) return;
-  const res = await api('DELETE',`/api/templates/${name}`);
-  toast('Template διαγράφηκε','success');
-  if (res.updated_activities && res.updated_activities.length > 0) {
-    toast('Ενημερώθηκαν ' + res.updated_activities.length + ' εγγραφές ιστορικού', 'success');
+  try {
+    const res = await api('DELETE',`/api/templates/${name}`);
+    if (res.error) {
+      toast('Σφάλμα: ' + res.error, 'error');
+      return;
+    }
+    toast('Template διαγράφηκε','success');
+    const updCount = (res.updated_activities || []).length;
+    if (updCount > 0) {
+      toast('Ενημερώθηκαν ' + updCount + ' εγγραφές ιστορικού', 'success');
+    }
+  } catch(e) {
+    console.error('deleteTemplate error:', e);
+    toast('Σφάλμα κατά τη διαγραφή', 'error');
   }
   // Πάντα ενημέρωσε ιστορικό και templates μετά τη διαγραφή
-  loadActivityHistory();
-  loadTemplates();
+  await Promise.all([loadActivityHistory(), loadTemplates()]);
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
