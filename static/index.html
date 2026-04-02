@@ -400,15 +400,20 @@ select.form-input option{background:var(--bg2);}
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th style="width:36px;"><input type="checkbox" id="doc-select-all" onchange="toggleSelectAll(this)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"/></th>
-              <th style="width:44px">#</th>
-              <th>Αρχείο</th>
-              <th>Template</th>
-              <th>Προμηθευτής</th>
-              <th>Τιμολόγιο</th>
-              <th>Κατάσταση</th>
-              <th>Ημ/νία Τιμολ.</th>
-              <th>Καταχώρηση</th>
+              <th style="width:36px;">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                  <button id="bulk-delete-btn" class="btn btn-danger btn-sm" onclick="deleteSelectedDocs()" style="display:none;padding:2px 6px;font-size:10px;white-space:nowrap;" title="Διαγραφή επιλεγμένων">🗑</button>
+                  <input type="checkbox" id="doc-select-all" onchange="toggleSelectAll(this)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"/>
+                </div>
+              </th>
+              <th style="width:44px;color:#fff">#</th>
+              <th style="color:#fff">ΑΡΧΕΙΟ</th>
+              <th style="color:#fff">ΕΤΙΚΕΤΕΣ</th>
+              <th style="color:#fff"><div>ΠΡΟΜΗΘΕΥΤΗΣ</div><div>ΠΩΛΗΤΗΣ</div></th>
+              <th style="color:#fff">ΚΑΤΑΣΤΑΣΗ</th>
+              <th style="color:#fff">BATCH</th>
+              <th style="color:#fff">ΠΟΣΟΣΤΟ</th>
+              <th style="color:#fff">ΚΑΤΑΧΩΡΗΣΗ</th>
               <th style="width:80px"></th>
             </tr></thead>
             <tbody id="docs-table"></tbody>
@@ -431,8 +436,8 @@ select.form-input option{background:var(--bg2);}
       <div class="content">
         <!-- Templates Search Bar -->
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;">
-          <input type="text" id="tf-name" placeholder="🔍 Όνομα Template..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
-          <input type="text" id="tf-supplier" placeholder="🏢 Supplier Pattern..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
+          <input type="text" id="tf-name" placeholder="🔍 Ετικέτα..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
+          <input type="text" id="tf-supplier" placeholder="🏢 Προμηθευτής Πωλητής..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
           <button class="af-btn" onclick="clearTemplateFilters()" title="Καθαρισμός">✕ Καθαρισμός</button>
         </div>
         <div id="templates-list"></div>
@@ -515,11 +520,11 @@ select.form-input option{background:var(--bg2);}
             <div class="card">
               <div class="card-title">+ Δημιουργία Νέου Template</div>
               <div class="form-group">
-                <label class="form-label">Όνομα Template</label>
+                <label class="form-label">Ετικέτα</label>
                 <input class="form-input" id="tb-new-tmpl-name" placeholder="π.χ. invoice, receipt..."/>
               </div>
               <div class="form-group">
-                <label class="form-label">🏢 Supplier Pattern</label>
+                <label class="form-label">🏢 Προμηθευτής Πωλητής</label>
                 <input class="form-input" id="tb-new-supplier-pattern" placeholder="π.χ. cosmote, ote — πολλαπλές με κόμμα"/>
               </div>
               <div id="tb-new-fields"></div>
@@ -556,11 +561,11 @@ select.form-input option{background:var(--bg2);}
     <!-- hidden: κρατά το αρχικό όνομα κατά την επεξεργασία -->
     <input type="hidden" id="tmpl-original-name" value=""/>
     <div class="form-group">
-      <label class="form-label">Όνομα Template</label>
-      <input class="form-input" id="tmpl-name" placeholder="π.χ. invoice, receipt..."/>
+      <label class="form-label">Ετικέτα</label>
+      <input class="form-input" id="tmpl-name" placeholder="π.χ. invoice_dei, cosmote_receipt..."/>
     </div>
     <div class="form-group">
-      <label class="form-label">🏢 Supplier Pattern <span style="color:var(--text3);font-size:11px;font-weight:400">(λέξεις-κλειδιά προμηθευτή, π.χ. ΔΕΗ, DEI, δεη)</span></label>
+      <label class="form-label">🏢 Προμηθευτής Πωλητής <span style="color:var(--text3);font-size:11px;font-weight:400">(λέξεις-κλειδιά προμηθευτή, π.χ. ΔΕΗ, DEI, δεη)</span></label>
       <input class="form-input" id="tmpl-supplier-pattern" placeholder="π.χ. cosmote, ote, κοσμοτε — πολλαπλές με κόμμα"/>
     </div>
     <div id="tmpl-fields"></div>
@@ -755,23 +760,25 @@ function renderDocs(docs) {
   if (countEl) countEl.textContent = docs.length + ' εγγραφές';
 
   if (!docs.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:40px">Δεν βρέθηκαν έγγραφα</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:40px">Δεν βρέθηκαν έγγραφα</td></tr>';
     return;
   }
   tbody.innerHTML = docs.map(doc => {
     const rd       = doc.result_data || {};
-    // Ημερομηνία τιμολογίου (από extracted data)
-    const invDate  = rd.invoice_date || rd.date || '—';
     // Ημερομηνία καταχώρησης
     const recDate  = doc.created_at ? doc.created_at.split('T')[0] : '—';
     // Προμηθευτής από extracted data (πολλαπλά field names)
     const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || '—';
-    // Αριθμός τιμολογίου
-    const invNo    = rd.invoice_number || rd.invoice_no || rd.inv_number || '—';
     // Αρχείο — εμφανίζουμε το πραγματικό όνομα αρχείου που ανέβασε ο χρήστης
     const filename = doc.original_filename || doc.filename || '—';
     // Smart name (vendor — invoice) για tooltip/title
     const smartName = doc.filename !== doc.original_filename ? doc.filename : null;
+    // Batch status
+    const batchStatus = (doc.status === 'Completed' || doc.status === 'pending_review')
+      ? '<span style="color:var(--accent);font-size:12px;">Ολοκληρώθηκε</span>'
+      : '<span style="color:var(--warn);font-size:12px;">Εκκρεμεί</span>';
+    // Ποσοστό OCR (θα ρυθμιστεί αργότερα)
+    const ocrPct = rd.confidence_pct || rd.ocr_confidence || '—';
 
     return `<tr data-id="${doc.id}">
       <td><input type="checkbox" class="doc-checkbox" value="${doc.id}" onchange="updateSelection()" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"/></td>
@@ -782,13 +789,13 @@ function renderDocs(docs) {
       </td>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${doc.schema_name||'—'}</span></td>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${supplier}</td>
-      <td><span style="font-family:'DM Mono',monospace;font-size:12px">${invNo}</span></td>
       <td>${badgeHtml(doc.status)}</td>
-      <td><span style="font-size:12px;color:var(--text2)">${invDate}</span></td>
+      <td>${batchStatus}</td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${ocrPct}</span></td>
       <td><span style="font-size:12px;color:var(--text3)">${recDate}</span></td>
       <td style="display:flex;gap:5px">
-        <button class="btn btn-secondary btn-sm" onclick="viewDoc(${doc.id})" title="Προβολή">👁</bu tton>
-        <button class="btn btn-danger btn-sm" onclick="deleteDoc(${doc.id})" title="Διαγραφή">🗑</bu tton>
+        <button class="btn btn-secondary btn-sm" onclick="viewDoc(${doc.id})" title="Προβολή">👁</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteDoc(${doc.id})" title="Διαγραφή">🗑</button>
       </td>
     </tr>`;
   }).join('');
@@ -844,6 +851,21 @@ async function deleteDoc(id) {
   loadDocuments();
 }
 
+async function deleteSelectedDocs() {
+  const ids = getSelectedIds();
+  if (!ids.length) { toast('Επιλέξτε έγγραφα πρώτα', 'error'); return; }
+  if (!confirm('Διαγραφή ' + ids.length + ' επιλεγμένων εγγράφων;')) return;
+  let deleted = 0;
+  for (const id of ids) {
+    try {
+      await api('DELETE', `/api/documents/${id}`);
+      deleted++;
+    } catch(e) { console.error('Delete error for #' + id, e); }
+  }
+  toast(deleted + ' έγγραφα διαγράφηκαν', 'success');
+  loadDocuments();
+}
+
 // ── Selection ────────────────────────────────────────────────────────────────
 function getSelectedIds() {
   return [...document.querySelectorAll('.doc-checkbox:checked')].map(cb => parseInt(cb.value));
@@ -854,10 +876,14 @@ function updateSelection() {
   const total     = document.querySelectorAll('.doc-checkbox').length;
   const selectAll = document.getElementById('doc-select-all');
   const countEl   = document.getElementById('doc-selected-count');
+  const bulkBtn   = document.getElementById('bulk-delete-btn');
 
   if (selectAll) {
     selectAll.checked       = selected.length > 0 && selected.length === total;
     selectAll.indeterminate = selected.length > 0 && selected.length < total;
+  }
+  if (bulkBtn) {
+    bulkBtn.style.display = selected.length > 0 ? 'inline-flex' : 'none';
   }
   if (countEl) {
     if (selected.length > 0) {

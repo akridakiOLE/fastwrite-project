@@ -1366,11 +1366,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
       <div class="section-title">[Edit] Πεδία Template</div>
 
       <div class="form-group">
-        <label class="form-label">Όνομα Template</label>
+        <label class="form-label">ΟΝΟΜΑ ΕΤΙΚΕΤΑΣ</label>
         <input class="form-input" id="tmpl-name" placeholder="π.χ. invoice_dei, cosmote_receipt..."/>
       </div>
       <div class="form-group">
-        <label class="form-label">[Co] Supplier Pattern <span style="color:var(--text3);font-weight:400;text-transform:none;">(λέξεις-κλειδιά auto-match, π.χ. ΔΕΗ, dei, cosmote)</span></label>
+        <label class="form-label">[Co] Προμηθευτής Πωλητής <span style="color:var(--text3);font-weight:400;text-transform:none;">(λέξεις-κλειδιά auto-match, π.χ. ΔΕΗ, dei, cosmote)</span></label>
         <input class="form-input" id="tmpl-supplier" placeholder="π.χ. cosmote, ote — πολλαπλές με κόμμα"/>
       </div>
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border-radius:8px;margin-bottom:16px;">
