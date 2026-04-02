@@ -325,6 +325,16 @@ select.form-input option{background:var(--bg2);}
             <div class="form-group" style="margin-top:6px;">
               <label class="form-label" id="batch-schema-label" style="font-size:10px;">Template</label>
               <select class="form-input" id="batch-schema" style="font-size:11px;padding:5px 8px;"></select>
+              <div id="batch-schema-hint" style="font-size:9px;color:var(--text2);margin-top:3px;display:none;">
+                ℹ Χρησιμοποιείται μόνο αν το Auto Match δεν βρει template
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:6px;margin-top:4px;">
+              <input type="checkbox" id="batch-auto-match" style="width:14px;height:14px;accent-color:var(--accent2);cursor:pointer" onchange="onAutoMatchChange()"/>
+              <div>
+                <div style="font-size:11px;color:var(--text);font-weight:500;">🔍 Auto Template Matching</div>
+                <div style="font-size:9px;color:var(--text2);margin-top:1px;">Αυτόματη επιλογή template ανά τιμολόγιο</div>
+              </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;margin-top:8px;">
               <button class="btn btn-secondary" style="flex:1;padding:10px 8px;font-size:13px;" id="batch-preview-btn" onclick="handlePreCheckClick()">
@@ -907,7 +917,31 @@ async function exportLineItems() { return exportSelected('line-items'); }
 async function loadSchemas() {
   const res = await api('GET','/api/templates');
   const opts = (res.templates||[]).map(t=>`<option value="${t.name}">${t.name}</option>`).join('');
-  document.getElementById('batch-schema').innerHTML = opts || '';
+  // Batch: προσθέτουμε επιλογή "Χωρίς Fallback" για Auto Match
+  const noFallback = '<option value="__none__">— Χωρίς Fallback (μόνο Auto Match) —</option>';
+  document.getElementById('batch-schema').innerHTML = noFallback + (opts || '');
+  onAutoMatchChange();
+}
+
+function onAutoMatchChange() {
+  const autoMatch = document.getElementById('batch-auto-match').checked;
+  const label     = document.getElementById('batch-schema-label');
+  const hint      = document.getElementById('batch-schema-hint');
+  const schema    = document.getElementById('batch-schema');
+  if (autoMatch) {
+    label.textContent = 'Template Fallback (για Auto Match)';
+    label.style.color = 'var(--accent2)';
+    hint.style.display = 'block';
+    schema.style.opacity = '0.7';
+  } else {
+    label.textContent = 'Template';
+    label.style.color = '';
+    hint.style.display = 'none';
+    schema.style.opacity = '1';
+    if (schema.value === '__none__') {
+      schema.selectedIndex = schema.options[1] ? 1 : 0;
+    }
+  }
 }
 
 function dragOver(e,id){e.preventDefault();document.getElementById(id).classList.add('drag');}
@@ -1069,8 +1103,15 @@ let batchPreCheckData = null;
 
 async function doBatchUpload() {
   const inp       = document.getElementById('batch-file');
-  const schema    = document.getElementById('batch-schema').value;
+  const schemaRaw = document.getElementById('batch-schema').value;
+  const autoMatch = document.getElementById('batch-auto-match').checked;
   if (!inp.files.length) { toast('Επίλεξε PDF πρώτα','error'); return; }
+  if (schemaRaw === '__none__' && !autoMatch) {
+    toast('Επίλεξε template ή ενεργοποίησε το Auto Template Matching','error'); return;
+  }
+  const schema = schemaRaw === '__none__'
+    ? (document.getElementById('batch-schema').options[1]?.value || '')
+    : schemaRaw;
   if (!schema) { toast('Δεν υπάρχουν templates. Δημιούργησε πρώτα ένα template.','error'); return; }
 
   const btn = document.getElementById('batch-btn');
@@ -1096,7 +1137,7 @@ async function doBatchUpload() {
   const fd = new FormData();
   fd.append('file', inp.files[0]);
   fd.append('schema_name', schema);
-  fd.append('auto_match', 'true');
+  fd.append('auto_match', autoMatch ? 'true' : 'false');
 
   const res = await api('POST','/api/batch',fd,true);
   btn.disabled=false;
