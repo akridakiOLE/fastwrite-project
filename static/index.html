@@ -96,6 +96,13 @@ tbody td:first-child{color:var(--text);}
 .badge-red{background:rgba(255,68,68,0.1);color:var(--danger);}
 .badge-gray{background:var(--bg3);color:var(--text2);}
 
+/* ── Column Filters ── */
+.col-filter-head{cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none;white-space:nowrap;}
+.col-filter-head:hover .cf-arrow{color:var(--accent);}
+.cf-arrow{font-size:8px;color:var(--text3);transition:color .15s;}
+.col-filter-dropdown{position:absolute;top:100%;left:0;min-width:140px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.5);}
+thead th{padding:10px 10px 8px !important;}
+
 /* ── Upload Zone ── */
 .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:48px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2);}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(0,229,160,0.04);}
@@ -366,56 +373,99 @@ select.form-input option{background:var(--bg2);}
       <div class="topbar">
         <div class="page-title">Έγγραφα</div>
         <div class="topbar-actions">
+          <span id="doc-count" style="font-size:12px;color:var(--text2);margin-right:8px;"></span>
+          <span id="doc-selected-count" style="font-size:12px;color:var(--accent);display:none;font-weight:500;margin-right:8px;"></span>
           <button class="btn btn-secondary btn-sm" onclick="exportDocs('csv')">↓ CSV</button>
           <button class="btn btn-secondary btn-sm" onclick="exportDocs('xlsx')">↓ XLSX</button>
           <button class="btn btn-secondary btn-sm" onclick="exportLineItems()" style="border-color:rgba(0,229,160,0.3);color:var(--accent)">↓ Line Items XLSX</button>
         </div>
       </div>
-      <!-- Filters bar -->
-      <div style="padding:12px 32px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-        <input class="form-input" style="width:200px;padding:7px 12px;font-size:13px;" placeholder="🔍 Αναζήτηση..." id="doc-search" oninput="filterDocs()"/>
-        <select class="form-input" style="width:130px;padding:7px 12px;font-size:13px;" id="doc-filter-status" onchange="filterDocs()">
-          <option value="">Όλα</option>
-          <option value="Completed">✓ Completed</option>
-          <option value="Pending">⏳ Pending</option>
-          <option value="Failed">✕ Failed</option>
-          <option value="pending_review">👁 Προς Έγκριση</option>
-        </select>
-        <select class="form-input" style="width:160px;padding:7px 12px;font-size:13px;" id="doc-filter-template" onchange="filterDocs()">
-          <option value="">Όλα τα Templates</option>
-        </select>
-        <input class="form-input" style="width:130px;padding:7px 12px;font-size:13px;" type="date" id="doc-filter-date-from" onchange="filterDocs()" title="Ημ/νία τιμολογίου από"/>
-        <input class="form-input" style="width:130px;padding:7px 12px;font-size:13px;" type="date" id="doc-filter-date-to" onchange="filterDocs()" title="Ημ/νία τιμολογίου έως"/>
-        <button class="btn btn-secondary btn-sm" onclick="clearDocFilters()">✕ Καθαρισμός</button>
-        <span id="doc-count" style="font-size:12px;color:var(--text2);margin-left:4px;"></span>
-        <!-- Selection info + export buttons -->
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <span id="doc-selected-count" style="font-size:12px;color:var(--accent);display:none;font-weight:500;"></span>
-          <button class="btn btn-secondary btn-sm" onclick="exportSelected('csv')">↓ CSV</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportSelected('xlsx')">↓ XLSX</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportSelected('line-items')" style="border-color:rgba(0,229,160,0.3);color:var(--accent)">↓ Line Items XLSX</button>
-        </div>
+      <!-- Search bar full width -->
+      <div style="padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg2);">
+        <input class="form-input" style="width:100%;padding:8px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);" placeholder="🔍 Αναζήτηση σε όλα τα πεδία..." id="doc-search" oninput="filterDocs()"/>
       </div>
       <div class="content" style="padding:0;">
         <div class="table-wrap">
           <table>
-            <thead><tr>
-              <th style="width:36px;">
+            <thead>
+            <tr id="doc-header-row" style="position:relative;">
+              <th style="width:36px;vertical-align:top;">
                 <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
                   <button id="bulk-delete-btn" class="btn btn-danger btn-sm" onclick="deleteSelectedDocs()" style="display:none;padding:2px 6px;font-size:10px;white-space:nowrap;" title="Διαγραφή επιλεγμένων">🗑</button>
                   <input type="checkbox" id="doc-select-all" onchange="toggleSelectAll(this)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"/>
                 </div>
               </th>
-              <th style="width:44px;color:#fff">#</th>
-              <th style="color:#fff">ΑΡΧΕΙΟ</th>
-              <th style="color:#fff">ΕΤΙΚΕΤΕΣ</th>
-              <th style="color:#fff"><div>ΠΡΟΜΗΘΕΥΤΗΣ</div><div>ΠΩΛΗΤΗΣ</div></th>
-              <th style="color:#fff">ΚΑΤΑΣΤΑΣΗ</th>
-              <th style="color:#fff">BATCH</th>
-              <th style="color:#fff">ΠΟΣΟΣΤΟ</th>
-              <th style="color:#fff">ΚΑΤΑΧΩΡΗΣΗ</th>
+              <th style="width:44px;color:#fff;vertical-align:top;">#</th>
+              <th style="color:#fff;vertical-align:top;min-width:120px;position:relative;">
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-file')">ΑΡΧΕΙΟ <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-dropdown" id="cf-file" style="display:none;">
+                  <select id="cff-file" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+                    <option value="">ΟΛΑ</option>
+                  </select>
+                </div>
+              </th>
+              <th style="color:#fff;vertical-align:top;min-width:100px;position:relative;">
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-label')">ΕΤΙΚΕΤΕΣ <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-dropdown" id="cf-label" style="display:none;">
+                  <select id="cff-label" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+                    <option value="">ΟΛΑ</option>
+                  </select>
+                </div>
+              </th>
+              <th style="color:#fff;vertical-align:top;min-width:110px;position:relative;">
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-supplier')"><div>ΠΡΟΜΗΘΕΥΤΗΣ</div><div>ΠΩΛΗΤΗΣ</div> <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-dropdown" id="cf-supplier" style="display:none;">
+                  <select id="cff-supplier" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+                    <option value="">ΟΛΑ</option>
+                  </select>
+                </div>
+              </th>
+              <th style="color:#fff;vertical-align:top;min-width:90px;position:relative;">
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-status')">ΚΑΤΑΣΤΑΣΗ <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-dropdown" id="cf-status" style="display:none;">
+                  <select id="cff-status" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+                    <option value="">ΟΛΑ</option>
+                    <option value="Completed">Completed</option>
+                    <option value="no_template">Εκκρεμεί</option>
+                    <option value="Failed">Failed</option>
+                    <option value="pending_review">Προς Έγκριση</option>
+                  </select>
+                </div>
+              </th>
+              <th style="color:#fff;vertical-align:top;min-width:90px;position:relative;">
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-batch')">BATCH <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-dropdown" id="cf-batch" style="display:none;">
+                  <select id="cff-batch" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+                    <option value="">ΟΛΑ</option>
+                    <option value="done">Ολοκληρώθηκε</option>
+                    <option value="pending">Εκκρεμεί</option>
+                  </select>
+                </div>
+              </th>
+              <th style="color:#fff;vertical-align:top;min-width:80px;position:relative;">
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-pct')">ΠΟΣΟΣΤΟ <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-dropdown" id="cf-pct" style="display:none;">
+                  <select id="cff-pct" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+                    <option value="">ΟΛΑ</option>
+                    <option value="90">≥ 90%</option>
+                    <option value="80">≥ 80%</option>
+                    <option value="70">≥ 70%</option>
+                  </select>
+                  <input type="number" id="cff-pct-custom" placeholder="Ποσοστό..." min="0" max="100" oninput="onPctCustom()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);margin-top:4px;"/>
+                </div>
+              </th>
+              <th style="color:#fff;vertical-align:top;min-width:100px;position:relative;">
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-date')">ΚΑΤΑΧΩΡΗΣΗ <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-dropdown" id="cf-date" style="display:none;">
+                  <div style="font-size:10px;color:var(--text2);margin-bottom:2px;">Από</div>
+                  <input type="date" id="cff-date-from" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);"/>
+                  <div style="font-size:10px;color:var(--text2);margin:4px 0 2px;">Μέχρι</div>
+                  <input type="date" id="cff-date-to" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);"/>
+                </div>
+              </th>
               <th style="width:80px"></th>
-            </tr></thead>
+            </tr>
+            </thead>
             <tbody id="docs-table"></tbody>
           </table>
         </div>
@@ -699,51 +749,114 @@ async function loadDashboard() {
 async function loadDocuments() {
   const res = await api('GET','/api/documents');
   allDocs = res.documents || [];
-  // Populate template filter dropdown
-  const tmplFilter = document.getElementById('doc-filter-template');
-  if (tmplFilter) {
-    const names = [...new Set(allDocs.map(d=>d.schema_name).filter(Boolean))].sort();
-    tmplFilter.innerHTML = '<option value="">Όλα τα Templates</option>'
-      + names.map(n=>`<option value="${n}">${n}</option>`).join('');
-  }
+  populateColumnFilters(allDocs);
   renderDocs(allDocs);
 }
 
 function clearDocFilters() {
   document.getElementById('doc-search').value = '';
-  document.getElementById('doc-filter-status').value = '';
-  document.getElementById('doc-filter-template').value = '';
-  document.getElementById('doc-filter-date-from').value = '';
-  document.getElementById('doc-filter-date-to').value = '';
+  ['cff-file','cff-label','cff-supplier','cff-status','cff-batch','cff-pct'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const pctCustom = document.getElementById('cff-pct-custom');
+  if (pctCustom) pctCustom.value = '';
+  ['cff-date-from','cff-date-to'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   renderDocs(allDocs);
 }
 
+// Toggle column filter dropdown
+function toggleColFilter(event, id) {
+  event.stopPropagation();
+  // Close all other dropdowns
+  document.querySelectorAll('.col-filter-dropdown').forEach(d => {
+    if (d.id !== id) d.style.display = 'none';
+  });
+  const dd = document.getElementById(id);
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+// Close dropdowns on click outside
+document.addEventListener('click', () => {
+  document.querySelectorAll('.col-filter-dropdown').forEach(d => d.style.display = 'none');
+});
+
+// Custom percentage input
+function onPctCustom() {
+  const custom = document.getElementById('cff-pct-custom').value;
+  if (custom) {
+    document.getElementById('cff-pct').value = '';
+  }
+  filterDocs();
+}
+
+// Populate dynamic filter dropdowns from data
+function populateColumnFilters(docs) {
+  // Files
+  const files = [...new Set(docs.map(d => d.original_filename || d.filename).filter(Boolean))].sort();
+  const fileSel = document.getElementById('cff-file');
+  if (fileSel) fileSel.innerHTML = '<option value="">ΟΛΑ</option>' + files.map(f => `<option value="${f}">${f}</option>`).join('');
+  // Labels (templates)
+  const labels = [...new Set(docs.map(d => d.schema_name).filter(Boolean))].sort();
+  const labelSel = document.getElementById('cff-label');
+  if (labelSel) labelSel.innerHTML = '<option value="">ΟΛΑ</option>' + labels.map(l => `<option value="${l}">${l}</option>`).join('');
+  // Suppliers
+  const suppliers = [...new Set(docs.map(d => {
+    const rd = d.result_data || {};
+    return rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || '';
+  }).filter(Boolean))].sort();
+  const suppSel = document.getElementById('cff-supplier');
+  if (suppSel) suppSel.innerHTML = '<option value="">ΟΛΑ</option>' + suppliers.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+
 function filterDocs() {
-  const q        = document.getElementById('doc-search').value.toLowerCase().trim();
-  const fStatus  = document.getElementById('doc-filter-status').value;
-  const fTmpl    = document.getElementById('doc-filter-template').value;
-  const fFrom    = document.getElementById('doc-filter-date-from').value;
-  const fTo      = document.getElementById('doc-filter-date-to').value;
+  const q         = (document.getElementById('doc-search').value || '').toLowerCase().trim();
+  const fFile     = (document.getElementById('cff-file')?.value || '');
+  const fLabel    = (document.getElementById('cff-label')?.value || '');
+  const fSupplier = (document.getElementById('cff-supplier')?.value || '');
+  const fStatus   = (document.getElementById('cff-status')?.value || '');
+  const fBatch    = (document.getElementById('cff-batch')?.value || '');
+  const fPct      = (document.getElementById('cff-pct')?.value || '');
+  const fPctCustom= (document.getElementById('cff-pct-custom')?.value || '');
+  const fFrom     = (document.getElementById('cff-date-from')?.value || '');
+  const fTo       = (document.getElementById('cff-date-to')?.value || '');
+
+  const minPct = fPctCustom ? parseFloat(fPctCustom) : (fPct ? parseFloat(fPct) : null);
 
   let filtered = allDocs;
 
-  if (fStatus)  filtered = filtered.filter(d => d.status === fStatus);
-  if (fTmpl)    filtered = filtered.filter(d => d.schema_name === fTmpl);
-
-  // Date filter on invoice date (result_data) or fallback to created_at
+  if (fFile) filtered = filtered.filter(d => (d.original_filename || d.filename) === fFile);
+  if (fLabel) filtered = filtered.filter(d => d.schema_name === fLabel);
+  if (fSupplier) filtered = filtered.filter(d => {
+    const rd = d.result_data || {};
+    const s = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || '';
+    return s === fSupplier;
+  });
+  if (fStatus) filtered = filtered.filter(d => d.status === fStatus);
+  if (fBatch) {
+    if (fBatch === 'done') filtered = filtered.filter(d => d.status === 'Completed' || d.status === 'pending_review');
+    else if (fBatch === 'pending') filtered = filtered.filter(d => d.status !== 'Completed' && d.status !== 'pending_review');
+  }
+  if (minPct !== null) filtered = filtered.filter(d => {
+    const rd = d.result_data || {};
+    const pct = parseFloat(rd.confidence_pct || rd.ocr_confidence || 0);
+    return pct >= minPct;
+  });
   if (fFrom) filtered = filtered.filter(d => {
-    const dt = (d.result_data?.invoice_date || d.result_data?.date || d.created_at||'').substring(0,10);
+    const dt = (d.created_at||'').substring(0,10);
     return dt >= fFrom;
   });
   if (fTo) filtered = filtered.filter(d => {
-    const dt = (d.result_data?.invoice_date || d.result_data?.date || d.created_at||'').substring(0,10);
+    const dt = (d.created_at||'').substring(0,10);
     return dt <= fTo;
   });
 
   if (q) filtered = filtered.filter(d => {
     const rd = d.result_data || {};
     return (
-      d.filename.toLowerCase().includes(q) ||
+      (d.original_filename||d.filename||'').toLowerCase().includes(q) ||
       (d.schema_name||'').toLowerCase().includes(q) ||
       (rd.supplier_name||rd.vendor_name||rd.company||'').toLowerCase().includes(q) ||
       (rd.invoice_number||rd.inv_number||'').toLowerCase().includes(q) ||
