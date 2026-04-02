@@ -100,7 +100,7 @@ tbody td:first-child{color:var(--text);}
 .col-filter-head{cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none;white-space:nowrap;}
 .col-filter-head:hover .cf-arrow{color:var(--accent);}
 .cf-arrow{font-size:8px;color:var(--text3);transition:color .15s;}
-.col-filter-dropdown{position:absolute;top:100%;left:0;min-width:140px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.5);}
+.col-filter-dropdown{position:absolute;top:100%;left:0;min-width:160px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.5);cursor:default;}
 thead th{padding:10px 10px 8px !important;}
 
 /* ── Upload Zone ── */
@@ -398,7 +398,7 @@ select.form-input option{background:var(--bg2);}
               <th style="width:44px;color:#fff;vertical-align:top;">#</th>
               <th style="color:#fff;vertical-align:top;min-width:120px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-file')">ΑΡΧΕΙΟ <span class="cf-arrow">▼</span></div>
-                <div class="col-filter-dropdown" id="cf-file" style="display:none;">
+                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-file" style="display:none;">
                   <select id="cff-file" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
                     <option value="">ΟΛΑ</option>
                   </select>
@@ -406,7 +406,7 @@ select.form-input option{background:var(--bg2);}
               </th>
               <th style="color:#fff;vertical-align:top;min-width:100px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-label')">ΕΤΙΚΕΤΕΣ <span class="cf-arrow">▼</span></div>
-                <div class="col-filter-dropdown" id="cf-label" style="display:none;">
+                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-label" style="display:none;">
                   <select id="cff-label" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
                     <option value="">ΟΛΑ</option>
                   </select>
@@ -414,7 +414,7 @@ select.form-input option{background:var(--bg2);}
               </th>
               <th style="color:#fff;vertical-align:top;min-width:110px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-supplier')"><div>ΠΡΟΜΗΘΕΥΤΗΣ</div><div>ΠΩΛΗΤΗΣ</div> <span class="cf-arrow">▼</span></div>
-                <div class="col-filter-dropdown" id="cf-supplier" style="display:none;">
+                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-supplier" style="display:none;">
                   <select id="cff-supplier" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
                     <option value="">ΟΛΑ</option>
                   </select>
@@ -422,7 +422,7 @@ select.form-input option{background:var(--bg2);}
               </th>
               <th style="color:#fff;vertical-align:top;min-width:90px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-status')">ΚΑΤΑΣΤΑΣΗ <span class="cf-arrow">▼</span></div>
-                <div class="col-filter-dropdown" id="cf-status" style="display:none;">
+                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-status" style="display:none;">
                   <select id="cff-status" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
                     <option value="">ΟΛΑ</option>
                     <option value="Completed">Completed</option>
@@ -434,7 +434,7 @@ select.form-input option{background:var(--bg2);}
               </th>
               <th style="color:#fff;vertical-align:top;min-width:90px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-batch')">BATCH <span class="cf-arrow">▼</span></div>
-                <div class="col-filter-dropdown" id="cf-batch" style="display:none;">
+                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-batch" style="display:none;">
                   <select id="cff-batch" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
                     <option value="">ΟΛΑ</option>
                     <option value="done">Ολοκληρώθηκε</option>
@@ -444,7 +444,7 @@ select.form-input option{background:var(--bg2);}
               </th>
               <th style="color:#fff;vertical-align:top;min-width:80px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-pct')">ΠΟΣΟΣΤΟ <span class="cf-arrow">▼</span></div>
-                <div class="col-filter-dropdown" id="cf-pct" style="display:none;">
+                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-pct" style="display:none;">
                   <select id="cff-pct" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
                     <option value="">ΟΛΑ</option>
                     <option value="90">≥ 90%</option>
@@ -456,7 +456,7 @@ select.form-input option{background:var(--bg2);}
               </th>
               <th style="color:#fff;vertical-align:top;min-width:100px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-date')">ΚΑΤΑΧΩΡΗΣΗ <span class="cf-arrow">▼</span></div>
-                <div class="col-filter-dropdown" id="cf-date" style="display:none;">
+                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-date" style="display:none;">
                   <div style="font-size:10px;color:var(--text2);margin-bottom:2px;">Από</div>
                   <input type="date" id="cff-date-from" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);"/>
                   <div style="font-size:10px;color:var(--text2);margin:4px 0 2px;">Μέχρι</div>
@@ -771,6 +771,7 @@ function clearDocFilters() {
 // Toggle column filter dropdown
 function toggleColFilter(event, id) {
   event.stopPropagation();
+  event.preventDefault();
   // Close all other dropdowns
   document.querySelectorAll('.col-filter-dropdown').forEach(d => {
     if (d.id !== id) d.style.display = 'none';
@@ -778,8 +779,9 @@ function toggleColFilter(event, id) {
   const dd = document.getElementById(id);
   dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
 }
-// Close dropdowns on click outside
-document.addEventListener('click', () => {
+// Prevent clicks inside dropdowns from closing them
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.col-filter-dropdown') || e.target.closest('.col-filter-head')) return;
   document.querySelectorAll('.col-filter-dropdown').forEach(d => d.style.display = 'none');
 });
 
