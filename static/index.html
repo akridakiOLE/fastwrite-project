@@ -304,42 +304,10 @@ select.form-input option{background:var(--bg2);}
     <div id="page-upload" class="page" style="display:none">
       <div class="topbar"><div class="page-title">Upload & Extract</div></div>
       <div class="content">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:stretch;height:calc(100vh - 140px);">
-
-          <!-- Activity History -->
-          <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
-            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
-              <span>📋 Ιστορικό Δραστηριοτήτων</span>
-              <button class="btn btn-secondary btn-sm" onclick="loadActivityHistory()" style="font-size:11px;padding:3px 10px;">↻</button>
-            </div>
-            <!-- Search/Filter bar -->
-            <div id="activity-filter-bar" style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:4px;">
-              <!-- Row 1: Search + icon buttons -->
-              <div style="display:flex;gap:4px;align-items:center;">
-                <input type="text" id="af-filename" placeholder="🔍 Όνομα αρχείου..." oninput="applyActivityFilters()" style="flex:1;min-width:120px;padding:4px 8px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
-                <button class="af-btn" id="af-no-tmpl" onclick="toggleAF(this)" title="Χωρίς template ≥1">🚫T</button>
-                <button class="af-btn" id="af-needs-appr" onclick="toggleAF(this)" title="Με έγκριση ≥1">✅</button>
-                <button class="af-btn" id="af-no-appr" onclick="toggleAF(this)" title="Χωρίς έγκριση ≥1">⏳</button>
-                <button class="af-btn" onclick="clearActivityFilters()" title="Καθαρισμός">✕</button>
-              </div>
-              <!-- Row 2: Action select + Date range -->
-              <div style="display:flex;gap:4px;align-items:center;">
-                <select id="af-action" onchange="applyActivityFilters()" style="padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;">
-                  <option value="">Όλες</option>
-                  <option value="pre-check">Επεξεργασία</option>
-                  <option value="batch">Batch</option>
-                </select>
-                <input type="date" id="af-date-from" onchange="applyActivityFilters()" style="flex:1;padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;" title="Από"/>
-                <input type="date" id="af-date-to" onchange="applyActivityFilters()" style="flex:1;padding:4px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;" title="Μέχρι"/>
-              </div>
-            </div>
-            <div id="activity-list" style="flex:1;overflow-y:auto;font-size:12px;">
-              <div style="text-align:center;padding:30px;color:var(--text3);">Φόρτωση...</div>
-            </div>
-          </div>
+        <div style="display:flex;justify-content:center;align-items:flex-start;height:calc(100vh - 140px);">
 
           <!-- Batch -->
-          <div class="card" style="display:flex;flex-direction:column;overflow:hidden;padding:12px;">
+          <div class="card" style="display:flex;flex-direction:column;overflow:hidden;padding:12px;max-width:540px;width:100%;">
             <div class="card-title" style="margin-bottom:6px;font-size:14px;">📦 Batch (Πολλαπλά Τιμολόγια)</div>
             <div class="upload-zone" id="batch-zone" onclick="document.getElementById('batch-file').click()" ondragover="dragOver(event,'batch-zone')" ondragleave="dragLeave('batch-zone')" ondrop="dropFile(event,'batch')" style="padding:10px 12px;">
               <input type="file" id="batch-file" accept=".pdf" onchange="fileSelected('batch')"/>
@@ -355,44 +323,19 @@ select.form-input option{background:var(--bg2);}
               </div>
             </div>
             <div class="form-group" style="margin-top:6px;">
-              <label class="form-label" id="batch-schema-label" style="font-size:10px;">Template Fallback (για Auto Match)</label>
+              <label class="form-label" id="batch-schema-label" style="font-size:10px;">Template</label>
               <select class="form-input" id="batch-schema" style="font-size:11px;padding:5px 8px;"></select>
-              <div id="batch-schema-hint" style="font-size:9px;color:var(--text2);margin-top:3px;display:none;">
-                ℹ Χρησιμοποιείται μόνο αν το Auto Match δεν βρει template
-              </div>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:6px;margin-top:4px;">
-              <input type="checkbox" id="batch-auto-match" style="width:14px;height:14px;accent-color:var(--accent2);cursor:pointer" onchange="onAutoMatchChange()"/>
-              <div>
-                <div style="font-size:11px;color:var(--text);font-weight:500;">🔍 Auto Template Matching</div>
-                <div style="font-size:9px;color:var(--text2);margin-top:1px;">Αυτόματη επιλογή template ανά τιμολόγιο</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px;">
-              <input type="checkbox" id="batch-skip-completed" style="width:14px;height:14px;accent-color:var(--warn);cursor:pointer"/>
-              <div>
-                <div style="font-size:11px;color:var(--text);font-weight:500;">⏭ Παράλειψη Ολοκληρωμένων</div>
-                <div style="font-size:9px;color:var(--text2);margin-top:1px;">Παράλειψη εγγράφων που έχουν ήδη εξαχθεί</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-              <button class="btn btn-secondary" style="flex:1;padding:6px 8px;font-size:12px;" id="batch-preview-btn" onclick="handlePreCheckClick()" disabled>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;margin-top:8px;">
+              <button class="btn btn-secondary" style="flex:1;padding:10px 8px;font-size:13px;" id="batch-preview-btn" onclick="handlePreCheckClick()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                🔍 Επεξεργασία & Δημιουργία / Template
+                Επεξεργασία & Δημιουργία / Template
               </button>
-              <input type="checkbox" id="repeat-precheck-chk" class="repeat-chk" disabled onchange="onRepeatCheckChange('precheck')" title="Επανάληψη: μετάβαση στη σελίδα Template Builder" style="width:16px;height:16px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
             </div>
             <div style="display:flex;align-items:center;gap:6px;">
-              <button class="btn btn-primary" style="flex:1;padding:6px 8px;font-size:12px;" onclick="handleBatchClick()" id="batch-btn">
+              <button class="btn btn-primary" style="flex:1;padding:10px 8px;font-size:13px;" onclick="handleBatchClick()" id="batch-btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 Έναρξη Batch
-              </button>
-              <input type="checkbox" id="repeat-batch-chk" class="repeat-chk" disabled onchange="onRepeatCheckChange('batch')" title="Επανάληψη: εκτέλεση Batch από ιστορικό" style="width:18px;height:18px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0;display:none;"/>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
-              <button class="btn btn-primary" style="flex:1;padding:6px 8px;font-size:12px;background:var(--accent);color:#000;" onclick="handleApprovalClick()" id="approval-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                Διαδικασία Έγκρισης
               </button>
             </div>
             <div id="batch-progress" style="margin-top:16px;display:none;">
@@ -687,7 +630,7 @@ function showPage(name, fromEvent) {
   if (name==='documents') loadDocuments();
   if (name==='templates') loadTemplates();
   if (name==='settings')  loadSettings();
-  if (name==='upload')    { loadSchemas(); loadActivityHistory(); }
+  if (name==='upload')    { loadSchemas(); }
 }
 // Handle URL hash on load (e.g. /ui#upload)
 (function(){
@@ -964,32 +907,7 @@ async function exportLineItems() { return exportSelected('line-items'); }
 async function loadSchemas() {
   const res = await api('GET','/api/templates');
   const opts = (res.templates||[]).map(t=>`<option value="${t.name}">${t.name}</option>`).join('');
-  // Batch: προσθέτουμε επιλογή "Χωρίς Fallback" για Auto Match
-  const noFallback = '<option value="__none__">— Χωρίς Fallback (μόνο Auto Match) —</option>';
-  document.getElementById('batch-schema').innerHTML = noFallback + (opts || '');
-  onAutoMatchChange();
-}
-
-function onAutoMatchChange() {
-  const autoMatch = document.getElementById('batch-auto-match').checked;
-  const label     = document.getElementById('batch-schema-label');
-  const hint      = document.getElementById('batch-schema-hint');
-  const schema    = document.getElementById('batch-schema');
-  if (autoMatch) {
-    label.textContent = 'Template Fallback (για Auto Match)';
-    label.style.color = 'var(--accent2)';
-    hint.style.display = 'block';
-    schema.style.opacity = '0.7';
-  } else {
-    label.textContent = 'Template';
-    label.style.color = '';
-    hint.style.display = 'none';
-    schema.style.opacity = '1';
-    // Αν είχε επιλεγεί __none__ και απενεργοποιήθηκε το auto match → επιλογή πρώτου
-    if (schema.value === '__none__') {
-      schema.selectedIndex = schema.options[1] ? 1 : 0;
-    }
-  }
+  document.getElementById('batch-schema').innerHTML = opts || '';
 }
 
 function dragOver(e,id){e.preventDefault();document.getElementById(id).classList.add('drag');}
@@ -1008,8 +926,6 @@ function fileSelected(type) {
   const inp = document.getElementById(type+'-file');
   if (!inp.files.length) return;
   document.getElementById(type+'-filename').textContent = inp.files[0].name;
-  const previewBtn = document.getElementById(type+'-preview-btn');
-  if (previewBtn) previewBtn.disabled = false;
   document.getElementById(type+'-selected').style.display = 'block';
   // Reset pre-check όταν αλλάζει αρχείο
   preCheckDone[type] = false;
@@ -1020,73 +936,13 @@ function fileSelected(type) {
 function clearFile(type) {
   document.getElementById(type+'-file').value='';
   document.getElementById(type+'-selected').style.display='none';
-  const previewBtn = document.getElementById(type+'-preview-btn');
-  if (previewBtn) previewBtn.disabled = true;
   // Reset pre-check
   preCheckDone[type] = false;
   preCheckResult[type] = null;
   uploadedDocIds[type] = null;
 }
 
-// ── History Selection & Repeat ───────────────────────────────────────────────
-let selectedActivityId   = null;
-let selectedActivityData = null;
-
-async function selectHistoryEntry(activityId) {
-  // Toggle: deselect if already selected
-  if (selectedActivityId === activityId) {
-    deselectHistoryEntry();
-    return;
-  }
-  selectedActivityId = activityId;
-  // Highlight selected row
-  document.querySelectorAll('.history-radio').forEach(r => r.checked = false);
-  const radio = document.getElementById('history-radio-' + activityId);
-  if (radio) radio.checked = true;
-  // Fetch full activity data
-  const res = await api('GET', '/api/activity/' + activityId);
-  if (!res || res.error) { toast('Σφάλμα φόρτωσης', 'error'); deselectHistoryEntry(); return; }
-  selectedActivityData = res;
-  // Template Builder checkbox: εμφανίζεται ΠΑΝΤΑ
-  const chk1 = document.getElementById('repeat-precheck-chk');
-  chk1.style.display = ''; chk1.disabled = false; chk1.checked = false;
-  // Batch checkbox: εμφανίζεται ΜΟΝΟ για batch entries (επανεκτέλεση batch)
-  const chk2 = document.getElementById('repeat-batch-chk');
-  if (res.action === 'batch') {
-    chk2.style.display = ''; chk2.disabled = false; chk2.checked = false;
-  } else {
-    chk2.style.display = 'none'; chk2.disabled = true; chk2.checked = false;
-  }
-  // Enable pre-check button (ώστε να μπορεί να χρησιμοποιηθεί σε repeat mode)
-  document.getElementById('batch-preview-btn').disabled = false;
-}
-
-function deselectHistoryEntry() {
-  selectedActivityId = null;
-  selectedActivityData = null;
-  document.querySelectorAll('.history-radio').forEach(r => r.checked = false);
-  // Hide & uncheck repeat checkboxes
-  const chk1 = document.getElementById('repeat-precheck-chk');
-  const chk2 = document.getElementById('repeat-batch-chk');
-  chk1.style.display = 'none'; chk1.checked = false; chk1.disabled = true;
-  chk2.style.display = 'none'; chk2.checked = false; chk2.disabled = true;
-  // Restore pre-check button disabled state if no file selected
-  const inp = document.getElementById('batch-file');
-  if (!inp || !inp.files.length) {
-    document.getElementById('batch-preview-btn').disabled = true;
-  }
-}
-
-// Mutual exclusion: only one checkbox at a time
-function onRepeatCheckChange(which) {
-  const chk1 = document.getElementById('repeat-precheck-chk');
-  const chk2 = document.getElementById('repeat-batch-chk');
-  if (which === 'precheck' && chk1.checked) {
-    chk2.checked = false;
-  } else if (which === 'batch' && chk2.checked) {
-    chk1.checked = false;
-  }
-}
+// History selection removed — simplified UI
 
 // Helper: find documents for the selected activity
 // Πρώτα ψάχνει doc_ids στο result_json, μετά στο documents API μέσω original_filename
@@ -1130,83 +986,12 @@ async function findDocsForActivity(data) {
 
 // Click handler for "Επεξεργασία & Δημιουργία / Template" button
 async function handlePreCheckClick() {
-  const repeatChk = document.getElementById('repeat-precheck-chk');
-  if (repeatChk.checked && selectedActivityData) {
-    // Repeat mode: navigate to Template Builder
-    const docs = await findDocsForActivity(selectedActivityData);
-    if (!docs.length) {
-      toast('Δεν βρέθηκαν έγγραφα — εκτελέστε πρώτα Batch', 'error'); return;
-    }
-    window.location.href = '/ui/template-builder/' + docs[0].id;
-  } else {
-    // Normal mode: run pre-check
-    doPreCheck('batch');
-  }
+  doPreCheck('batch');
 }
 
 // Click handler for "Έναρξη Batch" button
 async function handleBatchClick() {
-  const repeatChk = document.getElementById('repeat-batch-chk');
-  if (repeatChk.checked && selectedActivityData) {
-    // Repeat mode: re-run batch using file_path from history
-    let filePath = null;
-    // Ψάξε file_path στο result_json ή στο file_path του activity
-    const rj = selectedActivityData.result_json;
-    if (rj) {
-      try {
-        const parsed = typeof rj === 'string' ? JSON.parse(rj) : rj;
-        filePath = parsed.file_path || null;
-      } catch(e) {}
-    }
-    if (!filePath) filePath = selectedActivityData.file_path || null;
-    if (!filePath) {
-      toast('Δεν βρέθηκε αρχείο στο ιστορικό — ανεβάστε νέο αρχείο', 'error'); return;
-    }
-    // Re-run batch with same file_path using FormData (API requires form data)
-    const btn = document.getElementById('batch-btn');
-    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Επανεκτέλεση Batch...';
-    const schema = document.getElementById('batch-schema').value;
-    const autoMatch = document.getElementById('batch-auto-match').checked;
-    const skipCompleted = document.getElementById('batch-skip-completed').checked;
-    const schemaToSend = (schema === '__none__')
-      ? (document.getElementById('batch-schema').options[1]?.value || '')
-      : schema;
-    const fd = new FormData();
-    fd.append('file_path', filePath);
-    fd.append('schema_name', schemaToSend);
-    fd.append('auto_match', autoMatch ? 'true' : 'false');
-    fd.append('skip_completed', skipCompleted ? 'true' : 'false');
-    const res = await api('POST', '/api/batch', fd, true);
-    btn.disabled = false;
-    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Έναρξη Batch';
-    if (!res.success) { toast(res.error || 'Σφάλμα', 'error'); return; }
-    toast('Batch ξεκίνησε (επανεκτέλεση)!', 'success');
-    lastBatchJobId = res.job_id;
-    repeatBatchActivityId = selectedActivityData.id;  // Σημειώνει ότι είναι repeat
-    pollBatchJob(res.job_id);
-    document.getElementById('batch-progress').style.display = 'block';
-  } else {
-    // Normal mode: run batch
-    repeatBatchActivityId = null;  // Reset
-    doBatchUpload();
-  }
-}
-
-// Click handler for "Διαδικασία Έγκρισης" button
-// Λειτουργεί ΜΟΝΟ με επιλεγμένη εγγραφή από το Ιστορικό Δραστηριοτήτων
-async function handleApprovalClick() {
-  if (!selectedActivityData) {
-    toast('Επιλέξτε πρώτα μια εγγραφή από το Ιστορικό Δραστηριοτήτων', 'error');
-    return;
-  }
-  const docs = await findDocsForActivity(selectedActivityData);
-  if (!docs.length) {
-    toast('Δεν βρέθηκαν έγγραφα — εκτελέστε πρώτα Batch', 'error'); return;
-  }
-  // Find first pending_review doc, otherwise first doc
-  const reviewDoc = docs.find(d => d.status === 'pending_review');
-  const targetDoc = reviewDoc || docs[0];
-  window.location.href = '/ui/review/' + targetDoc.id;
+  doBatchUpload();
 }
 
 async function doSingleExtract() {
@@ -1283,25 +1068,15 @@ async function doSingleExtract() {
 let batchPreCheckData = null;
 
 async function doBatchUpload() {
-  const inp           = document.getElementById('batch-file');
-  const schemaRaw     = document.getElementById('batch-schema').value;
-  const autoMatch     = document.getElementById('batch-auto-match').checked;
-  const skipCompleted = document.getElementById('batch-skip-completed').checked;
+  const inp       = document.getElementById('batch-file');
+  const schema    = document.getElementById('batch-schema').value;
   if (!inp.files.length) { toast('Επίλεξε PDF πρώτα','error'); return; }
-  // Αν είναι __none__ (χωρίς fallback) χρειάζεται ενεργό Auto Match
-  if (schemaRaw === '__none__' && !autoMatch) {
-    toast('Επίλεξε template ή ενεργοποίησε το Auto Template Matching','error'); return;
-  }
-  // Αν __none__ → στέλνουμε το πρώτο διαθέσιμο template ως placeholder (δεν θα χρησιμοποιηθεί)
-  const schema = schemaRaw === '__none__'
-    ? (document.getElementById('batch-schema').options[1]?.value || '')
-    : schemaRaw;
   if (!schema) { toast('Δεν υπάρχουν templates. Δημιούργησε πρώτα ένα template.','error'); return; }
 
   const btn = document.getElementById('batch-btn');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Ανάλυση αρχείου...';
 
-  // ΒΗΜΑ 1: Pre-check — ίδια διαδικασία με "Επεξεργασία & Δημιουργία Template"
+  // ΒΗΜΑ 1: Pre-check
   const pcFd = new FormData();
   pcFd.append('file', inp.files[0]);
   const pcRes = await api('POST', '/api/batch/pre-check', pcFd, true);
@@ -1313,25 +1088,22 @@ async function doBatchUpload() {
     return;
   }
 
-  // Αποθήκευση pre-check δεδομένων για χρήση στο completion modal
   batchPreCheckData = pcRes;
 
-  // ΒΗΜΑ 2: Ξεκινάμε batch extraction
+  // ΒΗΜΑ 2: Batch extraction
   btn.innerHTML='<span class="spinner"></span> Ανέβασμα...';
 
   const fd = new FormData();
   fd.append('file', inp.files[0]);
   fd.append('schema_name', schema);
-  fd.append('auto_match',     autoMatch     ? 'true' : 'false');
-  fd.append('skip_completed', skipCompleted ? 'true' : 'false');
+  fd.append('auto_match', 'true');
 
   const res = await api('POST','/api/batch',fd,true);
   btn.disabled=false;
   btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Έναρξη Batch';
 
   if (!res.success) { toast(res.error||'Σφάλμα','error'); return; }
-  const flags = [autoMatch ? 'Auto Match' : '', skipCompleted ? 'Skip Completed' : ''].filter(Boolean).join(', ');
-  toast('Batch ξεκίνησε' + (flags ? ' (' + flags + ')' : '') + '!','success');
+  toast('Batch ξεκίνησε!','success');
   lastBatchJobId = res.job_id;
   pollBatchJob(res.job_id);
   document.getElementById('batch-progress').style.display='block';
@@ -1404,180 +1176,29 @@ function pollBatchJob(job_id) {
   }, 1500);
 }
 
-async function showBatchCompletionModal(st) {
-  const docIds = st.doc_ids || [];
-  const pc = batchPreCheckData;
-
-  // Φέρε τα πραγματικά documents για ακριβή υπολογισμό στατιστικών
-  let batchDocs = [];
-  let firstReviewId = null;
-  let firstTemplateId = null;
-  try {
-    if (docIds.length) {
-      const docsRes = await api('GET', '/api/documents');
-      if (docsRes && docsRes.documents) {
-        batchDocs = docsRes.documents.filter(d => docIds.includes(d.id));
-      }
-    }
-  } catch(e) { console.error('showBatchCompletionModal docs fetch error:', e); }
-
-  // Υπολογισμός στατιστικών από τα πραγματικά documents (ΠΑΝΤΑ live)
-  const totalInvoices = st.total_invoices || batchDocs.length || (pc ? pc.total_invoices : 0) || 0;
-  let withoutTemplate = 0;
-  let needsApproval = 0;   // pending_review
-  let noApproval = 0;      // Completed (δεν χρειάζεται έγκριση)
-  let batchCompleted = 0;  // Completed + pending_review (πέρασαν batch)
-  let batchPending = 0;    // no_template (ΔΕΝ πέρασαν batch)
-  for (const d of batchDocs) {
-    if (d.status === 'pending_review') {
-      needsApproval++;
-      batchCompleted++;
-      if (!firstReviewId) firstReviewId = d.id;
-    } else if (d.status === 'Completed') {
-      noApproval++;
-      batchCompleted++;
-    } else if (d.status === 'no_template') {
-      withoutTemplate++;
-      batchPending++;
-      if (!firstTemplateId) firstTemplateId = d.id;
-    }
-  }
-  // Fallback: pre-check data ή batch status
-  if (!batchDocs.length) {
-    if (pc) {
-      withoutTemplate = pc.without_template || 0;
-      needsApproval = pc.needs_approval || 0;
-      noApproval = pc.no_approval || 0;
-    }
-    batchCompleted = needsApproval + noApproval;
-    batchPending = withoutTemplate;
-  }
-
-  // Αποθήκευση / Ενημέρωση ιστορικού
-  const batchFilename = pc ? (pc.filename || 'unknown')
-    : (selectedActivityData ? (selectedActivityData.filename || 'unknown') : 'unknown');
-  const activityData = {
-    total_invoices: totalInvoices,
-    without_template: withoutTemplate,
-    needs_approval: needsApproval,
-    no_approval: noApproval,
-    batch_completed: batchCompleted,
-    batch_pending: batchPending,
-    file_path: pc ? (pc.file_path || null) : (selectedActivityData ? (selectedActivityData.file_path || null) : null),
-    doc_ids: docIds
-  };
-
-  if (repeatBatchActivityId) {
-    // Repeat mode: ενημέρωσε ΜΟΝΟ αν υπάρχουν νέα επεξεργασμένα
-    if (!allSkipped) {
-      try {
-        await api('PUT', '/api/activity/' + repeatBatchActivityId, {
-          total_invoices: totalInvoices,
-          without_template: withoutTemplate,
-          needs_approval: needsApproval,
-          no_approval: noApproval,
-          result_data: activityData
-        });
-        loadActivityHistory();
-      } catch(e) { console.error('Activity update error:', e); }
-    }
-    repeatBatchActivityId = null;  // Reset
-  } else {
-    // Πρώτη εκτέλεση: δημιούργησε νέα εγγραφή
-    saveActivity(batchFilename, 'batch', activityData);
-  }
-
-  // Καθαρισμός pre-check data
-  batchPreCheckData = null;
-
+function showCompletionMessage() {
   const modal = document.getElementById('precheck-modal');
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  const skippedCount = st.skipped || 0;
-  const processedCount = st.processed || 0;
-  const failedCount = st.failed || 0;
-  const allSkipped = skippedCount > 0 && processedCount === 0 && failedCount === 0;
+  title.textContent = 'Ολοκλήρωση Διαδικασίας';
 
-  title.textContent = allSkipped
-    ? 'Αποτελέσματα — Όλα ήδη ολοκληρωμένα'
-    : 'Αποτελέσματα — Έναρξης Batch';
-
-  let html = '';
-
-  // Αν ΟΛΑ παραλείφθηκαν, δείξε ξεκάθαρο μήνυμα
-  if (allSkipped) {
-    html += '<div style="padding:16px;text-align:center;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.3);border-radius:8px;margin-bottom:12px;">';
-    html += '<div style="font-size:24px;margin-bottom:8px;">✓</div>';
-    html += '<div style="font-size:14px;color:var(--accent);font-weight:600;">Όλα τα έγγραφα είναι ήδη ολοκληρωμένα</div>';
-    html += '<div style="font-size:12px;color:var(--text2);margin-top:4px;">' + skippedCount + ' έγγραφα παραλείφθηκαν — δεν χρειάζεται επανεπεξεργασία</div>';
-    html += '</div>';
-  }
-
-  html += '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + totalInvoices + '</td></tr>';
-  if (skippedCount > 0) {
-    html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">⏭ Παραλείφθηκαν (ήδη ολοκληρωμένα)</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + skippedCount + '</td></tr>';
-    html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);">Νέα επεξεργασμένα</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + processedCount + '</td></tr>';
-  }
-  if (!allSkipped) {
-    html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Έγγραφα χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTemplate + '</td></tr>';
-    html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Έγγραφα χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noApproval + '</td></tr>';
-    html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent2);">Έγγραφα με έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent2);">' + needsApproval + '</td></tr>';
-  }
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:500;">Ολοκληρωμένα Batch</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + batchCompleted + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;color:var(--warn);font-weight:500;">Μη Ολοκληρωμένα Batch</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--warn);">' + batchPending + '</td></tr>';
-  html += '</table>';
-
-  // 3 Επιλογές δράσης
-  html += '<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">';
-
-  // Επιλογή 1: Επεξεργασία & Δημιουργία Template
-  html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.2);border-radius:8px;">';
-  html += '<div style="flex:1;font-size:12px;color:var(--warn);">Αν θέλετε να ελέγξετε και επαναλάβετε την διαδικασία επεξεργασίας και δημιουργίας template</div>';
-  if (firstTemplateId || (docIds.length > 0)) {
-    const tbId = firstTemplateId || docIds[0];
-    html += '<button class="btn btn-sm" style="background:var(--warn);color:#000;white-space:nowrap;" onclick="closeModal(\'precheck-modal\'); window.location.href=\'/ui/template-builder/' + tbId + '\'">ΝΑΙ</button>';
-  } else {
-    html += '<button class="btn btn-sm" style="background:var(--warn);color:#000;opacity:0.4;" disabled>ΝΑΙ</button>';
-  }
+  let html = '<div style="padding:20px;text-align:center;">';
+  html += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:20px;">';
+  html += 'Αν θέλετε να συνεχίσετε την διαδικασία και να ολοκληρώσετε την εξαγωγή δεδομένων από το σύστημα παρακαλώ μετακινηθείτε στην σελίδα <b style="color:var(--accent);">Έγγραφα</b>';
   html += '</div>';
-
-  // Επιλογή 2: Διαδικασία Έγκρισης
-  html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(0,102,255,0.06);border:1px solid rgba(0,102,255,0.2);border-radius:8px;">';
-  html += '<div style="flex:1;font-size:12px;color:var(--accent2);">Αν θέλετε να συνεχίσετε την διαδικασία έγκρισης</div>';
-  if (firstReviewId) {
-    html += '<button class="btn btn-sm" style="background:var(--accent2);color:#fff;white-space:nowrap;" onclick="closeModal(\'precheck-modal\'); window.location.href=\'/ui/review/' + firstReviewId + '\'">ΝΑΙ</button>';
-  } else {
-    html += '<button class="btn btn-sm" style="background:var(--accent2);color:#fff;opacity:0.4;" disabled>ΝΑΙ</button>';
-  }
-  html += '</div>';
-
-  // Επιλογή 3: Αργότερα
-  html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;">';
-  html += '<div style="flex:1;font-size:12px;color:var(--text2);">Εναλλακτικά μπορείτε να ακολουθήσετε οποιαδήποτε διαδικασία θέλετε αργότερα</div>';
-  html += '<button class="btn btn-sm btn-secondary" style="white-space:nowrap;" onclick="closeModal(\'precheck-modal\')">OK</button>';
-  html += '</div>';
-
+  html += '<button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="closeModal(\'precheck-modal\')">OK</button>';
   html += '</div>';
 
   body.innerHTML = html;
   modal.classList.add('open');
 
-  // Ενημέρωση progress bar — δείχνει πόσα ΝΕΙΑ επεξεργάστηκαν
-  const statusEl = document.getElementById('batch-status-text');
-  const pctEl = document.getElementById('batch-pct');
-  const fillEl = document.getElementById('batch-fill');
-  const skippedInfo = skippedCount > 0 ? ` (${skippedCount} παραλείφθηκαν)` : '';
-  if (allSkipped) {
-    if (statusEl) statusEl.textContent = '0/' + totalInvoices + ' νέα — όλα ήδη ολοκληρωμένα';
-    if (pctEl) pctEl.textContent = '100%';
-  } else {
-    const pctReal = totalInvoices > 0 ? Math.round(batchCompleted / totalInvoices * 1000) / 10 : 100;
-    if (statusEl) statusEl.textContent = processedCount + '/' + totalInvoices + ' νέα έγγραφα' + skippedInfo;
-    if (pctEl) pctEl.textContent = pctReal + '%';
-  }
-  if (fillEl) fillEl.style.width = pctReal + '%';
+  // Καθαρισμός pre-check data
+  batchPreCheckData = null;
+}
+
+async function showBatchCompletionModal(st) {
+  showCompletionMessage();
 }
 
 // ── Batch Jobs Page ──────────────────────────────────────────────────────────
@@ -2007,11 +1628,7 @@ async function saveTemplate() {
     } else {
       toast(isEdit ? 'Template ενημερώθηκε!' : 'Template αποθηκεύτηκε!', 'success');
     }
-    // Auto-update: ανανέωση ιστορικού αν ενημερώθηκαν αποτελέσματα
-    if (res.updated_activities && res.updated_activities.length > 0) {
-      toast('Ενημερώθηκαν ' + res.updated_activities.length + ' εγγραφές ιστορικού', 'success');
-      loadActivityHistory();
-    }
+    // Template saved successfully
     closeModal('tmpl-modal');
     loadTemplates();
   }
@@ -2035,8 +1652,7 @@ async function deleteTemplate(name) {
     console.error('deleteTemplate error:', e);
     toast('Σφάλμα κατά τη διαγραφή', 'error');
   }
-  // Πάντα ενημέρωσε ιστορικό και templates μετά τη διαγραφή
-  await Promise.all([loadActivityHistory(), loadTemplates()]);
+  await loadTemplates();
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
@@ -2184,7 +1800,6 @@ async function checkServer() {
 // uploadedDocIds: tracks doc_id after upload for preview
 const uploadedDocIds = {};
 let lastBatchJobId = null;
-let repeatBatchActivityId = null;  // Αν είναι repeat batch, αποθηκεύει το activity ID
 // Pre-check flags: ελέγχει αν ο χρήστης πέρασε από τη διαδικασία pre-check
 let preCheckDone = { single: false, batch: false };
 let preCheckResult = { single: null, batch: null };
@@ -2219,52 +1834,21 @@ async function doPreCheck(type) {
   preCheckResult[type] = res;
   preCheckDone[type] = true;
 
-  // Αποθήκευση στο ιστορικό
-  const pcFilename = file.name || 'unknown';
-  saveActivity(pcFilename, 'pre-check', res);
+  const noTmpl = res.without_template || 0;
 
-  const total     = res.total_invoices || 0;
-  const noTmpl    = res.without_template || 0;
-  const withTmpl  = res.with_template || 0;
-  const needsAppr = res.needs_approval || 0;
-  const noAppr    = res.no_approval || 0;
-
-  // Δημιουργία πίνακα στοιχείων
-  let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + total + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Χωρίς Template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + noTmpl + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent2);">Τιμολόγια Έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent2);">' + needsAppr + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;color:var(--accent);">Τιμολόγια χωρίς έγκριση</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--accent);">' + noAppr + '</td></tr>';
-  html += '</table>';
-
-  // Μηνύματα + κουμπιά ανάλογα με αποτέλεσμα
   if (noTmpl > 0) {
-    // Υπάρχουν τιμολόγια ΧΩΡΙΣ template
-    html += '<div style="margin-top:20px;padding:12px;background:rgba(255,179,0,0.08);border:1px solid rgba(255,179,0,0.25);border-radius:8px;font-size:13px;color:var(--warn);">';
-    html += 'Για να συνεχίσετε την διαδικασία Επεξεργασία & Δημιουργία / Template πατήστε <b>ΝΑΙ</b>';
-    html += '</div>';
-    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
-    html += '<button class="btn btn-secondary btn-sm" onclick="closeModal(\'precheck-modal\')">Ακύρωση</button>';
-    html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\'); openTemplateBuilder(\'' + type + '\')">ΝΑΙ</button>';
-    html += '</div>';
+    // Υπάρχουν τιμολόγια ΧΩΡΙΣ template → πήγαινε στον Template Builder
+    closeModal('precheck-modal');
+    await openTemplateBuilder(type);
+    // Δείξε ενιαίο μήνυμα μετά το άνοιγμα template builder
+    showCompletionMessage();
   } else {
-    // ΟΛΑ τα τιμολόγια έχουν template
-    html += '<div style="margin-top:20px;padding:12px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);border-radius:8px;font-size:13px;color:var(--accent);">';
-    html += 'Όλα τα τιμολόγια έχουν template. Θέλετε να επεξεργαστείτε template;';
-    html += '</div>';
-    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
-    html += '<button class="btn btn-secondary btn-sm" onclick="closePreCheckWithMessage()">ΟΧΙ</button>';
-    html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\'); openTemplateBuilder(\'' + type + '\')">ΝΑΙ</button>';
-    html += '</div>';
+    // ΟΛΑ τα τιμολόγια έχουν template → ενιαίο μήνυμα ολοκλήρωσης
+    showCompletionMessage();
   }
-
-  body.innerHTML = html;
 }
 
-function closePreCheckWithMessage() {
-  const body = document.getElementById('precheck-modal-body');
-  body.innerHTML = '<div style="padding:16px;text-align:center;"><div style="font-size:14px;color:var(--accent);margin-bottom:16px;">Μπορείτε να συνεχίσετε με την διαδικασία, Έναρξη Batch</div><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div>';
-}
+// closePreCheckWithMessage removed — unified message used instead
 
 // ── Batch guard: Έλεγχος αν ο χρήστης πέρασε από pre-check ────────────────
 function canStartBatch() {
