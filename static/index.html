@@ -381,8 +381,9 @@ select.form-input option{background:var(--bg2);}
         </div>
       </div>
       <!-- Search bar full width -->
-      <div style="padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg2);">
-        <input class="form-input" style="width:100%;padding:8px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);" placeholder="🔍 Αναζήτηση σε όλα τα πεδία..." id="doc-search" oninput="filterDocs()"/>
+      <div style="padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;gap:8px;align-items:center;">
+        <input class="form-input" style="flex:1;padding:8px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);" placeholder="🔍 Αναζήτηση σε όλα τα πεδία..." id="doc-search" oninput="filterDocs()"/>
+        <button class="btn btn-secondary btn-sm" onclick="clearDocFilters()" style="white-space:nowrap;padding:8px 14px;">✕ Καθαρισμός Φίλτρων</button>
       </div>
       <div class="content" style="padding:0;">
         <div class="table-wrap">
