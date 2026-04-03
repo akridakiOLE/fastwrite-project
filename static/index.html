@@ -248,7 +248,7 @@ select.form-input option{background:var(--bg2);}
       <div class="nav-section">Ρυθμίσεις</div>
       <button class="nav-item" onclick="showPage('templates')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        Templates
+        Ετικέτες
       </button>
       <button class="nav-item" onclick="showPage('settings')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
@@ -333,14 +333,14 @@ select.form-input option{background:var(--bg2);}
               <label class="form-label" id="batch-schema-label" style="font-size:10px;">Template</label>
               <select class="form-input" id="batch-schema" style="font-size:11px;padding:5px 8px;"></select>
               <div id="batch-schema-hint" style="font-size:9px;color:var(--text2);margin-top:3px;display:none;">
-                ℹ Χρησιμοποιείται μόνο αν το Auto Match δεν βρει template
+                ℹ Χρησιμοποιείται μόνο αν το Auto Match δεν βρει ετικέτα
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:6px;margin-top:4px;">
               <input type="checkbox" id="batch-auto-match" style="width:14px;height:14px;accent-color:var(--accent2);cursor:pointer" onchange="onAutoMatchChange()"/>
               <div>
                 <div style="font-size:11px;color:var(--text);font-weight:500;">🔍 Auto Template Matching</div>
-                <div style="font-size:9px;color:var(--text2);margin-top:1px;">Αυτόματη επιλογή template ανά τιμολόγιο</div>
+                <div style="font-size:9px;color:var(--text2);margin-top:1px;">Αυτόματη επιλογή ετικέτας ανά τιμολόγιο</div>
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;margin-top:8px;">
@@ -479,9 +479,9 @@ select.form-input option{background:var(--bg2);}
     <!-- TEMPLATES -->
     <div id="page-templates" class="page" style="display:none">
       <div class="topbar">
-        <div class="page-title">Templates</div>
+        <div class="page-title">Ετικέτες</div>
         <div class="topbar-actions">
-          <button class="btn btn-primary btn-sm" onclick="openTemplateModal()">+ Νέο Template</button>
+          <button class="btn btn-primary btn-sm" onclick="openTemplateModal()">+ Νέα Ετικέτα</button>
         </div>
       </div>
       <div class="content">
@@ -606,7 +606,7 @@ select.form-input option{background:var(--bg2);}
 <div class="modal-overlay" id="tmpl-modal">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Νέο Template</div>
+      <div class="modal-title">Νέα Ετικέτα</div>
       <button class="modal-close" onclick="closeModal('tmpl-modal')">✕</button>
     </div>
     <!-- hidden: κρατά το αρχικό όνομα κατά την επεξεργασία -->
@@ -1207,7 +1207,7 @@ async function doSingleExtract() {
   const inp    = document.getElementById('single-file');
   const schema = document.getElementById('single-schema').value;
   if (!inp.files.length) { toast('Επίλεξε αρχείο πρώτα','error'); return; }
-  if (!schema) { toast('Επίλεξε template','error'); return; }
+  if (!schema) { toast('Επίλεξε ετικέτα','error'); return; }
 
   const btn = document.getElementById('single-btn');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Ανέβασμα...';
@@ -1261,12 +1261,12 @@ async function doBatchUpload() {
   const autoMatch = document.getElementById('batch-auto-match').checked;
   if (!inp.files.length) { toast('Επίλεξε PDF πρώτα','error'); return; }
   if (schemaRaw === '__none__' && !autoMatch) {
-    toast('Επίλεξε template ή ενεργοποίησε το Auto Template Matching','error'); return;
+    toast('Επίλεξε ετικέτα ή ενεργοποίησε το Auto Template Matching','error'); return;
   }
   const schema = schemaRaw === '__none__'
     ? (document.getElementById('batch-schema').options[1]?.value || '')
     : schemaRaw;
-  if (!schema) { toast('Δεν υπάρχουν templates. Δημιούργησε πρώτα ένα template.','error'); return; }
+  if (!schema) { toast('Δεν υπάρχουν ετικέτες. Δημιούργησε πρώτα μια ετικέτα.','error'); return; }
 
   const btn = document.getElementById('batch-btn');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Ανάλυση αρχείου...';
@@ -1554,7 +1554,7 @@ async function showActivityDetail(activityId) {
   html += '</div>';
   html += '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
   html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + totalInv + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Έγγραφα χωρίς template</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTmpl + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Έγγραφα χωρίς ετικέτα</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTmpl + '</td></tr>';
   html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Έγγραφα χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noAppr + '</td></tr>';
   html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent2);">Έγγραφα με έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent2);">' + needsAppr + '</td></tr>';
   html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:500;">Ολοκληρωμένα Batch</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + batchComp + '</td></tr>';
@@ -1580,7 +1580,7 @@ async function loadTemplates() {
 function renderTemplatesList(templates) {
   const el = document.getElementById('templates-list');
   if (!templates.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Δεν βρέθηκαν templates</div><div class="empty-sub">Δημιούργησε το πρώτο σου template</div></div>';
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Δεν βρέθηκαν ετικέτες</div><div class="empty-sub">Δημιούργησε την πρώτη σου ετικέτα</div></div>';
     return;
   }
   el.innerHTML = templates.map(t=>`
@@ -2128,7 +2128,7 @@ async function loadTemplateBuilder(docId) {
   const res = await api('GET', '/api/templates');
   const templates = res.templates || [];
   const opts = templates.map(t => `<option value="${t.name}" ${t.name===doc.schema_name?'selected':''}>${t.name}</option>`).join('');
-  document.getElementById('tb-schema').innerHTML = opts || '<option value="">— Δεν υπάρχουν templates —</option>';
+  document.getElementById('tb-schema').innerHTML = opts || '<option value="">— Δεν υπάρχουν ετικέτες —</option>';
 
   // Reset extract result
   document.getElementById('tb-extract-result').style.display = 'none';
@@ -2147,7 +2147,7 @@ function openTemplateBuilderById(docId) {
 async function doTemplateBuilderExtract() {
   if (!tbCurrentDocId) { toast('Δεν βρέθηκε έγγραφο', 'error'); return; }
   const schema = document.getElementById('tb-schema').value;
-  if (!schema) { toast('Επίλεξε template', 'error'); return; }
+  if (!schema) { toast('Επίλεξε ετικέτα', 'error'); return; }
 
   const btn = document.getElementById('tb-extract-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Εξαγωγή AI...';
