@@ -186,6 +186,23 @@ select.form-input option{background:var(--bg2);}
 .job-id{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);}
 
 
+/* ── Label Editor ── */
+.label-editor-container{position:relative;width:100%;height:calc(100vh - 60px);overflow:hidden;background:var(--bg);}
+.label-editor-img-wrap{width:100%;height:100%;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:20px;background:var(--bg3);}
+.label-editor-img-wrap img{max-width:100%;height:auto;border-radius:4px;}
+.label-editor-panel{position:absolute;top:60px;right:40px;width:420px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 48px rgba(0,0,0,0.7);z-index:50;cursor:default;overflow:hidden;}
+.label-editor-panel-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--bg3);border-bottom:1px solid var(--border);cursor:move;user-select:none;}
+.label-editor-panel-header .title{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--text);}
+.label-editor-panel-body{padding:16px 18px;max-height:calc(100vh - 200px);overflow-y:auto;}
+.le-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;margin-bottom:10px;transition:border-color .15s;}
+.le-input:focus{outline:none;border-color:var(--accent);}
+.le-input::placeholder{color:var(--text3);}
+.le-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:.5px;margin-bottom:4px;display:block;}
+.le-doc-nav{display:flex;align-items:center;justify-content:space-between;padding:8px 18px;background:var(--bg3);border-top:1px solid var(--border);font-size:12px;color:var(--text2);}
+.le-preview-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;}
+.le-preview-table th{background:var(--bg3);color:var(--accent);padding:6px 8px;text-align:left;font-family:'DM Mono',monospace;font-size:10px;border:1px solid var(--border);}
+.le-preview-table td{padding:6px 8px;color:var(--text2);border:1px solid var(--border);font-size:11px;}
+
 /* ── Line Items Table ── */
 .line-items-wrap{margin-top:8px;overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
 .line-items-table{width:100%;border-collapse:collapse;font-size:12px;}
@@ -346,7 +363,7 @@ select.form-input option{background:var(--bg2);}
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;margin-top:8px;">
               <button class="btn btn-secondary" style="flex:1;padding:10px 8px;font-size:13px;" id="batch-preview-btn" onclick="handlePreCheckClick()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                Επεξεργασία & Δημιουργία / Template
+                Επεξεργασία & Δημιουργία Ετικέτας
               </button>
             </div>
             <div style="display:flex;align-items:center;gap:6px;">
@@ -375,6 +392,8 @@ select.form-input option{background:var(--bg2);}
         <div class="topbar-actions">
           <span id="doc-count" style="font-size:12px;color:var(--text2);margin-right:8px;"></span>
           <span id="doc-selected-count" style="font-size:12px;color:var(--accent);display:none;font-weight:500;margin-right:8px;"></span>
+          <button class="btn btn-primary btn-sm" onclick="openLabelEditor()" style="font-weight:600;">🏷 Ετικέτες</button>
+          <button class="btn btn-secondary btn-sm" onclick="openBatchFromDocs()" style="border-color:rgba(0,102,255,0.4);color:var(--accent2);font-weight:600;" disabled title="Σύντομα διαθέσιμο">⚡ Batch</button>
           <button class="btn btn-secondary btn-sm" onclick="exportDocs('csv')">↓ CSV</button>
           <button class="btn btn-secondary btn-sm" onclick="exportDocs('xlsx')">↓ XLSX</button>
           <button class="btn btn-secondary btn-sm" onclick="exportLineItems()" style="border-color:rgba(0,229,160,0.3);color:var(--accent)">↓ Line Items XLSX</button>
@@ -525,6 +544,61 @@ select.form-input option{background:var(--bg2);}
             <div id="system-info" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
           </div>
 
+        </div>
+      </div>
+    </div>
+
+    <!-- LABEL EDITOR (Νέα Ετικέτα) -->
+    <div id="page-label-editor" class="page" style="display:none">
+      <div class="topbar" style="padding:10px 20px;">
+        <div style="display:flex;align-items:center;gap:16px;">
+          <button class="btn btn-secondary btn-sm" onclick="closeLabelEditor()">← Πίσω στα Έγγραφα</button>
+          <div class="page-title" style="font-size:16px;">Επεξεργασία & Δημιουργία Ετικέτας</div>
+        </div>
+        <div class="topbar-actions">
+          <span id="le-doc-counter" style="font-size:12px;color:var(--text2);">1 / 1</span>
+          <button class="btn btn-secondary btn-sm" onclick="lePrevDoc()" id="le-prev-btn" disabled>← Προηγ.</button>
+          <button class="btn btn-secondary btn-sm" onclick="leNextDoc()" id="le-next-btn" disabled>Επόμ. →</button>
+          <button class="btn btn-primary btn-sm" onclick="leSkipDoc()" id="le-skip-btn">Παράλειψη →</button>
+        </div>
+      </div>
+      <div class="label-editor-container">
+        <div class="label-editor-img-wrap" id="le-img-wrap">
+          <img id="le-doc-image" src="" alt="Έγγραφο" style="max-width:90%;"/>
+        </div>
+        <!-- Draggable Panel -->
+        <div class="label-editor-panel" id="le-panel">
+          <div class="label-editor-panel-header" id="le-panel-drag">
+            <span class="title">🏷 Νέα Ετικέτα</span>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:var(--bg2);color:var(--text2);border:1px solid var(--border);" onclick="leToggleLineItems()" id="le-lineitems-toggle">+ Array Line Items</button>
+            </div>
+          </div>
+          <div class="label-editor-panel-body" id="le-panel-body">
+            <div id="le-form-view">
+              <label class="le-label">Όνομα Ετικέτας</label>
+              <input class="le-input" id="le-label-name" placeholder="π.χ. invoice_dei, cosmote_receipt..."/>
+              <label class="le-label">🏢 Προμηθευτής / Πωλητής</label>
+              <input class="le-input" id="le-supplier" placeholder="π.χ. cosmote, ote, κοσμοτε — πολλαπλές με κόμμα"/>
+              <label class="le-label">Πεδία (χωρισμένα με κόμμα)</label>
+              <input class="le-input" id="le-fields" placeholder="π.χ. invoice_number, invoice_date, vendor_name, total_amount"/>
+              <div id="le-lineitems-row" style="display:none;">
+                <label class="le-label">📋 Στήλες Line Items (χωρισμένα με κόμμα)</label>
+                <input class="le-input" id="le-lineitems-fields" placeholder="π.χ. Description, Quantity, Unit Price, Total"/>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px;">
+                <button class="btn btn-primary btn-sm" onclick="lePreview()" style="flex:1;">Προεπισκόπηση</button>
+              </div>
+            </div>
+            <div id="le-preview-view" style="display:none;">
+              <div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:8px;">Προεπισκόπηση Ετικέτας</div>
+              <div id="le-preview-content"></div>
+              <div style="display:flex;gap:8px;margin-top:12px;">
+                <button class="btn btn-secondary btn-sm" onclick="leBackToForm()" style="flex:1;">← Πίσω</button>
+                <button class="btn btn-primary btn-sm" onclick="leSaveLabel()" style="flex:1;">💾 Αποθήκευση</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1172,7 +1246,7 @@ async function findDocsForActivity(data) {
   return [];
 }
 
-// Click handler for "Επεξεργασία & Δημιουργία / Template" button
+// Click handler for "Επεξεργασία & Δημιουργία Ετικέτας" button
 async function handlePreCheckClick() {
   doPreCheck('batch');
 }
@@ -1189,7 +1263,7 @@ async function doSingleExtract() {
     const body  = document.getElementById('precheck-modal-body');
     const title = document.getElementById('precheck-modal-title');
     title.textContent = 'Απαιτείται Έλεγχος';
-    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία / Template</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
+    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία Ετικέτας</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
     modal.classList.add('open');
     return;
   }
@@ -1199,7 +1273,7 @@ async function doSingleExtract() {
     const body  = document.getElementById('precheck-modal-body');
     const title = document.getElementById('precheck-modal-title');
     title.textContent = 'Απαιτείται Δημιουργία Template';
-    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Δεν βρέθηκε template για τον προμηθευτή αυτού του τιμολογίου.<br>Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία / Template</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
+    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Δεν βρέθηκε template για τον προμηθευτή αυτού του τιμολογίου.<br>Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία Ετικέτας</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
     modal.classList.add('open');
     return;
   }
@@ -1445,7 +1519,7 @@ function renderActivityList(items) {
     const num = allActivityItems.length - allActivityItems.indexOf(a);
     const date = formatLocalDate(a.created_at);
     const icon = a.action === 'pre-check' ? '🔍' : '▶';
-    const label = a.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Template' : 'Έναρξη Batch';
+    const label = a.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Ετικέτας' : 'Έναρξη Batch';
     const color = a.action === 'pre-check' ? 'var(--accent2)' : 'var(--accent)';
     const isSelected = selectedActivityId === a.id;
     return `<div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;${isSelected ? 'background:rgba(0,229,160,0.06);' : ''}">
@@ -1510,7 +1584,7 @@ async function showActivityDetail(activityId) {
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  const label = res.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Template' : 'Έναρξη Batch';
+  const label = res.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Ετικέτας' : 'Έναρξη Batch';
   const date  = formatLocalDate(res.updated_at || res.created_at);
 
   title.textContent = 'Αποτελέσματα — ' + label;
@@ -1566,6 +1640,243 @@ async function showActivityDetail(activityId) {
 
   body.innerHTML = html;
   modal.classList.add('open');
+}
+
+// ── Label Editor ──────────────────────────────────────────────────────────────
+let leDocIds = [];
+let leCurrentIndex = 0;
+
+function openLabelEditor() {
+  const ids = getSelectedIds();
+  if (!ids.length) {
+    toast('Επιλέξτε έγγραφα πρώτα (checkbox ή φίλτρα)', 'error');
+    return;
+  }
+  leDocIds = ids;
+  leCurrentIndex = 0;
+  showPage('label-editor');
+  leLoadDoc(leCurrentIndex);
+  leInitDrag();
+}
+
+function closeLabelEditor() {
+  showPage('documents');
+  loadDocuments();
+}
+
+function openBatchFromDocs() {
+  toast('Σύντομα διαθέσιμο', 'info');
+}
+
+async function leLoadDoc(idx) {
+  const id = leDocIds[idx];
+  document.getElementById('le-doc-counter').textContent = (idx + 1) + ' / ' + leDocIds.length;
+  document.getElementById('le-prev-btn').disabled = idx === 0;
+  document.getElementById('le-next-btn').disabled = idx >= leDocIds.length - 1;
+  document.getElementById('le-skip-btn').style.display = idx >= leDocIds.length - 1 ? 'none' : '';
+
+  // Load document image
+  document.getElementById('le-doc-image').src = `/api/documents/${id}/file`;
+
+  // Reset form
+  leResetForm();
+}
+
+function leResetForm() {
+  document.getElementById('le-label-name').value = '';
+  document.getElementById('le-supplier').value = '';
+  document.getElementById('le-fields').value = '';
+  document.getElementById('le-lineitems-fields').value = '';
+  document.getElementById('le-lineitems-row').style.display = 'none';
+  document.getElementById('le-lineitems-toggle').textContent = '+ Array Line Items';
+  document.getElementById('le-form-view').style.display = '';
+  document.getElementById('le-preview-view').style.display = 'none';
+}
+
+function lePrevDoc() {
+  if (leCurrentIndex > 0) {
+    leCurrentIndex--;
+    leLoadDoc(leCurrentIndex);
+  }
+}
+
+function leNextDoc() {
+  if (leCurrentIndex < leDocIds.length - 1) {
+    leCurrentIndex++;
+    leLoadDoc(leCurrentIndex);
+  }
+}
+
+function leSkipDoc() {
+  leNextDoc();
+}
+
+function leToggleLineItems() {
+  const row = document.getElementById('le-lineitems-row');
+  const btn = document.getElementById('le-lineitems-toggle');
+  if (row.style.display === 'none') {
+    row.style.display = '';
+    btn.textContent = '− Array Line Items';
+  } else {
+    row.style.display = 'none';
+    btn.textContent = '+ Array Line Items';
+    document.getElementById('le-lineitems-fields').value = '';
+  }
+}
+
+// Auto detect field type from name
+function guessFieldType(name) {
+  const n = name.toLowerCase().trim();
+  // Date types
+  if (/date|ημερομηνία|ημ\/νια|hmer/.test(n)) return 'date';
+  // Number types
+  if (/amount|total|sum|price|cost|rate|tax|vat|net|gross|quantity|qty|ποσό|τιμή|ποσότητα|αξία|φπα|μικτ|καθαρ/.test(n)) return 'number';
+  // Integer types
+  if (/count|num_|number_of|αριθμός_|πλήθος/.test(n)) return 'integer';
+  // Boolean types
+  if (/is_|has_|enabled|active|approved|paid/.test(n)) return 'boolean';
+  // Default string
+  return 'string';
+}
+
+function lePreview() {
+  const labelName = document.getElementById('le-label-name').value.trim();
+  const supplier  = document.getElementById('le-supplier').value.trim();
+  const fieldsRaw = document.getElementById('le-fields').value.trim();
+  const lineItemsRaw = document.getElementById('le-lineitems-fields').value.trim();
+
+  if (!labelName) { toast('Γράψε ένα όνομα ετικέτας', 'error'); return; }
+  if (!fieldsRaw)  { toast('Πρόσθεσε τουλάχιστον ένα πεδίο', 'error'); return; }
+
+  // Parse fields
+  const fields = fieldsRaw.split(',').map(f => f.trim()).filter(f => f);
+  const lineItems = lineItemsRaw ? lineItemsRaw.split(',').map(f => f.trim()).filter(f => f) : [];
+
+  // Build preview
+  let html = '';
+  html += `<div style="margin-bottom:8px;"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);">Ετικέτα:</span> <b style="color:var(--text);">${labelName}</b></div>`;
+  if (supplier) {
+    html += `<div style="margin-bottom:12px;"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);">Προμηθευτής:</span> <span style="color:var(--accent);">${supplier}</span></div>`;
+  }
+
+  // Fields table
+  html += '<table class="le-preview-table"><thead><tr><th>Πεδίο</th><th>Τύπος</th></tr></thead><tbody>';
+  fields.forEach(f => {
+    const type = guessFieldType(f);
+    const typeColor = type === 'string' ? 'var(--text2)' : type === 'number' ? 'var(--accent)' : type === 'date' ? 'var(--warn)' : 'var(--accent2)';
+    html += `<tr><td style="font-family:'DM Mono',monospace;">${f}</td><td><span style="color:${typeColor};font-family:'DM Mono',monospace;">${type}</span></td></tr>`;
+  });
+  html += '</tbody></table>';
+
+  // Line items table
+  if (lineItems.length) {
+    html += '<div style="margin-top:12px;font-size:12px;color:var(--warn);font-weight:600;">📋 Line Items</div>';
+    html += '<table class="le-preview-table"><thead><tr><th>Στήλη</th><th>Τύπος</th></tr></thead><tbody>';
+    lineItems.forEach(f => {
+      const type = guessFieldType(f);
+      const typeColor = type === 'string' ? 'var(--text2)' : type === 'number' ? 'var(--accent)' : type === 'date' ? 'var(--warn)' : 'var(--accent2)';
+      html += `<tr><td style="font-family:'DM Mono',monospace;">${f}</td><td><span style="color:${typeColor};font-family:'DM Mono',monospace;">${type}</span></td></tr>`;
+    });
+    html += '</tbody></table>';
+  }
+
+  document.getElementById('le-preview-content').innerHTML = html;
+  document.getElementById('le-form-view').style.display = 'none';
+  document.getElementById('le-preview-view').style.display = '';
+}
+
+function leBackToForm() {
+  document.getElementById('le-form-view').style.display = '';
+  document.getElementById('le-preview-view').style.display = 'none';
+}
+
+async function leSaveLabel() {
+  const labelName    = document.getElementById('le-label-name').value.trim();
+  const supplier     = document.getElementById('le-supplier').value.trim();
+  const fieldsRaw    = document.getElementById('le-fields').value.trim();
+  const lineItemsRaw = document.getElementById('le-lineitems-fields').value.trim();
+
+  if (!labelName || !fieldsRaw) { toast('Συμπλήρωσε τα υποχρεωτικά πεδία', 'error'); return; }
+
+  const fields = fieldsRaw.split(',').map(f => f.trim()).filter(f => f);
+  const lineItems = lineItemsRaw ? lineItemsRaw.split(',').map(f => f.trim()).filter(f => f) : [];
+
+  // Build fields array matching the API format: [{name, type, required}]
+  const apiFields = fields.map(f => ({ name: f, type: guessFieldType(f), required: true }));
+
+  // If line items exist, add as array type
+  if (lineItems.length) {
+    apiFields.push({
+      name: 'line_items',
+      type: 'array',
+      required: true,
+      items: lineItems.map(f => ({ name: f, type: guessFieldType(f) }))
+    });
+  }
+
+  const payload = {
+    name: labelName,
+    fields: apiFields,
+    supplier_pattern: supplier || ''
+  };
+
+  try {
+    await api('POST', '/api/templates', payload);
+    toast(`Ετικέτα "${labelName}" αποθηκεύτηκε!`, 'success');
+
+    // Assign this template/label to the current document
+    const docId = leDocIds[leCurrentIndex];
+    try {
+      await api('PATCH', `/api/documents/${docId}/assign-label`, { schema_name: labelName });
+    } catch(e) { console.error('Failed to assign label to doc', e); }
+
+    // Move to next document or close
+    if (leCurrentIndex < leDocIds.length - 1) {
+      leCurrentIndex++;
+      leLoadDoc(leCurrentIndex);
+    } else {
+      toast('Ολοκληρώθηκε! Όλα τα έγγραφα επεξεργάστηκαν.', 'success');
+      closeLabelEditor();
+    }
+  } catch(e) {
+    toast('Σφάλμα αποθήκευσης: ' + (e.message || e), 'error');
+  }
+}
+
+// Draggable panel
+function leInitDrag() {
+  const panel = document.getElementById('le-panel');
+  const header = document.getElementById('le-panel-drag');
+  let isDragging = false, startX, startY, origLeft, origTop;
+
+  // Reset position
+  panel.style.top = '60px';
+  panel.style.right = '40px';
+  panel.style.left = '';
+
+  header.onmousedown = function(e) {
+    if (e.target.tagName === 'BUTTON') return;
+    isDragging = true;
+    const rect = panel.getBoundingClientRect();
+    startX = e.clientX;
+    startY = e.clientY;
+    origLeft = rect.left;
+    origTop  = rect.top;
+    panel.style.right = '';
+    panel.style.left = origLeft + 'px';
+    panel.style.top  = origTop + 'px';
+    e.preventDefault();
+  };
+
+  document.onmousemove = function(e) {
+    if (!isDragging) return;
+    panel.style.left = (origLeft + e.clientX - startX) + 'px';
+    panel.style.top  = (origTop  + e.clientY - startY) + 'px';
+  };
+
+  document.onmouseup = function() {
+    isDragging = false;
+  };
 }
 
 // ── Templates ────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ Domain: fastwrite.duckdns.org
 import json
 import sys
 import logging
+from datetime import datetime
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file, make_response, redirect
 from db_manager     import DatabaseManager
@@ -551,6 +552,25 @@ def update_document_data(doc_id):
     existing.update(new_data)
     db.update_document_status(doc_id, status=doc["status"], result_json=json.dumps(existing))
     return jsonify({"success": True, "doc_id": doc_id, "data": existing})
+
+@app.route("/api/documents/<int:doc_id>/assign-label", methods=["PATCH"])
+@require_auth
+def assign_label_to_document(doc_id):
+    """Assign a schema_name (label) to a document."""
+    doc = db.get_document(doc_id)
+    if not doc:
+        return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    data = request.get_json(force=True) or {}
+    schema_name = data.get("schema_name", "").strip()
+    if not schema_name:
+        return jsonify({"error": "Δεν δόθηκε schema_name."}), 400
+    now = datetime.utcnow().isoformat()
+    db.conn.execute(
+        "UPDATE documents SET schema_name=?, updated_at=? WHERE id=?",
+        (schema_name, now, doc_id)
+    )
+    db.conn.commit()
+    return jsonify({"success": True, "doc_id": doc_id, "schema_name": schema_name})
 
 @app.get("/api/documents/<int:doc_id>/file")
 @require_auth
