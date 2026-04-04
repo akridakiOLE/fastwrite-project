@@ -599,6 +599,67 @@ def serve_original_pdf(doc_id):
         return jsonify({"error": "Original PDF δεν βρέθηκε."}), 404
     return send_file(str(pdf_path), mimetype="application/pdf")
 
+@app.get("/api/documents/filtered-pdf")
+@require_auth
+def serve_filtered_pdf():
+    """Δημιουργεί PDF μόνο με τις σελίδες των επιλεγμένων εγγράφων."""
+    import re as _re
+    import io
+    doc_ids = request.args.get("ids", "")
+    if not doc_ids:
+        return jsonify({"error": "Δεν δόθηκαν doc IDs."}), 400
+    ids = [int(x) for x in doc_ids.split(",") if x.strip().isdigit()]
+    if not ids:
+        return jsonify({"error": "Μη έγκυρα doc IDs."}), 400
+
+    # Group documents by original PDF file
+    pdf_pages = {}  # {pdf_path: set of page numbers (0-indexed)}
+    docs_order = []  # [(pdf_path, page_num)] to maintain order
+    for doc_id in ids:
+        doc = db.get_document(doc_id)
+        if not doc:
+            continue
+        original = doc.get("original_filename") or doc.get("filename", "")
+        pdf_path = UPLOAD_DIR / original
+        if not pdf_path.exists() or not str(pdf_path).lower().endswith(".pdf"):
+            continue
+        fp = doc.get("file_path", "")
+        m = _re.search(r"page_(\d+)", fp)
+        page_num = int(m.group(1)) - 1 if m else 0  # 0-indexed
+        if str(pdf_path) not in pdf_pages:
+            pdf_pages[str(pdf_path)] = set()
+        pdf_pages[str(pdf_path)].add(page_num)
+        docs_order.append((str(pdf_path), page_num))
+
+    if not docs_order:
+        return jsonify({"error": "Δεν βρέθηκαν σελίδες."}), 404
+
+    try:
+        try:
+            from pypdf import PdfReader, PdfWriter
+        except ImportError:
+            from PyPDF2 import PdfReader, PdfWriter
+
+        writer = PdfWriter()
+        readers_cache = {}
+        for pdf_path, page_num in docs_order:
+            if pdf_path not in readers_cache:
+                readers_cache[pdf_path] = PdfReader(pdf_path)
+            reader = readers_cache[pdf_path]
+            if page_num < len(reader.pages):
+                writer.add_page(reader.pages[page_num])
+
+        buf = io.BytesIO()
+        writer.write(buf)
+        buf.seek(0)
+        return send_file(buf, mimetype="application/pdf", download_name="selected_pages.pdf")
+    except Exception as e:
+        logging.error("filtered-pdf error: %s", e)
+        # Fallback: serve original PDF of first document
+        if docs_order:
+            return send_file(docs_order[0][0], mimetype="application/pdf")
+        return jsonify({"error": str(e)}), 500
+
 @app.get("/api/documents/<int:doc_id>/line-positions")
 @require_auth
 def get_line_positions(doc_id):
