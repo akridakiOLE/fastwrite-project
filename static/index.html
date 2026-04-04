@@ -550,29 +550,46 @@ select.form-input option{background:var(--bg2);}
 
     <!-- LABEL EDITOR (Νέα Ετικέτα) -->
     <div id="page-label-editor" class="page" style="display:none">
-      <div class="topbar" style="padding:10px 20px;">
-        <div style="display:flex;align-items:center;gap:16px;">
-          <button class="btn btn-secondary btn-sm" onclick="closeLabelEditor()">← Πίσω στα Έγγραφα</button>
-          <div class="page-title" style="font-size:16px;">Επεξεργασία & Δημιουργία Ετικέτας</div>
+      <div class="topbar" style="padding:8px 16px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="btn btn-secondary btn-sm" onclick="closeLabelEditor()">← Πίσω</button>
+          <div class="page-title" style="font-size:15px;">Επεξεργασία & Δημιουργία Ετικέτας</div>
         </div>
-        <div class="topbar-actions">
-          <span id="le-doc-counter" style="font-size:12px;color:var(--text2);">1 / 1</span>
-          <button class="btn btn-secondary btn-sm" onclick="lePrevDoc()" id="le-prev-btn" disabled>← Προηγ.</button>
-          <button class="btn btn-secondary btn-sm" onclick="leNextDoc()" id="le-next-btn" disabled>Επόμ. →</button>
-          <button class="btn btn-primary btn-sm" onclick="leSkipDoc()" id="le-skip-btn">Παράλειψη →</button>
+        <div class="topbar-actions" style="gap:6px;">
+          <!-- Dropdown 1: Επιλεγμένα Έγγραφα -->
+          <div style="position:relative;" id="le-docs-dd-wrap">
+            <button class="btn btn-secondary btn-sm" onclick="leToggleDocsDD(event)" style="font-size:11px;">
+              📄 Έγγραφα <span id="le-doc-counter" style="color:var(--accent);">1/1</span> ▼
+            </button>
+            <div id="le-docs-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:300px;max-height:320px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
+              <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;">ΕΠΙΛΕΓΜΕΝΑ ΕΓΓΡΑΦΑ</div>
+              <div id="le-docs-list"></div>
+            </div>
+          </div>
+          <!-- Dropdown 2: Υφιστάμενες Ετικέτες -->
+          <div style="position:relative;" id="le-labels-dd-wrap">
+            <button class="btn btn-secondary btn-sm" onclick="leToggleLabelsDD(event)" style="font-size:11px;">
+              🏷 Ετικέτες ▼
+            </button>
+            <div id="le-labels-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:280px;max-height:320px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
+              <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;">ΥΦΙΣΤΑΜΕΝΕΣ ΕΤΙΚΕΤΕΣ</div>
+              <div id="le-labels-list"></div>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="lePrevDoc()" id="le-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
+          <button class="btn btn-secondary btn-sm" onclick="leNextDoc()" id="le-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
+          <button class="btn btn-primary btn-sm" onclick="leSkipDoc()" id="le-skip-btn" style="font-size:11px;">Παράλειψη →</button>
         </div>
       </div>
       <div class="label-editor-container">
-        <div class="label-editor-img-wrap" id="le-img-wrap">
-          <img id="le-doc-image" src="" alt="Έγγραφο" style="max-width:90%;"/>
+        <div class="label-editor-img-wrap" id="le-img-wrap" style="user-select:text;-webkit-user-select:text;">
+          <img id="le-doc-image" src="" alt="Έγγραφο" style="max-width:90%;user-select:text;-webkit-user-select:text;pointer-events:auto;"/>
         </div>
         <!-- Draggable Panel -->
         <div class="label-editor-panel" id="le-panel">
           <div class="label-editor-panel-header" id="le-panel-drag">
             <span class="title">🏷 Νέα Ετικέτα</span>
-            <div style="display:flex;gap:6px;align-items:center;">
-              <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:var(--bg2);color:var(--text2);border:1px solid var(--border);" onclick="leToggleLineItems()" id="le-lineitems-toggle">+ Array Line Items</button>
-            </div>
+            <button class="btn btn-sm" style="padding:4px 12px;font-size:11px;font-weight:600;background:rgba(255,179,0,0.15);color:var(--warn);border:1px solid rgba(255,179,0,0.4);" onclick="leToggleLineItems()" id="le-lineitems-toggle">+ Array Line Items</button>
           </div>
           <div class="label-editor-panel-body" id="le-panel-body">
             <div id="le-form-view">
@@ -583,8 +600,8 @@ select.form-input option{background:var(--bg2);}
               <label class="le-label">Πεδία (χωρισμένα με κόμμα)</label>
               <input class="le-input" id="le-fields" placeholder="π.χ. invoice_number, invoice_date, vendor_name, total_amount"/>
               <div id="le-lineitems-row" style="display:none;">
-                <label class="le-label">📋 Στήλες Line Items (χωρισμένα με κόμμα)</label>
-                <input class="le-input" id="le-lineitems-fields" placeholder="π.χ. Description, Quantity, Unit Price, Total"/>
+                <label class="le-label" style="color:var(--warn);font-weight:500;">📋 Στήλες Line Items (χωρισμένα με κόμμα)</label>
+                <input class="le-input" id="le-lineitems-fields" placeholder="π.χ. Description, Quantity, Unit Price, Total" style="border-color:rgba(255,179,0,0.3);"/>
               </div>
               <div style="display:flex;gap:8px;margin-top:12px;">
                 <button class="btn btn-primary btn-sm" onclick="lePreview()" style="flex:1;">Προεπισκόπηση</button>
@@ -1644,7 +1661,9 @@ async function showActivityDetail(activityId) {
 
 // ── Label Editor ──────────────────────────────────────────────────────────────
 let leDocIds = [];
+let leDocsData = []; // full doc objects for dropdown display
 let leCurrentIndex = 0;
+let leDragState = { active: false, startX: 0, startY: 0, origLeft: 0, origTop: 0 };
 
 function openLabelEditor() {
   const ids = getSelectedIds();
@@ -1653,13 +1672,19 @@ function openLabelEditor() {
     return;
   }
   leDocIds = ids;
+  // Get doc data from allDocs for dropdown display
+  leDocsData = allDocs.filter(d => ids.includes(d.id));
   leCurrentIndex = 0;
   showPage('label-editor');
   leLoadDoc(leCurrentIndex);
   leInitDrag();
+  leLoadExistingLabels();
 }
 
 function closeLabelEditor() {
+  // Clean up drag listeners
+  document.removeEventListener('mousemove', leDragMove);
+  document.removeEventListener('mouseup', leDragEnd);
   showPage('documents');
   loadDocuments();
 }
@@ -1670,7 +1695,7 @@ function openBatchFromDocs() {
 
 async function leLoadDoc(idx) {
   const id = leDocIds[idx];
-  document.getElementById('le-doc-counter').textContent = (idx + 1) + ' / ' + leDocIds.length;
+  document.getElementById('le-doc-counter').textContent = (idx + 1) + '/' + leDocIds.length;
   document.getElementById('le-prev-btn').disabled = idx === 0;
   document.getElementById('le-next-btn').disabled = idx >= leDocIds.length - 1;
   document.getElementById('le-skip-btn').style.display = idx >= leDocIds.length - 1 ? 'none' : '';
@@ -1680,6 +1705,9 @@ async function leLoadDoc(idx) {
 
   // Reset form
   leResetForm();
+
+  // Update docs dropdown highlight
+  leRenderDocsDropdown();
 }
 
 function leResetForm() {
@@ -1694,22 +1722,133 @@ function leResetForm() {
 }
 
 function lePrevDoc() {
-  if (leCurrentIndex > 0) {
-    leCurrentIndex--;
-    leLoadDoc(leCurrentIndex);
-  }
+  if (leCurrentIndex > 0) { leCurrentIndex--; leLoadDoc(leCurrentIndex); }
 }
-
 function leNextDoc() {
-  if (leCurrentIndex < leDocIds.length - 1) {
-    leCurrentIndex++;
-    leLoadDoc(leCurrentIndex);
-  }
+  if (leCurrentIndex < leDocIds.length - 1) { leCurrentIndex++; leLoadDoc(leCurrentIndex); }
+}
+function leSkipDoc() { leNextDoc(); }
+
+// ── Dropdown 1: Selected Docs ──
+function leToggleDocsDD(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('le-docs-dropdown');
+  const other = document.getElementById('le-labels-dropdown');
+  other.style.display = 'none';
+  dd.style.display = dd.style.display === 'none' ? '' : 'none';
 }
 
-function leSkipDoc() {
-  leNextDoc();
+function leRenderDocsDropdown() {
+  const el = document.getElementById('le-docs-list');
+  el.innerHTML = leDocsData.map((doc, i) => {
+    const rd = doc.result_data || {};
+    const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || '';
+    const fname = doc.original_filename || doc.filename || '—';
+    const label = doc.schema_name && doc.status !== 'no_template' ? doc.schema_name : '';
+    const isCurrent = i === leCurrentIndex;
+    return `<div onclick="leGoToDoc(${i})" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin:2px 0;font-size:12px;
+      background:${isCurrent ? 'rgba(0,229,160,0.1)' : 'transparent'};
+      border-left:3px solid ${isCurrent ? 'var(--accent)' : 'transparent'};
+      ${isCurrent ? 'color:var(--accent);font-weight:600;' : 'color:var(--text2);'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">#${doc.id}</span>
+        ${label ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,160,0.1);color:var(--accent);">${label}</span>` : ''}
+      </div>
+      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;">${fname}</div>
+      ${supplier ? `<div style="font-size:10px;color:var(--text3);margin-top:2px;">🏢 ${supplier}</div>` : ''}
+    </div>`;
+  }).join('');
 }
+
+function leGoToDoc(idx) {
+  leCurrentIndex = idx;
+  leLoadDoc(idx);
+  document.getElementById('le-docs-dropdown').style.display = 'none';
+}
+
+// ── Dropdown 2: Existing Labels ──
+let leExistingLabels = [];
+
+async function leLoadExistingLabels() {
+  try {
+    const res = await api('GET', '/api/templates');
+    leExistingLabels = res.templates || [];
+    leRenderLabelsDropdown();
+  } catch(e) { console.error('Failed to load labels', e); }
+}
+
+function leToggleLabelsDD(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('le-labels-dropdown');
+  const other = document.getElementById('le-docs-dropdown');
+  other.style.display = 'none';
+  dd.style.display = dd.style.display === 'none' ? '' : 'none';
+}
+
+function leRenderLabelsDropdown() {
+  const el = document.getElementById('le-labels-list');
+  if (!leExistingLabels.length) {
+    el.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--text3);text-align:center;">Δεν υπάρχουν ετικέτες</div>';
+    return;
+  }
+  el.innerHTML = leExistingLabels.map(t => {
+    const sp = t.supplier_pattern || '';
+    const fieldCount = (t.fields || []).length;
+    return `<div onclick="leLoadExistingLabel('${t.name.replace(/'/g,"\\'")}')" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin:2px 0;font-size:12px;color:var(--text2);transition:background .1s;"
+      onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background='transparent'">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <b style="color:var(--text);font-size:12px;">${t.name}</b>
+        <span style="font-size:10px;color:var(--text3);">${fieldCount} πεδία</span>
+      </div>
+      ${sp ? `<div style="font-size:10px;color:var(--accent);margin-top:2px;">🏢 ${sp}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function leLoadExistingLabel(name) {
+  const t = leExistingLabels.find(l => l.name === name);
+  if (!t) return;
+  document.getElementById('le-label-name').value = t.name;
+  document.getElementById('le-supplier').value = t.supplier_pattern || '';
+
+  // Parse fields from template
+  const regularFields = [];
+  let lineItemFields = [];
+  (t.fields || []).forEach(f => {
+    if (f.type === 'array' && f.items) {
+      lineItemFields = f.items.map(i => i.name);
+    } else {
+      regularFields.push(f.name);
+    }
+  });
+  document.getElementById('le-fields').value = regularFields.join(', ');
+
+  if (lineItemFields.length) {
+    document.getElementById('le-lineitems-row').style.display = '';
+    document.getElementById('le-lineitems-toggle').textContent = '− Array Line Items';
+    document.getElementById('le-lineitems-fields').value = lineItemFields.join(', ');
+  } else {
+    document.getElementById('le-lineitems-row').style.display = 'none';
+    document.getElementById('le-lineitems-toggle').textContent = '+ Array Line Items';
+  }
+
+  document.getElementById('le-form-view').style.display = '';
+  document.getElementById('le-preview-view').style.display = 'none';
+  document.getElementById('le-labels-dropdown').style.display = 'none';
+  toast(`Ετικέτα "${name}" φορτώθηκε`, 'info');
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#le-docs-dd-wrap')) {
+    const dd = document.getElementById('le-docs-dropdown');
+    if (dd) dd.style.display = 'none';
+  }
+  if (!e.target.closest('#le-labels-dd-wrap')) {
+    const dd = document.getElementById('le-labels-dropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
 
 function leToggleLineItems() {
   const row = document.getElementById('le-lineitems-row');
@@ -1727,15 +1866,10 @@ function leToggleLineItems() {
 // Auto detect field type from name
 function guessFieldType(name) {
   const n = name.toLowerCase().trim();
-  // Date types
   if (/date|ημερομηνία|ημ\/νια|hmer/.test(n)) return 'date';
-  // Number types
   if (/amount|total|sum|price|cost|rate|tax|vat|net|gross|quantity|qty|ποσό|τιμή|ποσότητα|αξία|φπα|μικτ|καθαρ/.test(n)) return 'number';
-  // Integer types
   if (/count|num_|number_of|αριθμός_|πλήθος/.test(n)) return 'integer';
-  // Boolean types
   if (/is_|has_|enabled|active|approved|paid/.test(n)) return 'boolean';
-  // Default string
   return 'string';
 }
 
@@ -1748,18 +1882,15 @@ function lePreview() {
   if (!labelName) { toast('Γράψε ένα όνομα ετικέτας', 'error'); return; }
   if (!fieldsRaw)  { toast('Πρόσθεσε τουλάχιστον ένα πεδίο', 'error'); return; }
 
-  // Parse fields
   const fields = fieldsRaw.split(',').map(f => f.trim()).filter(f => f);
   const lineItems = lineItemsRaw ? lineItemsRaw.split(',').map(f => f.trim()).filter(f => f) : [];
 
-  // Build preview
   let html = '';
   html += `<div style="margin-bottom:8px;"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);">Ετικέτα:</span> <b style="color:var(--text);">${labelName}</b></div>`;
   if (supplier) {
     html += `<div style="margin-bottom:12px;"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);">Προμηθευτής:</span> <span style="color:var(--accent);">${supplier}</span></div>`;
   }
 
-  // Fields table
   html += '<table class="le-preview-table"><thead><tr><th>Πεδίο</th><th>Τύπος</th></tr></thead><tbody>';
   fields.forEach(f => {
     const type = guessFieldType(f);
@@ -1768,7 +1899,6 @@ function lePreview() {
   });
   html += '</tbody></table>';
 
-  // Line items table
   if (lineItems.length) {
     html += '<div style="margin-top:12px;font-size:12px;color:var(--warn);font-weight:600;">📋 Line Items</div>';
     html += '<table class="le-preview-table"><thead><tr><th>Στήλη</th><th>Τύπος</th></tr></thead><tbody>';
@@ -1801,36 +1931,33 @@ async function leSaveLabel() {
   const fields = fieldsRaw.split(',').map(f => f.trim()).filter(f => f);
   const lineItems = lineItemsRaw ? lineItemsRaw.split(',').map(f => f.trim()).filter(f => f) : [];
 
-  // Build fields array matching the API format: [{name, type, required}]
   const apiFields = fields.map(f => ({ name: f, type: guessFieldType(f), required: true }));
-
-  // If line items exist, add as array type
   if (lineItems.length) {
     apiFields.push({
-      name: 'line_items',
-      type: 'array',
-      required: true,
+      name: 'line_items', type: 'array', required: true,
       items: lineItems.map(f => ({ name: f, type: guessFieldType(f) }))
     });
   }
 
-  const payload = {
-    name: labelName,
-    fields: apiFields,
-    supplier_pattern: supplier || ''
-  };
+  const payload = { name: labelName, fields: apiFields, supplier_pattern: supplier || '' };
 
   try {
     await api('POST', '/api/templates', payload);
     toast(`Ετικέτα "${labelName}" αποθηκεύτηκε!`, 'success');
 
-    // Assign this template/label to the current document
+    // Assign label to current document
     const docId = leDocIds[leCurrentIndex];
     try {
       await api('PATCH', `/api/documents/${docId}/assign-label`, { schema_name: labelName });
+      // Update local data
+      const docObj = leDocsData.find(d => d.id === docId);
+      if (docObj) docObj.schema_name = labelName;
     } catch(e) { console.error('Failed to assign label to doc', e); }
 
-    // Move to next document or close
+    // Refresh labels dropdown
+    await leLoadExistingLabels();
+
+    // Move to next or close
     if (leCurrentIndex < leDocIds.length - 1) {
       leCurrentIndex++;
       leLoadDoc(leCurrentIndex);
@@ -1843,11 +1970,21 @@ async function leSaveLabel() {
   }
 }
 
-// Draggable panel
+// ── Draggable panel (scoped listeners) ──
+function leDragMove(e) {
+  if (!leDragState.active) return;
+  const panel = document.getElementById('le-panel');
+  panel.style.left = (leDragState.origLeft + e.clientX - leDragState.startX) + 'px';
+  panel.style.top  = (leDragState.origTop  + e.clientY - leDragState.startY) + 'px';
+}
+
+function leDragEnd() {
+  leDragState.active = false;
+}
+
 function leInitDrag() {
   const panel = document.getElementById('le-panel');
   const header = document.getElementById('le-panel-drag');
-  let isDragging = false, startX, startY, origLeft, origTop;
 
   // Reset position
   panel.style.top = '60px';
@@ -1855,28 +1992,21 @@ function leInitDrag() {
   panel.style.left = '';
 
   header.onmousedown = function(e) {
-    if (e.target.tagName === 'BUTTON') return;
-    isDragging = true;
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    leDragState.active = true;
     const rect = panel.getBoundingClientRect();
-    startX = e.clientX;
-    startY = e.clientY;
-    origLeft = rect.left;
-    origTop  = rect.top;
+    leDragState.startX = e.clientX;
+    leDragState.startY = e.clientY;
+    leDragState.origLeft = rect.left;
+    leDragState.origTop  = rect.top;
     panel.style.right = '';
-    panel.style.left = origLeft + 'px';
-    panel.style.top  = origTop + 'px';
+    panel.style.left = leDragState.origLeft + 'px';
+    panel.style.top  = leDragState.origTop + 'px';
     e.preventDefault();
   };
 
-  document.onmousemove = function(e) {
-    if (!isDragging) return;
-    panel.style.left = (origLeft + e.clientX - startX) + 'px';
-    panel.style.top  = (origTop  + e.clientY - startY) + 'px';
-  };
-
-  document.onmouseup = function() {
-    isDragging = false;
-  };
+  document.addEventListener('mousemove', leDragMove);
+  document.addEventListener('mouseup', leDragEnd);
 }
 
 // ── Templates ────────────────────────────────────────────────────────────────
