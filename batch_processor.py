@@ -86,6 +86,7 @@ class BatchJobStatus:
     processed     : int  = 0
     failed        : int  = 0
     skipped       : int  = 0
+    no_template   : int  = 0
     doc_ids       : list = None
     errors        : list = None
     started_at    : str  = ""
@@ -99,7 +100,7 @@ class BatchJobStatus:
             "job_id": self.job_id, "status": self.status,
             "total_pages": self.total_pages, "total_invoices": self.total_invoices,
             "processed": self.processed, "failed": self.failed,
-            "skipped": self.skipped,
+            "skipped": self.skipped, "no_template": self.no_template,
             "doc_ids": self.doc_ids, "errors": self.errors,
             "started_at": self.started_at, "completed_at": self.completed_at,
             "progress_pct": self.progress_pct,
@@ -523,7 +524,11 @@ class BatchProcessor:
             for future in as_completed(futures):
                 res = future.result()
                 if res["success"]:
-                    job.processed += 1
+                    if res.get("skipped"):
+                        # no_template — δεν βρέθηκε ετικέτα, δεν μετράει ως επιτυχία
+                        job.no_template += 1
+                    else:
+                        job.processed += 1
                     job.doc_ids.append(res["doc_id"])
                 else:
                     job.failed += 1
@@ -532,7 +537,7 @@ class BatchProcessor:
                     if "doc_id" in res:
                         job.doc_ids.append(res["doc_id"])
                 total = job.total_invoices or 1
-                job.progress_pct = round((job.processed + job.failed + job.skipped) / total * 100, 1)
+                job.progress_pct = round((job.processed + job.failed + job.skipped + job.no_template) / total * 100, 1)
                 self._update_job(job)
 
     def _get_job(self, job_id):

@@ -1496,18 +1496,25 @@ async function showBatchCompletionModal(st) {
   title.textContent = 'Ολοκλήρωση Batch';
 
   const total = st.total_invoices || 0;
-  const processed = st.processed || 0;
+  const successful = st.processed || 0;        // only truly extracted docs
   const failed = st.failed || 0;
-  const successful = processed - failed;
+  const noTemplate = st.no_template || 0;       // docs without matching label
+  const skipped = st.skipped || 0;              // already completed
   const pct = total > 0 ? ((successful / total) * 100).toFixed(1) : 0;
   const pages = st.total_pages || 0;
+
+  let detailParts = [];
+  if (pages > 0) detailParts.push('Σελίδες: ' + pages);
+  if (noTemplate > 0) detailParts.push('Χωρίς ετικέτα: ' + noTemplate);
+  if (failed > 0) detailParts.push('Αποτυχίες: ' + failed);
+  if (skipped > 0) detailParts.push('Παραλείφθηκαν: ' + skipped);
 
   let html = '<div style="padding:20px;text-align:center;">';
   html += `<div style="font-size:36px;font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);margin-bottom:8px;">${successful}/${total}</div>`;
   html += `<div style="font-size:16px;color:var(--text);margin-bottom:4px;">${pct}%</div>`;
-  html += `<div style="font-size:12px;color:var(--text2);margin-bottom:16px;">Σελίδες: ${pages}${failed > 0 ? ' | Αποτυχίες: ' + failed : ''}</div>`;
+  if (detailParts.length) html += `<div style="font-size:12px;color:var(--text2);margin-bottom:16px;">${detailParts.join(' | ')}</div>`;
   html += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:20px;">';
-  html += 'Αν θέλετε να συνεχίσετε την διαδικασία παρακαλώ μετακινηθείτε στην σελίδα <b style="color:var(--accent);">Έγγραφα</b>';
+  html += 'Για να ολοκληρώσετε τις διαδικασίες συνεχίστε στην σελίδα <b style="color:var(--accent);">Έγγραφα</b>';
   html += '</div>';
   html += '<button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="closeModal(\'precheck-modal\')">OK</button>';
   html += '</div>';
