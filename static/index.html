@@ -831,7 +831,7 @@ async function loadDashboard() {
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;font-size:13px">${filename}</span>
         ${smartName ? `<span style="font-size:10px;color:var(--text3);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${smartName}</span>` : ''}
       </td>
-      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${(doc.status === 'no_template' || !doc.schema_name) ? '—' : doc.schema_name}</span></td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${doc.schema_name && doc.status !== 'no_template' ? doc.schema_name : (doc.result_data && doc.result_data._matched_supplier && doc.result_data._matched_supplier !== 'unknown' ? '<span style="color:var(--warn);font-style:italic;" title="Ανιχνεύθηκε προμηθευτής — χωρίς ετικέτα">' + doc.result_data._matched_supplier + '</span>' : '—')}</span></td>
       <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${supplier}</td>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px">${invNo}</span></td>
       <td>${badgeHtml(doc.status)}</td>
@@ -999,7 +999,7 @@ function renderDocs(docs) {
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;font-size:13px">${filename}</span>
         ${smartName ? `<span style="font-size:10px;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${smartName}</span>` : ''}
       </td>
-      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${(doc.status === 'no_template' || !doc.schema_name) ? '—' : doc.schema_name}</span></td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${doc.schema_name && doc.status !== 'no_template' ? doc.schema_name : (doc.result_data && doc.result_data._matched_supplier && doc.result_data._matched_supplier !== 'unknown' ? '<span style="color:var(--warn);font-style:italic;" title="Ανιχνεύθηκε προμηθευτής — χωρίς ετικέτα">' + doc.result_data._matched_supplier + '</span>' : '—')}</span></td>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${supplier}</td>
       <td>${badgeHtml(doc.status)}</td>
       <td>${batchStatus}</td>
@@ -1796,7 +1796,7 @@ function leRenderDocsDropdown() {
     const rd = doc.result_data || {};
     const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || '';
     const fname = doc.original_filename || doc.filename || '—';
-    const label = doc.schema_name && doc.status !== 'no_template' ? doc.schema_name : '';
+    const label = doc.schema_name && doc.status !== 'no_template' ? doc.schema_name : (rd._matched_supplier && rd._matched_supplier !== 'unknown' ? rd._matched_supplier : '');
     const isCurrent = i === leCurrentIndex;
     return `<div onclick="leGoToDoc(${i})" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin:2px 0;font-size:12px;
       background:${isCurrent ? 'rgba(0,229,160,0.1)' : 'transparent'};
