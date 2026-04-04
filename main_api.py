@@ -565,12 +565,16 @@ def assign_label_to_document(doc_id):
     if not schema_name:
         return jsonify({"error": "Δεν δόθηκε schema_name."}), 400
     now = datetime.utcnow().isoformat()
+    # Also update status from no_template to pending so label shows in UI
+    new_status = doc.get("status", "")
+    if new_status == "no_template":
+        new_status = "pending"
     db.conn.execute(
-        "UPDATE documents SET schema_name=?, updated_at=? WHERE id=?",
-        (schema_name, now, doc_id)
+        "UPDATE documents SET schema_name=?, status=?, updated_at=? WHERE id=?",
+        (schema_name, new_status, now, doc_id)
     )
     db.conn.commit()
-    return jsonify({"success": True, "doc_id": doc_id, "schema_name": schema_name})
+    return jsonify({"success": True, "doc_id": doc_id, "schema_name": schema_name, "status": new_status})
 
 @app.get("/api/documents/<int:doc_id>/file")
 @require_auth

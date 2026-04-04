@@ -579,7 +579,7 @@ select.form-input option{background:var(--bg2);}
           <button class="btn btn-sm" id="le-panel-toggle-btn" onclick="leTogglePanel()" style="font-size:11px;background:rgba(0,229,160,0.1);color:var(--accent);border:1px solid rgba(0,229,160,0.3);display:none;">🏷 Πίνακας</button>
           <button class="btn btn-secondary btn-sm" onclick="lePrevDoc()" id="le-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
           <button class="btn btn-secondary btn-sm" onclick="leNextDoc()" id="le-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
-          <button class="btn btn-primary btn-sm" onclick="leSkipDoc()" id="le-skip-btn" style="font-size:11px;">Παράλειψη →</button>
+          <button class="btn btn-primary btn-sm" onclick="leResetForm()" id="le-clear-btn" style="font-size:11px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);">Καθαρισμός</button>
         </div>
       </div>
       <div class="label-editor-container" style="position:relative;">
@@ -1742,7 +1742,7 @@ async function leLoadDoc(idx) {
   document.getElementById('le-doc-counter').textContent = (idx + 1) + '/' + leDocIds.length;
   document.getElementById('le-prev-btn').disabled = idx === 0;
   document.getElementById('le-next-btn').disabled = idx >= leDocIds.length - 1;
-  document.getElementById('le-skip-btn').style.display = idx >= leDocIds.length - 1 ? 'none' : '';
+  // le-clear-btn is always visible
 
   // Navigate to the correct page in the filtered PDF
   // In the filtered PDF, pages are in the same order as leDocIds
@@ -1779,7 +1779,7 @@ function lePrevDoc() {
 function leNextDoc() {
   if (leCurrentIndex < leDocIds.length - 1) { leCurrentIndex++; leLoadDoc(leCurrentIndex); }
 }
-function leSkipDoc() { leNextDoc(); }
+
 
 // ── Dropdown 1: Selected Docs ──
 function leToggleDocsDD(e) {
@@ -1794,20 +1794,21 @@ function leRenderDocsDropdown() {
   const el = document.getElementById('le-docs-list');
   el.innerHTML = leDocsData.map((doc, i) => {
     const rd = doc.result_data || {};
-    const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || '';
-    const fname = doc.original_filename || doc.filename || '—';
+    const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer
+                     || (rd._matched_supplier && rd._matched_supplier !== 'unknown' ? rd._matched_supplier : '');
     const label = doc.schema_name && doc.status !== 'no_template' ? doc.schema_name : '';
+    const hasLabel = !!label;
+    const pageNum = i + 1; // page number in the filtered PDF
     const isCurrent = i === leCurrentIndex;
     return `<div onclick="leGoToDoc(${i})" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin:2px 0;font-size:12px;
       background:${isCurrent ? 'rgba(0,229,160,0.1)' : 'transparent'};
       border-left:3px solid ${isCurrent ? 'var(--accent)' : 'transparent'};
       ${isCurrent ? 'color:var(--accent);font-weight:600;' : 'color:var(--text2);'}">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">#${doc.id}</span>
-        ${label ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,160,0.1);color:var(--accent);">${label}</span>` : ''}
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">σελ. ${pageNum}</span>
+        ${hasLabel ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,160,0.15);color:var(--accent);">✓ ${label}</span>` : '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(255,179,0,0.1);color:var(--warn);">Εκκρεμεί</span>'}
       </div>
-      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;">${fname}</div>
-      ${supplier ? `<div style="font-size:10px;color:var(--text3);margin-top:2px;">🏢 ${supplier}</div>` : ''}
+      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;margin-top:2px;font-weight:500;${!supplier ? 'color:var(--text3);font-style:italic;' : ''}">${supplier || 'Άγνωστος προμηθευτής'}</div>
     </div>`;
   }).join('');
 }
@@ -2000,14 +2001,18 @@ async function leSaveLabel() {
     // Assign label to current document
     const docId = leDocIds[leCurrentIndex];
     try {
-      await api('PATCH', `/api/documents/${docId}/assign-label`, { schema_name: labelName });
+      const assignRes = await api('PATCH', `/api/documents/${docId}/assign-label`, { schema_name: labelName });
       // Update local data
       const docObj = leDocsData.find(d => d.id === docId);
-      if (docObj) docObj.schema_name = labelName;
+      if (docObj) {
+        docObj.schema_name = labelName;
+        if (docObj.status === 'no_template') docObj.status = 'pending';
+      }
     } catch(e) { console.error('Failed to assign label to doc', e); }
 
-    // Refresh labels dropdown
+    // Refresh dropdowns (labels + docs to show ✓ indicator)
     await leLoadExistingLabels();
+    leRenderDocsDropdown();
 
     // Move to next doc (never auto-leave the page)
     if (leCurrentIndex < leDocIds.length - 1) {
