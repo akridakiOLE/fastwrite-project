@@ -582,8 +582,8 @@ select.form-input option{background:var(--bg2);}
         </div>
       </div>
       <div class="label-editor-container">
-        <div class="label-editor-img-wrap" id="le-img-wrap" style="user-select:text;-webkit-user-select:text;">
-          <img id="le-doc-image" src="" alt="Έγγραφο" style="max-width:90%;user-select:text;-webkit-user-select:text;pointer-events:auto;"/>
+        <div id="le-img-wrap" style="width:100%;height:100%;overflow:hidden;">
+          <iframe id="le-doc-pdf" src="" style="width:100%;height:100%;border:none;background:#fff;"></iframe>
         </div>
         <!-- Draggable Panel -->
         <div class="label-editor-panel" id="le-panel">
@@ -1663,7 +1663,6 @@ async function showActivityDetail(activityId) {
 let leDocIds = [];
 let leDocsData = []; // full doc objects for dropdown display
 let leCurrentIndex = 0;
-let leDragState = { active: false, startX: 0, startY: 0, origLeft: 0, origTop: 0 };
 
 function openLabelEditor() {
   const ids = getSelectedIds();
@@ -1683,8 +1682,8 @@ function openLabelEditor() {
 
 function closeLabelEditor() {
   // Clean up drag listeners
-  document.removeEventListener('mousemove', leDragMove);
-  document.removeEventListener('mouseup', leDragEnd);
+  if (leDragHandler) { document.removeEventListener('mousemove', leDragHandler); leDragHandler = null; }
+  if (leDragUpHandler) { document.removeEventListener('mouseup', leDragUpHandler); leDragUpHandler = null; }
   showPage('documents');
   loadDocuments();
 }
@@ -1700,8 +1699,15 @@ async function leLoadDoc(idx) {
   document.getElementById('le-next-btn').disabled = idx >= leDocIds.length - 1;
   document.getElementById('le-skip-btn').style.display = idx >= leDocIds.length - 1 ? 'none' : '';
 
-  // Load document image
-  document.getElementById('le-doc-image').src = `/api/documents/${id}/file`;
+  // Load original PDF (supports text selection/copy)
+  // Extract page number from doc data to open at correct page
+  const doc = leDocsData.find(d => d.id === id);
+  let pageNum = 1;
+  if (doc && doc.file_path) {
+    const m = doc.file_path.match(/page_(\d+)/);
+    if (m) pageNum = parseInt(m[1]);
+  }
+  document.getElementById('le-doc-pdf').src = `/api/documents/${id}/original-pdf#page=${pageNum}`;
 
   // Reset form
   leResetForm();
@@ -1970,17 +1976,9 @@ async function leSaveLabel() {
   }
 }
 
-// ── Draggable panel (scoped listeners) ──
-function leDragMove(e) {
-  if (!leDragState.active) return;
-  const panel = document.getElementById('le-panel');
-  panel.style.left = (leDragState.origLeft + e.clientX - leDragState.startX) + 'px';
-  panel.style.top  = (leDragState.origTop  + e.clientY - leDragState.startY) + 'px';
-}
-
-function leDragEnd() {
-  leDragState.active = false;
-}
+// ── Draggable panel (strict header-only) ──
+let leDragHandler = null;
+let leDragUpHandler = null;
 
 function leInitDrag() {
   const panel = document.getElementById('le-panel');
@@ -1991,22 +1989,41 @@ function leInitDrag() {
   panel.style.right = '40px';
   panel.style.left = '';
 
+  // Remove old listeners if any
+  if (leDragHandler) document.removeEventListener('mousemove', leDragHandler);
+  if (leDragUpHandler) document.removeEventListener('mouseup', leDragUpHandler);
+
   header.onmousedown = function(e) {
+    // Only start drag if click is directly on the header bar, not on buttons/children
     if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
-    leDragState.active = true;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
     const rect = panel.getBoundingClientRect();
-    leDragState.startX = e.clientX;
-    leDragState.startY = e.clientY;
-    leDragState.origLeft = rect.left;
-    leDragState.origTop  = rect.top;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origLeft = rect.left;
+    const origTop  = rect.top;
+
     panel.style.right = '';
-    panel.style.left = leDragState.origLeft + 'px';
-    panel.style.top  = leDragState.origTop + 'px';
+    panel.style.left = origLeft + 'px';
+    panel.style.top  = origTop + 'px';
+
+    leDragHandler = function(ev) {
+      panel.style.left = (origLeft + ev.clientX - startX) + 'px';
+      panel.style.top  = (origTop  + ev.clientY - startY) + 'px';
+    };
+
+    leDragUpHandler = function() {
+      document.removeEventListener('mousemove', leDragHandler);
+      document.removeEventListener('mouseup', leDragUpHandler);
+      leDragHandler = null;
+      leDragUpHandler = null;
+    };
+
+    document.addEventListener('mousemove', leDragHandler);
+    document.addEventListener('mouseup', leDragUpHandler);
     e.preventDefault();
   };
-
-  document.addEventListener('mousemove', leDragMove);
-  document.addEventListener('mouseup', leDragEnd);
 }
 
 // ── Templates ────────────────────────────────────────────────────────────────
