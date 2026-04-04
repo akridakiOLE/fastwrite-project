@@ -846,6 +846,98 @@ def extract_document(doc_id):
         db.update_document_status(doc_id, status="Failed")
         return jsonify({"success": False, "error": result.error_message}), 500
 
+@app.post("/api/batch/extract-selected")
+@require_auth
+def batch_extract_selected():
+    """
+    Batch extraction για επιλεγμένα documents.
+    Αγνοεί docs που ήδη είναι Completed/pending_review.
+    Εξάγει δεδομένα μόνο για docs με schema_name (ετικέτα).
+    """
+    data = request.get_json(force=True) or {}
+    doc_ids = data.get("doc_ids", [])
+    if not doc_ids:
+        return jsonify({"error": "Δεν δόθηκαν doc_ids."}), 400
+
+    api_key = key_mgr.get_key("gemini")
+    if not api_key:
+        return jsonify({"error": "Gemini API key δεν βρέθηκε."}), 500
+
+    from ai_extractor import AIExtractor
+
+    results = {"total": len(doc_ids), "extracted": 0, "skipped_completed": 0,
+               "skipped_no_label": 0, "failed": 0, "details": []}
+
+    for doc_id in doc_ids:
+        doc = db.get_document(doc_id)
+        if not doc:
+            results["failed"] += 1
+            results["details"].append({"doc_id": doc_id, "status": "not_found"})
+            continue
+
+        # Skip already completed
+        if doc.get("status") in ("Completed", "pending_review", "completed"):
+            results["skipped_completed"] += 1
+            results["details"].append({"doc_id": doc_id, "status": "already_completed"})
+            continue
+
+        # Skip if no label assigned
+        sname = doc.get("schema_name", "").strip()
+        if not sname:
+            results["skipped_no_label"] += 1
+            results["details"].append({"doc_id": doc_id, "status": "no_label"})
+            continue
+
+        template = db.get_template(sname)
+        if not template:
+            results["skipped_no_label"] += 1
+            results["details"].append({"doc_id": doc_id, "status": "label_not_found"})
+            continue
+
+        try:
+            schema = schema_bld.build_from_list(template["fields"])
+            schema.pop("additionalProperties", None)
+
+            file_path = Path(doc["file_path"])
+            processed_result = processor.process(file_path)
+            if not processed_result.is_ok():
+                results["failed"] += 1
+                results["details"].append({"doc_id": doc_id, "status": "process_error"})
+                continue
+
+            extractor = AIExtractor(api_key=api_key)
+            result = extractor.extract(image_paths=processed_result.pages, schema=schema)
+
+            if result.is_ok():
+                extracted = result.extracted_data
+                # Preserve supplier info
+                rd = {}
+                try:
+                    rd = json.loads(doc.get("result_json") or "{}")
+                except:
+                    pass
+                if rd.get("_matched_supplier"):
+                    extracted.setdefault("_matched_supplier", rd["_matched_supplier"])
+                extracted.setdefault("_matched_template", sname)
+
+                require_review = template.get("require_review", True)
+                final_status = "pending_review" if require_review else "Completed"
+                db.update_document_status(doc_id, status=final_status,
+                                          result_json=json.dumps(extracted))
+                results["extracted"] += 1
+                results["details"].append({"doc_id": doc_id, "status": final_status})
+            else:
+                db.update_document_status(doc_id, status="Failed")
+                results["failed"] += 1
+                results["details"].append({"doc_id": doc_id, "status": "extraction_failed"})
+        except Exception as e:
+            logger.error("extract-selected doc %d error: %s", doc_id, e)
+            results["failed"] += 1
+            results["details"].append({"doc_id": doc_id, "status": "error", "error": str(e)})
+
+    return jsonify({"success": True, **results})
+
+
 # ── Batch Endpoints ───────────────────────────────────────────────────────────
 from batch_processor import BatchProcessor
 

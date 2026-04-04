@@ -380,7 +380,7 @@ select.form-input option{background:var(--bg2);}
           <span id="doc-count" style="font-size:12px;color:var(--text2);margin-right:8px;"></span>
           <span id="doc-selected-count" style="font-size:12px;color:var(--accent);display:none;font-weight:500;margin-right:8px;"></span>
           <button class="btn btn-primary btn-sm" onclick="openLabelEditor()" style="font-weight:600;">🏷 Ετικέτες</button>
-          <button class="btn btn-secondary btn-sm" onclick="openBatchFromDocs()" style="border-color:rgba(0,102,255,0.4);color:var(--accent2);font-weight:600;" disabled title="Σύντομα διαθέσιμο">⚡ Batch</button>
+          <button class="btn btn-secondary btn-sm" onclick="openBatchFromDocs()" style="border-color:rgba(0,102,255,0.4);color:var(--accent2);font-weight:600;">⚡ Batch</button>
           <button class="btn btn-secondary btn-sm" onclick="exportDocs('csv')">↓ CSV</button>
           <button class="btn btn-secondary btn-sm" onclick="exportDocs('xlsx')">↓ XLSX</button>
           <button class="btn btn-secondary btn-sm" onclick="exportLineItems()" style="border-color:rgba(0,229,160,0.3);color:var(--accent)">↓ Line Items XLSX</button>
@@ -1781,8 +1781,102 @@ function closeLabelEditor() {
   loadDocuments();
 }
 
-function openBatchFromDocs() {
-  toast('Σύντομα διαθέσιμο', 'info');
+async function openBatchFromDocs() {
+  const ids = getSelectedIds();
+  if (!ids.length) { toast('Επιλέξτε έγγραφα πρώτα', 'error'); return; }
+
+  // Ανάλυση επιλεγμένων εγγράφων
+  const selectedDocs = allDocs.filter(d => ids.includes(d.id));
+  const completed = selectedDocs.filter(d => d.status === 'Completed' || d.status === 'pending_review' || d.status === 'completed');
+  const noLabel = selectedDocs.filter(d => !d.schema_name && d.status !== 'Completed' && d.status !== 'pending_review' && d.status !== 'completed');
+  const toExtract = selectedDocs.filter(d => d.schema_name && d.status !== 'Completed' && d.status !== 'pending_review' && d.status !== 'completed');
+
+  // Εμφάνιση confirmation modal
+  const modal = document.getElementById('precheck-modal');
+  const title = document.getElementById('precheck-modal-title');
+  const body  = document.getElementById('precheck-modal-body');
+
+  title.textContent = 'Εξαγωγή Δεδομένων (Batch)';
+
+  if (toExtract.length === 0) {
+    let reason = '';
+    if (completed.length > 0 && noLabel.length === 0) reason = 'Όλα τα επιλεγμένα έγγραφα έχουν ήδη ολοκληρωθεί.';
+    else if (noLabel.length > 0 && completed.length === 0) reason = 'Τα επιλεγμένα έγγραφα δεν έχουν ετικέτα. Δημιουργήστε πρώτα ετικέτες.';
+    else reason = 'Δεν υπάρχουν έγγραφα για εξαγωγή. Ελέγξτε ότι έχουν ετικέτα και δεν έχουν ήδη ολοκληρωθεί.';
+    body.innerHTML = `<div style="padding:20px;text-align:center;">
+      <div style="font-size:14px;color:var(--warn);margin-bottom:16px;">${reason}</div>
+      ${completed.length > 0 ? `<div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Ολοκληρωμένα: ${completed.length}</div>` : ''}
+      ${noLabel.length > 0 ? `<div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Χωρίς ετικέτα: ${noLabel.length}</div>` : ''}
+      <button class="btn btn-primary btn-sm" style="padding:8px 24px;" onclick="closeModal('precheck-modal')">Εντάξει</button>
+    </div>`;
+    modal.classList.add('open');
+    return;
+  }
+
+  let summaryHtml = `<div style="padding:20px;">`;
+  summaryHtml += `<div style="font-size:14px;color:var(--text);margin-bottom:16px;text-align:center;">`;
+  summaryHtml += `<span style="font-size:24px;font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);">${toExtract.length}</span> έγγραφα θα εξαχθούν`;
+  summaryHtml += `</div>`;
+  if (completed.length > 0) summaryHtml += `<div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:4px;">Αγνοούνται: ${completed.length} (ήδη ολοκληρωμένα)</div>`;
+  if (noLabel.length > 0) summaryHtml += `<div style="font-size:12px;color:var(--warn);text-align:center;margin-bottom:4px;">Χωρίς ετικέτα: ${noLabel.length} (παραλείπονται)</div>`;
+  summaryHtml += `<div style="display:flex;justify-content:center;gap:8px;margin-top:20px;">`;
+  summaryHtml += `<button class="btn btn-secondary btn-sm" style="padding:8px 20px;" onclick="closeModal('precheck-modal')">Ακύρωση</button>`;
+  summaryHtml += `<button class="btn btn-primary btn-sm" style="padding:8px 20px;" onclick="executeBatchFromDocs()">Εξαγωγή</button>`;
+  summaryHtml += `</div></div>`;
+
+  body.innerHTML = summaryHtml;
+  modal.classList.add('open');
+}
+
+async function executeBatchFromDocs() {
+  const ids = getSelectedIds();
+  const modal = document.getElementById('precheck-modal');
+  const title = document.getElementById('precheck-modal-title');
+  const body  = document.getElementById('precheck-modal-body');
+
+  title.textContent = 'Εξαγωγή σε εξέλιξη...';
+  body.innerHTML = `<div style="text-align:center;padding:30px;">
+    <span class="spinner" style="display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;"></span>
+    <div style="margin-top:12px;color:var(--text2);font-size:13px;">Εξαγωγή δεδομένων...</div>
+  </div>`;
+
+  try {
+    const res = await api('POST', '/api/batch/extract-selected', { doc_ids: ids });
+
+    if (!res.success) {
+      body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">${res.error || 'Σφάλμα'}</div>
+        <div style="text-align:center;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="closeModal('precheck-modal')">Κλείσιμο</button></div>`;
+      return;
+    }
+
+    title.textContent = 'Ολοκλήρωση Batch';
+    const total = res.total || 0;
+    const extracted = res.extracted || 0;
+    const pct = total > 0 ? ((extracted / total) * 100).toFixed(1) : 0;
+
+    let detailParts = [];
+    if (res.skipped_completed > 0) detailParts.push('Ήδη ολοκληρωμένα: ' + res.skipped_completed);
+    if (res.skipped_no_label > 0) detailParts.push('Χωρίς ετικέτα: ' + res.skipped_no_label);
+    if (res.failed > 0) detailParts.push('Αποτυχίες: ' + res.failed);
+
+    let html = '<div style="padding:20px;text-align:center;">';
+    html += `<div style="font-size:36px;font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);margin-bottom:8px;">${extracted}/${total}</div>`;
+    html += `<div style="font-size:16px;color:var(--text);margin-bottom:4px;">${pct}%</div>`;
+    if (detailParts.length) html += `<div style="font-size:12px;color:var(--text2);margin-bottom:16px;">${detailParts.join(' | ')}</div>`;
+    html += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:20px;">';
+    html += 'Η εξαγωγή δεδομένων ολοκληρώθηκε.';
+    html += '</div>';
+    html += '<button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="closeModal(\'precheck-modal\');loadDocuments();">OK</button>';
+    html += '</div>';
+
+    body.innerHTML = html;
+
+    // Refresh documents table
+    await loadDocuments();
+  } catch(e) {
+    body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">Σφάλμα: ${e.message || e}</div>
+      <div style="text-align:center;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="closeModal('precheck-modal')">Κλείσιμο</button></div>`;
+  }
 }
 
 async function leLoadDoc(idx) {
