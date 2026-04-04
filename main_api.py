@@ -634,6 +634,14 @@ def serve_filtered_pdf():
     if not docs_order:
         return jsonify({"error": "Δεν βρέθηκαν σελίδες."}), 404
 
+    # Deduplicate: keep order but skip repeated (pdf_path, page_num) pairs
+    seen = set()
+    unique_order = []
+    for item in docs_order:
+        if item not in seen:
+            seen.add(item)
+            unique_order.append(item)
+
     try:
         try:
             from pypdf import PdfReader, PdfWriter
@@ -642,7 +650,7 @@ def serve_filtered_pdf():
 
         writer = PdfWriter()
         readers_cache = {}
-        for pdf_path, page_num in docs_order:
+        for pdf_path, page_num in unique_order:
             if pdf_path not in readers_cache:
                 readers_cache[pdf_path] = PdfReader(pdf_path)
             reader = readers_cache[pdf_path]
@@ -653,11 +661,11 @@ def serve_filtered_pdf():
         writer.write(buf)
         buf.seek(0)
         return send_file(buf, mimetype="application/pdf", download_name="selected_pages.pdf")
+    except ImportError:
+        logging.error("filtered-pdf: pypdf/PyPDF2 NOT installed — install with: pip install pypdf")
+        return jsonify({"error": "Απαιτείται εγκατάσταση pypdf στον server: pip install pypdf"}), 500
     except Exception as e:
         logging.error("filtered-pdf error: %s", e)
-        # Fallback: serve original PDF of first document
-        if docs_order:
-            return send_file(docs_order[0][0], mimetype="application/pdf")
         return jsonify({"error": str(e)}), 500
 
 @app.get("/api/documents/<int:doc_id>/line-positions")

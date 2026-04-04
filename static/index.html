@@ -1489,7 +1489,32 @@ function showCompletionMessage() {
 }
 
 async function showBatchCompletionModal(st) {
-  showCompletionMessage();
+  const modal = document.getElementById('precheck-modal');
+  const title = document.getElementById('precheck-modal-title');
+  const body  = document.getElementById('precheck-modal-body');
+
+  title.textContent = 'Ολοκλήρωση Batch';
+
+  const total = st.total_invoices || 0;
+  const processed = st.processed || 0;
+  const failed = st.failed || 0;
+  const successful = processed - failed;
+  const pct = total > 0 ? ((successful / total) * 100).toFixed(1) : 0;
+  const pages = st.total_pages || 0;
+
+  let html = '<div style="padding:20px;text-align:center;">';
+  html += `<div style="font-size:36px;font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);margin-bottom:8px;">${successful}/${total}</div>`;
+  html += `<div style="font-size:16px;color:var(--text);margin-bottom:4px;">${pct}%</div>`;
+  html += `<div style="font-size:12px;color:var(--text2);margin-bottom:16px;">Σελίδες: ${pages}${failed > 0 ? ' | Αποτυχίες: ' + failed : ''}</div>`;
+  html += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:20px;">';
+  html += 'Αν θέλετε να συνεχίσετε την διαδικασία παρακαλώ μετακινηθείτε στην σελίδα <b style="color:var(--accent);">Έγγραφα</b>';
+  html += '</div>';
+  html += '<button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="closeModal(\'precheck-modal\')">OK</button>';
+  html += '</div>';
+
+  body.innerHTML = html;
+  modal.classList.add('open');
+  batchPreCheckData = null;
 }
 
 // ── Batch Jobs Page ──────────────────────────────────────────────────────────
@@ -1977,14 +2002,19 @@ async function leSaveLabel() {
     // Refresh labels dropdown
     await leLoadExistingLabels();
 
-    // Move to next or close
+    // Move to next doc (never auto-leave the page)
     if (leCurrentIndex < leDocIds.length - 1) {
       leCurrentIndex++;
       leLoadDoc(leCurrentIndex);
     } else {
-      toast('Ολοκληρώθηκε! Όλα τα έγγραφα επεξεργάστηκαν.', 'success');
-      closeLabelEditor();
+      // Last doc — just reset form, user leaves manually via Πίσω button
+      toast('Αποθηκεύτηκε! Μπορείτε να συνεχίσετε ή να πατήσετε Πίσω.', 'success');
     }
+    // Reset form fields for next label
+    document.getElementById('le-label-name').value = '';
+    document.getElementById('le-supplier').value = '';
+    document.getElementById('le-fields').value = '';
+    document.getElementById('le-lineitems-fields').value = '';
   } catch(e) {
     toast('Σφάλμα αποθήκευσης: ' + (e.message || e), 'error');
   }
