@@ -327,6 +327,9 @@ class BatchProcessor:
                                 result_json=json.dumps({"_skipped": True,
                                     "_reason": "Template δεν βρέθηκε στη βάση",
                                     "_matched_supplier": detected_supplier or "unknown"}))
+                            # Clear schema_name so batch won't try to extract later
+                            self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
+                            self.db.conn.commit()
                             return {"success": True, "doc_id": doc_id,
                                     "matched_template": None, "skipped": True}
                     else:
@@ -336,6 +339,9 @@ class BatchProcessor:
                             result_json=json.dumps({"_skipped": True,
                                 "_reason": "Δεν βρέθηκε template για αυτό το τιμολόγιο",
                                 "_matched_supplier": detected_supplier or "unknown"}))
+                        # Clear schema_name so batch won't try to extract later
+                        self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
+                        self.db.conn.commit()
                         return {"success": True, "doc_id": doc_id,
                                 "matched_template": None, "skipped": True}
                 else:
@@ -346,6 +352,9 @@ class BatchProcessor:
                             result_json=json.dumps({"_skipped": True,
                                 "_reason": "Δεν υπάρχει ετικέτα",
                                 "_matched_supplier": "unknown"}))
+                        # Clear schema_name so batch won't try to extract later
+                        self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
+                        self.db.conn.commit()
                         return {"success": True, "doc_id": doc_id,
                                 "matched_template": None, "skipped": True}
                     seg_schema          = default_schema
@@ -512,10 +521,12 @@ class BatchProcessor:
                 job.errors.append(
                     f"Invoice {idx+1} ({filename}): παραλείφθηκε (ήδη {skip_match.get('status', 'Completed')}).")
             else:
+                # Don't store placeholder schema names like __auto__
+                initial_schema = schema_name if schema_name and schema_name != '__auto__' else None
                 doc_id = self.db.insert_document(
                     filename=filename,
                     file_path=str(segment.pages[0]),
-                    schema_name=schema_name,
+                    schema_name=initial_schema,
                     original_filename=original_filename or filename)
                 doc_id_map[idx] = doc_id
 
