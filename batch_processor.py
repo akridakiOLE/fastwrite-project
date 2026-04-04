@@ -295,12 +295,15 @@ class BatchProcessor:
               f"skip_completed={skip_completed}, auto_match={auto_match}, "
               f"segments={len(segments)}", flush=True)
 
-        default_template = self.db.get_template(schema_name)
-        if not default_template:
+        default_template = self.db.get_template(schema_name) if schema_name else None
+        if not default_template and not auto_match:
             self._fail_job(job, f"Template '{schema_name}' δεν βρέθηκε.")
             return
-        default_schema = self.schema_bld.build_from_list(default_template["fields"])
-        default_schema.pop("additionalProperties", None)
+        if default_template:
+            default_schema = self.schema_bld.build_from_list(default_template["fields"])
+            default_schema.pop("additionalProperties", None)
+        else:
+            default_schema = None
 
         def extract_one(idx, segment, doc_id):
             try:
@@ -336,6 +339,15 @@ class BatchProcessor:
                         return {"success": True, "doc_id": doc_id,
                                 "matched_template": None, "skipped": True}
                 else:
+                    if not default_schema or not default_template:
+                        # No template available and auto_match didn't find one
+                        self.db.update_document_status(
+                            doc_id, status="no_template",
+                            result_json=json.dumps({"_skipped": True,
+                                "_reason": "Δεν υπάρχει ετικέτα",
+                                "_matched_supplier": "unknown"}))
+                        return {"success": True, "doc_id": doc_id,
+                                "matched_template": None, "skipped": True}
                     seg_schema          = default_schema
                     used_schema_name    = schema_name
                     used_require_review = default_template.get("require_review", True)

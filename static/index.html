@@ -346,30 +346,17 @@ select.form-input option{background:var(--bg2);}
                 <button onclick="clearFile('batch')" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:11px;">✕</button>
               </div>
             </div>
-            <div class="form-group" style="margin-top:6px;">
+            <div class="form-group" style="margin-top:6px;display:none;">
               <label class="form-label" id="batch-schema-label" style="font-size:10px;">Template</label>
               <select class="form-input" id="batch-schema" style="font-size:11px;padding:5px 8px;"></select>
               <div id="batch-schema-hint" style="font-size:9px;color:var(--text2);margin-top:3px;display:none;">
                 ℹ Χρησιμοποιείται μόνο αν το Auto Match δεν βρει ετικέτα
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:6px;margin-top:4px;">
-              <input type="checkbox" id="batch-auto-match" style="width:14px;height:14px;accent-color:var(--accent2);cursor:pointer" onchange="onAutoMatchChange()"/>
-              <div>
-                <div style="font-size:11px;color:var(--text);font-weight:500;">🔍 Auto Template Matching</div>
-                <div style="font-size:9px;color:var(--text2);margin-top:1px;">Αυτόματη επιλογή ετικέτας ανά τιμολόγιο</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;margin-top:8px;">
-              <button class="btn btn-secondary" style="flex:1;padding:10px 8px;font-size:13px;" id="batch-preview-btn" onclick="handlePreCheckClick()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                Επεξεργασία & Δημιουργία Ετικέτας
-              </button>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <button class="btn btn-primary" style="flex:1;padding:10px 8px;font-size:13px;" onclick="handleBatchClick()" id="batch-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Έναρξη Batch
+            <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+              <button class="btn btn-primary" style="flex:1;padding:12px 8px;font-size:13px;font-weight:600;" onclick="handleRegisterClick()" id="batch-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                Καταγραφή Εγγράφων
               </button>
             </div>
             <div id="batch-progress" style="margin-top:16px;display:none;">
@@ -553,7 +540,7 @@ select.form-input option{background:var(--bg2);}
       <div class="topbar" style="padding:8px 16px;">
         <div style="display:flex;align-items:center;gap:12px;">
           <button class="btn btn-secondary btn-sm" onclick="closeLabelEditor()">← Πίσω</button>
-          <div class="page-title" style="font-size:15px;">Επεξεργασία & Δημιουργία Ετικέτας</div>
+          <div class="page-title" style="font-size:15px;">Καταγραφή Εγγράφων</div>
         </div>
         <div class="topbar-actions" style="gap:6px;">
           <!-- Dropdown 1: Επιλεγμένα Έγγραφα -->
@@ -1268,14 +1255,38 @@ async function findDocsForActivity(data) {
   return [];
 }
 
-// Click handler for "Επεξεργασία & Δημιουργία Ετικέτας" button
-async function handlePreCheckClick() {
-  doPreCheck('batch');
-}
+// Click handler for "Καταγραφή Εγγράφων" button
+async function handleRegisterClick() {
+  const inp = document.getElementById('batch-file');
+  if (!inp.files.length) { toast('Επίλεξε PDF πρώτα','error'); return; }
 
-// Click handler for "Έναρξη Batch" button
-async function handleBatchClick() {
-  doBatchUpload();
+  const btn = document.getElementById('batch-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Καταγραφή σε εξέλιξη...';
+
+  // Use first available template as fallback, or '__auto__' if none exist
+  const schemaSelect = document.getElementById('batch-schema');
+  let schema = '';
+  if (schemaSelect) {
+    for (let opt of schemaSelect.options) {
+      if (opt.value && opt.value !== '__none__') { schema = opt.value; break; }
+    }
+  }
+
+  const fd = new FormData();
+  fd.append('file', inp.files[0]);
+  fd.append('schema_name', schema || '__auto__');
+  fd.append('auto_match', 'true');
+
+  const res = await api('POST', '/api/batch', fd, true);
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Καταγραφή Εγγράφων';
+
+  if (!res.success) { toast(res.error || 'Σφάλμα', 'error'); return; }
+  toast('Καταγραφή ξεκίνησε!', 'success');
+  lastBatchJobId = res.job_id;
+  pollBatchJob(res.job_id, true);  // true = registration mode
+  document.getElementById('batch-progress').style.display = 'block';
 }
 
 async function doSingleExtract() {
@@ -1285,7 +1296,7 @@ async function doSingleExtract() {
     const body  = document.getElementById('precheck-modal-body');
     const title = document.getElementById('precheck-modal-title');
     title.textContent = 'Απαιτείται Έλεγχος';
-    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία Ετικέτας</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
+    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Ακολουθήστε πρώτα την διαδικασία <b>Καταγραφή Εγγράφων</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
     modal.classList.add('open');
     return;
   }
@@ -1295,7 +1306,7 @@ async function doSingleExtract() {
     const body  = document.getElementById('precheck-modal-body');
     const title = document.getElementById('precheck-modal-title');
     title.textContent = 'Απαιτείται Δημιουργία Template';
-    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Δεν βρέθηκε template για τον προμηθευτή αυτού του τιμολογίου.<br>Ακολουθήστε πρώτα την διαδικασία <b>Επεξεργασία & Δημιουργία Ετικέτας</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
+    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Δεν βρέθηκε template για τον προμηθευτή αυτού του τιμολογίου.<br>Ακολουθήστε πρώτα την διαδικασία <b>Καταγραφή Εγγράφων</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
     modal.classList.add('open');
     return;
   }
@@ -1400,7 +1411,7 @@ async function doBatchUpload() {
   document.getElementById('batch-progress').style.display='block';
 }
 
-function pollBatchJob(job_id) {
+function pollBatchJob(job_id, registrationMode) {
   // Animated pulse κατά την επεξεργασία
   const fill = document.getElementById('batch-fill');
   if (fill) fill.style.transition = 'width 0.5s ease';
@@ -1458,10 +1469,15 @@ function pollBatchJob(job_id) {
       if (batchDoneHandled) return;  // Διπλός έλεγχος μετά το clearInterval
       batchDoneHandled = true;
       if (st.status === 'completed') {
-        toast(`✓ Batch ολοκληρώθηκε: ${st.processed} έγγραφα`, 'success');
-        showBatchCompletionModal(st);
+        if (registrationMode) {
+          toast(`✓ Καταγραφή ολοκληρώθηκε: ${st.total_invoices} έγγραφα`, 'success');
+          showRegistrationCompletionModal(st);
+        } else {
+          toast(`✓ Batch ολοκληρώθηκε: ${st.processed} έγγραφα`, 'success');
+          showBatchCompletionModal(st);
+        }
       } else {
-        toast('✕ Batch απέτυχε', 'error');
+        toast('✕ Η διαδικασία απέτυχε', 'error');
       }
     }
   }, 1500);
@@ -1486,6 +1502,30 @@ function showCompletionMessage() {
 
   // Καθαρισμός pre-check data
   batchPreCheckData = null;
+}
+
+function showRegistrationCompletionModal(st) {
+  const modal = document.getElementById('precheck-modal');
+  const title = document.getElementById('precheck-modal-title');
+  const body  = document.getElementById('precheck-modal-body');
+
+  title.textContent = 'Καταγραφή Εγγράφων';
+
+  const total = st.total_invoices || 0;
+  const pages = st.total_pages || 0;
+
+  let html = '<div style="padding:20px;text-align:center;">';
+  html += `<div style="font-size:36px;font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);margin-bottom:8px;">${total}</div>`;
+  html += `<div style="font-size:14px;color:var(--text2);margin-bottom:4px;">έγγραφα καταγράφηκαν</div>`;
+  html += `<div style="font-size:12px;color:var(--text3);margin-bottom:20px;">Σελίδες: ${pages}</div>`;
+  html += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:20px;">';
+  html += 'Ολοκληρώθηκε η καταγραφή των εγγράφων.<br>Παρακαλώ μετακινηθείτε στην σελίδα <b style="color:var(--accent);">Έγγραφα</b> για να ολοκληρώσετε τη διαδικασία.';
+  html += '</div>';
+  html += '<button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="closeModal(\'precheck-modal\')">OK</button>';
+  html += '</div>';
+
+  body.innerHTML = html;
+  modal.classList.add('open');
 }
 
 async function showBatchCompletionModal(st) {
@@ -1573,7 +1613,7 @@ function renderActivityList(items) {
     const num = allActivityItems.length - allActivityItems.indexOf(a);
     const date = formatLocalDate(a.created_at);
     const icon = a.action === 'pre-check' ? '🔍' : '▶';
-    const label = a.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Ετικέτας' : 'Έναρξη Batch';
+    const label = a.action === 'pre-check' ? 'Καταγραφή Εγγράφων' : 'Έναρξη Batch';
     const color = a.action === 'pre-check' ? 'var(--accent2)' : 'var(--accent)';
     const isSelected = selectedActivityId === a.id;
     return `<div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;${isSelected ? 'background:rgba(0,229,160,0.06);' : ''}">
@@ -1638,7 +1678,7 @@ async function showActivityDetail(activityId) {
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  const label = res.action === 'pre-check' ? 'Επεξεργασία & Δημιουργία Ετικέτας' : 'Έναρξη Batch';
+  const label = res.action === 'pre-check' ? 'Καταγραφή Εγγράφων' : 'Έναρξη Batch';
   const date  = formatLocalDate(res.updated_at || res.created_at);
 
   title.textContent = 'Αποτελέσματα — ' + label;
