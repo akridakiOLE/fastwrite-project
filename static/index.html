@@ -377,10 +377,10 @@ select.form-input option{background:var(--bg2);}
       <div class="topbar">
         <div class="page-title">Έγγραφα</div>
         <div class="topbar-actions">
-          <span id="doc-count" style="font-size:12px;color:var(--text2);margin-right:8px;"></span>
           <span id="doc-selected-count" style="font-size:12px;color:var(--accent);display:none;font-weight:500;margin-right:8px;"></span>
           <button class="btn btn-primary btn-sm" onclick="openLabelEditor()" style="font-weight:600;">🏷 Ετικέτες</button>
           <button class="btn btn-secondary btn-sm" onclick="openBatchFromDocs()" style="border-color:rgba(0,102,255,0.4);color:var(--accent2);font-weight:600;">⚡ Batch</button>
+          <button class="btn btn-primary btn-sm" onclick="openApprovalFromDocs()" style="background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.4);font-weight:600;">✓ Έγκριση</button>
           <button class="btn btn-secondary btn-sm" onclick="exportDocs('csv')">↓ CSV</button>
           <button class="btn btn-secondary btn-sm" onclick="exportDocs('xlsx')">↓ XLSX</button>
           <button class="btn btn-secondary btn-sm" onclick="exportLineItems()" style="border-color:rgba(0,229,160,0.3);color:var(--accent)">↓ Line Items XLSX</button>
@@ -606,6 +606,71 @@ select.form-input option{background:var(--bg2);}
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- APPROVAL PAGE -->
+    <div id="page-approval" class="page" style="display:none">
+      <div class="topbar" style="padding:8px 16px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="btn btn-secondary btn-sm" onclick="closeApprovalPage()">← Πίσω</button>
+          <div class="page-title" style="font-size:15px;">Έγκριση Εγγράφων</div>
+        </div>
+        <div class="topbar-actions" style="gap:6px;">
+          <!-- Document dropdown -->
+          <div style="position:relative;" id="ap-docs-dd-wrap">
+            <button class="btn btn-secondary btn-sm" onclick="apToggleDocsDD(event)" style="font-size:11px;">
+              📄 Έγγραφα <span id="ap-doc-counter" style="color:var(--accent);">1/1</span> ▼
+            </button>
+            <div id="ap-docs-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:320px;max-height:340px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
+              <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;">ΕΓΓΡΑΦΑ ΠΡΟΣ ΕΓΚΡΙΣΗ</div>
+              <div id="ap-docs-list"></div>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="apPrevDoc()" id="ap-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
+          <button class="btn btn-secondary btn-sm" onclick="apNextDoc()" id="ap-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
+        </div>
+      </div>
+      <div style="display:flex;width:100%;height:calc(100vh - 52px);overflow:hidden;background:var(--bg);position:relative;">
+        <!-- Toggle sidebar button -->
+        <button id="ap-sidebar-toggle" onclick="apToggleSidebar()" style="position:absolute;left:220px;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:left .3s ease;" title="Εμφάνιση/Απόκρυψη μενού">◀</button>
+        <!-- PDF Area -->
+        <div id="ap-pdf-area" style="flex:1;height:100%;overflow:hidden;min-width:0;position:relative;">
+          <div id="ap-img-wrap" style="width:100%;height:100%;overflow:auto;position:relative;cursor:crosshair;">
+            <img id="ap-doc-img" src="" style="display:block;width:100%;user-select:none;" onload="apOnImgLoad()"/>
+            <canvas id="ap-hl-canvas" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
+          </div>
+        </div>
+        <!-- Data Panel (right side) -->
+        <div id="ap-panel" style="width:440px;min-width:440px;height:100%;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;">
+          <!-- Scalar fields -->
+          <div style="flex-shrink:0;border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);cursor:pointer;user-select:none;" onclick="apToggleScalars()">
+              <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;">Γενικά Στοιχεία</span>
+              <span style="font-size:10px;color:var(--accent);" id="ap-toggle-icon">▲ Απόκρυψη</span>
+            </div>
+            <div id="ap-scalar-fields" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px;"></div>
+          </div>
+          <!-- Line items table -->
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
+            <div style="padding:6px 14px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;">
+              <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;flex:1;" id="ap-li-title">LINE ITEMS</span>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:2px 9px;font-size:13px;cursor:pointer;" onclick="apNavRow(-1)">↑</button>
+                <button style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:2px 9px;font-size:13px;cursor:pointer;" onclick="apNavRow(1)">↓</button>
+                <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);min-width:80px;" id="ap-li-nav-label">—</span>
+              </div>
+            </div>
+            <div style="flex:1;overflow:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;" id="ap-li-table">
+                <thead id="ap-li-thead"><tr></tr></thead>
+                <tbody id="ap-li-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- Approve bar -->
+          <div id="ap-approve-bar" style="flex-shrink:0;padding:10px 14px;border-top:1px solid rgba(0,229,160,0.3);background:rgba(0,229,160,0.08);"></div>
         </div>
       </div>
     </div>
@@ -964,8 +1029,7 @@ function filterDocs() {
 
 function renderDocs(docs) {
   const tbody = document.getElementById('docs-table');
-  const countEl = document.getElementById('doc-count');
-  if (countEl) countEl.textContent = docs.length + ' εγγραφές';
+  // doc-count removed from UI
 
   if (!docs.length) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:40px">Δεν βρέθηκαν έγγραφα</td></tr>';
@@ -1224,6 +1288,17 @@ function clearFile(type) {
   preCheckDone[type] = false;
   preCheckResult[type] = null;
   uploadedDocIds[type] = null;
+  // Clear progress bar & stats
+  const prog = document.getElementById(type+'-progress');
+  if (prog) { prog.style.display='none'; }
+  const fill = document.getElementById(type+'-fill');
+  if (fill) { fill.style.width='0%'; fill.classList.remove('active'); }
+  const pct = document.getElementById(type+'-pct');
+  if (pct) pct.textContent = '0%';
+  const statusText = document.getElementById(type+'-status-text');
+  if (statusText) statusText.textContent = '';
+  const detail = document.getElementById(type+'-detail');
+  if (detail) detail.textContent = '';
 }
 
 // History selection removed — simplified UI
@@ -1894,6 +1969,385 @@ async function executeBatchFromDocs() {
   }
 }
 
+// ── Approval Page ────────────────────────────────────────────────────────────
+let apDocIds = [];
+let apDocData = {};   // { id: {doc, result_data, linePositions} }
+let apCurrentIdx = 0;
+let apCurRow = -1;
+let apCurArrKey = null;
+let apNumRows = 0;
+let apDirty = false;
+let apSidebarVisible = true;
+let apLineData = {};
+
+function openApprovalFromDocs() {
+  const ids = getSelectedIds();
+  if (!ids.length) { toast('Επιλέξτε έγγραφα πρώτα', 'error'); return; }
+
+  const selectedDocs = allDocs.filter(d => ids.includes(d.id));
+
+  // Check: all must have Batch = Ολοκληρώθηκε (real extracted data)
+  const metaKeys = new Set(['_matched_supplier','_matched_template','_skipped','_reason','_confidence_pct']);
+  const notReady = selectedDocs.filter(d => {
+    const rd = d.result_data || {};
+    const hasData = Object.keys(rd).some(k => !metaKeys.has(k));
+    return !hasData;
+  });
+
+  if (notReady.length > 0) {
+    toast(`${notReady.length} έγγραφα δεν έχουν ολοκληρώσει Batch. Εκτελέστε πρώτα Batch.`, 'error');
+    return;
+  }
+
+  // Already approved docs — skip them
+  const alreadyApproved = selectedDocs.filter(d => d.status === 'approved' || d.status === 'Approved');
+
+  apDocIds = selectedDocs.map(d => d.id);
+  apDocData = {};
+  selectedDocs.forEach(d => {
+    const rd = d.result_data || {};
+    apDocData[d.id] = { doc: d, result_data: rd, linePositions: [] };
+  });
+
+  // Show approval page
+  document.querySelectorAll('.page').forEach(p => p.style.display='none');
+  document.getElementById('page-approval').style.display='block';
+
+  apCurrentIdx = 0;
+  apRenderDocsList();
+  apLoadDoc(0);
+}
+
+function closeApprovalPage() {
+  // Restore sidebar if hidden
+  if (!apSidebarVisible) {
+    document.querySelector('.sidebar').style.display = '';
+    apSidebarVisible = true;
+  }
+  showPage('documents');
+  loadDocuments();
+}
+
+function apToggleDocsDD(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('ap-docs-dropdown');
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', () => {
+  const dd = document.getElementById('ap-docs-dropdown');
+  if (dd) dd.style.display = 'none';
+});
+
+function apRenderDocsList() {
+  const list = document.getElementById('ap-docs-list');
+  list.innerHTML = apDocIds.map((id, i) => {
+    const info = apDocData[id];
+    const doc = info.doc;
+    const rd = info.result_data;
+    const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || rd._matched_supplier || doc.filename || 'Doc #' + id;
+    const invNum = rd.invoice_number || rd.INVOICE_NUMBER || '';
+    const isCurrent = i === apCurrentIdx;
+    const isApproved = ['approved','Approved','Completed','completed'].includes(doc.status);
+    const badgeCls = isApproved ? 'badge-green' : 'badge-yellow';
+    const badgeText = isApproved ? '✓' : '⏳';
+    return `<div onclick="apGoToDoc(${i})" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;margin-bottom:2px;border-left:3px solid ${isCurrent ? 'var(--accent)' : isApproved ? 'rgba(0,229,160,0.4)' : 'var(--warn)'};background:${isCurrent ? 'rgba(0,229,160,0.08)' : 'transparent'};" title="${supplier}${invNum ? ' — ' + invNum : ''}">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:${isCurrent ? 'var(--accent)' : 'var(--text2)'};">${supplier}${invNum ? ' — ' + invNum : ''}</span>
+      <span class="badge ${badgeCls}" style="font-size:9px;padding:1px 6px;">${badgeText}</span>
+    </div>`;
+  }).join('');
+}
+
+function apGoToDoc(idx) {
+  if (idx === apCurrentIdx) return;
+  apLoadDoc(idx);
+  document.getElementById('ap-docs-dropdown').style.display = 'none';
+}
+
+async function apLoadDoc(idx) {
+  apCurrentIdx = idx;
+  const id = apDocIds[idx];
+  const info = apDocData[id];
+  const doc = info.doc;
+  const rd = info.result_data;
+
+  // Update nav
+  document.getElementById('ap-doc-counter').textContent = (idx + 1) + '/' + apDocIds.length;
+  document.getElementById('ap-prev-btn').disabled = idx === 0;
+  document.getElementById('ap-next-btn').disabled = idx >= apDocIds.length - 1;
+
+  // Load image
+  document.getElementById('ap-doc-img').src = `/api/documents/${id}/file`;
+
+  // Load line positions
+  try {
+    const res = await fetch(`/api/documents/${id}/line-positions`, {credentials:'include'});
+    const data = await res.json();
+    info.linePositions = data.positions || [];
+  } catch(e) { info.linePositions = []; }
+
+  // Scalar fields
+  const scalarEl = document.getElementById('ap-scalar-fields');
+  let scalarHtml = '';
+  apLineData = {};
+  for (const [k, v] of Object.entries(rd)) {
+    if (k.startsWith('_')) continue;
+    if (Array.isArray(v)) {
+      apLineData[k] = v;
+    } else {
+      scalarHtml += `<div style="display:flex;flex-direction:column;gap:3px;min-width:140px;flex:1;">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;">${k}</div>
+        <input class="le-input ap-field-input" data-key="${k}" value="${v != null ? v : ''}" oninput="apMarkDirty()" style="margin:0;padding:6px 9px;font-size:12px;"/>
+      </div>`;
+    }
+  }
+  scalarEl.innerHTML = scalarHtml || '<div style="padding:8px;color:var(--text3);font-size:12px;">Δεν υπάρχουν πεδία</div>';
+
+  // Line items
+  apCurRow = -1;
+  apCurArrKey = null;
+  apNumRows = 0;
+  const keys = Object.keys(apLineData);
+  if (keys.length) {
+    apCurArrKey = keys[0];
+    const rows = apLineData[apCurArrKey];
+    apNumRows = rows.length;
+    apRenderTable(apCurArrKey, rows);
+    document.getElementById('ap-li-title').textContent = 'LINE ITEMS: ' + apCurArrKey;
+  } else {
+    document.getElementById('ap-li-title').textContent = 'LINE ITEMS';
+    document.querySelector('#ap-li-thead tr').innerHTML = '';
+    document.getElementById('ap-li-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">Δεν υπάρχουν γραμμές</td></tr>';
+  }
+  apUpdateNavLabel();
+
+  // Approve bar
+  apUpdateApproveBar(doc.status);
+
+  apDirty = false;
+  apRenderDocsList();
+}
+
+function apRenderTable(key, rows) {
+  if (!rows.length) {
+    document.querySelector('#ap-li-thead tr').innerHTML = '';
+    document.getElementById('ap-li-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">Δεν υπάρχουν γραμμές</td></tr>';
+    return;
+  }
+  const cols = Object.keys(rows[0]);
+  document.querySelector('#ap-li-thead tr').innerHTML = cols.map(c =>
+    `<th style="background:var(--bg3);padding:6px 8px;text-align:left;color:var(--text3);font-family:'DM Mono',monospace;font-size:9px;border-bottom:1px solid var(--border);white-space:nowrap;text-transform:uppercase;letter-spacing:.8px;">${c}</th>`
+  ).join('');
+  document.getElementById('ap-li-tbody').innerHTML = rows.map((row, ri) =>
+    `<tr id="ap-row-${ri}" onclick="apSelectRow(${ri})" style="cursor:pointer;transition:background .1s;border-bottom:1px solid var(--border);">` +
+    cols.map(c => `<td contenteditable="true" data-key="${key}" data-col="${c}" data-ri="${ri}" oninput="apMarkDirty()" style="padding:6px 8px;color:var(--text2);min-width:50px;">${row[c] != null ? row[c] : ''}</td>`).join('') +
+    '</tr>'
+  ).join('');
+}
+
+function apSelectRow(ri) {
+  apCurRow = ri;
+  document.querySelectorAll('#ap-li-tbody tr').forEach(r => {
+    r.style.background = '';
+    r.style.outline = '';
+    r.querySelectorAll('td').forEach(td => td.style.color = '');
+  });
+  const row = document.getElementById('ap-row-' + ri);
+  if (row) {
+    row.style.background = 'rgba(0,229,160,0.12)';
+    row.style.outline = '1px solid rgba(0,229,160,0.35)';
+    row.querySelectorAll('td').forEach(td => td.style.color = 'var(--text)');
+    row.scrollIntoView({block:'nearest'});
+  }
+  apUpdateNavLabel();
+  apDrawHighlight(ri);
+}
+
+function apNavRow(dir) {
+  if (apNumRows === 0) return;
+  const next = apCurRow + dir;
+  if (next < 0 || next >= apNumRows) return;
+  apSelectRow(next);
+}
+
+function apUpdateNavLabel() {
+  const lbl = document.getElementById('ap-li-nav-label');
+  if (apCurRow < 0) { lbl.textContent = apNumRows + ' γραμμές'; return; }
+  lbl.textContent = 'Γραμμή ' + (apCurRow + 1) + ' / ' + apNumRows;
+}
+
+function apOnImgLoad() {
+  const img = document.getElementById('ap-doc-img');
+  const canvas = document.getElementById('ap-hl-canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  canvas.style.width = img.clientWidth + 'px';
+  canvas.style.height = img.clientHeight + 'px';
+  if (apCurRow >= 0) apDrawHighlight(apCurRow);
+}
+
+function apDrawHighlight(ri) {
+  const img = document.getElementById('ap-doc-img');
+  const canvas = document.getElementById('ap-hl-canvas');
+  if (!img.complete || canvas.width === 0) return;
+  canvas.style.width = img.clientWidth + 'px';
+  canvas.style.height = img.clientHeight + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (ri < 0 || apNumRows === 0) return;
+
+  const id = apDocIds[apCurrentIdx];
+  const positions = apDocData[id].linePositions;
+  let y, bandH;
+  if (positions.length > ri) {
+    const pos = positions[ri];
+    y = canvas.height * pos.top_pct;
+    bandH = canvas.height * (pos.bottom_pct - pos.top_pct);
+  } else {
+    bandH = canvas.height / apNumRows;
+    y = ri * bandH;
+  }
+  ctx.fillStyle = 'rgba(0, 229, 160, 0.25)';
+  ctx.strokeStyle = 'rgba(0, 229, 160, 0.80)';
+  ctx.lineWidth = 2;
+  ctx.fillRect(0, y, canvas.width, bandH);
+  ctx.strokeRect(1, y + 1, canvas.width - 2, bandH - 2);
+}
+
+window.addEventListener('resize', function() {
+  const img = document.getElementById('ap-doc-img');
+  const canvas = document.getElementById('ap-hl-canvas');
+  if (img && canvas && img.complete) {
+    canvas.style.width = img.clientWidth + 'px';
+    canvas.style.height = img.clientHeight + 'px';
+    if (apCurRow >= 0) apDrawHighlight(apCurRow);
+  }
+});
+
+function apToggleScalars() {
+  const f = document.getElementById('ap-scalar-fields');
+  const i = document.getElementById('ap-toggle-icon');
+  const collapsed = f.style.display === 'none';
+  f.style.display = collapsed ? 'flex' : 'none';
+  i.textContent = collapsed ? '▲ Απόκρυψη' : '▼ Εμφάνιση';
+}
+
+function apToggleSidebar() {
+  apSidebarVisible = !apSidebarVisible;
+  const sidebar = document.querySelector('.sidebar');
+  const toggle = document.getElementById('ap-sidebar-toggle');
+  if (apSidebarVisible) {
+    sidebar.style.display = '';
+    toggle.style.left = '220px';
+    toggle.textContent = '◀';
+  } else {
+    sidebar.style.display = 'none';
+    toggle.style.left = '0';
+    toggle.textContent = '▶';
+  }
+  // Resize canvas after layout change
+  setTimeout(() => {
+    const img = document.getElementById('ap-doc-img');
+    const canvas = document.getElementById('ap-hl-canvas');
+    if (img && canvas && img.complete) {
+      canvas.style.width = img.clientWidth + 'px';
+      canvas.style.height = img.clientHeight + 'px';
+      if (apCurRow >= 0) apDrawHighlight(apCurRow);
+    }
+  }, 350);
+}
+
+function apMarkDirty() { apDirty = true; }
+
+function apCollectData() {
+  const data = {};
+  document.querySelectorAll('.ap-field-input').forEach(f => { data[f.dataset.key] = f.value; });
+  if (apCurArrKey && apLineData[apCurArrKey]) {
+    const rows = [];
+    document.querySelectorAll('#ap-li-tbody tr').forEach(tr => {
+      const row = {};
+      tr.querySelectorAll('td[contenteditable]').forEach(td => {
+        if (td.dataset.col) row[td.dataset.col] = td.textContent.trim();
+      });
+      if (Object.keys(row).length) rows.push(row);
+    });
+    data[apCurArrKey] = rows;
+  }
+  return data;
+}
+
+async function apDoApprove() {
+  const id = apDocIds[apCurrentIdx];
+  apUpdateApproveBar('approving');
+  try {
+    // Save edits if dirty
+    if (apDirty) {
+      const sr = await fetch(`/api/documents/${id}/data`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify(apCollectData())
+      });
+      if (!sr.ok) { toast('Σφάλμα αποθήκευσης: ' + sr.status, 'error'); apUpdateApproveBar('pending'); return; }
+    }
+    // Approve
+    const r = await fetch(`/api/documents/${id}/approve`, {method: 'POST', credentials: 'include'});
+    if (!r.ok) { toast('HTTP Error: ' + r.status, 'error'); apUpdateApproveBar('pending'); return; }
+    const j = await r.json();
+    if (j.success) {
+      const newStatus = j.status || 'Completed';
+      apUpdateApproveBar(newStatus);
+      // Update local data
+      apDocData[id].doc.status = newStatus;
+      // Update allDocs too
+      const ad = allDocs.find(d => d.id === id);
+      if (ad) ad.status = newStatus;
+      toast('Εγκρίθηκε!', 'success');
+      apDirty = false;
+      apRenderDocsList();
+
+      // Auto-advance to next unapproved doc
+      const apDoneStatuses = ['approved','Approved','Completed','completed'];
+      const nextIdx = apDocIds.findIndex((did, i) => i > apCurrentIdx && !apDoneStatuses.includes(apDocData[did].doc.status));
+      if (nextIdx >= 0) {
+        setTimeout(() => apLoadDoc(nextIdx), 800);
+      }
+    } else {
+      toast('Σφάλμα: ' + (j.error || ''), 'error');
+      apUpdateApproveBar('pending');
+    }
+  } catch(err) {
+    toast('Σφάλμα: ' + err.message, 'error');
+    apUpdateApproveBar('pending');
+  }
+}
+
+function apUpdateApproveBar(status) {
+  const bar = document.getElementById('ap-approve-bar');
+  if (status === 'approved' || status === 'Approved' || status === 'Completed') {
+    bar.style.background = 'rgba(0,229,160,0.06)';
+    bar.innerHTML = '<div style="text-align:center;padding:6px;font-size:13px;color:var(--accent);font-weight:600;">✓ Εγκρίθηκε</div>';
+  } else if (status === 'approving') {
+    bar.style.background = 'rgba(0,229,160,0.04)';
+    bar.innerHTML = '<div style="text-align:center;padding:8px;font-size:13px;color:var(--text3);">Έγκριση...</div>';
+  } else {
+    bar.style.background = 'rgba(0,229,160,0.08)';
+    bar.innerHTML = `<button class="btn btn-primary" onclick="apDoApprove()" style="width:100%;padding:10px;font-size:13px;font-weight:700;border-radius:8px;">✓ Έγκριση Τιμολογίου</button>`;
+  }
+}
+
+function apPrevDoc() { if (apCurrentIdx > 0) apLoadDoc(apCurrentIdx - 1); }
+function apNextDoc() { if (apCurrentIdx < apDocIds.length - 1) apLoadDoc(apCurrentIdx + 1); }
+
+// Keyboard shortcuts for approval page
+document.addEventListener('keydown', function(e) {
+  if (document.getElementById('page-approval').style.display === 'none') return;
+  if (e.target.tagName === 'INPUT' || e.target.contentEditable === 'true') return;
+  if (e.key === 'ArrowUp')   { e.preventDefault(); apNavRow(-1); }
+  if (e.key === 'ArrowDown') { e.preventDefault(); apNavRow(1); }
+  if (e.key === 'Escape')    { apCurRow = -1; document.querySelectorAll('#ap-li-tbody tr').forEach(r => { r.style.background=''; r.style.outline=''; }); apDrawHighlight(-1); apUpdateNavLabel(); }
+});
+
+// ── Label Editor ────────────────────────────────────────────────────────────
 async function leLoadDoc(idx) {
   const id = leDocIds[idx];
   document.getElementById('le-doc-counter').textContent = (idx + 1) + '/' + leDocIds.length;
