@@ -178,15 +178,22 @@ class AIExtractor:
                 for i in o: _ds(i)
         _ds(clean_schema)
 
-        # Generation config — με logprobs για confidence score
+        # Προσθήκη _confidence_pct στο schema — ζητάμε self-assessment
+        if "properties" in clean_schema:
+            clean_schema["properties"]["_confidence_pct"] = {
+                "type": "number",
+                "description": "Overall confidence score 0-100 for the entire extraction. "
+                               "100 = all fields clearly readable, 0 = unreadable document. "
+                               "Consider: text clarity, completeness, ambiguous values."
+            }
+
+        # Generation config
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             response_mime_type="application/json",
             response_schema=clean_schema,
             temperature=0.0,
             max_output_tokens=8192,
-            response_logprobs=True,
-            logprobs=5,
         )
 
         response = client.models.generate_content(
@@ -216,31 +223,6 @@ class AIExtractor:
         except Exception:
             result.tokens_used = 0
 
-        # ── Confidence score από logprobs ──
-        try:
-            import math
-            candidate = response.candidates[0] if response.candidates else None
-            if candidate:
-                # Μέθοδος 1: avg_logprobs (μέσος όρος log-probability)
-                avg_lp = getattr(candidate, 'avg_logprobs', None)
-                if avg_lp is not None:
-                    # Μετατροπή logprob → probability: e^logprob * 100
-                    confidence = round(math.exp(avg_lp) * 100, 1)
-                    result.extracted_data["_confidence_pct"] = min(confidence, 100.0)
-                else:
-                    # Μέθοδος 2: logprobs_result.log_probability_sum / αριθμός tokens
-                    lpr = getattr(candidate, 'logprobs_result', None)
-                    if lpr and lpr.chosen_candidates:
-                        n_tokens = len(lpr.chosen_candidates)
-                        lp_values = [c.log_probability for c in lpr.chosen_candidates
-                                     if c.log_probability is not None]
-                        if lp_values:
-                            avg_lp2 = sum(lp_values) / len(lp_values)
-                            confidence = round(math.exp(avg_lp2) * 100, 1)
-                            result.extracted_data["_confidence_pct"] = min(confidence, 100.0)
-        except Exception as e:
-            logging.warning(f"Could not compute confidence from logprobs: {e}")
-
         return result
 
     def _build_prompt(self, schema: Dict, extra: str) -> str:
@@ -253,6 +235,10 @@ class AIExtractor:
             f"- If a field is not present in the document, use null.\n"
             f"- Monetary amounts must be numbers (float), not strings.\n"
             f"- Dates must be in YYYY-MM-DD format.\n"
+            f"- For _confidence_pct: rate your overall confidence in the extraction from 0 to 100.\n"
+            f"  Score HIGH (90-100) if all text is clear and unambiguous.\n"
+            f"  Score MEDIUM (60-89) if some fields are unclear or estimated.\n"
+            f"  Score LOW (0-59) if the document is poor quality or many fields are missing.\n"
         )
         if extra:
             prompt += f"\nAdditional instructions: {extra}\n"
