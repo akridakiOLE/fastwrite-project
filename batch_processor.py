@@ -120,7 +120,7 @@ class BatchProcessor:
         self._jobs_lock  = threading.Lock()
 
     def submit(self, pdf_path, schema_name, original_filename="", auto_match=False,
-               skip_completed=False):
+               skip_completed=False, registration_only=False):
         job_id = str(uuid.uuid4())
         job    = BatchJobStatus(job_id=job_id, status="pending",
                                 started_at=datetime.utcnow().isoformat())
@@ -128,7 +128,7 @@ class BatchProcessor:
             self._jobs[job_id] = job
         t = threading.Thread(target=self._run_job,
             args=(job_id, pdf_path, schema_name, original_filename,
-                  auto_match, skip_completed), daemon=True)
+                  auto_match, skip_completed, registration_only), daemon=True)
         t.start()
         return job_id
 
@@ -142,7 +142,7 @@ class BatchProcessor:
             return [j.to_dict() for j in self._jobs.values()]
 
     def _run_job(self, job_id, pdf_path, schema_name, original_filename,
-                 auto_match=False, skip_completed=False):
+                 auto_match=False, skip_completed=False, registration_only=False):
         job = self._get_job(job_id)
         job.status = "running"
         try:
@@ -163,7 +163,8 @@ class BatchProcessor:
 
             self._extract_parallel(segments, schema_name, original_filename, job,
                                    auto_match=auto_match,
-                                   skip_completed=skip_completed)
+                                   skip_completed=skip_completed,
+                                   registration_only=registration_only)
 
             job.status       = "completed"
             job.completed_at = datetime.utcnow().isoformat()
@@ -287,7 +288,8 @@ class BatchProcessor:
             return default_schema_name, "unknown", False
 
     def _extract_parallel(self, segments, schema_name, original_filename, job,
-                          auto_match=False, skip_completed=False):
+                          auto_match=False, skip_completed=False,
+                          registration_only=False):
         from ai_extractor import AIExtractor
         api_key  = self.key_mgr.get_key("gemini")
 
@@ -361,6 +363,27 @@ class BatchProcessor:
                     used_schema_name    = schema_name
                     used_require_review = default_template.get("require_review", True)
                     detected_supplier   = None
+
+                # ── Registration Only: μόνο καταγραφή, ΟΧΙ extraction ──
+                if registration_only:
+                    reg_data = {}
+                    if detected_supplier and detected_supplier != "unknown":
+                        reg_data["_matched_supplier"] = detected_supplier
+                    if used_schema_name:
+                        reg_data["_matched_template"] = used_schema_name
+                    self.db.update_document_status(
+                        doc_id, status="registered",
+                        result_json=json.dumps(reg_data) if reg_data else None)
+                    if used_schema_name and used_schema_name != schema_name:
+                        try:
+                            self.db.conn.execute(
+                                "UPDATE documents SET schema_name=? WHERE id=?",
+                                (used_schema_name, doc_id))
+                            self.db.conn.commit()
+                        except Exception:
+                            pass
+                    return {"success": True, "doc_id": doc_id,
+                            "matched_template": used_schema_name, "registered": True}
 
                 result = extractor.extract(image_paths=segment.pages, schema=seg_schema)
                 if result.is_ok():

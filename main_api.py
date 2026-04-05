@@ -1131,17 +1131,19 @@ def batch_upload():
         original_filename = f.filename
     else:
         return jsonify({"error": "Δεν βρέθηκε αρχείο."}), 400
-    schema_name    = request.form.get("schema_name", "invoice")
-    auto_match     = request.form.get("auto_match", "false").lower() == "true"
-    skip_completed = request.form.get("skip_completed", "false").lower() == "true"
+    schema_name       = request.form.get("schema_name", "invoice")
+    auto_match        = request.form.get("auto_match", "false").lower() == "true"
+    skip_completed    = request.form.get("skip_completed", "false").lower() == "true"
+    registration_only = request.form.get("registration_only", "false").lower() == "true"
     logger.info("[batch_upload] original_filename='%s', skip_completed=%s, auto_match=%s, "
-                "schema='%s', file_path_param='%s'",
-                original_filename, skip_completed, auto_match, schema_name,
-                file_path_param or "(uploaded file)")
+                "registration_only=%s, schema='%s', file_path_param='%s'",
+                original_filename, skip_completed, auto_match, registration_only,
+                schema_name, file_path_param or "(uploaded file)")
     job_id = batch_proc.submit(pdf_path=dest, schema_name=schema_name,
                                original_filename=original_filename,
                                auto_match=auto_match,
-                               skip_completed=skip_completed)
+                               skip_completed=skip_completed,
+                               registration_only=registration_only)
     return jsonify({"success": True, "job_id": job_id,
                     "filename": original_filename, "schema_name": schema_name})
 

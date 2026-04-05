@@ -929,9 +929,17 @@ function filterDocs() {
     }
   }
   if (fBatch) {
-    const batchDone = ['Completed','pending_review','completed','approved','Approved','pending'];
-    if (fBatch === 'done') filtered = filtered.filter(d => batchDone.includes(d.status));
-    else if (fBatch === 'pending') filtered = filtered.filter(d => !batchDone.includes(d.status));
+    const _metaKeys = new Set(['_matched_supplier','_matched_template','_skipped','_reason']);
+    if (fBatch === 'done') filtered = filtered.filter(d => {
+      const _rd = d.result_data || {};
+      const _hasData = Object.keys(_rd).some(k => !_metaKeys.has(k));
+      return _hasData && ['pending','approved','Completed','pending_review'].includes(d.status);
+    });
+    else if (fBatch === 'pending') filtered = filtered.filter(d => {
+      const _rd = d.result_data || {};
+      const _hasData = Object.keys(_rd).some(k => !_metaKeys.has(k));
+      return !(_hasData && ['pending','approved','Completed','pending_review'].includes(d.status));
+    });
   }
   if (minPct !== null) filtered = filtered.filter(d => {
     const rd = d.result_data || {};
@@ -980,8 +988,11 @@ function renderDocs(docs) {
     const filename = doc.original_filename || doc.filename || '—';
     // Smart name (vendor — invoice) για tooltip/title
     const smartName = doc.filename !== doc.original_filename ? doc.filename : null;
-    // Batch status
-    const batchStatus = (doc.status === 'Completed' || doc.status === 'pending_review' || doc.status === 'approved' || doc.status === 'pending')
+    // Batch status — Ολοκληρώθηκε ΜΟΝΟ αν υπάρχουν πραγματικά extracted data
+    const metaKeys = new Set(['_matched_supplier','_matched_template','_skipped','_reason']);
+    const hasExtractedData = Object.keys(rd).some(k => !metaKeys.has(k));
+    const batchDone = hasExtractedData && (doc.status === 'pending' || doc.status === 'approved' || doc.status === 'Completed' || doc.status === 'pending_review');
+    const batchStatus = batchDone
       ? '<span style="color:var(--accent);font-size:12px;">Ολοκληρώθηκε</span>'
       : '<span style="color:var(--warn);font-size:12px;">Εκκρεμεί</span>';
     // Ποσοστό OCR (θα ρυθμιστεί αργότερα)
@@ -1285,6 +1296,7 @@ async function handleRegisterClick() {
   fd.append('file', inp.files[0]);
   fd.append('schema_name', schema || '__auto__');
   fd.append('auto_match', 'true');
+  fd.append('registration_only', 'true');
 
   const res = await api('POST', '/api/batch', fd, true);
   btn.disabled = false;
@@ -2512,6 +2524,7 @@ function badgeHtml(status) {
     'Pending':'badge-yellow','pending':'badge-yellow',
     'pending_review':'badge-yellow',
     'no_template':'badge-yellow',
+    'registered':'badge-yellow',
     'Failed':'badge-red','failed':'badge-red',
   };
   const labelMap = {
@@ -2519,6 +2532,7 @@ function badgeHtml(status) {
     'Pending': 'Εκκρεμεί',
     'pending_review': 'Εκκρεμεί',
     'no_template': 'Εκκρεμεί',
+    'registered': 'Εκκρεμεί',
     'Completed': 'Εκκρεμεί',
     'completed': 'Εκκρεμεί',
     'approved': 'Εγκρίθηκε',
