@@ -633,8 +633,8 @@ select.form-input option{background:var(--bg2);}
         </div>
       </div>
       <div style="display:flex;width:100%;height:calc(100vh - 52px);overflow:hidden;background:var(--bg);position:relative;">
-        <!-- Toggle sidebar button -->
-        <button id="ap-sidebar-toggle" onclick="apToggleSidebar()" style="position:absolute;left:220px;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:left .3s ease;" title="Εμφάνιση/Απόκρυψη μενού">◀</button>
+        <!-- Toggle sidebar button — positioned at left edge of PDF area -->
+        <button id="ap-sidebar-toggle" onclick="apToggleSidebar()" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:all .3s ease;" title="Εμφάνιση/Απόκρυψη μενού">◀</button>
         <!-- PDF Area -->
         <div id="ap-pdf-area" style="flex:1;height:100%;overflow:hidden;min-width:0;position:relative;">
           <div id="ap-img-wrap" style="width:100%;height:100%;overflow:auto;position:relative;cursor:crosshair;">
@@ -978,10 +978,13 @@ function filterDocs() {
   });
   if (fStatus) {
     if (fStatus === 'pending') {
-      // Εκκρεμεί: all non-approved statuses
-      filtered = filtered.filter(d => d.status !== 'approved' && d.status !== 'Approved');
+      // Εκκρεμεί: all non-approved/completed statuses
+      const approvedStatuses = ['approved','Approved','Completed','completed'];
+      filtered = filtered.filter(d => !approvedStatuses.includes(d.status));
     } else if (fStatus === 'approved') {
-      filtered = filtered.filter(d => d.status === 'approved' || d.status === 'Approved');
+      // Εγκρίθηκε: approved + Completed
+      const approvedStatuses = ['approved','Approved','Completed','completed'];
+      filtered = filtered.filter(d => approvedStatuses.includes(d.status));
     } else {
       filtered = filtered.filter(d => d.status === fStatus);
     }
@@ -2044,15 +2047,23 @@ function apRenderDocsList() {
     const info = apDocData[id];
     const doc = info.doc;
     const rd = info.result_data;
-    const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || rd._matched_supplier || doc.filename || 'Doc #' + id;
-    const invNum = rd.invoice_number || rd.INVOICE_NUMBER || '';
+    const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer
+                     || (rd._matched_supplier && rd._matched_supplier !== 'unknown' ? rd._matched_supplier : '')
+                     || 'Άγνωστος προμηθευτής';
+    const pageNum = i + 1;
     const isCurrent = i === apCurrentIdx;
     const isApproved = ['approved','Approved','Completed','completed'].includes(doc.status);
-    const badgeCls = isApproved ? 'badge-green' : 'badge-yellow';
-    const badgeText = isApproved ? '✓' : '⏳';
-    return `<div onclick="apGoToDoc(${i})" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;margin-bottom:2px;border-left:3px solid ${isCurrent ? 'var(--accent)' : isApproved ? 'rgba(0,229,160,0.4)' : 'var(--warn)'};background:${isCurrent ? 'rgba(0,229,160,0.08)' : 'transparent'};" title="${supplier}${invNum ? ' — ' + invNum : ''}">
-      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:${isCurrent ? 'var(--accent)' : 'var(--text2)'};">${supplier}${invNum ? ' — ' + invNum : ''}</span>
-      <span class="badge ${badgeCls}" style="font-size:9px;padding:1px 6px;">${badgeText}</span>
+    return `<div onclick="apGoToDoc(${i})" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin:2px 0;font-size:12px;
+      background:${isCurrent ? 'rgba(0,229,160,0.1)' : 'transparent'};
+      border-left:3px solid ${isCurrent ? 'var(--accent)' : 'transparent'};
+      ${isCurrent ? 'color:var(--accent);font-weight:600;' : 'color:var(--text2);'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">σελ. ${pageNum}</span>
+        ${isApproved
+          ? '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,160,0.15);color:var(--accent);">✓ Εγκρίθηκε</span>'
+          : '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(255,179,0,0.1);color:var(--warn);">Εκκρεμεί</span>'}
+      </div>
+      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;margin-top:2px;font-weight:500;${!supplier || supplier === 'Άγνωστος προμηθευτής' ? 'color:var(--text3);font-style:italic;' : ''}">${supplier}</div>
     </div>`;
   }).join('');
 }
@@ -2237,11 +2248,9 @@ function apToggleSidebar() {
   const toggle = document.getElementById('ap-sidebar-toggle');
   if (apSidebarVisible) {
     sidebar.style.display = '';
-    toggle.style.left = '220px';
     toggle.textContent = '◀';
   } else {
     sidebar.style.display = 'none';
-    toggle.style.left = '0';
     toggle.textContent = '▶';
   }
   // Resize canvas after layout change
@@ -2977,8 +2986,8 @@ function badgeHtml(status) {
     'pending_review': 'Εκκρεμεί',
     'no_template': 'Εκκρεμεί',
     'registered': 'Εκκρεμεί',
-    'Completed': 'Εκκρεμεί',
-    'completed': 'Εκκρεμεί',
+    'Completed': 'Εγκρίθηκε',
+    'completed': 'Εγκρίθηκε',
     'approved': 'Εγκρίθηκε',
     'Approved': 'Εγκρίθηκε',
     'Failed': 'Αποτυχία',
