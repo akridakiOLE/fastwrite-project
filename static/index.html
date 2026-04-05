@@ -642,10 +642,6 @@ select.form-input option{background:var(--bg2);}
           <div id="ap-img-wrap" style="flex:1;overflow:auto;position:relative;cursor:crosshair;">
             <img id="ap-doc-img" src="" style="display:block;width:100%;user-select:none;" onload="apOnImgLoad()"/>
             <canvas id="ap-hl-canvas" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
-            <!-- Page number overlay at bottom of image -->
-            <div id="ap-page-overlay" style="position:sticky;bottom:0;left:0;right:0;padding:6px 0;text-align:center;background:rgba(10,12,16,0.85);border-top:1px solid var(--border);z-index:5;">
-              <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);letter-spacing:1px;" id="ap-page-label">σελ. 1 / 1</span>
-            </div>
           </div>
         </div>
         <!-- Data Panel (right side) -->
@@ -2102,10 +2098,6 @@ async function apLoadDoc(idx) {
 
   // Load PNG image for highlight sync
   document.getElementById('ap-doc-img').src = `/api/documents/${id}/file`;
-
-  // Update page number overlay
-  const pageLabel = document.getElementById('ap-page-label');
-  if (pageLabel) pageLabel.textContent = 'σελ. ' + (idx + 1) + ' / ' + apDocIds.length;
 
   // Load line positions for highlight
   try {
