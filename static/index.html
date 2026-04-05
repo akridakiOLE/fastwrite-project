@@ -636,14 +636,18 @@ select.form-input option{background:var(--bg2);}
         <!-- Toggle sidebar button — positioned at left edge of PDF area -->
         <button id="ap-sidebar-toggle" onclick="apToggleSidebar()" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:all .3s ease;" title="Εμφάνιση/Απόκρυψη μενού">◀</button>
         <!-- PDF Area -->
-        <div id="ap-pdf-area" style="flex:1;height:100%;overflow:hidden;min-width:0;position:relative;">
-          <div id="ap-img-wrap" style="width:100%;height:100%;overflow:auto;position:relative;cursor:crosshair;">
+        <div id="ap-pdf-area" style="flex:1;height:100%;overflow:hidden;min-width:0;position:relative;display:flex;flex-direction:column;">
+          <div id="ap-img-wrap" style="width:100%;flex:1;overflow:auto;position:relative;cursor:crosshair;">
             <img id="ap-doc-img" src="" style="display:block;width:100%;user-select:none;" onload="apOnImgLoad()"/>
             <canvas id="ap-hl-canvas" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
           </div>
+          <!-- Page number bar at bottom of PDF -->
+          <div id="ap-page-bar" style="flex-shrink:0;padding:6px 16px;background:var(--bg3);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:12px;">
+            <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);" id="ap-page-label">σελ. 1</span>
+          </div>
         </div>
         <!-- Data Panel (right side) -->
-        <div id="ap-panel" style="width:440px;min-width:440px;height:100%;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;">
+        <div id="ap-panel" style="width:440px;min-width:440px;height:100%;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .3s ease,min-width .3s ease;">
           <!-- Scalar fields -->
           <div style="flex-shrink:0;border-bottom:1px solid var(--border);">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);cursor:pointer;user-select:none;" onclick="apToggleScalars()">
@@ -2087,6 +2091,10 @@ async function apLoadDoc(idx) {
   document.getElementById('ap-prev-btn').disabled = idx === 0;
   document.getElementById('ap-next-btn').disabled = idx >= apDocIds.length - 1;
 
+  // Update page number bar
+  const pageLabel = document.getElementById('ap-page-label');
+  if (pageLabel) pageLabel.textContent = 'σελ. ' + (idx + 1) + ' / ' + apDocIds.length;
+
   // Load image
   document.getElementById('ap-doc-img').src = `/api/documents/${id}/file`;
 
@@ -2248,14 +2256,21 @@ function apToggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const layout = document.querySelector('.layout');
   const toggle = document.getElementById('ap-sidebar-toggle');
+  const panel = document.getElementById('ap-panel');
   if (apSidebarVisible) {
     sidebar.style.display = '';
     layout.style.gridTemplateColumns = '220px 1fr';
     toggle.textContent = '◀';
+    // Restore panel to default width
+    panel.style.width = '440px';
+    panel.style.minWidth = '440px';
   } else {
     sidebar.style.display = 'none';
     layout.style.gridTemplateColumns = '1fr';
     toggle.textContent = '▶';
+    // Expand panel to use the extra space
+    panel.style.width = '580px';
+    panel.style.minWidth = '580px';
   }
   // Resize canvas after layout change
   setTimeout(() => {
