@@ -427,9 +427,7 @@ class BatchProcessor:
                 if result.is_ok():
                     final_status = "pending"
                     extracted = result.extracted_data
-                    # Υπολογισμός confidence score
-                    conf_pct = _calc_confidence(extracted, seg_schema)
-                    extracted["_confidence_pct"] = conf_pct
+                    # _confidence_pct υπολογίζεται αυτόματα από ai_extractor (logprobs)
                     if detected_supplier and detected_supplier != "unknown":
                         extracted.setdefault("_matched_supplier", detected_supplier)
                         extracted.setdefault("_matched_template", used_schema_name)

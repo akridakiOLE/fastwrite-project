@@ -910,10 +910,7 @@ def batch_extract_selected():
 
             if result.is_ok():
                 extracted = result.extracted_data
-                # Υπολογισμός confidence score
-                from batch_processor import _calc_confidence
-                conf_pct = _calc_confidence(extracted, schema)
-                extracted["_confidence_pct"] = conf_pct
+                # _confidence_pct υπολογίζεται αυτόματα από ai_extractor (logprobs)
                 # Preserve supplier info
                 rd = {}
                 try:

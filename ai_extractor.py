@@ -178,13 +178,15 @@ class AIExtractor:
                 for i in o: _ds(i)
         _ds(clean_schema)
 
-        # Generation config
+        # Generation config — με logprobs για confidence score
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             response_mime_type="application/json",
             response_schema=clean_schema,
             temperature=0.0,
             max_output_tokens=8192,
+            response_logprobs=True,
+            logprobs=5,
         )
 
         response = client.models.generate_content(
@@ -213,6 +215,31 @@ class AIExtractor:
             result.tokens_used = response.usage_metadata.total_token_count
         except Exception:
             result.tokens_used = 0
+
+        # ── Confidence score από logprobs ──
+        try:
+            import math
+            candidate = response.candidates[0] if response.candidates else None
+            if candidate:
+                # Μέθοδος 1: avg_logprobs (μέσος όρος log-probability)
+                avg_lp = getattr(candidate, 'avg_logprobs', None)
+                if avg_lp is not None:
+                    # Μετατροπή logprob → probability: e^logprob * 100
+                    confidence = round(math.exp(avg_lp) * 100, 1)
+                    result.extracted_data["_confidence_pct"] = min(confidence, 100.0)
+                else:
+                    # Μέθοδος 2: logprobs_result.log_probability_sum / αριθμός tokens
+                    lpr = getattr(candidate, 'logprobs_result', None)
+                    if lpr and lpr.chosen_candidates:
+                        n_tokens = len(lpr.chosen_candidates)
+                        lp_values = [c.log_probability for c in lpr.chosen_candidates
+                                     if c.log_probability is not None]
+                        if lp_values:
+                            avg_lp2 = sum(lp_values) / len(lp_values)
+                            confidence = round(math.exp(avg_lp2) * 100, 1)
+                            result.extracted_data["_confidence_pct"] = min(confidence, 100.0)
+        except Exception as e:
+            logging.warning(f"Could not compute confidence from logprobs: {e}")
 
         return result
 
