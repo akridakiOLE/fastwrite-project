@@ -364,7 +364,8 @@ class BatchProcessor:
 
                 result = extractor.extract(image_paths=segment.pages, schema=seg_schema)
                 if result.is_ok():
-                    final_status = "pending_review" if used_require_review else "Completed"
+                    # Μετά extraction: πάντα pending (Εκκρεμεί) — ο χρήστης εγκρίνει χειροκίνητα
+                    final_status = "pending"
                     extracted = result.extracted_data
                     if detected_supplier and detected_supplier != "unknown":
                         extracted.setdefault("_matched_supplier", detected_supplier)
@@ -423,7 +424,7 @@ class BatchProcessor:
                 d_ofn = d.get("original_filename") or ""
                 d_fp = d.get("file_path") or ""
 
-                if d_status in ("Completed", "pending_review"):
+                if d_status in ("Completed", "pending_review", "approved"):
                     completed_count += 1
                     # Method 1: by current filename
                     all_docs_by_lookup[d["filename"]] = d

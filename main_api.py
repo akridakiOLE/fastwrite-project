@@ -875,8 +875,8 @@ def batch_extract_selected():
             results["details"].append({"doc_id": doc_id, "status": "not_found"})
             continue
 
-        # Skip already completed
-        if doc.get("status") in ("Completed", "pending_review", "completed"):
+        # Skip already completed/approved
+        if doc.get("status") in ("Completed", "pending_review", "completed", "approved"):
             results["skipped_completed"] += 1
             results["details"].append({"doc_id": doc_id, "status": "already_completed"})
             continue
@@ -920,8 +920,8 @@ def batch_extract_selected():
                     extracted.setdefault("_matched_supplier", rd["_matched_supplier"])
                 extracted.setdefault("_matched_template", sname)
 
-                require_review = template.get("require_review", True)
-                final_status = "pending_review" if require_review else "Completed"
+                # Μετά extraction: πάντα Εκκρεμεί (pending) — ο χρήστης εγκρίνει χειροκίνητα
+                final_status = "pending"
                 db.update_document_status(doc_id, status=final_status,
                                           result_json=json.dumps(extracted))
                 results["extracted"] += 1

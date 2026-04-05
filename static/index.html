@@ -427,28 +427,6 @@ select.form-input option{background:var(--bg2);}
                   </select>
                 </div>
               </th>
-              <th style="color:#fff;vertical-align:top;min-width:90px;position:relative;">
-                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-status')">ΚΑΤΑΣΤΑΣΗ <span class="cf-arrow">▼</span></div>
-                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-status" style="display:none;">
-                  <select id="cff-status" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-                    <option value="">ΟΛΑ</option>
-                    <option value="Completed">Completed</option>
-                    <option value="no_template">Εκκρεμεί</option>
-                    <option value="Failed">Failed</option>
-                    <option value="pending_review">Προς Έγκριση</option>
-                  </select>
-                </div>
-              </th>
-              <th style="color:#fff;vertical-align:top;min-width:90px;position:relative;">
-                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-batch')">BATCH <span class="cf-arrow">▼</span></div>
-                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-batch" style="display:none;">
-                  <select id="cff-batch" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-                    <option value="">ΟΛΑ</option>
-                    <option value="done">Ολοκληρώθηκε</option>
-                    <option value="pending">Εκκρεμεί</option>
-                  </select>
-                </div>
-              </th>
               <th style="color:#fff;vertical-align:top;min-width:80px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-pct')">ΠΟΣΟΣΤΟ <span class="cf-arrow">▼</span></div>
                 <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-pct" style="display:none;">
@@ -459,6 +437,16 @@ select.form-input option{background:var(--bg2);}
                     <option value="70">≥ 70%</option>
                   </select>
                   <input type="number" id="cff-pct-custom" placeholder="Ποσοστό..." min="0" max="100" oninput="onPctCustom()" onkeydown="if(event.key==='Enter'){event.preventDefault();onPctCustom();}" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);margin-top:4px;"/>
+                </div>
+              </th>
+              <th style="color:#fff;vertical-align:top;min-width:90px;position:relative;">
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-status')">ΚΑΤΑΣΤΑΣΗ <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-status" style="display:none;">
+                  <select id="cff-status" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+                    <option value="">ΟΛΑ</option>
+                    <option value="pending">Εκκρεμεί</option>
+                    <option value="approved">Εγκρίθηκε</option>
+                  </select>
                 </div>
               </th>
               <th style="color:#fff;vertical-align:top;min-width:100px;position:relative;">
@@ -839,7 +827,7 @@ async function loadDocuments() {
 
 function clearDocFilters() {
   document.getElementById('doc-search').value = '';
-  ['cff-file','cff-label','cff-supplier','cff-status','cff-batch','cff-pct'].forEach(id => {
+  ['cff-file','cff-label','cff-supplier','cff-status','cff-pct'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -903,7 +891,6 @@ function filterDocs() {
   const fLabel    = (document.getElementById('cff-label')?.value || '');
   const fSupplier = (document.getElementById('cff-supplier')?.value || '');
   const fStatus   = (document.getElementById('cff-status')?.value || '');
-  const fBatch    = (document.getElementById('cff-batch')?.value || '');
   const fPct      = (document.getElementById('cff-pct')?.value || '');
   const fPctCustom= (document.getElementById('cff-pct-custom')?.value || '');
   const fFrom     = (document.getElementById('cff-date-from')?.value || '');
@@ -920,10 +907,15 @@ function filterDocs() {
     const s = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || (rd._matched_supplier && rd._matched_supplier !== 'unknown' ? rd._matched_supplier : '') || '';
     return s === fSupplier;
   });
-  if (fStatus) filtered = filtered.filter(d => d.status === fStatus);
-  if (fBatch) {
-    if (fBatch === 'done') filtered = filtered.filter(d => d.status === 'Completed' || d.status === 'pending_review');
-    else if (fBatch === 'pending') filtered = filtered.filter(d => d.status !== 'Completed' && d.status !== 'pending_review');
+  if (fStatus) {
+    if (fStatus === 'pending') {
+      // Εκκρεμεί: all non-approved statuses
+      filtered = filtered.filter(d => d.status !== 'approved' && d.status !== 'Approved');
+    } else if (fStatus === 'approved') {
+      filtered = filtered.filter(d => d.status === 'approved' || d.status === 'Approved');
+    } else {
+      filtered = filtered.filter(d => d.status === fStatus);
+    }
   }
   if (minPct !== null) filtered = filtered.filter(d => {
     const rd = d.result_data || {};
@@ -959,7 +951,7 @@ function renderDocs(docs) {
   if (countEl) countEl.textContent = docs.length + ' εγγραφές';
 
   if (!docs.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:40px">Δεν βρέθηκαν έγγραφα</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:40px">Δεν βρέθηκαν έγγραφα</td></tr>';
     return;
   }
   tbody.innerHTML = docs.map(doc => {
@@ -972,10 +964,6 @@ function renderDocs(docs) {
     const filename = doc.original_filename || doc.filename || '—';
     // Smart name (vendor — invoice) για tooltip/title
     const smartName = doc.filename !== doc.original_filename ? doc.filename : null;
-    // Batch status
-    const batchStatus = (doc.status === 'Completed' || doc.status === 'pending_review')
-      ? '<span style="color:var(--accent);font-size:12px;">Ολοκληρώθηκε</span>'
-      : '<span style="color:var(--warn);font-size:12px;">Εκκρεμεί</span>';
     // Ποσοστό OCR (θα ρυθμιστεί αργότερα)
     const ocrPct = rd.confidence_pct || rd.ocr_confidence || '—';
 
@@ -988,9 +976,8 @@ function renderDocs(docs) {
       </td>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${(doc.status === 'no_template' || !doc.schema_name) ? '—' : doc.schema_name}</span></td>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${supplier}</td>
-      <td>${badgeHtml(doc.status)}</td>
-      <td>${batchStatus}</td>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${ocrPct}</span></td>
+      <td>${badgeHtml(doc.status)}</td>
       <td><span style="font-size:12px;color:var(--text3)">${recDate}</span></td>
       <td style="display:flex;gap:5px">
         <button class="btn btn-secondary btn-sm" onclick="viewDoc(${doc.id})" title="Προβολή">👁</button>
@@ -1787,9 +1774,10 @@ async function openBatchFromDocs() {
 
   // Ανάλυση επιλεγμένων εγγράφων
   const selectedDocs = allDocs.filter(d => ids.includes(d.id));
-  const completed = selectedDocs.filter(d => d.status === 'Completed' || d.status === 'pending_review' || d.status === 'completed');
-  const noLabel = selectedDocs.filter(d => !d.schema_name && d.status !== 'Completed' && d.status !== 'pending_review' && d.status !== 'completed');
-  const toExtract = selectedDocs.filter(d => d.schema_name && d.status !== 'Completed' && d.status !== 'pending_review' && d.status !== 'completed');
+  const doneStatuses = ['Completed','pending_review','completed','approved','Approved'];
+  const completed = selectedDocs.filter(d => doneStatuses.includes(d.status));
+  const noLabel = selectedDocs.filter(d => !d.schema_name && !doneStatuses.includes(d.status));
+  const toExtract = selectedDocs.filter(d => d.schema_name && !doneStatuses.includes(d.status));
 
   // Εμφάνιση confirmation modal
   const modal = document.getElementById('precheck-modal');
@@ -2498,6 +2486,7 @@ async function saveKey() {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function badgeHtml(status) {
   const map = {
+    'approved':'badge-green','Approved':'badge-green',
     'Completed':'badge-green','completed':'badge-green',
     'Pending':'badge-yellow','pending':'badge-yellow',
     'pending_review':'badge-yellow',
@@ -2505,10 +2494,16 @@ function badgeHtml(status) {
     'Failed':'badge-red','failed':'badge-red',
   };
   const labelMap = {
-    'pending_review': '⏳ Προς Έγκριση',
-    'no_template': '⏳ Εκκρεμεί',
-    'Completed': 'Completed',
-    'completed': 'Completed',
+    'pending': 'Εκκρεμεί',
+    'Pending': 'Εκκρεμεί',
+    'pending_review': 'Εκκρεμεί',
+    'no_template': 'Εκκρεμεί',
+    'Completed': 'Εκκρεμεί',
+    'completed': 'Εκκρεμεί',
+    'approved': 'Εγκρίθηκε',
+    'Approved': 'Εγκρίθηκε',
+    'Failed': 'Αποτυχία',
+    'failed': 'Αποτυχία',
   };
   const label = labelMap[status] || status;
   return `<span class="badge ${map[status]||'badge-gray'}">${label}</span>`;
