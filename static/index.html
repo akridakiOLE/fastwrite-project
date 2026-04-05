@@ -637,9 +637,16 @@ select.form-input option{background:var(--bg2);}
       <div style="display:flex;width:100%;height:calc(100vh - 52px);overflow:hidden;background:var(--bg);position:relative;">
         <!-- Toggle sidebar button — positioned at left edge of PDF area -->
         <button id="ap-sidebar-toggle" onclick="apToggleSidebar()" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:all .3s ease;" title="Εμφάνιση/Απόκρυψη μενού">◀</button>
-        <!-- PDF Area (iframe like Label Editor) -->
-        <div id="ap-pdf-area" style="flex:1;height:100%;overflow:hidden;min-width:0;">
-          <iframe id="ap-doc-pdf" src="" style="width:100%;height:100%;border:none;background:#fff;"></iframe>
+        <!-- PDF Area (PNG + canvas highlight + page number overlay) -->
+        <div id="ap-pdf-area" style="flex:1;height:100%;overflow:hidden;min-width:0;display:flex;flex-direction:column;">
+          <div id="ap-img-wrap" style="flex:1;overflow:auto;position:relative;cursor:crosshair;">
+            <img id="ap-doc-img" src="" style="display:block;width:100%;user-select:none;" onload="apOnImgLoad()"/>
+            <canvas id="ap-hl-canvas" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
+            <!-- Page number overlay at bottom of image -->
+            <div id="ap-page-overlay" style="position:sticky;bottom:0;left:0;right:0;padding:6px 0;text-align:center;background:rgba(10,12,16,0.85);border-top:1px solid var(--border);z-index:5;">
+              <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);letter-spacing:1px;" id="ap-page-label">σελ. 1 / 1</span>
+            </div>
+          </div>
         </div>
         <!-- Data Panel (right side) -->
         <div id="ap-panel" style="width:440px;min-width:440px;height:100%;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .3s ease,min-width .3s ease;">
@@ -1987,7 +1994,6 @@ let apNumRows = 0;
 let apDirty = false;
 let apSidebarVisible = true;
 let apLineData = {};
-let apPdfLoaded = false;
 
 function openApprovalFromDocs() {
   const ids = getSelectedIds();
@@ -2013,7 +2019,7 @@ function openApprovalFromDocs() {
 
   apDocIds = selectedDocs.map(d => d.id);
   apDocData = {};
-  apPdfLoaded = false;
+
   selectedDocs.forEach(d => {
     const rd = d.result_data || {};
     apDocData[d.id] = { doc: d, result_data: rd, linePositions: [] };
@@ -2094,16 +2100,19 @@ async function apLoadDoc(idx) {
   document.getElementById('ap-prev-btn').disabled = idx === 0;
   document.getElementById('ap-next-btn').disabled = idx >= apDocIds.length - 1;
 
-  // Load PDF in iframe (like Label Editor) — page number corresponds to document index
-  const pageNum = idx + 1;
-  const iframe = document.getElementById('ap-doc-pdf');
-  // If first load, set full src; if same PDF already loaded, just change page
-  if (!apPdfLoaded) {
-    iframe.src = `/api/documents/filtered-pdf?ids=${apDocIds.join(',')}#page=${pageNum}`;
-    apPdfLoaded = true;
-  } else {
-    iframe.src = `/api/documents/filtered-pdf?ids=${apDocIds.join(',')}#page=${pageNum}`;
-  }
+  // Load PNG image for highlight sync
+  document.getElementById('ap-doc-img').src = `/api/documents/${id}/file`;
+
+  // Update page number overlay
+  const pageLabel = document.getElementById('ap-page-label');
+  if (pageLabel) pageLabel.textContent = 'σελ. ' + (idx + 1) + ' / ' + apDocIds.length;
+
+  // Load line positions for highlight
+  try {
+    const res = await fetch(`/api/documents/${id}/line-positions`, {credentials:'include'});
+    const data = await res.json();
+    info.linePositions = data.positions || [];
+  } catch(e) { info.linePositions = []; }
 
   // Scalar fields
   const scalarEl = document.getElementById('ap-scalar-fields');
@@ -2179,6 +2188,7 @@ function apSelectRow(ri) {
     row.scrollIntoView({block:'nearest'});
   }
   apUpdateNavLabel();
+  apDrawHighlight(ri);
 }
 
 function apNavRow(dir) {
@@ -2193,6 +2203,54 @@ function apUpdateNavLabel() {
   if (apCurRow < 0) { lbl.textContent = apNumRows + ' γραμμές'; return; }
   lbl.textContent = 'Γραμμή ' + (apCurRow + 1) + ' / ' + apNumRows;
 }
+
+function apOnImgLoad() {
+  const img = document.getElementById('ap-doc-img');
+  const canvas = document.getElementById('ap-hl-canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  canvas.style.width = img.clientWidth + 'px';
+  canvas.style.height = img.clientHeight + 'px';
+  if (apCurRow >= 0) apDrawHighlight(apCurRow);
+}
+
+function apDrawHighlight(ri) {
+  const img = document.getElementById('ap-doc-img');
+  const canvas = document.getElementById('ap-hl-canvas');
+  if (!img.complete || canvas.width === 0) return;
+  canvas.style.width = img.clientWidth + 'px';
+  canvas.style.height = img.clientHeight + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (ri < 0 || apNumRows === 0) return;
+
+  const id = apDocIds[apCurrentIdx];
+  const positions = apDocData[id].linePositions;
+  let y, bandH;
+  if (positions.length > ri) {
+    const pos = positions[ri];
+    y = canvas.height * pos.top_pct;
+    bandH = canvas.height * (pos.bottom_pct - pos.top_pct);
+  } else {
+    bandH = canvas.height / apNumRows;
+    y = ri * bandH;
+  }
+  ctx.fillStyle = 'rgba(0, 229, 160, 0.25)';
+  ctx.strokeStyle = 'rgba(0, 229, 160, 0.80)';
+  ctx.lineWidth = 2;
+  ctx.fillRect(0, y, canvas.width, bandH);
+  ctx.strokeRect(1, y + 1, canvas.width - 2, bandH - 2);
+}
+
+window.addEventListener('resize', function() {
+  const img = document.getElementById('ap-doc-img');
+  const canvas = document.getElementById('ap-hl-canvas');
+  if (img && canvas && img.complete) {
+    canvas.style.width = img.clientWidth + 'px';
+    canvas.style.height = img.clientHeight + 'px';
+    if (apCurRow >= 0) apDrawHighlight(apCurRow);
+  }
+});
 
 function apToggleScalars() {
   const f = document.getElementById('ap-scalar-fields');
@@ -2223,6 +2281,16 @@ function apToggleSidebar() {
     panel.style.width = '580px';
     panel.style.minWidth = '580px';
   }
+  // Resize canvas after layout change
+  setTimeout(() => {
+    const img = document.getElementById('ap-doc-img');
+    const canvas = document.getElementById('ap-hl-canvas');
+    if (img && canvas && img.complete) {
+      canvas.style.width = img.clientWidth + 'px';
+      canvas.style.height = img.clientHeight + 'px';
+      if (apCurRow >= 0) apDrawHighlight(apCurRow);
+    }
+  }, 350);
 }
 
 function apMarkDirty() { apDirty = true; }
@@ -2313,7 +2381,7 @@ document.addEventListener('keydown', function(e) {
   if (e.target.tagName === 'INPUT' || e.target.contentEditable === 'true') return;
   if (e.key === 'ArrowUp')   { e.preventDefault(); apNavRow(-1); }
   if (e.key === 'ArrowDown') { e.preventDefault(); apNavRow(1); }
-  if (e.key === 'Escape')    { apCurRow = -1; document.querySelectorAll('#ap-li-tbody tr').forEach(r => { r.style.background=''; r.style.outline=''; }); apUpdateNavLabel(); }
+  if (e.key === 'Escape')    { apCurRow = -1; document.querySelectorAll('#ap-li-tbody tr').forEach(r => { r.style.background=''; r.style.outline=''; }); apDrawHighlight(-1); apUpdateNavLabel(); }
 });
 
 // ── Label Editor ────────────────────────────────────────────────────────────
