@@ -2022,9 +2022,10 @@ function openApprovalFromDocs() {
 }
 
 function closeApprovalPage() {
-  // Restore sidebar if hidden
+  // Restore sidebar and grid layout if hidden
   if (!apSidebarVisible) {
     document.querySelector('.sidebar').style.display = '';
+    document.querySelector('.layout').style.gridTemplateColumns = '220px 1fr';
     apSidebarVisible = true;
   }
   showPage('documents');
@@ -2245,12 +2246,15 @@ function apToggleScalars() {
 function apToggleSidebar() {
   apSidebarVisible = !apSidebarVisible;
   const sidebar = document.querySelector('.sidebar');
+  const layout = document.querySelector('.layout');
   const toggle = document.getElementById('ap-sidebar-toggle');
   if (apSidebarVisible) {
     sidebar.style.display = '';
+    layout.style.gridTemplateColumns = '220px 1fr';
     toggle.textContent = '◀';
   } else {
     sidebar.style.display = 'none';
+    layout.style.gridTemplateColumns = '1fr';
     toggle.textContent = '▶';
   }
   // Resize canvas after layout change
