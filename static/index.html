@@ -705,13 +705,6 @@ select.form-input option{background:var(--bg2);}
       <button class="btn btn-secondary btn-sm" onclick="addField()">+ Προσθήκη Πεδίου</button>
       <button class="btn btn-secondary btn-sm" id="tmpl-paste-btn" onclick="pasteTemplateFromClipboard()" style="display:none;">📋 Επικόλληση</button>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg3);border-radius:8px;margin-bottom:16px;">
-      <input type="checkbox" id="tmpl-require-review" style="width:16px;height:16px;accent-color:var(--warn);cursor:pointer"/>
-      <div>
-        <div style="font-size:13px;color:var(--text);font-weight:500;">⏳ Απαιτείται Έγκριση</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:2px;">Τα έγγραφα θα περιμένουν έγκριση πριν ολοκληρωθούν</div>
-      </div>
-    </div>
     <button class="btn btn-primary" id="tmpl-save-btn" style="width:100%" onclick="saveTemplate()">Αποθήκευση Template</button>
   </div>
 </div>
@@ -929,7 +922,7 @@ function filterDocs() {
     }
   }
   if (fBatch) {
-    const _metaKeys = new Set(['_matched_supplier','_matched_template','_skipped','_reason']);
+    const _metaKeys = new Set(['_matched_supplier','_matched_template','_skipped','_reason','_confidence_pct']);
     if (fBatch === 'done') filtered = filtered.filter(d => {
       const _rd = d.result_data || {};
       const _hasData = Object.keys(_rd).some(k => !_metaKeys.has(k));
@@ -943,7 +936,7 @@ function filterDocs() {
   }
   if (minPct !== null) filtered = filtered.filter(d => {
     const rd = d.result_data || {};
-    const pct = parseFloat(rd.confidence_pct || rd.ocr_confidence || 0);
+    const pct = parseFloat(rd._confidence_pct || 0);
     return pct >= minPct;
   });
   if (fFrom) filtered = filtered.filter(d => {
@@ -989,14 +982,15 @@ function renderDocs(docs) {
     // Smart name (vendor — invoice) για tooltip/title
     const smartName = doc.filename !== doc.original_filename ? doc.filename : null;
     // Batch status — Ολοκληρώθηκε ΜΟΝΟ αν υπάρχουν πραγματικά extracted data
-    const metaKeys = new Set(['_matched_supplier','_matched_template','_skipped','_reason']);
+    const metaKeys = new Set(['_matched_supplier','_matched_template','_skipped','_reason','_confidence_pct']);
     const hasExtractedData = Object.keys(rd).some(k => !metaKeys.has(k));
     const batchDone = hasExtractedData && (doc.status === 'pending' || doc.status === 'approved' || doc.status === 'Completed' || doc.status === 'pending_review');
     const batchStatus = batchDone
       ? '<span style="color:var(--accent);font-size:12px;">Ολοκληρώθηκε</span>'
       : '<span style="color:var(--warn);font-size:12px;">Εκκρεμεί</span>';
-    // Ποσοστό OCR (θα ρυθμιστεί αργότερα)
-    const ocrPct = rd.confidence_pct || rd.ocr_confidence || '—';
+    // Ποσοστό εμπιστοσύνης (υπολογίζεται κατά extraction)
+    const confVal = rd._confidence_pct;
+    const ocrPct = confVal !== undefined && confVal !== null ? confVal + '%' : '—';
 
     return `<tr data-id="${doc.id}">
       <td><input type="checkbox" class="doc-checkbox" value="${doc.id}" onchange="updateSelection()" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"/></td>
@@ -2239,7 +2233,6 @@ function renderTemplatesList(templates) {
           ? `<span style="background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent)">${f.name} <span style="color:var(--text3)">array[${(f.items||[]).map(i=>i.name).join(', ')}]</span></span>`
           : `<span style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--text2)">${f.name} <span style="color:var(--text3)">${f.type}</span></span>`
         ).join('')}
-        ${t.require_review ? `<span style="background:rgba(255,179,0,0.1);border:1px solid rgba(255,179,0,0.3);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--warn)">⏳ Απαιτείται Έγκριση</span>` : ''}
         ${t.supplier_pattern ? `<span style="background:rgba(0,102,255,0.1);border:1px solid rgba(0,102,255,0.3);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent2)">🏢 ${t.supplier_pattern}</span>` : ''}
       </div>
     </div>`).join('');
@@ -2268,7 +2261,6 @@ function openTemplateModal() {
   document.getElementById('tmpl-original-name').value='';
   document.getElementById('tmpl-supplier-pattern').value='';
   document.getElementById('tmpl-fields').innerHTML='';
-  document.getElementById('tmpl-require-review').checked=false;
   document.querySelector('#tmpl-modal .modal-title').textContent='Νέο Template';
   document.getElementById('tmpl-save-btn').textContent='Αποθήκευση Template';
   // Εμφάνιση κουμπιού Επικόλληση μόνο αν υπάρχει αντιγραμμένο template
@@ -2287,7 +2279,6 @@ async function editTemplate(name) {
   document.getElementById('tmpl-original-name').value = tmpl.name;  // Αποθήκευση παλιού ονόματος
   document.querySelector('#tmpl-modal .modal-title').textContent = '✏️ Επεξεργασία: ' + tmpl.name;
   document.getElementById('tmpl-save-btn').textContent = 'Αποθήκευση Αλλαγών';
-  document.getElementById('tmpl-require-review').checked = !!tmpl.require_review;
   document.getElementById('tmpl-supplier-pattern').value = tmpl.supplier_pattern || '';
   document.getElementById('tmpl-fields').innerHTML = '';
 
@@ -2333,7 +2324,6 @@ function pasteTemplateFromClipboard() {
   if (!copiedTemplateData) { toast('Δεν υπάρχει αντιγραμμένο template','error'); return; }
   const tmpl = copiedTemplateData;
   document.getElementById('tmpl-supplier-pattern').value = tmpl.supplier_pattern || '';
-  document.getElementById('tmpl-require-review').checked = !!tmpl.require_review;
   document.getElementById('tmpl-fields').innerHTML = '';
 
   (tmpl.fields||[]).forEach(f => {
@@ -2449,7 +2439,7 @@ async function saveTemplate() {
     }
   });
   if (!fields.length) { toast('Πρόσθεσε τουλάχιστον ένα πεδίο','error'); return; }
-  const require_review   = document.getElementById('tmpl-require-review').checked;
+  const require_review   = false;
   const supplier_pattern = document.getElementById('tmpl-supplier-pattern').value.trim();
   const originalName     = document.getElementById('tmpl-original-name').value;
   const isEdit           = originalName !== '';

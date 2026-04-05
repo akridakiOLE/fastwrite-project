@@ -18,6 +18,37 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+
+def _calc_confidence(extracted: dict, schema: dict) -> float:
+    """Υπολογισμός ποσοστού εμπιστοσύνης βάσει πληρότητας πεδίων.
+    Ελέγχει πόσα πεδία του schema επιστράφηκαν non-null/non-empty.
+    Επιστρέφει ποσοστό 0-100.
+    """
+    if not schema or not extracted:
+        return 0.0
+    props = schema.get("properties", {})
+    if not props:
+        return 0.0
+    # Μετράμε μόνο πεδία χρήστη (όχι metadata _matched_supplier κτλ)
+    total = 0
+    filled = 0
+    for key, prop in props.items():
+        if key.startswith("_"):
+            continue
+        total += 1
+        val = extracted.get(key)
+        if val is None:
+            continue
+        if isinstance(val, str) and val.strip() == "":
+            continue
+        if isinstance(val, list):
+            # array field: μετράμε αν έχει τουλάχιστον 1 item
+            if len(val) > 0:
+                filled += 1
+            continue
+        filled += 1
+    return round((filled / total) * 100, 1) if total > 0 else 0.0
+
 BATCH_SIZE            = 10
 MAX_WORKERS           = 4
 MAX_PAGES_PER_INVOICE = 10
@@ -396,9 +427,13 @@ class BatchProcessor:
                 if result.is_ok():
                     final_status = "pending"
                     extracted = result.extracted_data
+                    # Υπολογισμός confidence score
+                    conf_pct = _calc_confidence(extracted, seg_schema)
+                    extracted["_confidence_pct"] = conf_pct
                     if detected_supplier and detected_supplier != "unknown":
                         extracted.setdefault("_matched_supplier", detected_supplier)
                         extracted.setdefault("_matched_template", used_schema_name)
+                    print(f"[extract_one] doc_id={doc_id} EXTRACTED. confidence={conf_pct}%", flush=True)
                     self.db.update_document_status(
                         doc_id, status=final_status,
                         result_json=json.dumps(extracted))
