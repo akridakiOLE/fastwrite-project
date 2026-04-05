@@ -1136,9 +1136,11 @@ def batch_upload():
     skip_completed    = request.form.get("skip_completed", "false").lower() == "true"
     registration_only = request.form.get("registration_only", "false").lower() == "true"
     logger.info("[batch_upload] original_filename='%s', skip_completed=%s, auto_match=%s, "
-                "registration_only=%s, schema='%s', file_path_param='%s'",
+                "REGISTRATION_ONLY=%s, schema='%s', file_path_param='%s'",
                 original_filename, skip_completed, auto_match, registration_only,
                 schema_name, file_path_param or "(uploaded file)")
+    print(f"[batch_upload] REGISTRATION_ONLY={registration_only}, "
+          f"auto_match={auto_match}, schema='{schema_name}'", flush=True)
     job_id = batch_proc.submit(pdf_path=dest, schema_name=schema_name,
                                original_filename=original_filename,
                                auto_match=auto_match,

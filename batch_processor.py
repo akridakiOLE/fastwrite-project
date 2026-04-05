@@ -295,7 +295,7 @@ class BatchProcessor:
 
         print(f"[_extract_parallel] START: original_filename='{original_filename}', "
               f"skip_completed={skip_completed}, auto_match={auto_match}, "
-              f"segments={len(segments)}", flush=True)
+              f"registration_only={registration_only}, segments={len(segments)}", flush=True)
 
         default_template = self.db.get_template(schema_name) if schema_name else None
         if not default_template and not auto_match:
@@ -310,18 +310,24 @@ class BatchProcessor:
         def extract_one(idx, segment, doc_id):
             try:
                 extractor = AIExtractor(api_key=api_key)
+                detected_supplier = None
+                used_schema_name  = None
+                seg_schema        = None
 
-                # ── Auto Template Matching ──────────────────────────────────
+                # ── ΒΗΜΑ 1: Template Matching (ανίχνευση προμηθευτή + ετικέτα) ──
                 if auto_match:
                     matched_name, detected_supplier, is_real_match = self._match_template(
                         extractor, segment.pages, schema_name, job)
+                    print(f"[extract_one] doc_id={doc_id}, auto_match=True, "
+                          f"is_real_match={is_real_match}, matched_name={matched_name}, "
+                          f"detected_supplier={detected_supplier}, "
+                          f"registration_only={registration_only}", flush=True)
                     if is_real_match:
                         tmpl = self.db.get_template(matched_name)
                         if tmpl:
                             seg_schema = self.schema_bld.build_from_list(tmpl["fields"])
                             seg_schema.pop("additionalProperties", None)
-                            used_schema_name    = matched_name
-                            used_require_review = tmpl.get("require_review", True)
+                            used_schema_name = matched_name
                         else:
                             # Template name matched αλλά δεν βρέθηκε στη βάση
                             self.db.update_document_status(
@@ -329,7 +335,6 @@ class BatchProcessor:
                                 result_json=json.dumps({"_skipped": True,
                                     "_reason": "Template δεν βρέθηκε στη βάση",
                                     "_matched_supplier": detected_supplier or "unknown"}))
-                            # Clear schema_name so batch won't try to extract later
                             self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
                             self.db.conn.commit()
                             return {"success": True, "doc_id": doc_id,
@@ -341,39 +346,32 @@ class BatchProcessor:
                             result_json=json.dumps({"_skipped": True,
                                 "_reason": "Δεν βρέθηκε template για αυτό το τιμολόγιο",
                                 "_matched_supplier": detected_supplier or "unknown"}))
-                        # Clear schema_name so batch won't try to extract later
                         self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
                         self.db.conn.commit()
                         return {"success": True, "doc_id": doc_id,
                                 "matched_template": None, "skipped": True}
                 else:
                     if not default_schema or not default_template:
-                        # No template available and auto_match didn't find one
                         self.db.update_document_status(
                             doc_id, status="no_template",
                             result_json=json.dumps({"_skipped": True,
                                 "_reason": "Δεν υπάρχει ετικέτα",
                                 "_matched_supplier": "unknown"}))
-                        # Clear schema_name so batch won't try to extract later
                         self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
                         self.db.conn.commit()
                         return {"success": True, "doc_id": doc_id,
                                 "matched_template": None, "skipped": True}
-                    seg_schema          = default_schema
-                    used_schema_name    = schema_name
-                    used_require_review = default_template.get("require_review", True)
-                    detected_supplier   = None
+                    seg_schema       = default_schema
+                    used_schema_name = schema_name
 
-                # ── Registration Only: μόνο καταγραφή, ΟΧΙ extraction ──
+                # ── ΒΗΜΑ 2: Registration Only → ΜΟΝΟ καταγραφή, ΠΟΤΕ extraction ──
                 if registration_only:
                     reg_data = {}
                     if detected_supplier and detected_supplier != "unknown":
                         reg_data["_matched_supplier"] = detected_supplier
                     if used_schema_name:
                         reg_data["_matched_template"] = used_schema_name
-                    self.db.update_document_status(
-                        doc_id, status="registered",
-                        result_json=json.dumps(reg_data) if reg_data else None)
+                    # Αποθήκευση schema_name αν βρέθηκε match
                     if used_schema_name and used_schema_name != schema_name:
                         try:
                             self.db.conn.execute(
@@ -382,12 +380,18 @@ class BatchProcessor:
                             self.db.conn.commit()
                         except Exception:
                             pass
+                    self.db.update_document_status(
+                        doc_id, status="registered",
+                        result_json=json.dumps(reg_data) if reg_data else None)
+                    print(f"[extract_one] doc_id={doc_id} REGISTERED (no extraction). "
+                          f"supplier={detected_supplier}, template={used_schema_name}", flush=True)
                     return {"success": True, "doc_id": doc_id,
                             "matched_template": used_schema_name, "registered": True}
 
+                # ── ΒΗΜΑ 3: Extraction (ΜΟΝΟ αν δεν είναι registration_only) ──
+                print(f"[extract_one] doc_id={doc_id} EXTRACTING data...", flush=True)
                 result = extractor.extract(image_paths=segment.pages, schema=seg_schema)
                 if result.is_ok():
-                    # Μετά extraction: πάντα pending (Εκκρεμεί) — ο χρήστης εγκρίνει χειροκίνητα
                     final_status = "pending"
                     extracted = result.extracted_data
                     if detected_supplier and detected_supplier != "unknown":
@@ -545,8 +549,12 @@ class BatchProcessor:
                 job.errors.append(
                     f"Invoice {idx+1} ({filename}): παραλείφθηκε (ήδη {skip_match.get('status', 'Completed')}).")
             else:
-                # Don't store placeholder schema names like __auto__
-                initial_schema = schema_name if schema_name and schema_name != '__auto__' else None
+                # Registration only: ΜΗΝ βάλεις default schema — θα ανατεθεί από auto_match
+                # Normal batch: βάλε schema αν δεν είναι placeholder
+                if registration_only:
+                    initial_schema = None
+                else:
+                    initial_schema = schema_name if schema_name and schema_name != '__auto__' else None
                 doc_id = self.db.insert_document(
                     filename=filename,
                     file_path=str(segment.pages[0]),
