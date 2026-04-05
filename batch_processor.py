@@ -371,15 +371,17 @@ class BatchProcessor:
                         reg_data["_matched_supplier"] = detected_supplier
                     if used_schema_name:
                         reg_data["_matched_template"] = used_schema_name
-                    # Αποθήκευση schema_name αν βρέθηκε match
-                    if used_schema_name and used_schema_name != schema_name:
+                    # ΠΑΝΤΑ αποθήκευση schema_name αν βρέθηκε match
+                    # (κατά registration, initial_schema=None, οπότε πρέπει να ενημερωθεί)
+                    if used_schema_name:
                         try:
                             self.db.conn.execute(
                                 "UPDATE documents SET schema_name=? WHERE id=?",
                                 (used_schema_name, doc_id))
                             self.db.conn.commit()
-                        except Exception:
-                            pass
+                            print(f"[extract_one] doc_id={doc_id} schema_name SET to '{used_schema_name}'", flush=True)
+                        except Exception as e:
+                            print(f"[extract_one] doc_id={doc_id} FAILED to set schema_name: {e}", flush=True)
                     self.db.update_document_status(
                         doc_id, status="registered",
                         result_json=json.dumps(reg_data) if reg_data else None)
