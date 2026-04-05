@@ -449,6 +449,16 @@ select.form-input option{background:var(--bg2);}
                   </select>
                 </div>
               </th>
+              <th style="color:#fff;vertical-align:top;min-width:90px;position:relative;">
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-batch')">BATCH <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-batch" style="display:none;">
+                  <select id="cff-batch" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+                    <option value="">ΟΛΑ</option>
+                    <option value="done">Ολοκληρώθηκε</option>
+                    <option value="pending">Εκκρεμεί</option>
+                  </select>
+                </div>
+              </th>
               <th style="color:#fff;vertical-align:top;min-width:100px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-date')">ΚΑΤΑΧΩΡΗΣΗ <span class="cf-arrow">▼</span></div>
                 <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-date" style="display:none;">
@@ -827,7 +837,7 @@ async function loadDocuments() {
 
 function clearDocFilters() {
   document.getElementById('doc-search').value = '';
-  ['cff-file','cff-label','cff-supplier','cff-status','cff-pct'].forEach(id => {
+  ['cff-file','cff-label','cff-supplier','cff-status','cff-batch','cff-pct'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -891,6 +901,7 @@ function filterDocs() {
   const fLabel    = (document.getElementById('cff-label')?.value || '');
   const fSupplier = (document.getElementById('cff-supplier')?.value || '');
   const fStatus   = (document.getElementById('cff-status')?.value || '');
+  const fBatch    = (document.getElementById('cff-batch')?.value || '');
   const fPct      = (document.getElementById('cff-pct')?.value || '');
   const fPctCustom= (document.getElementById('cff-pct-custom')?.value || '');
   const fFrom     = (document.getElementById('cff-date-from')?.value || '');
@@ -916,6 +927,11 @@ function filterDocs() {
     } else {
       filtered = filtered.filter(d => d.status === fStatus);
     }
+  }
+  if (fBatch) {
+    const batchDone = ['Completed','pending_review','completed','approved','Approved','pending'];
+    if (fBatch === 'done') filtered = filtered.filter(d => batchDone.includes(d.status));
+    else if (fBatch === 'pending') filtered = filtered.filter(d => !batchDone.includes(d.status));
   }
   if (minPct !== null) filtered = filtered.filter(d => {
     const rd = d.result_data || {};
@@ -951,7 +967,7 @@ function renderDocs(docs) {
   if (countEl) countEl.textContent = docs.length + ' εγγραφές';
 
   if (!docs.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:40px">Δεν βρέθηκαν έγγραφα</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:40px">Δεν βρέθηκαν έγγραφα</td></tr>';
     return;
   }
   tbody.innerHTML = docs.map(doc => {
@@ -964,6 +980,10 @@ function renderDocs(docs) {
     const filename = doc.original_filename || doc.filename || '—';
     // Smart name (vendor — invoice) για tooltip/title
     const smartName = doc.filename !== doc.original_filename ? doc.filename : null;
+    // Batch status
+    const batchStatus = (doc.status === 'Completed' || doc.status === 'pending_review' || doc.status === 'approved' || doc.status === 'pending')
+      ? '<span style="color:var(--accent);font-size:12px;">Ολοκληρώθηκε</span>'
+      : '<span style="color:var(--warn);font-size:12px;">Εκκρεμεί</span>';
     // Ποσοστό OCR (θα ρυθμιστεί αργότερα)
     const ocrPct = rd.confidence_pct || rd.ocr_confidence || '—';
 
@@ -978,6 +998,7 @@ function renderDocs(docs) {
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${supplier}</td>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${ocrPct}</span></td>
       <td>${badgeHtml(doc.status)}</td>
+      <td>${batchStatus}</td>
       <td><span style="font-size:12px;color:var(--text3)">${recDate}</span></td>
       <td style="display:flex;gap:5px">
         <button class="btn btn-secondary btn-sm" onclick="viewDoc(${doc.id})" title="Προβολή">👁</button>
