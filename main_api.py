@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file, make_response, redirect
 from db_manager     import DatabaseManager
-from auth_manager   import create_token, verify_token, hash_password, check_password, require_auth, COOKIE_NAME
+from auth_manager   import create_token, verify_token, hash_password, check_password, require_auth, require_admin, COOKIE_NAME
 from key_manager    import KeyManager
 from file_processor import FileProcessor
 from schema_builder import SchemaBuilder
@@ -1310,7 +1310,7 @@ def auth_login():
         except ImportError:
             logger.error("pyotp not installed — cannot verify 2FA")
             return jsonify({"error": "2FA library missing on server"}), 500
-    token = create_token(user["id"], user["username"])
+    token = create_token(user["id"], user["username"], user.get("role", "user"))
     resp = make_response(jsonify({"success": True, "username": user["username"], "role": user["role"]}))
     resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="Lax", secure=False, max_age=86400, path="/")
     return resp
@@ -1329,6 +1329,7 @@ def auth_me():
         return jsonify({"error": "User not found"}), 404
     return jsonify({"id": user["id"], "username": user["username"],
                      "role": user["role"], "email": user.get("email", ""),
+                     "totp_enabled": bool(user.get("totp_enabled", 0)),
                      "created_at": user["created_at"]})
 
 @app.post("/api/auth/change-username")
@@ -1355,7 +1356,7 @@ def auth_change_username():
     except Exception:
         return jsonify({"error": "Το username χρησιμοποιείται ήδη"}), 409
     # Issue new token with updated username
-    token = create_token(user["id"], new_username)
+    token = create_token(user["id"], new_username, user.get("role", "user"))
     resp = make_response(jsonify({"success": True}))
     resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="Lax", secure=False, max_age=86400, path="/")
     return resp
@@ -1478,6 +1479,98 @@ def auth_2fa_status():
     return jsonify({"totp_enabled": bool(user.get("totp_enabled", 0))})
 
 
+# ── Registration Endpoint ─────────────────────────────────────────────────────
+
+@app.post("/api/auth/register")
+def auth_register():
+    """Public registration. Creates a new user with role='user'."""
+    data = request.get_json(force=True)
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    email = data.get("email", "").strip()
+    if not username or not password:
+        return jsonify({"error": "Απαιτείται username και κωδικός"}), 400
+    if len(username) < 3:
+        return jsonify({"error": "Το username πρέπει να έχει τουλάχιστον 3 χαρακτήρες"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες"}), 400
+    if email and "@" not in email:
+        return jsonify({"error": "Μη έγκυρη μορφή email"}), 400
+    # Check duplicate username
+    existing = db.get_user_by_username(username)
+    if existing:
+        return jsonify({"error": "Το username χρησιμοποιείται ήδη"}), 409
+    try:
+        user_id = db.create_user(username, hash_password(password), role="user")
+        if email:
+            db.update_user_email(user_id, email)
+        # Auto-login: issue JWT token
+        token = create_token(user_id, username, "user")
+        resp = make_response(jsonify({"success": True, "username": username, "role": "user"}))
+        resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="Lax", secure=False, max_age=86400, path="/")
+        return resp
+    except Exception as e:
+        logger.error(f"Registration error: {e}")
+        return jsonify({"error": "Σφάλμα κατά την εγγραφή"}), 500
+
+
+# ── Admin Endpoints ──────────────────────────────────────────────────────────
+
+@app.get("/api/admin/users")
+@require_admin
+def admin_list_users():
+    """List all users. Admin only. No sensitive data (no password_hash, no totp_secret)."""
+    users = db.list_users()
+    return jsonify(users)
+
+
+@app.post("/api/admin/users/<int:user_id>/toggle-active")
+@require_admin
+def admin_toggle_active(user_id):
+    """Activate or deactivate a user. Cannot deactivate yourself."""
+    admin_id = request.current_user["user_id"]
+    if user_id == admin_id:
+        return jsonify({"error": "Δεν μπορείς να απενεργοποιήσεις τον εαυτό σου"}), 400
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return jsonify({"error": "Ο χρήστης δεν βρέθηκε"}), 404
+    if user.get("is_active"):
+        db.deactivate_user(user_id)
+        return jsonify({"success": True, "is_active": False})
+    else:
+        db.activate_user(user_id)
+        return jsonify({"success": True, "is_active": True})
+
+
+@app.post("/api/admin/users/<int:user_id>/reset-2fa")
+@require_admin
+def admin_reset_2fa(user_id):
+    """Reset (disable) 2FA for a user. Admin only."""
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return jsonify({"error": "Ο χρήστης δεν βρέθηκε"}), 404
+    db.disable_totp(user_id)
+    return jsonify({"success": True, "message": f"Το 2FA απενεργοποιήθηκε για τον χρήστη {user['username']}"})
+
+
+@app.post("/api/admin/users/<int:user_id>/change-role")
+@require_admin
+def admin_change_role(user_id):
+    """Change user role. Cannot change your own role."""
+    admin_id = request.current_user["user_id"]
+    if user_id == admin_id:
+        return jsonify({"error": "Δεν μπορείς να αλλάξεις τον δικό σου ρόλο"}), 400
+    data = request.get_json(force=True)
+    new_role = data.get("role", "").strip()
+    if new_role not in ("admin", "user"):
+        return jsonify({"error": "Μη έγκυρος ρόλος"}), 400
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return jsonify({"error": "Ο χρήστης δεν βρέθηκε"}), 404
+    db.update_user_role(user_id, new_role)
+    return jsonify({"success": True, "role": new_role})
+
+
 # ── Login Page ────────────────────────────────────────────────────────────────
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="el">
@@ -1520,6 +1613,9 @@ button:hover{opacity:.85;}
     </div>
     <button type="submit" id="login-btn">Sign In</button>
   </form>
+  <div style="text-align:center;margin-top:20px;font-size:13px;color:#7c8299;">
+    Δεν έχεις λογαριασμό; <a href="/ui/register" style="color:#00e5a0;text-decoration:none;">Εγγραφή</a>
+  </div>
 </div>
 <script>
 let needs2fa=false;
@@ -1552,6 +1648,87 @@ async function doLogin(e){
 @app.get("/ui/login")
 def serve_login():
     return LOGIN_HTML, 200, {"Content-Type": "text/html"}
+
+
+REGISTER_HTML = """<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FastWrite — Register</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--bg3:#181c24;--border:#1e2330;--accent:#00e5a0;--text:#e8eaf0;--text2:#7c8299;--danger:#ff4444;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.reg-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:48px 40px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.5);}
+.reg-card h1{font-size:24px;margin-bottom:8px;letter-spacing:-0.5px;}
+.reg-card h1 span{color:var(--accent);}
+.reg-card p{color:var(--text2);font-size:14px;margin-bottom:32px;}
+label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;}
+input{width:100%;padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;margin-bottom:16px;outline:none;transition:border .2s;}
+input:focus{border-color:var(--accent);}
+button{width:100%;padding:14px;background:var(--accent);color:#0a0c10;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;}
+button:hover{opacity:.85;}
+.error-msg{color:var(--danger);font-size:13px;margin-bottom:16px;display:none;}
+.success-msg{color:var(--accent);font-size:13px;margin-bottom:16px;display:none;}
+</style>
+</head>
+<body>
+<div class="reg-card">
+  <h1>Fast<span>Write</span></h1>
+  <p>Create your account</p>
+  <div class="error-msg" id="error-msg"></div>
+  <div class="success-msg" id="success-msg"></div>
+  <form id="reg-form" onsubmit="return doRegister(event)">
+    <label>Username</label>
+    <input type="text" id="reg-username" placeholder="min. 3 characters" autocomplete="username" required minlength="3"/>
+    <label>Email (optional)</label>
+    <input type="email" id="reg-email" placeholder="your@email.com" autocomplete="email"/>
+    <label>Password</label>
+    <div style="position:relative">
+      <input type="password" id="reg-password" placeholder="min. 6 characters" autocomplete="new-password" required minlength="6" style="padding-right:40px"/>
+      <span onclick="var p=document.getElementById('reg-password');p.type=p.type==='password'?'text':'password'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#7c8299;font-size:18px;">&#128065;</span>
+    </div>
+    <label>Confirm Password</label>
+    <div style="position:relative">
+      <input type="password" id="reg-password2" placeholder="repeat password" autocomplete="new-password" required minlength="6" style="padding-right:40px"/>
+      <span onclick="var p=document.getElementById('reg-password2');p.type=p.type==='password'?'text':'password'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#7c8299;font-size:18px;">&#128065;</span>
+    </div>
+    <button type="submit">Create Account</button>
+  </form>
+  <div style="text-align:center;margin-top:20px;font-size:13px;color:#7c8299;">
+    Already have an account? <a href="/ui/login" style="color:#00e5a0;text-decoration:none;">Sign In</a>
+  </div>
+</div>
+<script>
+async function doRegister(e){
+  e.preventDefault();
+  const err=document.getElementById('error-msg');
+  const suc=document.getElementById('success-msg');
+  err.style.display='none';suc.style.display='none';
+  const username=document.getElementById('reg-username').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const pw=document.getElementById('reg-password').value;
+  const pw2=document.getElementById('reg-password2').value;
+  if(pw!==pw2){err.textContent='Passwords do not match';err.style.display='block';return false;}
+  try{
+    const r=await fetch('/api/auth/register',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:username,password:pw,email:email})});
+    const d=await r.json();
+    if(r.ok&&d.success){window.location.href='/ui';}
+    else{err.textContent=d.error||'Registration failed';err.style.display='block';}
+  }catch(ex){err.textContent='Connection error';err.style.display='block';}
+  return false;
+}
+</script>
+</body>
+</html>"""
+
+
+@app.get("/ui/register")
+def serve_register():
+    return REGISTER_HTML, 200, {"Content-Type": "text/html"}
+
 
 @app.get("/ui")
 @app.get("/ui/")

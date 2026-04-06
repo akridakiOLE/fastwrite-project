@@ -638,6 +638,13 @@ select.form-input option{background:var(--bg2);}
             <div id="system-info" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
           </div>
 
+          <!-- Section 4: Διαχείριση Χρηστών (Admin only) -->
+          <div class="card" id="admin-users-section" style="display:none;">
+            <div class="card-title">👥 Διαχείριση Χρηστών</div>
+            <div id="admin-users-count" style="font-size:13px;color:var(--text2);margin-bottom:12px;">Φόρτωση...</div>
+            <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -3078,8 +3085,9 @@ async function loadSettings() {
     api('GET','/health'),
     api('GET','/api/auth/me')
   ]);
-  // Load 2FA status
+  // Load 2FA status + Admin users
   load2FAStatus();
+  loadAdminUsers();
 
   // Account info
   const accEl = document.getElementById('account-info');
@@ -3222,6 +3230,80 @@ async function disable2FA() {
     toast(res.message || '2FA απενεργοποιήθηκε', 'success');
     document.getElementById('twofa-disable-pw').value = '';
     load2FAStatus();
+  } else {
+    toast(res.error || 'Σφάλμα', 'error');
+  }
+}
+
+// ── Admin User Management ────────────────────────────────────────────────────
+async function loadAdminUsers() {
+  const section = document.getElementById('admin-users-section');
+  // Only show for admins
+  const me = await api('GET', '/api/auth/me');
+  if (!me || me.role !== 'admin') { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  const users = await api('GET', '/api/admin/users');
+  if (!Array.isArray(users)) {
+    document.getElementById('admin-users-count').textContent = 'Σφάλμα φόρτωσης';
+    return;
+  }
+  const active = users.filter(u => u.is_active).length;
+  document.getElementById('admin-users-count').textContent =
+    `${users.length} χρήστες συνολικά, ${active} ενεργοί`;
+
+  const list = document.getElementById('admin-users-list');
+  list.innerHTML = users.map(u => {
+    const isMe = u.id === me.id;
+    const statusBadge = u.is_active
+      ? '<span class="badge badge-green" style="font-size:10px;">Ενεργός</span>'
+      : '<span class="badge badge-red" style="font-size:10px;">Ανενεργός</span>';
+    const roleBadge = u.role === 'admin'
+      ? '<span class="badge" style="font-size:10px;background:rgba(168,85,247,0.15);color:#a855f7;">Admin</span>'
+      : '<span class="badge" style="font-size:10px;background:rgba(0,229,160,0.1);color:var(--accent);">User</span>';
+    const twofaBadge = u.totp_enabled
+      ? '<span style="font-size:10px;color:var(--accent);">2FA ✓</span>'
+      : '';
+    const actions = isMe ? '<span style="font-size:11px;color:var(--text3);">(εσύ)</span>' : `
+      <button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" onclick="adminToggleActive(${u.id})">${u.is_active ? 'Απενεργ.' : 'Ενεργοπ.'}</button>
+      ${u.totp_enabled ? `<button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" onclick="adminReset2FA(${u.id})">Reset 2FA</button>` : ''}
+      <button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" onclick="adminChangeRole(${u.id},'${u.role==='admin'?'user':'admin'}')">${u.role==='admin'?'→ User':'→ Admin'}</button>
+    `;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div style="font-size:13px;font-weight:600;">${u.username} ${roleBadge} ${statusBadge} ${twofaBadge}</div>
+        <div style="font-size:11px;color:var(--text3);">${u.email || 'Χωρίς email'} · ${u.created_at?.split('T')[0] || '—'}</div>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;">${actions}</div>
+    </div>`;
+  }).join('');
+}
+
+async function adminToggleActive(userId) {
+  const res = await api('POST', `/api/admin/users/${userId}/toggle-active`);
+  if (res.success) {
+    toast(res.is_active ? 'Ο χρήστης ενεργοποιήθηκε' : 'Ο χρήστης απενεργοποιήθηκε', 'success');
+    loadAdminUsers();
+  } else {
+    toast(res.error || 'Σφάλμα', 'error');
+  }
+}
+
+async function adminReset2FA(userId) {
+  const res = await api('POST', `/api/admin/users/${userId}/reset-2fa`);
+  if (res.success) {
+    toast(res.message || '2FA reset!', 'success');
+    loadAdminUsers();
+  } else {
+    toast(res.error || 'Σφάλμα', 'error');
+  }
+}
+
+async function adminChangeRole(userId, newRole) {
+  const res = await api('POST', `/api/admin/users/${userId}/change-role`, { role: newRole });
+  if (res.success) {
+    toast(`Ο ρόλος άλλαξε σε ${newRole}`, 'success');
+    loadAdminUsers();
   } else {
     toast(res.error || 'Σφάλμα', 'error');
   }

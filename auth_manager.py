@@ -44,11 +44,12 @@ TOKEN_EXPIRY_HOURS = 24
 COOKIE_NAME = "fw_token"
 
 
-def create_token(user_id: int, username: str) -> str:
+def create_token(user_id: int, username: str, role: str = "user") -> str:
     """Create a JWT token for the given user."""
     payload = {
         "user_id": user_id,
         "username": username,
+        "role": role,
         "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRY_HOURS),
         "iat": datetime.now(timezone.utc),
     }
@@ -59,7 +60,11 @@ def verify_token(token: str) -> dict | None:
     """Verify a JWT token. Returns user dict or None."""
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return {"user_id": payload["user_id"], "username": payload["username"]}
+        return {
+            "user_id": payload["user_id"],
+            "username": payload["username"],
+            "role": payload.get("role", "user"),
+        }
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
         return None
 
@@ -84,6 +89,23 @@ def require_auth(f):
         user = verify_token(token)
         if not user:
             return jsonify({"error": "Invalid or expired token"}), 401
+        request.current_user = user
+        return f(*args, **kwargs)
+    return decorated
+
+
+def require_admin(f):
+    """Decorator that checks fw_token cookie AND requires admin role."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.cookies.get(COOKIE_NAME)
+        if not token:
+            return jsonify({"error": "Authentication required"}), 401
+        user = verify_token(token)
+        if not user:
+            return jsonify({"error": "Invalid or expired token"}), 401
+        if user.get("role") != "admin":
+            return jsonify({"error": "Admin access required"}), 403
         request.current_user = user
         return f(*args, **kwargs)
     return decorated

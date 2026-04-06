@@ -360,9 +360,9 @@ class DatabaseManager:
         return dict(row) if row else None
 
     def list_users(self) -> List[Dict[str, Any]]:
-        """Return all users."""
+        """Return all users (safe fields only — no password_hash, no totp_secret)."""
         rows = self.conn.execute(
-            "SELECT id, username, role, created_at, is_active FROM users ORDER BY created_at DESC"
+            "SELECT id, username, role, email, created_at, is_active, totp_enabled FROM users ORDER BY created_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -418,6 +418,20 @@ class DatabaseManager:
         """Deactivate a user by ID."""
         self.conn.execute(
             "UPDATE users SET is_active = 0 WHERE id = ?", (user_id,)
+        )
+        self.conn.commit()
+
+    def activate_user(self, user_id: int):
+        """Activate a user by ID."""
+        self.conn.execute(
+            "UPDATE users SET is_active = 1 WHERE id = ?", (user_id,)
+        )
+        self.conn.commit()
+
+    def update_user_role(self, user_id: int, role: str):
+        """Update a user's role."""
+        self.conn.execute(
+            "UPDATE users SET role = ? WHERE id = ?", (role, user_id)
         )
         self.conn.commit()
 
