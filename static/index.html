@@ -3003,14 +3003,15 @@ function leRenderLabelsDropdown() {
     el.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--text3);text-align:center;">${t('js_no_labels')}</div>`;
     return;
   }
-  el.innerHTML = leExistingLabels.map(t => {
-    const sp = t.supplier_pattern || '';
-    const fieldCount = (t.fields || []).length;
-    return `<div onclick="leLoadExistingLabel('${t.name.replace(/'/g,"\\'")}')" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin:2px 0;font-size:12px;color:var(--text2);transition:background .1s;"
+  const fieldsLabel = t('js_fields');
+  el.innerHTML = leExistingLabels.map(tmpl => {
+    const sp = tmpl.supplier_pattern || '';
+    const fieldCount = (tmpl.fields || []).length;
+    return `<div onclick="leLoadExistingLabel('${tmpl.name.replace(/'/g,"\\'")}')" style="padding:8px 10px;border-radius:6px;cursor:pointer;margin:2px 0;font-size:12px;color:var(--text2);transition:background .1s;"
       onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background='transparent'">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <b style="color:var(--text);font-size:12px;">${t.name}</b>
-        <span style="font-size:10px;color:var(--text3);">${fieldCount} ${t('js_fields')}</span>
+        <b style="color:var(--text);font-size:12px;">${tmpl.name}</b>
+        <span style="font-size:10px;color:var(--text3);">${fieldCount} ${fieldsLabel}</span>
       </div>
       ${sp ? `<div style="font-size:10px;color:var(--accent);margin-top:2px;">🏢 ${sp}</div>` : ''}
     </div>`;
@@ -3244,22 +3245,22 @@ function renderTemplatesList(templates) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">${t('js_no_labels_found')}</div><div class="empty-sub">${t('js_create_first_label')}</div></div>`;
     return;
   }
-  el.innerHTML = templates.map(t=>`
+  el.innerHTML = templates.map(tmpl=>`
     <div class="card" style="margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div class="card-title" style="margin:0">${t.name}</div>
+        <div class="card-title" style="margin:0">${tmpl.name}</div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-secondary btn-sm" onclick="editTemplate('${t.name}')">✏️ ${t('js_edit')}</button>
-          <button class="btn btn-secondary btn-sm" onclick="copyTemplateToClipboard('${t.name}')" title="${t('js_copy_hint')}">📋 ${t('js_copy')}</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${t.name}')">${t('btn_delete')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="editTemplate('${tmpl.name}')">${t('js_edit')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyTemplateToClipboard('${tmpl.name}')" title="${t('js_copy_hint')}">${t('js_copy')}</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${tmpl.name}')">${t('btn_delete')}</button>
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${(t.fields||[]).map(f=> f.type === 'array'
+        ${(tmpl.fields||[]).map(f=> f.type === 'array'
           ? `<span style="background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent)">${f.name} <span style="color:var(--text3)">array[${(f.items||[]).map(i=>i.name).join(', ')}]</span></span>`
           : `<span style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--text2)">${f.name} <span style="color:var(--text3)">${f.type}</span></span>`
         ).join('')}
-        ${t.supplier_pattern ? `<span style="background:rgba(0,102,255,0.1);border:1px solid rgba(0,102,255,0.3);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent2)">🏢 ${t.supplier_pattern}</span>` : ''}
+        ${tmpl.supplier_pattern ? `<span style="background:rgba(0,102,255,0.1);border:1px solid rgba(0,102,255,0.3);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent2)">🏢 ${tmpl.supplier_pattern}</span>` : ''}
       </div>
     </div>`).join('');
 }
