@@ -136,12 +136,11 @@ class DatabaseManager:
                     username      TEXT    NOT NULL UNIQUE,
                     password_hash TEXT    NOT NULL,
                     role          TEXT    NOT NULL DEFAULT 'user',
-                    email         TEXT    DEFAULT '',
                     created_at    TEXT    NOT NULL,
                     is_active     INTEGER NOT NULL DEFAULT 1
                 )
             """)
-            # Migration: add email column if missing
+            # Migration: add email column if missing (safe for multiple workers)
             try:
                 cols = [row[1] for row in self.conn.execute("PRAGMA table_info(users)").fetchall()]
                 if 'email' not in cols:
