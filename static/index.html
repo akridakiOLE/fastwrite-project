@@ -668,6 +668,79 @@ select.form-input option{background:var(--bg2);}
     <div id="page-faq" class="page" style="display:none">
       <div class="topbar"><div class="page-title">Βοήθεια &amp; Συχνές Ερωτήσεις</div></div>
       <div class="content" style="max-width:800px;">
+
+        <!-- Περιγραφή Συστήματος -->
+        <div class="card" style="margin-bottom:24px;border:1px solid rgba(0,229,160,0.2);background:rgba(0,229,160,0.03);">
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--accent);margin-bottom:16px;">📋 Περιγραφή Συστήματος</div>
+
+          <div style="font-size:13px;color:var(--text);line-height:1.8;">
+            <p style="margin-bottom:14px;">Το <strong>FastWrite</strong> είναι ένα τοπικό εργαλείο αυτόματης εξαγωγής δεδομένων από έγγραφα (τιμολόγια, αποδείξεις, παραστατικά) με χρήση τεχνητής νοημοσύνης (AI). Λειτουργεί αποκλειστικά στον δικό σας υπολογιστή — τα δεδομένα σας δεν κοινοποιούνται σε κανέναν, ούτε στον διαχειριστή της πλατφόρμας.</p>
+
+            <p style="margin-bottom:14px;"><strong>Τι κάνει:</strong> Ανεβάζετε ένα PDF με ένα ή πολλαπλά τιμολόγια. Το σύστημα αναγνωρίζει αυτόματα κάθε ξεχωριστό τιμολόγιο, εντοπίζει τον προμηθευτή, αντιστοιχεί την κατάλληλη ετικέτα και εξάγει τα δεδομένα που εσείς ορίσατε (αριθμός τιμολογίου, ημερομηνία, ποσά, γραμμές ειδών κ.λπ.). Τέλος, εξάγετε τα αποτελέσματα σε CSV ή Excel.</p>
+
+            <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--accent2);margin:20px 0 12px;">🔄 Ροή Εργασίας — Βήμα προς Βήμα</div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;">
+
+              <div style="display:flex;gap:12px;align-items:flex-start;">
+                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">1</div>
+                <div>
+                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Ρύθμιση API Key</div>
+                  <div style="color:var(--text2);font-size:12px;">Πηγαίνετε στις <strong>Ρυθμίσεις → API Keys</strong> και εισάγετε το δικό σας κλειδί AI (π.χ. Google Gemini). Αυτό είναι υποχρεωτικό — η πλατφόρμα δεν παρέχει δικό της κλειδί. Η χρέωση γίνεται απευθείας στον δικό σας λογαριασμό AI.</div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:12px;align-items:flex-start;">
+                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">2</div>
+                <div>
+                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Ανέβασμα Εγγράφων</div>
+                  <div style="color:var(--text2);font-size:12px;">Πηγαίνετε στο <strong>Upload &amp; Extract</strong>. Σύρετε ή επιλέξτε ένα PDF αρχείο (μέχρι 200 τιμολόγια ανά αρχείο) και πατήστε <strong>"Καταγραφή Εγγράφων"</strong>. Το σύστημα αναγνωρίζει αυτόματα τα ξεχωριστά τιμολόγια και τους προμηθευτές.</div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:12px;align-items:flex-start;">
+                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">3</div>
+                <div>
+                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Δημιουργία Ετικετών</div>
+                  <div style="color:var(--text2);font-size:12px;">Από τη σελίδα <strong>Έγγραφα</strong>, επιλέξτε ένα ή περισσότερα έγγραφα και πατήστε <strong>"Ετικέτες"</strong>. Θα μεταφερθείτε σε ειδική σελίδα όπου βλέπετε το πραγματικό τιμολόγιο αριστερά και τη φόρμα ετικέτας δεξιά. Ορίστε τα πεδία που θέλετε να εξαχθούν (π.χ. αριθμός τιμολογίου, ημερομηνία, σύνολο, ΦΠΑ) και τις γραμμές ειδών (line items). Εναλλακτικά, δημιουργήστε ετικέτα από τη σελίδα <strong>Ετικέτες → + Νέα Ετικέτα</strong>.</div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:12px;align-items:flex-start;">
+                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">4</div>
+                <div>
+                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Εξαγωγή Δεδομένων (Batch)</div>
+                  <div style="color:var(--text2);font-size:12px;">Από τη σελίδα <strong>Έγγραφα</strong>, επιλέξτε τα έγγραφα και πατήστε <strong>"Batch"</strong>. Το σύστημα χρησιμοποιεί AI για να εξάγει τα δεδομένα βάσει της ετικέτας κάθε εγγράφου. Τα αποτελέσματα εμφανίζονται στον πίνακα εγγράφων.</div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:12px;align-items:flex-start;">
+                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">5</div>
+                <div>
+                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Έλεγχος &amp; Έγκριση</div>
+                  <div style="color:var(--text2);font-size:12px;">Από τη σελίδα <strong>Έγγραφα</strong>, επιλέξτε τα έγγραφα και πατήστε <strong>"Έγκριση"</strong>. Βλέπετε το τιμολόγιο αριστερά και τα εξαγόμενα δεδομένα δεξιά. Διορθώστε τυχόν λάθη και πατήστε <strong>"Έγκριση Τιμολογίου"</strong>. Η highlight sync τονίζει στο έγγραφο κάθε γραμμή που περνάτε τον κέρσορα.</div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:12px;align-items:flex-start;">
+                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">6</div>
+                <div>
+                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Εξαγωγή Αρχείων</div>
+                  <div style="color:var(--text2);font-size:12px;">Αφού εγκρίνετε τα έγγραφα, επιστρέψτε στη σελίδα <strong>Έγγραφα</strong>. Επιλέξτε τα εγκεκριμένα έγγραφα και πατήστε <strong>"CSV"</strong>, <strong>"XLSX"</strong> ή <strong>"Line Items XLSX"</strong> για εξαγωγή σε αρχείο. Αν δεν επιλέξετε κανένα, εξάγονται όλα τα εγκεκριμένα.</div>
+                </div>
+              </div>
+
+            </div>
+
+            <div style="margin-top:20px;padding:12px 16px;background:rgba(0,102,255,0.08);border:1px solid rgba(0,102,255,0.2);border-radius:8px;">
+              <div style="font-weight:600;color:var(--accent2);margin-bottom:6px;">💡 Συμβουλή</div>
+              <div style="color:var(--text2);font-size:12px;">Η σωστή σειρά είναι: <strong>Ανέβασμα → Ετικέτες → Batch → Έγκριση → Εξαγωγή</strong>. Δημιουργήστε πρώτα ετικέτες για κάθε τύπο τιμολογίου (π.χ. ΔΕΗ, COSMOTE, VODAFONE) και μετά ξεκινήστε τη μαζική εξαγωγή. Μόλις δημιουργήσετε μια ετικέτα, το σύστημα αντιστοιχεί αυτόματα τα νέα τιμολόγια του ίδιου προμηθευτή.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px;">❓ Συχνές Ερωτήσεις</div>
+
         <div style="margin-bottom:16px;">
           <input class="form-input" type="text" id="faq-search" placeholder="🔍 Αναζήτηση ερώτησης..." oninput="filterFAQ()" style="margin-bottom:0;"/>
         </div>
