@@ -136,10 +136,16 @@ class DatabaseManager:
                     username      TEXT    NOT NULL UNIQUE,
                     password_hash TEXT    NOT NULL,
                     role          TEXT    NOT NULL DEFAULT 'user',
+                    email         TEXT    DEFAULT '',
                     created_at    TEXT    NOT NULL,
                     is_active     INTEGER NOT NULL DEFAULT 1
                 )
             """)
+            # Migration: add email column if missing
+            cols = [row[1] for row in self.conn.execute("PRAGMA table_info(users)").fetchall()]
+            if 'email' not in cols:
+                self.conn.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''")
+                self.conn.commit()
 
     # ─── DOCUMENTS ────────────────────────────────────────────────────────────
 
@@ -353,6 +359,22 @@ class DatabaseManager:
             "SELECT id, username, role, created_at, is_active FROM users ORDER BY created_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def update_user_password(self, user_id: int, password_hash: str):
+        """Update a user's password hash."""
+        self.conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (password_hash, user_id)
+        )
+        self.conn.commit()
+
+    def update_user_email(self, user_id: int, email: str):
+        """Update a user's email."""
+        self.conn.execute(
+            "UPDATE users SET email = ? WHERE id = ?",
+            (email, user_id)
+        )
+        self.conn.commit()
 
     def deactivate_user(self, user_id: int):
         """Deactivate a user by ID."""

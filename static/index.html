@@ -491,8 +491,47 @@ select.form-input option{background:var(--bg2);}
     <div id="page-settings" class="page" style="display:none">
       <div class="topbar"><div class="page-title">Ρυθμίσεις</div></div>
       <div class="content">
-        <div style="max-width:560px;display:flex;flex-direction:column;gap:20px;">
+        <div style="max-width:600px;display:flex;flex-direction:column;gap:20px;">
 
+          <!-- Section 1: Λογαριασμός -->
+          <div class="card">
+            <div class="card-title">👤 Λογαριασμός</div>
+            <div id="account-info" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
+
+            <!-- Αλλαγή Κωδικού -->
+            <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
+              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">🔒 Αλλαγή Κωδικού</div>
+              <div class="form-group">
+                <label class="form-label">Τρέχων κωδικός</label>
+                <input class="form-input" type="password" id="pw-current" placeholder="Εισήγαγε τον τρέχοντα κωδικό..." autocomplete="current-password"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Νέος κωδικός</label>
+                <input class="form-input" type="password" id="pw-new" placeholder="Τουλάχιστον 6 χαρακτήρες..." autocomplete="new-password"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Επιβεβαίωση νέου κωδικού</label>
+                <input class="form-input" type="password" id="pw-confirm" placeholder="Επανάλαβε τον νέο κωδικό..." autocomplete="new-password"/>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="changePassword()">Αλλαγή Κωδικού</button>
+            </div>
+
+            <!-- Αλλαγή Email -->
+            <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
+              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">📧 Αλλαγή Email</div>
+              <div class="form-group">
+                <label class="form-label">Νέο email</label>
+                <input class="form-input" type="email" id="email-new" placeholder="π.χ. user@example.com"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Κωδικός (για επιβεβαίωση)</label>
+                <input class="form-input" type="password" id="email-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="current-password"/>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="changeEmail()">Αλλαγή Email</button>
+            </div>
+          </div>
+
+          <!-- Section 2: API Keys -->
           <div class="card">
             <div class="card-title">🔑 API Keys</div>
             <div id="keys-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
@@ -512,6 +551,7 @@ select.form-input option{background:var(--bg2);}
             <button class="btn btn-primary" onclick="saveKey()">Αποθήκευση Key</button>
           </div>
 
+          <!-- Section 3: Πληροφορίες Συστήματος -->
           <div class="card">
             <div class="card-title">⚙️ Πληροφορίες Συστήματος</div>
             <div id="system-info" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
@@ -2952,11 +2992,31 @@ async function deleteTemplate(name) {
 
 // ── Settings ─────────────────────────────────────────────────────────────────
 async function loadSettings() {
-  const [keys, health] = await Promise.all([api('GET','/api/keys/status'), api('GET','/health')]);
+  const [keys, health, me] = await Promise.all([
+    api('GET','/api/keys/status'),
+    api('GET','/health'),
+    api('GET','/api/auth/me')
+  ]);
+
+  // Account info
+  const accEl = document.getElementById('account-info');
+  if (me && me.username) {
+    accEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="data-item"><div class="data-key">Χρήστης</div><div class="data-val">${me.username}</div></div>
+        <div class="data-item"><div class="data-key">Ρόλος</div><div class="data-val">${me.role || '—'}</div></div>
+        <div class="data-item"><div class="data-key">Email</div><div class="data-val">${me.email || '<span style="color:var(--text3)">Δεν έχει οριστεί</span>'}</div></div>
+        <div class="data-item"><div class="data-key">Εγγραφή</div><div class="data-val">${me.created_at?.split('T')[0] || '—'}</div></div>
+      </div>`;
+  }
+
+  // API Keys
   const services = keys.configured_services||[];
   document.getElementById('keys-status').innerHTML = services.length
     ? services.map(s=>`<span class="badge badge-green" style="margin-right:6px">✓ ${s}</span>`).join('')
     : '<span style="color:var(--text3)">Δεν υπάρχουν αποθηκευμένα keys</span>';
+
+  // System info
   document.getElementById('system-info').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="data-item"><div class="data-key">Database</div><div class="data-val">${health.checks?.database||'—'}</div></div>
@@ -2964,6 +3024,40 @@ async function loadSettings() {
       <div class="data-item"><div class="data-key">Status</div><div class="data-val" style="color:var(--accent)">${health.status||'—'}</div></div>
       <div class="data-item"><div class="data-key">Domain</div><div class="data-val">fastwrite.duckdns.org</div></div>
     </div>`;
+}
+
+async function changePassword() {
+  const current = document.getElementById('pw-current').value;
+  const newPw   = document.getElementById('pw-new').value;
+  const confirm = document.getElementById('pw-confirm').value;
+  if (!current || !newPw || !confirm) { toast('Συμπλήρωσε όλα τα πεδία', 'error'); return; }
+  if (newPw !== confirm) { toast('Οι κωδικοί δεν ταιριάζουν', 'error'); return; }
+  if (newPw.length < 6) { toast('Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες', 'error'); return; }
+  const res = await api('POST', '/api/auth/change-password', { current_password: current, new_password: newPw });
+  if (res.success) {
+    toast('Ο κωδικός άλλαξε επιτυχώς!', 'success');
+    document.getElementById('pw-current').value = '';
+    document.getElementById('pw-new').value = '';
+    document.getElementById('pw-confirm').value = '';
+  } else {
+    toast(res.error || 'Σφάλμα αλλαγής κωδικού', 'error');
+  }
+}
+
+async function changeEmail() {
+  const email = document.getElementById('email-new').value.trim();
+  const pw    = document.getElementById('email-pw').value;
+  if (!email || !pw) { toast('Συμπλήρωσε email και κωδικό', 'error'); return; }
+  if (!email.includes('@')) { toast('Μη έγκυρη μορφή email', 'error'); return; }
+  const res = await api('POST', '/api/auth/change-email', { email: email, password: pw });
+  if (res.success) {
+    toast('Το email ενημερώθηκε!', 'success');
+    document.getElementById('email-new').value = '';
+    document.getElementById('email-pw').value = '';
+    loadSettings();
+  } else {
+    toast(res.error || 'Σφάλμα αλλαγής email', 'error');
+  }
 }
 
 async function saveKey() {

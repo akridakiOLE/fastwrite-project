@@ -1312,7 +1312,42 @@ def auth_me():
     if not user:
         return jsonify({"error": "User not found"}), 404
     return jsonify({"id": user["id"], "username": user["username"],
-                     "role": user["role"], "created_at": user["created_at"]})
+                     "role": user["role"], "email": user.get("email", ""),
+                     "created_at": user["created_at"]})
+
+@app.post("/api/auth/change-password")
+@require_auth
+def auth_change_password():
+    data = request.get_json(force=True)
+    current_pw = data.get("current_password", "")
+    new_pw = data.get("new_password", "")
+    if not current_pw or not new_pw:
+        return jsonify({"error": "Απαιτείται τρέχων και νέος κωδικός"}), 400
+    if len(new_pw) < 6:
+        return jsonify({"error": "Ο νέος κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες"}), 400
+    user = db.get_user_by_id(request.current_user["user_id"])
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if not check_password(current_pw, user["password_hash"]):
+        return jsonify({"error": "Λάθος τρέχων κωδικός"}), 401
+    db.update_user_password(user["id"], hash_password(new_pw))
+    return jsonify({"success": True})
+
+@app.post("/api/auth/change-email")
+@require_auth
+def auth_change_email():
+    data = request.get_json(force=True)
+    new_email = data.get("email", "").strip()
+    password = data.get("password", "")
+    if not new_email or not password:
+        return jsonify({"error": "Απαιτείται email και κωδικός"}), 400
+    user = db.get_user_by_id(request.current_user["user_id"])
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if not check_password(password, user["password_hash"]):
+        return jsonify({"error": "Λάθος κωδικός"}), 401
+    db.update_user_email(user["id"], new_email)
+    return jsonify({"success": True})
 
 # ── Login Page ────────────────────────────────────────────────────────────────
 LOGIN_HTML = """<!DOCTYPE html>
