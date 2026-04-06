@@ -642,6 +642,9 @@ select.form-input option{background:var(--bg2);}
           <div class="card" id="admin-users-section" style="display:none;">
             <div class="card-title">👥 Διαχείριση Χρηστών</div>
             <div id="admin-users-count" style="font-size:13px;color:var(--text2);margin-bottom:12px;">Φόρτωση...</div>
+            <div style="margin-bottom:12px;">
+              <input class="form-input" type="text" id="admin-users-search" placeholder="Αναζήτηση χρήστη (username ή email)..." oninput="filterAdminUsers()" style="margin-bottom:0;"/>
+            </div>
             <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
 
@@ -3236,25 +3239,45 @@ async function disable2FA() {
 }
 
 // ── Admin User Management ────────────────────────────────────────────────────
+let allAdminUsers = [];
+let adminMeId = null;
+
 async function loadAdminUsers() {
   const section = document.getElementById('admin-users-section');
-  // Only show for admins
   const me = await api('GET', '/api/auth/me');
   if (!me || me.role !== 'admin') { section.style.display = 'none'; return; }
   section.style.display = 'block';
+  adminMeId = me.id;
 
   const users = await api('GET', '/api/admin/users');
   if (!Array.isArray(users)) {
     document.getElementById('admin-users-count').textContent = 'Σφάλμα φόρτωσης';
     return;
   }
-  const active = users.filter(u => u.is_active).length;
+  allAdminUsers = users;
+  document.getElementById('admin-users-search').value = '';
+  renderAdminUsers(users);
+}
+
+function filterAdminUsers() {
+  const q = (document.getElementById('admin-users-search').value || '').toLowerCase().trim();
+  if (!q) { renderAdminUsers(allAdminUsers); return; }
+  const filtered = allAdminUsers.filter(u =>
+    (u.username || '').toLowerCase().includes(q) ||
+    (u.email || '').toLowerCase().includes(q)
+  );
+  renderAdminUsers(filtered);
+}
+
+function renderAdminUsers(users) {
+  const active = allAdminUsers.filter(u => u.is_active).length;
   document.getElementById('admin-users-count').textContent =
-    `${users.length} χρήστες συνολικά, ${active} ενεργοί`;
+    `${allAdminUsers.length} χρήστες συνολικά, ${active} ενεργοί` +
+    (users.length !== allAdminUsers.length ? ` (εμφάνιση ${users.length})` : '');
 
   const list = document.getElementById('admin-users-list');
   list.innerHTML = users.map(u => {
-    const isMe = u.id === me.id;
+    const isMe = u.id === adminMeId;
     const statusBadge = u.is_active
       ? '<span class="badge badge-green" style="font-size:10px;">Ενεργός</span>'
       : '<span class="badge badge-red" style="font-size:10px;">Ανενεργός</span>';

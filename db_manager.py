@@ -66,6 +66,12 @@ class DatabaseManager:
                 self.conn.commit()
             except Exception:
                 pass  # Column already exists
+            # Migration: add user_id column for data isolation
+            try:
+                self.conn.execute("ALTER TABLE documents ADD COLUMN user_id INTEGER DEFAULT NULL")
+                self.conn.commit()
+            except Exception:
+                pass
 
             # Settings table: key-value store for user preferences
             self.conn.execute("""
@@ -100,6 +106,12 @@ class DatabaseManager:
                 self.conn.commit()
             except Exception:
                 pass  # Column already exists
+            # Migration: add user_id column for data isolation
+            try:
+                self.conn.execute("ALTER TABLE templates ADD COLUMN user_id INTEGER DEFAULT NULL")
+                self.conn.commit()
+            except Exception:
+                pass
 
             # Activity Log table: ιστορικό δραστηριοτήτων Upload & Extract
             self.conn.execute("""
@@ -128,6 +140,12 @@ class DatabaseManager:
                 self.conn.commit()
             except Exception:
                 pass
+            # Migration: add user_id column for data isolation
+            try:
+                self.conn.execute("ALTER TABLE activity_log ADD COLUMN user_id INTEGER DEFAULT NULL")
+                self.conn.commit()
+            except Exception:
+                pass
 
             # Users table: authentication and authorization
             self.conn.execute("""
@@ -153,19 +171,34 @@ class DatabaseManager:
             except Exception:
                 pass  # Columns already exist (race condition with multiple workers)
 
+            # Migration: assign orphan data (user_id IS NULL) to first admin user
+            try:
+                admin = self.conn.execute(
+                    "SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1"
+                ).fetchone()
+                if admin:
+                    aid = admin["id"]
+                    self.conn.execute("UPDATE documents SET user_id=? WHERE user_id IS NULL", (aid,))
+                    self.conn.execute("UPDATE templates SET user_id=? WHERE user_id IS NULL", (aid,))
+                    self.conn.execute("UPDATE activity_log SET user_id=? WHERE user_id IS NULL", (aid,))
+                    self.conn.commit()
+            except Exception:
+                pass
+
     # ─── DOCUMENTS ────────────────────────────────────────────────────────────
 
     def insert_document(self, filename: str, file_path: str = None,
                          schema_name: str = None,
-                         original_filename: str = None) -> int:
+                         original_filename: str = None,
+                         user_id: int = None) -> int:
         """Insert a new document record. Returns the new row id."""
         now = datetime.utcnow().isoformat()
         orig = original_filename or filename  # fallback: ίδιο με filename
         cursor = self.conn.execute(
             """INSERT INTO documents
-               (filename, original_filename, file_path, status, created_at, updated_at, schema_name)
-               VALUES (?, ?, ?, 'Pending', ?, ?, ?)""",
-            (filename, orig, file_path, now, now, schema_name)
+               (filename, original_filename, file_path, status, created_at, updated_at, schema_name, user_id)
+               VALUES (?, ?, ?, 'Pending', ?, ?, ?, ?)""",
+            (filename, orig, file_path, now, now, schema_name, user_id)
         )
         self.conn.commit()
         return cursor.lastrowid
@@ -193,17 +226,21 @@ class DatabaseManager:
         self.conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
         self.conn.commit()
 
-    def list_documents(self, status: str = None) -> List[Dict[str, Any]]:
-        """Return all documents, optionally filtered by status."""
+    def list_documents(self, status: str = None, user_id: int = None) -> List[Dict[str, Any]]:
+        """Return documents, filtered by status and/or user_id."""
+        conditions = []
+        params = []
         if status:
-            rows = self.conn.execute(
-                "SELECT * FROM documents WHERE status=? ORDER BY created_at DESC",
-                (status,)
-            ).fetchall()
-        else:
-            rows = self.conn.execute(
-                "SELECT * FROM documents ORDER BY created_at DESC"
-            ).fetchall()
+            conditions.append("status = ?")
+            params.append(status)
+        if user_id is not None:
+            conditions.append("user_id = ?")
+            params.append(user_id)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        rows = self.conn.execute(
+            f"SELECT * FROM documents {where} ORDER BY created_at DESC",
+            params
+        ).fetchall()
         return [dict(r) for r in rows]
 
     # ─── SETTINGS ─────────────────────────────────────────────────────────────
@@ -231,28 +268,52 @@ class DatabaseManager:
 
     def save_template(self, name: str, fields: List[Dict],
                        require_review: bool = False,
-                       supplier_pattern: str = None) -> int:
+                       supplier_pattern: str = None,
+                       user_id: int = None) -> int:
         """Save (insert or replace) an extraction template."""
         now = datetime.utcnow().isoformat()
-        cursor = self.conn.execute(
-            """INSERT INTO templates (name, fields_json, require_review, supplier_pattern, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?)
-               ON CONFLICT(name) DO UPDATE SET
-                   fields_json=excluded.fields_json,
-                   require_review=excluded.require_review,
-                   supplier_pattern=excluded.supplier_pattern,
-                   updated_at=excluded.updated_at""",
-            (name, json.dumps(fields), int(require_review),
-             supplier_pattern.strip() if supplier_pattern else None, now, now)
-        )
-        self.conn.commit()
-        return cursor.lastrowid
+        # Check if template exists for this user
+        existing = None
+        if user_id is not None:
+            existing = self.conn.execute(
+                "SELECT id FROM templates WHERE name=? AND user_id=?", (name, user_id)
+            ).fetchone()
+        else:
+            existing = self.conn.execute(
+                "SELECT id FROM templates WHERE name=?", (name,)
+            ).fetchone()
+        if existing:
+            self.conn.execute(
+                """UPDATE templates SET fields_json=?, require_review=?,
+                   supplier_pattern=?, updated_at=? WHERE id=?""",
+                (json.dumps(fields), int(require_review),
+                 supplier_pattern.strip() if supplier_pattern else None,
+                 now, existing["id"])
+            )
+            self.conn.commit()
+            return existing["id"]
+        else:
+            cursor = self.conn.execute(
+                """INSERT INTO templates (name, fields_json, require_review,
+                   supplier_pattern, created_at, updated_at, user_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (name, json.dumps(fields), int(require_review),
+                 supplier_pattern.strip() if supplier_pattern else None,
+                 now, now, user_id)
+            )
+            self.conn.commit()
+            return cursor.lastrowid
 
-    def get_template(self, name: str) -> Optional[Dict]:
-        """Fetch a template by name."""
-        row = self.conn.execute(
-            "SELECT * FROM templates WHERE name=?", (name,)
-        ).fetchone()
+    def get_template(self, name: str, user_id: int = None) -> Optional[Dict]:
+        """Fetch a template by name, optionally scoped to user."""
+        if user_id is not None:
+            row = self.conn.execute(
+                "SELECT * FROM templates WHERE name=? AND user_id=?", (name, user_id)
+            ).fetchone()
+        else:
+            row = self.conn.execute(
+                "SELECT * FROM templates WHERE name=?", (name,)
+            ).fetchone()
         if row:
             d = dict(row)
             d["fields"] = json.loads(d["fields_json"])
@@ -261,11 +322,16 @@ class DatabaseManager:
             return d
         return None
 
-    def list_templates(self) -> List[Dict]:
-        """Return all saved templates."""
-        rows = self.conn.execute(
-            "SELECT * FROM templates ORDER BY name"
-        ).fetchall()
+    def list_templates(self, user_id: int = None) -> List[Dict]:
+        """Return templates, optionally filtered by user_id."""
+        if user_id is not None:
+            rows = self.conn.execute(
+                "SELECT * FROM templates WHERE user_id=? ORDER BY name", (user_id,)
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM templates ORDER BY name"
+            ).fetchall()
         result = []
         for r in rows:
             d = dict(r)
@@ -275,9 +341,12 @@ class DatabaseManager:
             result.append(d)
         return result
 
-    def delete_template(self, name: str):
-        """Delete a template by name."""
-        self.conn.execute("DELETE FROM templates WHERE name=?", (name,))
+    def delete_template(self, name: str, user_id: int = None):
+        """Delete a template by name, optionally scoped to user."""
+        if user_id is not None:
+            self.conn.execute("DELETE FROM templates WHERE name=? AND user_id=?", (name, user_id))
+        else:
+            self.conn.execute("DELETE FROM templates WHERE name=?", (name,))
         self.conn.commit()
 
     # ─── ACTIVITY LOG ──────────────────────────────────────────────────────────
@@ -285,16 +354,17 @@ class DatabaseManager:
     def insert_activity(self, filename: str, action: str,
                         total_invoices: int = 0, without_template: int = 0,
                         needs_approval: int = 0, no_approval: int = 0,
-                        result_json: str = None, file_path: str = None) -> int:
+                        result_json: str = None, file_path: str = None,
+                        user_id: int = None) -> int:
         """Insert a new activity log entry. Returns the new row id."""
         now = datetime.utcnow().isoformat()
         cursor = self.conn.execute(
             """INSERT INTO activity_log
                (filename, file_path, action, total_invoices, without_template,
-                needs_approval, no_approval, result_json, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                needs_approval, no_approval, result_json, created_at, updated_at, user_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (filename, file_path, action, total_invoices, without_template,
-             needs_approval, no_approval, result_json, now, now)
+             needs_approval, no_approval, result_json, now, now, user_id)
         )
         self.conn.commit()
         return cursor.lastrowid
@@ -317,12 +387,18 @@ class DatabaseManager:
         self.conn.commit()
         return True
 
-    def list_activities(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """Return recent activity log entries."""
-        rows = self.conn.execute(
-            "SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?",
-            (limit,)
-        ).fetchall()
+    def list_activities(self, limit: int = 50, user_id: int = None) -> List[Dict[str, Any]]:
+        """Return recent activity log entries, optionally filtered by user_id."""
+        if user_id is not None:
+            rows = self.conn.execute(
+                "SELECT * FROM activity_log WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit)
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?",
+                (limit,)
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def get_activity(self, activity_id: int) -> Optional[Dict[str, Any]]:

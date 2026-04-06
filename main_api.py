@@ -115,6 +115,7 @@ def delete_api_key(service):
 @app.post("/api/templates")
 @require_auth
 def save_template():
+    uid = request.current_user["user_id"]
     data = request.get_json(force=True)
     try:
         schema = schema_bld.build_from_list(data.get("fields", []))
@@ -122,10 +123,11 @@ def save_template():
             data.get("name",""),
             data.get("fields",[]),
             require_review=bool(data.get("require_review", False)),
-            supplier_pattern=data.get("supplier_pattern")
+            supplier_pattern=data.get("supplier_pattern"),
+            user_id=uid
         )
         # ── Auto-update activity history results ──────────────────────────
-        updated_activities = _recalc_activities_after_template_change()
+        updated_activities = _recalc_activities_after_template_change(uid=uid)
         return jsonify({
             "success": True,
             "name": data.get("name"),
@@ -153,22 +155,22 @@ def _match_supplier_to_template(supplier, templates):
     return None
 
 
-def _recalc_activities_after_template_change():
+def _recalc_activities_after_template_change(uid: int = None):
     """Re-match suppliers in ALL activity entries against current templates.
     Handles both pre-check entries (with invoices array) and batch entries
     (with doc_ids — looks up actual documents in the database).
     Also checks document status: Completed docs count as no_approval.
     Returns list of activity IDs that were updated."""
-    templates = db.list_templates()
+    templates = db.list_templates(user_id=uid)
     templates_dict = {t["name"]: t for t in templates}
-    activities = db.list_activities(limit=500)
+    activities = db.list_activities(limit=500, user_id=uid)
     updated_ids = []
 
     logger.info("[_recalc] START — %d templates, %d activities",
                 len(templates), len(activities))
 
     # Build a map of original_filename → list of documents for pre-check lookups
-    all_docs = db.list_documents()
+    all_docs = db.list_documents(user_id=uid)
     docs_by_filename = {}
     for d in all_docs:
         ofn = d.get("original_filename") or ""
@@ -325,13 +327,15 @@ def _recalc_activities_after_template_change():
 @app.get("/api/templates")
 @require_auth
 def list_templates():
-    t = db.list_templates()
+    uid = request.current_user["user_id"]
+    t = db.list_templates(user_id=uid)
     return jsonify({"templates": t, "count": len(t)})
 
 @app.get("/api/templates/<name>")
 @require_auth
 def get_template(name):
-    tmpl = db.get_template(name)
+    uid = request.current_user["user_id"]
+    tmpl = db.get_template(name, user_id=uid)
     if not tmpl:
         return jsonify({"error": f"Template '{name}' δεν βρέθηκε."}), 404
     tmpl["json_schema"] = schema_bld.build_from_list(tmpl["fields"])
@@ -340,13 +344,14 @@ def get_template(name):
 @app.delete("/api/templates/<name>")
 @require_auth
 def delete_template(name):
-    if not db.get_template(name):
+    uid = request.current_user["user_id"]
+    if not db.get_template(name, user_id=uid):
         return jsonify({"error": f"Template '{name}' δεν βρέθηκε."}), 404
-    db.delete_template(name)
+    db.delete_template(name, user_id=uid)
     logger.info("[delete_template] Template '%s' deleted, running _recalc...", name)
     # Re-calc activity results μετά τη διαγραφή
     try:
-        updated_activities = _recalc_activities_after_template_change()
+        updated_activities = _recalc_activities_after_template_change(uid=uid)
     except Exception as e:
         logger.error("[delete_template] _recalc failed: %s", str(e), exc_info=True)
         updated_activities = []
@@ -361,6 +366,7 @@ def delete_template(name):
 @app.post("/api/upload")
 @require_auth
 def upload_file():
+    uid = request.current_user["user_id"]
     if "file" not in request.files:
         return jsonify({"error": "Δεν βρέθηκε αρχείο."}), 400
     f      = request.files["file"]
@@ -370,7 +376,7 @@ def upload_file():
     schema_name = request.form.get("schema_name")
     dest = UPLOAD_DIR / f.filename
     f.save(str(dest))
-    doc_id = db.insert_document(filename=f.filename, file_path=str(dest), schema_name=schema_name)
+    doc_id = db.insert_document(filename=f.filename, file_path=str(dest), schema_name=schema_name, user_id=uid)
     return jsonify({"success":True,"doc_id":doc_id,"filename":f.filename,
                     "file_path":str(dest),"schema_name":schema_name,"status":"Pending"})
 
@@ -381,6 +387,7 @@ def upload_pre_check():
     Pre-check για μεμονωμένο αρχείο: ανιχνεύει τον προμηθευτή και ελέγχει αν
     υπάρχει αντίστοιχο template.
     """
+    uid = request.current_user["user_id"]
     if "file" not in request.files:
         return jsonify({"error": "Δεν βρέθηκε αρχείο."}), 400
     f = request.files["file"]
@@ -429,7 +436,7 @@ def upload_pre_check():
                 pass
 
         # Template matching
-        templates = db.list_templates()
+        templates = db.list_templates(user_id=uid)
         if detected_supplier and detected_supplier != "unknown":
             detected_lower = detected_supplier.lower()
             for tmpl in templates:
@@ -471,7 +478,8 @@ def upload_pre_check():
 @app.get("/api/documents")
 @require_auth
 def list_documents():
-    docs = db.list_documents(status=request.args.get("status"))
+    uid = request.current_user["user_id"]
+    docs = db.list_documents(status=request.args.get("status"), user_id=uid)
     # Hide batch parent documents (original PDFs that were split into pages)
     batch_parents = set()
     for d in docs:
@@ -488,9 +496,12 @@ def list_documents():
 @app.get("/api/documents/<int:doc_id>")
 @require_auth
 def get_document(doc_id):
+    uid = request.current_user["user_id"]
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     if doc.get("result_json"):
         try: doc["result_data"] = json.loads(doc["result_json"])
         except: doc["result_data"] = None
@@ -499,8 +510,12 @@ def get_document(doc_id):
 @app.delete("/api/documents/<int:doc_id>")
 @require_auth
 def delete_document(doc_id):
-    if not db.get_document(doc_id):
+    uid = request.current_user["user_id"]
+    doc = db.get_document(doc_id)
+    if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     db.delete_document(doc_id)
     return jsonify({"success": True, "message": f"Έγγραφο #{doc_id} διαγράφηκε."})
 
@@ -508,7 +523,8 @@ def delete_document(doc_id):
 @require_auth
 def cleanup_pending():
     """Delete all Pending documents that have no result_json (unprocessed uploads)."""
-    docs = db.list_documents(status="Pending")
+    uid = request.current_user["user_id"]
+    docs = db.list_documents(status="Pending", user_id=uid)
     deleted = 0
     for d in docs:
         if not d.get("result_json"):
@@ -519,33 +535,46 @@ def cleanup_pending():
 
 # ── Document Actions (Approve / Reject / Edit Data) ──────────────────────────
 @app.post("/api/documents/<int:doc_id>/approve")
+@require_auth
 def approve_document(doc_id):
+    uid = request.current_user["user_id"]
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     old_status = doc.get("status", "?")
     db.update_document_status(doc_id, status="Completed", result_json=doc.get("result_json"))
     updated = db.get_document(doc_id)
     new_status = updated.get("status", "?") if updated else "NOT_FOUND"
     print(f"[APPROVE] doc #{doc_id}: {old_status} → {new_status}", flush=True)
     # Recalc activity history results (needs_approval → no_approval)
-    updated_activities = _recalc_activities_after_template_change()
+    updated_activities = _recalc_activities_after_template_change(uid=uid)
     print(f"[APPROVE] recalc updated {len(updated_activities)} activities", flush=True)
     return jsonify({"success": True, "doc_id": doc_id, "status": new_status,
                      "updated_activities": len(updated_activities)})
 
 @app.post("/api/documents/<int:doc_id>/reject")
+@require_auth
 def reject_document(doc_id):
-    if not db.get_document(doc_id):
+    uid = request.current_user["user_id"]
+    doc = db.get_document(doc_id)
+    if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     db.update_document_status(doc_id, status="Failed")
     return jsonify({"success": True, "doc_id": doc_id, "status": "Failed"})
 
 @app.route("/api/documents/<int:doc_id>/data", methods=["PATCH"])
+@require_auth
 def update_document_data(doc_id):
+    uid = request.current_user["user_id"]
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     new_data = request.get_json(force=True) or {}
     existing = {}
     if doc.get("result_json"):
@@ -559,9 +588,12 @@ def update_document_data(doc_id):
 @require_auth
 def assign_label_to_document(doc_id):
     """Assign a schema_name (label) to a document."""
+    uid = request.current_user["user_id"]
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     data = request.get_json(force=True) or {}
     schema_name = data.get("schema_name", "").strip()
     if not schema_name:
@@ -582,9 +614,12 @@ def assign_label_to_document(doc_id):
 @require_auth
 def serve_document_file(doc_id):
     """Σερβίρει το processed αρχείο (PNG/εικόνα) για preview στο UI."""
+    uid = request.current_user["user_id"]
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     file_path = Path(doc["file_path"])
     if not file_path.exists():
         return jsonify({"error": "Αρχείο δεν βρέθηκε στο σύστημα."}), 404
@@ -596,9 +631,12 @@ def serve_document_file(doc_id):
 @require_auth
 def serve_original_pdf(doc_id):
     """Σερβίρει το πρωτότυπο PDF αρχείο."""
+    uid = request.current_user["user_id"]
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     original = doc.get("original_filename") or doc.get("filename", "")
     pdf_path = UPLOAD_DIR / original
     if not pdf_path.exists():
@@ -609,6 +647,7 @@ def serve_original_pdf(doc_id):
 @require_auth
 def serve_filtered_pdf():
     """Δημιουργεί PDF μόνο με τις σελίδες των επιλεγμένων εγγράφων."""
+    uid = request.current_user["user_id"]
     import re as _re
     import io
     doc_ids = request.args.get("ids", "")
@@ -624,6 +663,8 @@ def serve_filtered_pdf():
     for doc_id in ids:
         doc = db.get_document(doc_id)
         if not doc:
+            continue
+        if doc.get("user_id") != uid:
             continue
         original = doc.get("original_filename") or doc.get("filename", "")
         pdf_path = UPLOAD_DIR / original
@@ -678,10 +719,13 @@ def serve_filtered_pdf():
 @require_auth
 def get_line_positions(doc_id):
     """Επιστρέφει τις y-θέσεις των γραμμών του πίνακα (ως % ύψους σελίδας)."""
+    uid = request.current_user["user_id"]
     import re as _re
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
 
     original = doc.get("original_filename") or doc.get("filename") or ""
     pdf_path = UPLOAD_DIR / original
@@ -729,20 +773,23 @@ def get_line_positions(doc_id):
 @require_auth
 def get_batch_siblings(doc_id):
     """Επιστρέφει όλα τα docs που ανήκουν στο ίδιο batch (ίδιο original_filename)."""
+    uid = request.current_user["user_id"]
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"error": "Not found"}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     original = doc.get("original_filename")
     if not original:
         return jsonify({"siblings": [dict(doc)], "original_filename": ""})
-    all_docs = db.list_documents()
+    all_docs = db.list_documents(user_id=uid)
     siblings = [d for d in all_docs if d.get("original_filename") == original and d.get("filename") != original]
     siblings.sort(key=lambda d: d["id"])
     return jsonify({"siblings": siblings, "original_filename": original})
 
 # ── Export ────────────────────────────────────────────────────────────────────
-def _get_records_for_export(doc_ids=None):
-    all_docs = db.list_documents()
+def _get_records_for_export(doc_ids=None, user_id: int = None):
+    all_docs = db.list_documents(user_id=user_id)
     if doc_ids:
         all_docs = [d for d in all_docs if d["id"] in doc_ids]
     records = []
@@ -759,8 +806,9 @@ def _get_records_for_export(doc_ids=None):
 @app.post("/api/export/csv")
 @require_auth
 def export_csv():
+    uid = request.current_user["user_id"]
     data    = request.get_json(force=True) or {}
-    records = _get_records_for_export(data.get("doc_ids"))
+    records = _get_records_for_export(data.get("doc_ids"), user_id=uid)
     if not records:
         return jsonify({"error": "Δεν βρέθηκαν έγγραφα."}), 404
     result = exporter.export_csv(records, filename=data.get("filename"), columns=data.get("columns"))
@@ -772,8 +820,9 @@ def export_csv():
 @app.post("/api/export/xlsx")
 @require_auth
 def export_xlsx():
+    uid = request.current_user["user_id"]
     data    = request.get_json(force=True) or {}
-    records = _get_records_for_export(data.get("doc_ids"))
+    records = _get_records_for_export(data.get("doc_ids"), user_id=uid)
     if not records:
         return jsonify({"error": "Δεν βρέθηκαν έγγραφα."}), 404
     result = exporter.export_xlsx(records, filename=data.get("filename"), columns=data.get("columns"))
@@ -787,7 +836,8 @@ def export_xlsx():
 @app.get("/api/search")
 @require_auth
 def search_documents():
-    records = _get_records_for_export()
+    uid = request.current_user["user_id"]
+    records = _get_records_for_export(user_id=uid)
     result  = exporter.search(records,
         query=request.args.get("q",""),
         status_filter=request.args.get("status"),
@@ -802,7 +852,8 @@ def search_documents():
 @app.get("/api/stats")
 @require_auth
 def get_stats():
-    return jsonify(exporter.summary_stats(_get_records_for_export()))
+    uid = request.current_user["user_id"]
+    return jsonify(exporter.summary_stats(_get_records_for_export(user_id=uid)))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
@@ -813,6 +864,7 @@ from ai_extractor import AIExtractor, ExtractionResult
 @app.post("/api/extract/<int:doc_id>")
 @require_auth
 def extract_document(doc_id):
+    uid = request.current_user["user_id"]
     data        = request.get_json() or {}
     schema_name = data.get("schema_name")
     if not schema_name:
@@ -821,8 +873,10 @@ def extract_document(doc_id):
     doc = db.get_document(doc_id)
     if not doc:
         return jsonify({"success": False, "error": "Έγγραφο δεν βρέθηκε"}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
 
-    template = db.get_template(schema_name)
+    template = db.get_template(schema_name, user_id=uid)
     if not template:
         return jsonify({"success": False, "error": f"Schema '{schema_name}' δεν βρέθηκε"}), 404
 
@@ -856,6 +910,7 @@ def batch_extract_selected():
     Αγνοεί docs που ήδη είναι Completed/pending_review.
     Εξάγει δεδομένα μόνο για docs με schema_name (ετικέτα).
     """
+    uid = request.current_user["user_id"]
     data = request.get_json(force=True) or {}
     doc_ids = data.get("doc_ids", [])
     if not doc_ids:
@@ -876,6 +931,10 @@ def batch_extract_selected():
             results["failed"] += 1
             results["details"].append({"doc_id": doc_id, "status": "not_found"})
             continue
+        if doc.get("user_id") != uid:
+            results["failed"] += 1
+            results["details"].append({"doc_id": doc_id, "status": "access_denied"})
+            continue
 
         # Skip already completed/approved
         if doc.get("status") in ("Completed", "pending_review", "completed", "approved"):
@@ -890,7 +949,7 @@ def batch_extract_selected():
             results["details"].append({"doc_id": doc_id, "status": "no_label"})
             continue
 
-        template = db.get_template(sname)
+        template = db.get_template(sname, user_id=uid)
         if not template:
             results["skipped_no_label"] += 1
             results["details"].append({"doc_id": doc_id, "status": "label_not_found"})
@@ -955,6 +1014,7 @@ def batch_pre_check():
     Επιστρέφει στατιστικά πριν ξεκινήσει το batch.
     Δέχεται file upload Ή file_path (για αρχεία από ιστορικό).
     """
+    uid = request.current_user["user_id"]
     # Πηγή αρχείου: upload ή file_path από ιστορικό
     file_path_param = request.form.get("file_path", "").strip()
     if file_path_param and Path(file_path_param).exists():
@@ -1040,7 +1100,7 @@ def batch_pre_check():
             "properties": {"supplier_name": {"type": "string"}},
             "required": ["supplier_name"]
         }
-        templates = db.list_templates()
+        templates = db.list_templates(user_id=uid)
         invoices_info = []
 
         for idx, seg in enumerate(segments):
@@ -1170,6 +1230,7 @@ def batch_list():
 @require_auth
 def activity_create():
     """Save a new activity log entry."""
+    uid = request.current_user["user_id"]
     data = request.get_json(force=True)
     filename = data.get("filename", "")
     action = data.get("action", "")
@@ -1190,7 +1251,8 @@ def activity_create():
         needs_approval=data.get("needs_approval", 0),
         no_approval=data.get("no_approval", 0),
         result_json=json.dumps(data.get("result_data")) if data.get("result_data") else None,
-        file_path=data.get("file_path")
+        file_path=data.get("file_path"),
+        user_id=uid
     )
     return jsonify({"success": True, "id": aid})
 
@@ -1198,9 +1260,12 @@ def activity_create():
 @require_auth
 def activity_update(activity_id):
     """Update an existing activity log entry (for repeat batch)."""
+    uid = request.current_user["user_id"]
     a = db.get_activity(activity_id)
     if not a:
         return jsonify({"error": "Activity not found"}), 404
+    if a.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     data = request.get_json(force=True)
     # Merge result_data into existing result_json
     existing_rj = {}
@@ -1225,17 +1290,21 @@ def activity_update(activity_id):
 @require_auth
 def activity_list():
     """Return recent activity log entries."""
+    uid = request.current_user["user_id"]
     limit = request.args.get("limit", 50, type=int)
-    activities = db.list_activities(limit=limit)
+    activities = db.list_activities(limit=limit, user_id=uid)
     return jsonify({"activities": activities})
 
 @app.get("/api/activity/<int:activity_id>")
 @require_auth
 def activity_get(activity_id):
     """Fetch a single activity log entry."""
+    uid = request.current_user["user_id"]
     a = db.get_activity(activity_id)
     if not a:
         return jsonify({"error": "Not found"}), 404
+    if a.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
     return jsonify(a)
 
 
@@ -1244,7 +1313,8 @@ def activity_get(activity_id):
 def documents_cleanup():
     """Remove duplicate documents, keeping only the LATEST per original_filename + page.
     Useful when multiple batch runs created duplicates."""
-    all_docs = db.list_documents()
+    uid = request.current_user["user_id"]
+    all_docs = db.list_documents(user_id=uid)
     # Group by (original_filename, page_basename)
     groups = {}
     for d in all_docs:
