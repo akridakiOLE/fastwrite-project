@@ -47,9 +47,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .nav-item.active .icon{opacity:1;}
 .sidebar-footer{padding:16px;border-top:1px solid var(--border);}
 #lang-dropdown.show{display:block!important;}
-.lang-option{padding:8px 12px;font-size:12px;cursor:pointer;color:var(--text2);transition:background .15s,color .15s;}
-.lang-option:hover{background:rgba(0,229,160,0.1);color:var(--text);}
-.lang-option.active{background:rgba(0,229,160,0.15);color:var(--accent);font-weight:600;}
+.lang-option{padding:9px 14px;font-size:13px;cursor:pointer;color:#d0d4e0;transition:background .15s,color .15s;font-weight:500;border-bottom:1px solid rgba(255,255,255,0.05);}
+.lang-option:last-child{border-bottom:none;}
+.lang-option:hover{background:#252b3d;color:#fff;}
+.lang-option.active{background:#1e3a2f;color:#00e5a0;font-weight:700;}
 .pw-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--text3);padding:4px 6px;border-radius:4px;transition:color .15s;opacity:0.6;}
 .pw-eye:hover{color:var(--text);opacity:1;}
 .faq-item{background:var(--bg3);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
@@ -297,7 +298,7 @@ select.form-input option{background:var(--bg2);}
         <span>🌐 <span id="lang-selector-current">EL</span></span>
         <span style="font-size:10px;">▼</span>
       </button>
-      <div id="lang-dropdown" style="display:none;position:absolute;bottom:100%;left:16px;right:16px;max-height:280px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 -4px 16px rgba(0,0,0,0.4);z-index:999;margin-bottom:4px;">
+      <div id="lang-dropdown" style="display:none;position:absolute;bottom:100%;left:16px;right:16px;max-height:280px;overflow-y:auto;background:#1a1f2e;border:1px solid #2a3042;border-radius:8px;box-shadow:0 -4px 20px rgba(0,0,0,0.7);z-index:9999;margin-bottom:4px;">
         <!-- Populated dynamically by I18N.buildLangSelector() -->
       </div>
     </div>
