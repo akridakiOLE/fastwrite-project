@@ -46,6 +46,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .nav-item .icon{width:18px;height:18px;opacity:.7;flex-shrink:0;}
 .nav-item.active .icon{opacity:1;}
 .sidebar-footer{padding:16px;border-top:1px solid var(--border);}
+.pw-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--text3);padding:4px 6px;border-radius:4px;transition:color .15s;opacity:0.6;}
+.pw-eye:hover{color:var(--text);opacity:1;}
 .status-dot{display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-right:6px;box-shadow:0 0 8px var(--accent);}
 .status-text{font-size:12px;color:var(--text2);}
 
@@ -512,7 +514,10 @@ select.form-input option{background:var(--bg2);}
               </div>
               <div class="form-group">
                 <label class="form-label">Κωδικός (για επιβεβαίωση)</label>
-                <input class="form-input" type="password" id="uname-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="current-password"/>
+                <div style="position:relative;">
+                  <input class="form-input" type="password" id="uname-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="current-password" style="padding-right:40px;"/>
+                  <button type="button" onclick="togglePw('uname-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
+                </div>
               </div>
               <button class="btn btn-primary btn-sm" onclick="changeUsername()">Αλλαγή Username</button>
             </div>
@@ -522,15 +527,24 @@ select.form-input option{background:var(--bg2);}
               <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">🔒 Αλλαγή Κωδικού</div>
               <div class="form-group">
                 <label class="form-label">Τρέχων κωδικός</label>
-                <input class="form-input" type="password" id="pw-current" placeholder="Εισήγαγε τον τρέχοντα κωδικό..." autocomplete="current-password"/>
+                <div style="position:relative;">
+                  <input class="form-input" type="password" id="pw-current" placeholder="Εισήγαγε τον τρέχοντα κωδικό..." autocomplete="current-password" style="padding-right:40px;"/>
+                  <button type="button" onclick="togglePw('pw-current',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
+                </div>
               </div>
               <div class="form-group">
                 <label class="form-label">Νέος κωδικός</label>
-                <input class="form-input" type="password" id="pw-new" placeholder="Τουλάχιστον 6 χαρακτήρες..." autocomplete="new-password"/>
+                <div style="position:relative;">
+                  <input class="form-input" type="password" id="pw-new" placeholder="Τουλάχιστον 6 χαρακτήρες..." autocomplete="new-password" style="padding-right:40px;"/>
+                  <button type="button" onclick="togglePw('pw-new',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
+                </div>
               </div>
               <div class="form-group">
                 <label class="form-label">Επιβεβαίωση νέου κωδικού</label>
-                <input class="form-input" type="password" id="pw-confirm" placeholder="Επανάλαβε τον νέο κωδικό..." autocomplete="new-password"/>
+                <div style="position:relative;">
+                  <input class="form-input" type="password" id="pw-confirm" placeholder="Επανάλαβε τον νέο κωδικό..." autocomplete="new-password" style="padding-right:40px;"/>
+                  <button type="button" onclick="togglePw('pw-confirm',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
+                </div>
               </div>
               <button class="btn btn-primary btn-sm" onclick="changePassword()">Αλλαγή Κωδικού</button>
             </div>
@@ -544,7 +558,10 @@ select.form-input option{background:var(--bg2);}
               </div>
               <div class="form-group">
                 <label class="form-label">Κωδικός (για επιβεβαίωση)</label>
-                <input class="form-input" type="password" id="email-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="current-password"/>
+                <div style="position:relative;">
+                  <input class="form-input" type="password" id="email-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="current-password" style="padding-right:40px;"/>
+                  <button type="button" onclick="togglePw('email-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
+                </div>
               </div>
               <button class="btn btn-primary btn-sm" onclick="changeEmail()">Αλλαγή Email</button>
             </div>
@@ -3043,6 +3060,12 @@ async function loadSettings() {
       <div class="data-item"><div class="data-key">Status</div><div class="data-val" style="color:var(--accent)">${health.status||'—'}</div></div>
       <div class="data-item"><div class="data-key">Domain</div><div class="data-val">fastwrite.duckdns.org</div></div>
     </div>`;
+}
+
+function togglePw(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🔒'; }
+  else { inp.type = 'password'; btn.textContent = '👁'; }
 }
 
 async function changeUsername() {
