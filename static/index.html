@@ -309,18 +309,6 @@ select.form-input option{background:var(--bg2);}
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
-            Τελευταία Έγγραφα
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th style="width:44px">#</th><th>Αρχείο</th><th>Template</th><th>Προμηθευτής</th><th>Τιμολόγιο</th><th>Κατάσταση</th><th>Ημ/νία Τιμολ.</th><th>Καταχώρηση</th><th></th></tr></thead>
-              <tbody id="dashboard-docs"></tbody>
-            </table>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -682,7 +670,7 @@ select.form-input option{background:var(--bg2);}
       <div class="topbar">
         <div class="page-title" id="tb-title">Template Builder</div>
         <div class="topbar-actions">
-          <button class="btn btn-secondary btn-sm" onclick="window.close()">✕ Κλείσιμο</button>
+          <button class="btn btn-secondary btn-sm" onclick="showPage('documents')">← Πίσω</button>
         </div>
       </div>
       <div class="content">
@@ -859,32 +847,6 @@ async function loadDashboard() {
   document.getElementById('stat-completed').textContent = completed;
   document.getElementById('stat-pending').textContent   = pending;
   document.getElementById('stat-failed').textContent    = failed;
-
-  const tbody = document.getElementById('dashboard-docs');
-  const recent = d.slice(0,8);
-  tbody.innerHTML = recent.length ? recent.map(doc => {
-    const rd       = doc.result_data || {};
-    const filename = doc.original_filename || doc.filename || '—';
-    const smartName = (doc.filename !== doc.original_filename && doc.original_filename) ? doc.filename : null;
-    const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || (rd._matched_supplier && rd._matched_supplier !== 'unknown' ? rd._matched_supplier : '') || '—';
-    const invNo    = rd.invoice_number || rd.invoice_no || rd.inv_number || '—';
-    const invDate  = rd.invoice_date || rd.date || '—';
-    const recDate  = doc.created_at ? doc.created_at.split('T')[0] : '—';
-    return `<tr>
-      <td><span style="font-family:'DM Mono',monospace;color:var(--text3);font-size:11px">#${doc.id}</span></td>
-      <td style="max-width:160px;" title="${smartName || filename}">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;font-size:13px">${filename}</span>
-        ${smartName ? `<span style="font-size:10px;color:var(--text3);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${smartName}</span>` : ''}
-      </td>
-      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${(doc.status === 'no_template' || !doc.schema_name) ? '—' : doc.schema_name}</span></td>
-      <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${supplier}</td>
-      <td><span style="font-family:'DM Mono',monospace;font-size:12px">${invNo}</span></td>
-      <td>${badgeHtml(doc.status)}</td>
-      <td><span style="font-size:12px;color:var(--text2)">${invDate}</span></td>
-      <td><span style="font-size:12px;color:var(--text3)">${recDate}</span></td>
-      <td><button class="btn btn-secondary btn-sm" onclick="viewDoc(${doc.id})">👁</button></td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:32px">Δεν υπάρχουν έγγραφα</td></tr>';
 }
 
 // ── Documents ───────────────────────────────────────────────────────────────
@@ -3381,13 +3343,13 @@ async function openTemplateBuilder(type) {
       // Batch έχει τρέξει — άνοιξε το πρώτο doc στο Template Builder
       const st = await api('GET', '/api/batch/' + lastBatchJobId + '/status');
       if (st && st.doc_ids && st.doc_ids.length) {
-        window.open('/ui/template-builder/' + st.doc_ids[0], '_blank');
+        openTemplateBuilderById(st.doc_ids[0]);
         return;
       }
     }
     // Reuse existing upload if available
     if (uploadedDocIds['batch']) {
-      window.open('/ui/template-builder/' + uploadedDocIds['batch'], '_blank');
+      openTemplateBuilderById(uploadedDocIds['batch']);
       return;
     }
     // Batch δεν έχει τρέξει — ανέβασε το αρχείο ως preview
@@ -3400,12 +3362,12 @@ async function openTemplateBuilder(type) {
     const data = await r.json();
     if (!data.doc_id) { toast('Σφάλμα ανεβάσματος', 'error'); return; }
     uploadedDocIds['batch'] = data.doc_id;
-    window.open('/ui/template-builder/' + data.doc_id, '_blank');
+    openTemplateBuilderById(data.doc_id);
     return;
   }
   // Reuse existing upload if available
   if (uploadedDocIds[type]) {
-    window.open('/ui/template-builder/' + uploadedDocIds[type], '_blank');
+    openTemplateBuilderById(uploadedDocIds[type]);
     return;
   }
   // First upload the file if not already uploaded
@@ -3423,7 +3385,7 @@ async function openTemplateBuilder(type) {
 
   uploadedDocIds[type] = data.doc_id;
   // Open template builder in new tab
-  window.open('/ui/template-builder/' + data.doc_id, '_blank');
+  openTemplateBuilderById(data.doc_id);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -3434,12 +3396,7 @@ setInterval(checkServer, 30000);
   const m = window.location.pathname.match(/\/ui\/template-builder\/(\d+)/);
   if (m) {
     const docId = parseInt(m[1]);
-    // Κρύψε το sidebar και άνοιξε απευθείας το Template Builder
-    if (typeof openTemplateBuilderById === 'function') {
-      openTemplateBuilderById(docId);
-    } else {
-      window.location.href = '/ui/template-builder/' + docId;
-    }
+    openTemplateBuilderById(docId);
   } else {
     loadDashboard();
   }
