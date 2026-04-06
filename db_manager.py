@@ -142,10 +142,13 @@ class DatabaseManager:
                 )
             """)
             # Migration: add email column if missing
-            cols = [row[1] for row in self.conn.execute("PRAGMA table_info(users)").fetchall()]
-            if 'email' not in cols:
-                self.conn.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''")
-                self.conn.commit()
+            try:
+                cols = [row[1] for row in self.conn.execute("PRAGMA table_info(users)").fetchall()]
+                if 'email' not in cols:
+                    self.conn.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''")
+                    self.conn.commit()
+            except Exception:
+                pass  # Column already exists (race condition with multiple workers)
 
     # ─── DOCUMENTS ────────────────────────────────────────────────────────────
 
