@@ -1180,6 +1180,7 @@ def batch_pre_check():
 @require_auth
 def batch_upload():
     """Δέχεται file upload Ή file_path (για αρχεία από ιστορικό)."""
+    uid = request.current_user["user_id"]
     file_path_param = request.form.get("file_path", "").strip()
     if file_path_param and Path(file_path_param).exists():
         dest = Path(file_path_param)
@@ -1208,7 +1209,8 @@ def batch_upload():
                                original_filename=original_filename,
                                auto_match=auto_match,
                                skip_completed=skip_completed,
-                               registration_only=registration_only)
+                               registration_only=registration_only,
+                               user_id=uid)
     return jsonify({"success": True, "job_id": job_id,
                     "filename": original_filename, "schema_name": schema_name})
 

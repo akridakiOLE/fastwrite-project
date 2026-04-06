@@ -149,9 +149,10 @@ class BatchProcessor:
         self.max_workers = max_workers
         self._jobs       = {}
         self._jobs_lock  = threading.Lock()
+        self._current_user_id = None
 
     def submit(self, pdf_path, schema_name, original_filename="", auto_match=False,
-               skip_completed=False, registration_only=False):
+               skip_completed=False, registration_only=False, user_id=None):
         job_id = str(uuid.uuid4())
         job    = BatchJobStatus(job_id=job_id, status="pending",
                                 started_at=datetime.utcnow().isoformat())
@@ -159,7 +160,7 @@ class BatchProcessor:
             self._jobs[job_id] = job
         t = threading.Thread(target=self._run_job,
             args=(job_id, pdf_path, schema_name, original_filename,
-                  auto_match, skip_completed, registration_only), daemon=True)
+                  auto_match, skip_completed, registration_only, user_id), daemon=True)
         t.start()
         return job_id
 
@@ -173,7 +174,9 @@ class BatchProcessor:
             return [j.to_dict() for j in self._jobs.values()]
 
     def _run_job(self, job_id, pdf_path, schema_name, original_filename,
-                 auto_match=False, skip_completed=False, registration_only=False):
+                 auto_match=False, skip_completed=False, registration_only=False,
+                 user_id=None):
+        self._current_user_id = user_id
         job = self._get_job(job_id)
         job.status = "running"
         try:
@@ -294,7 +297,7 @@ class BatchProcessor:
                 return default_schema_name, "unknown"
 
             # Fuzzy match: ψάχνουμε templates με supplier_pattern
-            templates = self.db.list_templates()
+            templates = self.db.list_templates(user_id=self._current_user_id)
             detected_lower = detected.lower()
             best_match = None
             for tmpl in templates:
@@ -328,7 +331,7 @@ class BatchProcessor:
               f"skip_completed={skip_completed}, auto_match={auto_match}, "
               f"registration_only={registration_only}, segments={len(segments)}", flush=True)
 
-        default_template = self.db.get_template(schema_name) if schema_name else None
+        default_template = self.db.get_template(schema_name, user_id=self._current_user_id) if schema_name else None
         if not default_template and not auto_match:
             self._fail_job(job, f"Template '{schema_name}' δεν βρέθηκε.")
             return
@@ -354,7 +357,7 @@ class BatchProcessor:
                           f"detected_supplier={detected_supplier}, "
                           f"registration_only={registration_only}", flush=True)
                     if is_real_match:
-                        tmpl = self.db.get_template(matched_name)
+                        tmpl = self.db.get_template(matched_name, user_id=self._current_user_id)
                         if tmpl:
                             seg_schema = self.schema_bld.build_from_list(tmpl["fields"])
                             seg_schema.pop("additionalProperties", None)
@@ -474,7 +477,7 @@ class BatchProcessor:
         docs_by_ofn_page = {}
 
         if skip_completed:
-            existing = self.db.list_documents()
+            existing = self.db.list_documents(user_id=self._current_user_id)
             print(f"[skip_completed] === START === original_filename='{original_filename}', "
                   f"total docs in DB: {len(existing)}", flush=True)
             logger.info("[skip_completed] === START === original_filename='%s', "
@@ -594,7 +597,8 @@ class BatchProcessor:
                     filename=filename,
                     file_path=str(segment.pages[0]),
                     schema_name=initial_schema,
-                    original_filename=original_filename or filename)
+                    original_filename=original_filename or filename,
+                    user_id=self._current_user_id)
                 doc_id_map[idx] = doc_id
 
         # Ενημέρωση progress — skipped μετράνε ως ολοκληρωμένα στο progress
