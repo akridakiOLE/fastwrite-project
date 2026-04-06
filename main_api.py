@@ -789,6 +789,7 @@ def get_batch_siblings(doc_id):
 
 # ── Export ────────────────────────────────────────────────────────────────────
 def _get_records_for_export(doc_ids=None, user_id: int = None):
+    """Επιστρέφει ΟΛΑ τα πεδία (εσωτερικά + extracted) — χρησιμοποιείται από search/stats."""
     all_docs = db.list_documents(user_id=user_id)
     if doc_ids:
         all_docs = [d for d in all_docs if d["id"] in doc_ids]
@@ -803,12 +804,31 @@ def _get_records_for_export(doc_ids=None, user_id: int = None):
         records.append(row)
     return records
 
+def _get_clean_records_for_export(doc_ids=None, user_id: int = None):
+    """Επιστρέφει ΜΟΝΟ τα πεδία που ο χρήστης όρισε στην ετικέτα (result_json).
+    Χρησιμοποιείται από CSV/XLSX/Line Items export — καθαρά δεδομένα χωρίς
+    εσωτερικά πεδία FastWrite (filename, status, batch_id κλπ)."""
+    all_docs = db.list_documents(user_id=user_id)
+    if doc_ids:
+        all_docs = [d for d in all_docs if d["id"] in doc_ids]
+    records = []
+    for doc in all_docs:
+        row = {}
+        if doc.get("result_json"):
+            try:
+                for k, v in json.loads(doc["result_json"]).items():
+                    if not k.startswith("_"): row[k] = v
+            except: pass
+        if row:  # μόνο αν υπάρχουν εξαγόμενα δεδομένα
+            records.append(row)
+    return records
+
 @app.post("/api/export/csv")
 @require_auth
 def export_csv():
     uid = request.current_user["user_id"]
     data    = request.get_json(force=True) or {}
-    records = _get_records_for_export(data.get("doc_ids"), user_id=uid)
+    records = _get_clean_records_for_export(data.get("doc_ids"), user_id=uid)
     if not records:
         return jsonify({"error": "Δεν βρέθηκαν έγγραφα."}), 404
     result = exporter.export_csv(records, filename=data.get("filename"), columns=data.get("columns"))
@@ -822,7 +842,7 @@ def export_csv():
 def export_xlsx():
     uid = request.current_user["user_id"]
     data    = request.get_json(force=True) or {}
-    records = _get_records_for_export(data.get("doc_ids"), user_id=uid)
+    records = _get_clean_records_for_export(data.get("doc_ids"), user_id=uid)
     if not records:
         return jsonify({"error": "Δεν βρέθηκαν έγγραφα."}), 404
     result = exporter.export_xlsx(records, filename=data.get("filename"), columns=data.get("columns"))
@@ -837,7 +857,7 @@ def export_xlsx():
 def export_line_items_xlsx():
     uid = request.current_user["user_id"]
     data    = request.get_json(force=True) or {}
-    records = _get_records_for_export(data.get("doc_ids"), user_id=uid)
+    records = _get_clean_records_for_export(data.get("doc_ids"), user_id=uid)
     if not records:
         return jsonify({"error": "Δεν βρέθηκαν έγγραφα."}), 404
     result = exporter.export_line_items_xlsx(records, filename=data.get("filename"))

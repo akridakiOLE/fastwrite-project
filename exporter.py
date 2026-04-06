@@ -283,8 +283,8 @@ class DocumentExporter:
                                filename: str = None) -> ExportResult:
         """
         Εξαγωγή line items σε Excel. Κάθε line item γίνεται ξεχωριστή γραμμή,
-        με τα βασικά πεδία του εγγράφου (αρχείο, προμηθευτής, ετικέτα κλπ)
-        να επαναλαμβάνονται σε κάθε γραμμή.
+        με τα scalar πεδία της ετικέτας να επαναλαμβάνονται σε κάθε γραμμή.
+        Τα records περιέχουν ΜΟΝΟ πεδία που ο χρήστης όρισε στην ετικέτα.
         """
         result = ExportResult(format="xlsx")
 
@@ -295,21 +295,10 @@ class DocumentExporter:
         try:
             rows = []
             for rec in records:
-                # Βασικά πεδία εγγράφου
-                base = {
-                    "doc_id": rec.get("id", ""),
-                    "filename": rec.get("filename", ""),
-                    "label": rec.get("label", rec.get("schema_name", "")),
-                    "supplier": rec.get("supplier", rec.get("vendor_name", "")),
-                    "status": rec.get("status", ""),
-                }
-                # Scalar πεδία από result_json (π.χ. invoice_number, date, total)
+                # Scalar πεδία (string/number) — τα πεδία που ο χρήστης όρισε
                 scalar_fields = {}
                 for k, v in rec.items():
-                    if k in ("id", "filename", "label", "schema_name", "supplier",
-                             "vendor_name", "status", "result_json", "file_path",
-                             "user_id", "confidence", "batch_id", "created_at",
-                             "page_count", "page_index"):
+                    if k == "line_items":
                         continue
                     if isinstance(v, (str, int, float, type(None))):
                         scalar_fields[k] = v
@@ -326,13 +315,13 @@ class DocumentExporter:
                 if li and isinstance(li, list):
                     for item in li:
                         if isinstance(item, dict):
-                            row = {**base, **scalar_fields}
+                            row = {**scalar_fields}
                             for ik, iv in item.items():
                                 row[f"li_{ik}"] = iv
                             rows.append(row)
                 else:
                     # Αν δεν υπάρχουν line items, βάλε μία γραμμή με τα scalars
-                    rows.append({**base, **scalar_fields})
+                    rows.append(scalar_fields)
 
             if not rows:
                 result.error = "Δεν βρέθηκαν line items."
