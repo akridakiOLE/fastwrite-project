@@ -247,6 +247,7 @@ select.form-input option{background:var(--bg2);}
 .af-btn:hover{background:var(--bg2);border-color:var(--text3);}
 .af-btn.active{background:rgba(0,229,160,0.12);border-color:var(--accent);color:var(--accent);}
 </style>
+<script src="/static/i18n.js"></script>
 </head>
 <body>
 
@@ -258,34 +259,39 @@ select.form-input option{background:var(--bg2);}
       <div class="logo-sub">AI Document Extractor</div>
     </div>
     <nav class="nav">
-      <div class="nav-section">Κύριο Μενού</div>
+      <div class="nav-section" data-i18n="sidebar_main_menu">Κύριο Μενού</div>
       <button class="nav-item active" onclick="showPage('dashboard')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-        Dashboard
+        <span data-i18n="sidebar_dashboard">Dashboard</span>
       </button>
       <button class="nav-item" onclick="showPage('upload')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Upload & Extract
+        <span data-i18n="sidebar_upload">Upload & Extract</span>
       </button>
       <button class="nav-item" onclick="showPage('documents')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        Έγγραφα
+        <span data-i18n="sidebar_documents">Έγγραφα</span>
       </button>
       <!-- Batch Processing page αφαιρέθηκε — ιστορικό μεταφέρθηκε στο Upload & Extract -->
-      <div class="nav-section">Ρυθμίσεις</div>
+      <div class="nav-section" data-i18n="sidebar_settings_group">Ρυθμίσεις</div>
       <button class="nav-item" onclick="showPage('templates')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        Ετικέτες
+        <span data-i18n="sidebar_labels">Ετικέτες</span>
       </button>
       <button class="nav-item" onclick="showPage('settings')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
-        Ρυθμίσεις
+        <span data-i18n="sidebar_settings">Ρυθμίσεις</span>
       </button>
       <button class="nav-item" onclick="showPage('faq')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 015.12 1.65c0 1.35-2.12 2.35-2.12 2.35M12 17h.01"/></svg>
-        Βοήθεια
+        <span data-i18n="sidebar_help">Βοήθεια</span>
       </button>
     </nav>
+    <!-- Language Selector -->
+    <div style="display:flex;justify-content:center;gap:4px;padding:0 16px 8px;">
+      <button onclick="I18N.setLanguage('el')" id="lang-btn-el" style="flex:1;padding:4px 0;border:1px solid var(--border);border-radius:6px 0 0 6px;background:rgba(0,229,160,0.1);color:var(--accent);font-size:11px;font-weight:600;cursor:pointer;">EL</button>
+      <button onclick="I18N.setLanguage('en')" id="lang-btn-en" style="flex:1;padding:4px 0;border:1px solid var(--border);border-radius:0 6px 6px 0;background:transparent;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;">EN</button>
+    </div>
     <div class="sidebar-footer">
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
         <div style="display:flex;align-items:center;gap:6px;">
@@ -294,6 +300,7 @@ select.form-input option{background:var(--bg2);}
         </div>
         <button class="tooltip-hint" data-hint="Αποσύνδεση από τον λογαριασμό σας" onclick="doLogout()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 10px;font-size:11px;transition:all .15s;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'" title="Αποσύνδεση">⏻ Έξοδος</button>
       </div>
+      <a href="/legal" target="_blank" style="display:block;text-align:center;margin-top:8px;font-size:10px;color:var(--text2);text-decoration:none;opacity:0.6;" data-i18n="legal_link">Όροι &amp; Απόρρητο</a>
     </div>
   </aside>
 
@@ -303,28 +310,28 @@ select.form-input option{background:var(--bg2);}
     <!-- DASHBOARD -->
     <div id="page-dashboard" class="page">
       <div class="topbar">
-        <div class="page-title">Dashboard</div>
+        <div class="page-title" data-i18n="page_dashboard">Dashboard</div>
         <div class="topbar-actions">
-          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Ανανέωση στατιστικών Dashboard σε πραγματικό χρόνο" onclick="loadDashboard()">↻ Ανανέωση</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Ανανέωση στατιστικών Dashboard σε πραγματικό χρόνο" data-i18n-hint="dashboard_refresh_hint" data-i18n="dashboard_refresh" onclick="loadDashboard()">↻ Ανανέωση</button>
         </div>
       </div>
       <div class="content">
         <div class="stats-grid">
           <div class="stat-card green">
             <div class="stat-value" id="stat-total">—</div>
-            <div class="stat-label">Σύνολο Εγγράφων</div>
+            <div class="stat-label" data-i18n="stat_total">Σύνολο Εγγράφων</div>
           </div>
           <div class="stat-card blue">
             <div class="stat-value" id="stat-completed">—</div>
-            <div class="stat-label">Ολοκληρωμένα</div>
+            <div class="stat-label" data-i18n="stat_completed">Ολοκληρωμένα</div>
           </div>
           <div class="stat-card yellow">
             <div class="stat-value" id="stat-pending">—</div>
-            <div class="stat-label">Σε Αναμονή</div>
+            <div class="stat-label" data-i18n="stat_pending">Σε Αναμονή</div>
           </div>
           <div class="stat-card red">
             <div class="stat-value" id="stat-failed">—</div>
-            <div class="stat-label">Αποτυχημένα</div>
+            <div class="stat-label" data-i18n="stat_failed">Αποτυχημένα</div>
           </div>
         </div>
 
@@ -332,7 +339,7 @@ select.form-input option{background:var(--bg2);}
         <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;margin-top:20px;">
           <!-- Donut Chart -->
           <div class="card" style="padding:20px;display:flex;flex-direction:column;align-items:center;">
-            <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;">Κατανομή Εγγράφων</div>
+            <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;" data-i18n="donut_title">Κατανομή Εγγράφων</div>
             <div style="position:relative;width:180px;height:180px;">
               <svg id="donut-chart" viewBox="0 0 36 36" style="width:100%;height:100%;transform:rotate(-90deg);">
                 <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg3)" stroke-width="3.5"/>
@@ -342,7 +349,7 @@ select.form-input option{background:var(--bg2);}
               </svg>
               <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
                 <div id="donut-center-value" style="font-size:24px;font-weight:700;color:var(--text);">—</div>
-                <div style="font-size:10px;color:var(--text2);">Σύνολο</div>
+                <div style="font-size:10px;color:var(--text2);" data-i18n="donut_total">Σύνολο</div>
               </div>
             </div>
             <!-- Legend -->
@@ -367,7 +374,7 @@ select.form-input option{background:var(--bg2);}
 
           <!-- Recent Activity -->
           <div class="card" style="padding:20px;overflow:hidden;">
-            <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;">Πρόσφατη Δραστηριότητα</div>
+            <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;" data-i18n="activity_title">Πρόσφατη Δραστηριότητα</div>
             <div id="activity-list" style="display:flex;flex-direction:column;gap:0;">
               <div style="text-align:center;color:var(--text2);font-size:13px;padding:24px;">Φόρτωση...</div>
             </div>
@@ -379,23 +386,23 @@ select.form-input option{background:var(--bg2);}
 
     <!-- UPLOAD -->
     <div id="page-upload" class="page" style="display:none">
-      <div class="topbar"><div class="page-title">Upload & Extract</div></div>
+      <div class="topbar"><div class="page-title" data-i18n="page_upload">Upload & Extract</div></div>
       <div class="content">
         <!-- Mini Workflow Guide -->
         <div style="display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:20px;padding:16px 20px;background:rgba(0,229,160,0.03);border:1px solid rgba(0,229,160,0.15);border-radius:12px;max-width:640px;margin-left:auto;margin-right:auto;">
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#0a0c10;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">1</div>
-            <div style="font-size:12px;color:var(--text);">Ανεβάστε PDF</div>
+            <div style="font-size:12px;color:var(--text);" data-i18n="upload_step1">Ανεβάστε PDF</div>
           </div>
           <div style="flex:0 0 40px;height:2px;background:rgba(0,229,160,0.3);margin:0 6px;"></div>
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="width:28px;height:28px;border-radius:50%;background:var(--accent2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">2</div>
-            <div style="font-size:12px;color:var(--text);">Ορίστε Ετικέτες</div>
+            <div style="font-size:12px;color:var(--text);" data-i18n="upload_step2">Ορίστε Ετικέτες</div>
           </div>
           <div style="flex:0 0 40px;height:2px;background:rgba(0,102,255,0.3);margin:0 6px;"></div>
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="width:28px;height:28px;border-radius:50%;background:#f0c040;color:#0a0c10;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">3</div>
-            <div style="font-size:12px;color:var(--text);">Εξαγωγή Batch</div>
+            <div style="font-size:12px;color:var(--text);" data-i18n="upload_step3">Εξαγωγή Batch</div>
           </div>
         </div>
 
@@ -446,7 +453,7 @@ select.form-input option{background:var(--bg2);}
     <!-- DOCUMENTS -->
     <div id="page-documents" class="page" style="display:none">
       <div class="topbar">
-        <div class="page-title">Έγγραφα</div>
+        <div class="page-title" data-i18n="page_documents">Έγγραφα</div>
         <div class="topbar-actions">
           <span id="doc-selected-count" style="font-size:12px;color:var(--accent);display:none;font-weight:500;margin-right:8px;"></span>
           <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Άνοιγμα επεξεργαστή ετικετών για ταξινόμηση και ομαδοποίηση εγγράφων" onclick="openLabelEditor()" style="font-weight:600;">🏷 Ετικέτες</button>
@@ -4080,6 +4087,27 @@ async function openTemplateBuilder(type) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 checkServer();
 setInterval(checkServer, 30000);
+// ── i18n initialization ──
+I18N.init();
+// Update language selector buttons
+function updateLangButtons() {
+  const elBtn = document.getElementById('lang-btn-el');
+  const enBtn = document.getElementById('lang-btn-en');
+  if (elBtn && enBtn) {
+    if (I18N.currentLang === 'el') {
+      elBtn.style.background = 'rgba(0,229,160,0.1)'; elBtn.style.color = 'var(--accent)';
+      enBtn.style.background = 'transparent'; enBtn.style.color = 'var(--text2)';
+    } else {
+      enBtn.style.background = 'rgba(0,229,160,0.1)'; enBtn.style.color = 'var(--accent)';
+      elBtn.style.background = 'transparent'; elBtn.style.color = 'var(--text2)';
+    }
+  }
+}
+// Override setLanguage to also update buttons
+const _origSetLang = I18N.setLanguage.bind(I18N);
+I18N.setLanguage = function(lang) { _origSetLang(lang); updateLangButtons(); };
+updateLangButtons();
+
 // URL-based routing: αν το URL είναι /ui/template-builder/<id>, άνοιξε το Template Builder
 (function() {
   const m = window.location.pathname.match(/\/ui\/template-builder\/(\d+)/);

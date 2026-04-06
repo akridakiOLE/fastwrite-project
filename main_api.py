@@ -1731,6 +1731,9 @@ button:hover{opacity:.85;}
   <div style="text-align:center;margin-top:20px;font-size:13px;color:#7c8299;">
     Δεν έχεις λογαριασμό; <a href="/ui/register" style="color:#00e5a0;text-decoration:none;">Εγγραφή</a>
   </div>
+  <div style="text-align:center;margin-top:12px;font-size:11px;color:#555;">
+    <a href="/legal" target="_blank" style="color:#7c8299;text-decoration:none;">Όροι Χρήσης &amp; Πολιτική Απορρήτου</a>
+  </div>
 </div>
 <script>
 let needs2fa=false;
@@ -1761,6 +1764,7 @@ async function doLogin(e){
 
 
 @app.get("/ui/terms")
+@app.get("/legal")
 def serve_terms():
     return TERMS_HTML, 200, {"Content-Type": "text/html"}
 
@@ -1770,11 +1774,11 @@ def serve_login():
 
 
 TERMS_HTML = """<!DOCTYPE html>
-<html lang="en">
+<html lang="el">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>FastWrite — Terms &amp; Conditions</title>
+<title>FastWrite — Terms of Service &amp; Privacy Policy</title>
 <style>
 :root{--bg:#0a0c10;--bg2:#111318;--border:#1e2330;--accent:#00e5a0;--text:#e8eaf0;--text2:#7c8299;}
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -1788,84 +1792,224 @@ ul{padding-left:24px;margin-bottom:12px;}
 a{color:var(--accent);text-decoration:none;} a:hover{text-decoration:underline;}
 .back-link{display:inline-block;margin-top:24px;padding:10px 20px;background:var(--accent);color:#0a0c10;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none;}
 .back-link:hover{opacity:.85;text-decoration:none;}
+.lang-switch{position:absolute;top:20px;right:20px;display:flex;gap:8px;}
+.lang-switch a{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);color:var(--text2);}
+.lang-switch a.active{background:var(--accent);color:#0a0c10;border-color:var(--accent);}
+.section-divider{margin:40px 0 32px;border-top:2px solid var(--accent);padding-top:8px;}
 </style>
 </head>
 <body>
-<div class="terms-wrap">
+<div class="terms-wrap" style="position:relative;">
+<div class="lang-switch">
+  <a href="#" onclick="showLang('el');return false;" id="lang-el" class="active">EL</a>
+  <a href="#" onclick="showLang('en');return false;" id="lang-en">EN</a>
+</div>
+
 <h1>Fast<span>Write</span></h1>
-<p class="subtitle">Terms &amp; Conditions &middot; Privacy Policy &middot; Last updated: April 2026</p>
+<p class="subtitle">Terms of Service &amp; Privacy Policy &middot; Last updated: April 2026</p>
 
-<h2>1. Introduction</h2>
-<p>Welcome to FastWrite ("Service", "Platform", "we", "us"). FastWrite is an AI-powered document extraction tool operated as a Software-as-a-Service (SaaS) platform accessible at fastwrite.duckdns.org. By creating an account and using the Service, you ("User", "you") agree to be bound by these Terms &amp; Conditions.</p>
+<!-- ======================== GREEK VERSION ======================== -->
+<div id="terms-el">
 
-<h2>2. Service Description</h2>
-<p>FastWrite provides automated document data extraction using artificial intelligence. The Service allows users to upload documents (PDF, images), extract structured data from them using AI models, organize documents with labels/templates, and export extracted data. The Service is provided on an "as-is" basis.</p>
+<h2>ΜΕΡΟΣ Α: ΟΡΟΙ ΧΡΗΣΗΣ</h2>
 
-<h2>3. Account Registration &amp; Security</h2>
-<p>To use the Service, you must create an account with a valid username and password. You are responsible for maintaining the confidentiality of your credentials and for all activity under your account. You must notify us immediately of any unauthorized use. We recommend enabling Two-Factor Authentication (2FA) for enhanced security.</p>
+<h2>1. Εισαγωγή</h2>
+<p>Καλώς ήρθατε στο FastWrite ("Υπηρεσία", "Πλατφόρμα", "εμείς"). Το FastWrite είναι ένα εργαλείο εξαγωγής δεδομένων από έγγραφα με τεχνητή νοημοσύνη, το οποίο λειτουργεί ως Software-as-a-Service (SaaS) πλατφόρμα, προσβάσιμη στη διεύθυνση fastwrite.duckdns.org. Με τη δημιουργία λογαριασμού και τη χρήση της Υπηρεσίας, ο χρήστης ("Χρήστης", "εσείς") αποδέχεται τους παρόντες Όρους Χρήσης.</p>
 
-<h2>4. User Data &amp; Privacy</h2>
-<h3>4.1 Data You Upload</h3>
-<p>Documents and files you upload remain your property. We do not access, view, analyze, or share your uploaded documents or extracted data. Your data is isolated from other users' data. The Service operator (admin) does not have access to any user documents or extracted information.</p>
+<h2>2. Περιγραφή Υπηρεσίας</h2>
+<p>Το FastWrite παρέχει αυτοματοποιημένη εξαγωγή δεδομένων από έγγραφα χρησιμοποιώντας τεχνητή νοημοσύνη. Η Υπηρεσία επιτρέπει στους χρήστες να ανεβάζουν έγγραφα (PDF), να εξάγουν δομημένα δεδομένα μέσω μοντέλων AI, να οργανώνουν τα έγγραφα με ετικέτες/πρότυπα, και να εξάγουν δεδομένα σε μορφές CSV/XLSX. Η Υπηρεσία παρέχεται "ως έχει" (as-is).</p>
 
-<h3>4.2 Data We Collect</h3>
-<p>We collect only the minimum data necessary to provide the Service:</p>
+<h2>3. Μοντέλο BYOK (Bring Your Own Key)</h2>
+<p>Το FastWrite λειτουργεί αποκλειστικά με το μοντέλο BYOK (Bring Your Own Key). Αυτό σημαίνει ότι:</p>
 <ul>
-<li>Account information: username, email address (optional), password (stored as a bcrypt hash — we never store plain-text passwords)</li>
-<li>Usage metadata: account creation date, login timestamps</li>
-<li>Technical data: authentication tokens (JWT cookies) for session management</li>
+<li>Ο χρήστης <strong>υποχρεούται</strong> να παρέχει το δικό του κλειδί API (API Key) από τον πάροχο AI (π.χ. Google Gemini) για να χρησιμοποιήσει τις λειτουργίες εξαγωγής.</li>
+<li>Η πλατφόρμα <strong>δεν παρέχει, δεν μεσολαβεί και δεν επιδοτεί</strong> κλειδιά API. Η χρέωση για τη χρήση του AI γίνεται <strong>απευθείας</strong> μεταξύ του χρήστη και του παρόχου AI.</li>
+<li>Τα κλειδιά API αποθηκεύονται κρυπτογραφημένα (Fernet encryption) στον server και χρησιμοποιούνται μόνο κατά την εκτέλεση εξαγωγών.</li>
+<li>Η πλατφόρμα δεν έχει πρόσβαση στα κλειδιά API σε μη κρυπτογραφημένη μορφή, εκτός από τη στιγμή της χρήσης τους για κλήση του AI API.</li>
 </ul>
 
-<h3>4.3 Third-Party AI Processing</h3>
-<p>Document extraction uses third-party AI services (such as Google Gemini). When you process a document, its content is sent to the configured AI provider for extraction. You acknowledge that third-party AI providers have their own terms of service and privacy policies. We recommend reviewing those policies. You may configure your own API key (BYOK — Bring Your Own Key) for direct billing with the AI provider.</p>
+<h2>4. Ακρίβεια Εξαγωγής Δεδομένων &amp; Ευθύνη Χρήστη</h2>
+<p><strong>ΣΗΜΑΝΤΙΚΟ:</strong> Η εξαγωγή δεδομένων με τεχνητή νοημοσύνη δεν είναι 100% ακριβής. Ο χρήστης αναγνωρίζει και αποδέχεται ότι:</p>
+<ul>
+<li>Η πλατφόρμα παρέχει εργαλεία ελέγχου (confidence scores, workflow έγκρισης), αλλά <strong>ο τελικός έλεγχος και η ευθύνη για την ορθότητα των εξαγόμενων δεδομένων ανήκει αποκλειστικά στον χρήστη</strong>.</li>
+<li>Η πλατφόρμα <strong>δεν εγγυάται</strong> την ακρίβεια, πληρότητα ή αξιοπιστία των δεδομένων που εξάγονται μέσω AI.</li>
+<li>Ο χρήστης οφείλει να ελέγχει τα εξαγόμενα δεδομένα <strong>πριν</strong> τα χρησιμοποιήσει για επαγγελματικούς, νομικούς ή οικονομικούς σκοπούς.</li>
+<li>Η πλατφόρμα <strong>δεν φέρει καμία ευθύνη</strong> για τυχόν λανθασμένες εξαγωγές, ελλιπή δεδομένα ή σφάλματα στα αποτελέσματα εξαγωγής, ανεξαρτήτως της αιτίας.</li>
+</ul>
 
-<h3>4.4 Data Storage &amp; Security</h3>
-<p>Your data is stored on secure servers. Uploaded files and extracted data are stored per-user and are not shared across accounts. API keys are encrypted at rest using Fernet symmetric encryption. We use HTTPS for data in transit and JWT tokens with httpOnly cookies for authentication.</p>
+<h2>5. Λογαριασμός &amp; Ασφάλεια</h2>
+<p>Για τη χρήση της Υπηρεσίας, ο χρήστης πρέπει να δημιουργήσει λογαριασμό. Ο χρήστης ευθύνεται για τη διατήρηση της εμπιστευτικότητας των στοιχείων πρόσβασης και για κάθε δραστηριότητα στον λογαριασμό του. Συνιστάται η ενεργοποίηση Ελέγχου Ταυτότητας Δύο Παραγόντων (2FA) για ενισχυμένη ασφάλεια.</p>
 
-<h3>4.5 Data Retention &amp; Deletion</h3>
-<p>You may delete your documents at any time through the platform. Upon account deactivation, your data may be retained for a reasonable period for backup purposes before permanent deletion. You may request complete data deletion by contacting support.</p>
+<h2>6. Αποδεκτή Χρήση</h2>
+<p>Ο χρήστης συμφωνεί να μην:</p>
+<ul>
+<li>Ανεβάζει παράνομο, επιβλαβές ή προσβλητικό περιεχόμενο</li>
+<li>Επιχειρεί πρόσβαση σε δεδομένα ή λογαριασμούς άλλων χρηστών</li>
+<li>Αποσυμπιλεί, αποσυναρμολογεί ή κάνει reverse engineering στην Υπηρεσία</li>
+<li>Επεξεργάζεται έγγραφα που δεν δικαιούται να επεξεργαστεί</li>
+<li>Υπερφορτώνει την Υπηρεσία με υπερβολικά αιτήματα</li>
+<li>Μοιράζεται τα στοιχεία πρόσβασης με τρίτους</li>
+</ul>
 
-<h2>5. Acceptable Use</h2>
-<p>You agree not to:</p>
+<h2>7. Πνευματική Ιδιοκτησία</h2>
+<p>Η πλατφόρμα FastWrite, συμπεριλαμβανομένου του λογισμικού, του σχεδιασμού και της τεκμηρίωσης, αποτελεί πνευματική ιδιοκτησία του φορέα λειτουργίας. Τα έγγραφα και τα δεδομένα του χρήστη παραμένουν δική του ιδιοκτησία.</p>
+
+<h2>8. Διαθεσιμότητα Υπηρεσίας</h2>
+<p>Στοχεύουμε σε υψηλή διαθεσιμότητα αλλά δεν εγγυόμαστε αδιάκοπη λειτουργία. Η Υπηρεσία μπορεί να είναι προσωρινά μη διαθέσιμη λόγω συντήρησης ή περιστάσεων εκτός ελέγχου μας. Δεν ευθυνόμαστε για τυχόν ζημία λόγω διακοπής λειτουργίας.</p>
+
+<h2>9. Περιορισμός Ευθύνης</h2>
+<p>Στο μέγιστο βαθμό που επιτρέπεται από το εφαρμοστέο δίκαιο, η πλατφόρμα FastWrite και οι φορείς λειτουργίας της <strong>δεν ευθύνονται</strong> για οποιαδήποτε έμμεση, τυχαία, ειδική, παρεπόμενη ή αποθετική ζημία, συμπεριλαμβανομένων ενδεικτικά απώλειας κερδών, δεδομένων ή επιχειρηματικών ευκαιριών, που προκύπτει από τη χρήση της Υπηρεσίας. Ειδικότερα, η πλατφόρμα <strong>δεν φέρει ευθύνη</strong> για αποφάσεις που λαμβάνονται βάσει δεδομένων που εξήχθησαν μέσω της Υπηρεσίας.</p>
+
+<h2>10. Καταγγελία</h2>
+<p>Διατηρούμε το δικαίωμα αναστολής ή τερματισμού λογαριασμών που παραβιάζουν τους παρόντες όρους. Ο χρήστης μπορεί να σταματήσει τη χρήση ανά πάσα στιγμή.</p>
+
+<h2>11. Αλλαγές στους Όρους</h2>
+<p>Ενδέχεται να ενημερώσουμε τους παρόντες Όρους. Η συνέχιση χρήσης μετά τις αλλαγές συνιστά αποδοχή. Θα καταβάλουμε εύλογες προσπάθειες ενημέρωσης για σημαντικές αλλαγές.</p>
+
+<div class="section-divider"></div>
+<h2>ΜΕΡΟΣ Β: ΠΟΛΙΤΙΚΗ ΑΠΟΡΡΗΤΟΥ</h2>
+
+<h2>12. Δεδομένα που Ανεβάζετε</h2>
+<p>Τα έγγραφα και τα αρχεία που ανεβάζετε παραμένουν δική σας ιδιοκτησία. Δεν έχουμε πρόσβαση, δεν προβάλλουμε, δεν αναλύουμε και <strong>δεν μοιραζόμαστε</strong> τα ανεβασμένα έγγραφα ή τα εξαγόμενα δεδομένα σας με κανέναν τρίτο. Τα δεδομένα σας είναι απομονωμένα από τα δεδομένα άλλων χρηστών.</p>
+
+<h2>13. Δεδομένα που Συλλέγουμε</h2>
+<p>Συλλέγουμε μόνο τα ελάχιστα δεδομένα που απαιτούνται:</p>
+<ul>
+<li>Στοιχεία λογαριασμού: username, κωδικός (αποθηκεύεται ως bcrypt hash — ποτέ σε απλό κείμενο)</li>
+<li>Μεταδεδομένα χρήσης: ημερομηνία δημιουργίας λογαριασμού, χρονοσήματα σύνδεσης</li>
+<li>Τεχνικά δεδομένα: JWT authentication tokens για τη διαχείριση συνεδριών</li>
+</ul>
+
+<h2>14. Επεξεργασία AI &amp; Τρίτοι Πάροχοι</h2>
+<p>Η εξαγωγή δεδομένων χρησιμοποιεί υπηρεσίες AI τρίτων (π.χ. Google Gemini). Όταν γίνεται επεξεργασία εγγράφου, το περιεχόμενό του αποστέλλεται <strong>απευθείας</strong> στον πάροχο AI μέσω του κλειδιού API του χρήστη. Η πλατφόρμα <strong>δεν αποθηκεύει, δεν προωθεί και δεν κοινοποιεί</strong> δεδομένα εγγράφων σε κανέναν εκτός του AI παρόχου που έχει επιλέξει ο χρήστης. Ο χρήστης αναγνωρίζει ότι οι πάροχοι AI έχουν τους δικούς τους όρους χρήσης.</p>
+
+<h2>15. Αποθήκευση &amp; Ασφάλεια Δεδομένων</h2>
+<p>Τα δεδομένα αποθηκεύονται <strong>τοπικά</strong> στον server της πλατφόρμας. Δεν χρησιμοποιούνται εξωτερικές υπηρεσίες αποθήκευσης (cloud storage) τρίτων. Τα κλειδιά API κρυπτογραφούνται (Fernet encryption). Χρησιμοποιούμε HTTPS για τα δεδομένα κατά τη μεταφορά και JWT tokens με httpOnly cookies για τον έλεγχο ταυτότητας.</p>
+
+<h2>16. Διατήρηση &amp; Διαγραφή Δεδομένων</h2>
+<p>Μπορείτε να διαγράψετε τα έγγραφά σας ανά πάσα στιγμή μέσα από την πλατφόρμα. Μετά την απενεργοποίηση λογαριασμού, τα δεδομένα μπορεί να διατηρηθούν για εύλογο χρονικό διάστημα πριν τη μόνιμη διαγραφή. Μπορείτε να ζητήσετε πλήρη διαγραφή δεδομένων.</p>
+
+<h2>17. Κοινοποίηση σε Τρίτους</h2>
+<p><strong>ΔΕΝ</strong> κοινοποιούμε, πωλούμε ή μεταφέρουμε προσωπικά δεδομένα σε τρίτους. Τα δεδομένα σας παραμένουν αποκλειστικά στην πλατφόρμα και δεν αξιοποιούνται για εμπορικούς σκοπούς ή διαφήμιση.</p>
+
+<h2>18. Εφαρμοστέο Δίκαιο</h2>
+<p>Οι παρόντες όροι διέπονται από το εφαρμοστέο δίκαιο. Τυχόν διαφορές θα επιλύονται κατ' αρχήν μέσω καλόπιστης διαπραγμάτευσης και, εάν απαιτηθεί, μέσω των αρμόδιων δικαστηρίων.</p>
+
+<h2>19. Επικοινωνία</h2>
+<p>Για ερωτήσεις σχετικά με τους Όρους Χρήσης ή την Πολιτική Απορρήτου, ή για αίτημα διαγραφής δεδομένων, επικοινωνήστε μέσω της πλατφόρμας.</p>
+
+<p style="margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--text2);">
+<strong>Σημείωση:</strong> Το παρόν αποτελεί προσχέδιο και πρέπει να ελεγχθεί από εξειδικευμένο νομικό σύμβουλο πριν τη χρήση. Δεν αποτελεί νομική συμβουλή.
+</p>
+</div>
+
+<!-- ======================== ENGLISH VERSION ======================== -->
+<div id="terms-en" style="display:none;">
+
+<h2>PART A: TERMS OF SERVICE</h2>
+
+<h2>1. Introduction</h2>
+<p>Welcome to FastWrite ("Service", "Platform", "we", "us"). FastWrite is an AI-powered document extraction tool operated as a Software-as-a-Service (SaaS) platform accessible at fastwrite.duckdns.org. By creating an account and using the Service, you ("User", "you") agree to be bound by these Terms of Service.</p>
+
+<h2>2. Service Description</h2>
+<p>FastWrite provides automated document data extraction using artificial intelligence. The Service allows users to upload documents (PDF), extract structured data using AI models, organize documents with labels/templates, and export data in CSV/XLSX formats. The Service is provided on an "as-is" basis.</p>
+
+<h2>3. BYOK Model (Bring Your Own Key)</h2>
+<p>FastWrite operates exclusively on the BYOK (Bring Your Own Key) model. This means:</p>
+<ul>
+<li>The user is <strong>required</strong> to provide their own API Key from the AI provider (e.g. Google Gemini) to use extraction features.</li>
+<li>The platform <strong>does not provide, mediate, or subsidize</strong> API keys. AI usage is billed <strong>directly</strong> between the user and the AI provider.</li>
+<li>API keys are stored encrypted (Fernet encryption) on the server and are used only during extraction execution.</li>
+<li>The platform does not have access to API keys in unencrypted form, except at the moment of use for AI API calls.</li>
+</ul>
+
+<h2>4. Data Extraction Accuracy &amp; User Responsibility</h2>
+<p><strong>IMPORTANT:</strong> AI-based data extraction is not 100% accurate. The user acknowledges and accepts that:</p>
+<ul>
+<li>The platform provides verification tools (confidence scores, approval workflow), but <strong>the final verification and responsibility for the accuracy of extracted data lies exclusively with the user</strong>.</li>
+<li>The platform <strong>does not guarantee</strong> the accuracy, completeness, or reliability of AI-extracted data.</li>
+<li>The user must verify extracted data <strong>before</strong> using it for business, legal, or financial purposes.</li>
+<li>The platform <strong>bears no responsibility</strong> for incorrect extractions, incomplete data, or errors in extraction results, regardless of the cause.</li>
+</ul>
+
+<h2>5. Account &amp; Security</h2>
+<p>To use the Service, the user must create an account. The user is responsible for maintaining credential confidentiality and for all activity on their account. Enabling Two-Factor Authentication (2FA) is recommended for enhanced security.</p>
+
+<h2>6. Acceptable Use</h2>
+<p>The user agrees not to:</p>
 <ul>
 <li>Upload illegal, harmful, or infringing content</li>
 <li>Attempt to access other users' data or accounts</li>
 <li>Reverse engineer, decompile, or disassemble the Service</li>
-<li>Use the Service to process documents you do not have the right to process</li>
-<li>Overload the Service with excessive requests or abuse API endpoints</li>
-<li>Share your account credentials with others</li>
+<li>Process documents they do not have the right to process</li>
+<li>Overload the Service with excessive requests</li>
+<li>Share account credentials with third parties</li>
 </ul>
 
-<h2>6. Intellectual Property</h2>
-<p>The FastWrite platform, including its software, design, and documentation, is the intellectual property of the Service operator. Your documents and data remain your intellectual property. We claim no ownership over content you upload or data you extract.</p>
-
-<h2>7. AI Extraction Accuracy</h2>
-<p>AI-based document extraction is not 100% accurate. The Service provides confidence scores and an approval workflow for you to review extracted data. You are responsible for verifying the accuracy of extracted data before relying on it for business, legal, or financial purposes. We do not guarantee the accuracy, completeness, or reliability of AI-generated extractions.</p>
+<h2>7. Intellectual Property</h2>
+<p>The FastWrite platform, including its software, design, and documentation, is the intellectual property of the Service operator. User documents and data remain the user's property.</p>
 
 <h2>8. Service Availability</h2>
-<p>We aim to maintain high availability but do not guarantee uninterrupted service. The Service may be temporarily unavailable due to maintenance, updates, or circumstances beyond our control. We are not liable for any loss resulting from service downtime.</p>
+<p>We aim for high availability but do not guarantee uninterrupted service. The Service may be temporarily unavailable due to maintenance or circumstances beyond our control. We are not liable for any loss resulting from service downtime.</p>
 
 <h2>9. Limitation of Liability</h2>
-<p>To the maximum extent permitted by applicable law, FastWrite and its operators shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to loss of profits, data, or business opportunities, arising from your use of the Service.</p>
+<p>To the maximum extent permitted by applicable law, FastWrite and its operators shall <strong>not be liable</strong> for any indirect, incidental, special, consequential, or punitive damages, including but not limited to loss of profits, data, or business opportunities, arising from the use of the Service. In particular, the platform <strong>bears no liability</strong> for decisions made based on data extracted through the Service.</p>
 
 <h2>10. Termination</h2>
-<p>We reserve the right to suspend or terminate accounts that violate these terms. You may stop using the Service at any time. Upon termination, your right to use the Service ceases immediately.</p>
+<p>We reserve the right to suspend or terminate accounts that violate these terms. The user may stop using the Service at any time.</p>
 
 <h2>11. Changes to Terms</h2>
-<p>We may update these Terms &amp; Conditions from time to time. Continued use of the Service after changes constitutes acceptance of the updated terms. We will make reasonable efforts to notify users of significant changes.</p>
+<p>We may update these Terms from time to time. Continued use after changes constitutes acceptance. We will make reasonable efforts to notify users of significant changes.</p>
 
-<h2>12. Governing Law</h2>
-<p>These terms are governed by and construed in accordance with applicable laws. Any disputes shall be resolved through good-faith negotiation first, and if necessary, through the courts of competent jurisdiction.</p>
+<div class="section-divider"></div>
+<h2>PART B: PRIVACY POLICY</h2>
 
-<h2>13. Contact</h2>
-<p>For questions about these Terms &amp; Conditions, or to request data deletion, please contact us through the platform or at the email address provided in your account settings.</p>
+<h2>12. Data You Upload</h2>
+<p>Documents and files you upload remain your property. We do not access, view, analyze, or <strong>share</strong> your uploaded documents or extracted data with anyone. Your data is isolated from other users' data.</p>
+
+<h2>13. Data We Collect</h2>
+<p>We collect only the minimum data necessary:</p>
+<ul>
+<li>Account information: username, password (stored as bcrypt hash — never in plain text)</li>
+<li>Usage metadata: account creation date, login timestamps</li>
+<li>Technical data: JWT authentication tokens for session management</li>
+</ul>
+
+<h2>14. AI Processing &amp; Third Parties</h2>
+<p>Data extraction uses third-party AI services (e.g. Google Gemini). When a document is processed, its content is sent <strong>directly</strong> to the AI provider using the user's API key. The platform <strong>does not store, forward, or disclose</strong> document data to anyone other than the AI provider selected by the user. The user acknowledges that AI providers have their own terms of service.</p>
+
+<h2>15. Data Storage &amp; Security</h2>
+<p>Data is stored <strong>locally</strong> on the platform's server. No third-party cloud storage services are used. API keys are encrypted (Fernet encryption). We use HTTPS for data in transit and JWT tokens with httpOnly cookies for authentication.</p>
+
+<h2>16. Data Retention &amp; Deletion</h2>
+<p>You may delete your documents at any time through the platform. Upon account deactivation, data may be retained for a reasonable period before permanent deletion. You may request complete data deletion.</p>
+
+<h2>17. Third-Party Sharing</h2>
+<p>We do <strong>NOT</strong> share, sell, or transfer personal data to third parties. Your data remains exclusively on the platform and is not used for commercial purposes or advertising.</p>
+
+<h2>18. Governing Law</h2>
+<p>These terms are governed by applicable law. Disputes shall be resolved through good-faith negotiation first, and if necessary, through courts of competent jurisdiction.</p>
+
+<h2>19. Contact</h2>
+<p>For questions about these Terms of Service or Privacy Policy, or to request data deletion, please contact us through the platform.</p>
 
 <p style="margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--text2);">
-<strong>Disclaimer:</strong> This document is provided as a template and should be reviewed by a qualified legal professional before being relied upon. It is not legal advice.
+<strong>Disclaimer:</strong> This document is a draft and should be reviewed by a qualified legal professional before being relied upon. It does not constitute legal advice.
 </p>
-
-<a href="/ui/login" class="back-link">← Back to Login</a>
 </div>
+
+<a href="/ui/login" class="back-link" id="back-link-text">&#8592; Επιστροφή</a>
+</div>
+
+<script>
+function showLang(lang) {
+  document.getElementById('terms-el').style.display = lang === 'el' ? 'block' : 'none';
+  document.getElementById('terms-en').style.display = lang === 'en' ? 'block' : 'none';
+  document.getElementById('lang-el').className = lang === 'el' ? 'active' : '';
+  document.getElementById('lang-en').className = lang === 'en' ? 'active' : '';
+  document.getElementById('back-link-text').innerHTML = lang === 'el' ? '&#8592; Επιστροφή' : '&#8592; Back to Login';
+}
+</script>
 </body>
 </html>"""
 
