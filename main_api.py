@@ -4,6 +4,8 @@ Domain: fastwrite.duckdns.org
 """
 import json
 import sys
+import io
+import base64
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -1287,6 +1289,7 @@ def auth_login():
     data = request.get_json(force=True)
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    totp_code = data.get("totp_code", "").strip()
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
     user = db.get_user_by_username(username)
@@ -1294,6 +1297,19 @@ def auth_login():
         return jsonify({"error": "Invalid credentials"}), 401
     if not check_password(password, user["password_hash"]):
         return jsonify({"error": "Invalid credentials"}), 401
+    # ── 2FA check ──
+    if user.get("totp_enabled"):
+        if not totp_code:
+            # Password OK but 2FA required — tell frontend to show TOTP field
+            return jsonify({"requires_2fa": True}), 200
+        try:
+            import pyotp
+            totp = pyotp.TOTP(user.get("totp_secret", ""))
+            if not totp.verify(totp_code, valid_window=1):
+                return jsonify({"error": "Λάθος κωδικός 2FA"}), 401
+        except ImportError:
+            logger.error("pyotp not installed — cannot verify 2FA")
+            return jsonify({"error": "2FA library missing on server"}), 500
     token = create_token(user["id"], user["username"])
     resp = make_response(jsonify({"success": True, "username": user["username"], "role": user["role"]}))
     resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="Lax", secure=False, max_age=86400, path="/")
@@ -1378,6 +1394,90 @@ def auth_change_email():
     db.update_user_email(user["id"], new_email)
     return jsonify({"success": True})
 
+
+# ── 2FA / TOTP Endpoints ─────────────────────────────────────────────────────
+
+@app.post("/api/auth/2fa/setup")
+@require_auth
+def auth_2fa_setup():
+    """Generate TOTP secret and return QR code as base64 PNG."""
+    try:
+        import pyotp
+        import qrcode
+    except ImportError:
+        return jsonify({"error": "2FA libraries not installed on server"}), 500
+    user = db.get_user_by_id(request.current_user["user_id"])
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if user.get("totp_enabled"):
+        return jsonify({"error": "Το 2FA είναι ήδη ενεργοποιημένο"}), 400
+    # Generate secret and store it (not yet enabled)
+    secret = pyotp.random_base32()
+    db.set_totp_secret(user["id"], secret)
+    # Build provisioning URI
+    totp = pyotp.TOTP(secret)
+    uri = totp.provisioning_uri(name=user["username"], issuer_name="FastWrite")
+    # Generate QR code as base64 PNG
+    img = qrcode.make(uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    qr_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    return jsonify({"secret": secret, "qr_code": qr_b64})
+
+
+@app.post("/api/auth/2fa/verify")
+@require_auth
+def auth_2fa_verify():
+    """Verify TOTP code and enable 2FA for the user."""
+    try:
+        import pyotp
+    except ImportError:
+        return jsonify({"error": "2FA libraries not installed on server"}), 500
+    data = request.get_json(force=True)
+    code = data.get("code", "").strip()
+    if not code or len(code) != 6:
+        return jsonify({"error": "Απαιτείται 6ψήφιος κωδικός"}), 400
+    user = db.get_user_by_id(request.current_user["user_id"])
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    secret = user.get("totp_secret", "")
+    if not secret:
+        return jsonify({"error": "Πρώτα κάνε setup 2FA"}), 400
+    totp = pyotp.TOTP(secret)
+    if not totp.verify(code, valid_window=1):
+        return jsonify({"error": "Λάθος κωδικός. Δοκίμασε ξανά."}), 401
+    db.enable_totp(user["id"])
+    return jsonify({"success": True, "message": "Το 2FA ενεργοποιήθηκε!"})
+
+
+@app.post("/api/auth/2fa/disable")
+@require_auth
+def auth_2fa_disable():
+    """Disable 2FA. Requires current password."""
+    data = request.get_json(force=True)
+    password = data.get("password", "")
+    if not password:
+        return jsonify({"error": "Απαιτείται κωδικός"}), 400
+    user = db.get_user_by_id(request.current_user["user_id"])
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if not check_password(password, user["password_hash"]):
+        return jsonify({"error": "Λάθος κωδικός"}), 401
+    db.disable_totp(user["id"])
+    return jsonify({"success": True, "message": "Το 2FA απενεργοποιήθηκε."})
+
+
+@app.get("/api/auth/2fa/status")
+@require_auth
+def auth_2fa_status():
+    """Return whether 2FA is enabled for the current user."""
+    user = db.get_user_by_id(request.current_user["user_id"])
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({"totp_enabled": bool(user.get("totp_enabled", 0))})
+
+
 # ── Login Page ────────────────────────────────────────────────────────────────
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="el">
@@ -1412,21 +1512,34 @@ button:hover{opacity:.85;}
     <label>Password</label>
     <div style="position:relative">
       <input type="password" id="password" autocomplete="current-password" required style="width:100%;padding-right:40px"/>
-      <span onclick="var p=document.getElementById('password');p.type=p.type==='password'?'text':'password'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#7c8299;font-size:18px;">👁</span>
+      <span onclick="var p=document.getElementById('password');p.type=p.type==='password'?'text':'password'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#7c8299;font-size:18px;">&#128065;</span>
     </div>
-    <button type="submit">Sign In</button>
+    <div id="totp-section" style="display:none;">
+      <label>2FA Code</label>
+      <input type="text" id="totp-code" placeholder="6-digit code" maxlength="6" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" style="text-align:center;font-size:20px;letter-spacing:8px;"/>
+    </div>
+    <button type="submit" id="login-btn">Sign In</button>
   </form>
 </div>
 <script>
+let needs2fa=false;
 async function doLogin(e){
   e.preventDefault();
   const err=document.getElementById('error-msg');
   err.style.display='none';
+  const body={username:document.getElementById('username').value,password:document.getElementById('password').value};
+  if(needs2fa) body.totp_code=document.getElementById('totp-code').value;
   try{
-    const r=await fetch('/api/auth/login',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:document.getElementById('username').value,password:document.getElementById('password').value})});
+    const r=await fetch('/api/auth/login',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
-    if(r.ok){window.location.href='/ui';}
+    if(d.requires_2fa){
+      needs2fa=true;
+      document.getElementById('totp-section').style.display='block';
+      document.getElementById('totp-code').focus();
+      document.getElementById('login-btn').textContent='Verify & Sign In';
+      return false;
+    }
+    if(r.ok&&d.success){window.location.href='/ui';}
     else{err.textContent=d.error||'Login failed';err.style.display='block';}
   }catch(ex){err.textContent='Connection error';err.style.display='block';}
   return false;

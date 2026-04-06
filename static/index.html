@@ -567,7 +567,52 @@ select.form-input option{background:var(--bg2);}
             </div>
           </div>
 
-          <!-- Section 2: API Keys -->
+          <!-- Section 2: Ασφάλεια 2FA -->
+          <div class="card">
+            <div class="card-title">🛡️ Ταυτοποίηση 2 Βημάτων (2FA)</div>
+            <div id="twofa-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
+
+            <!-- 2FA Disabled State: Show enable button -->
+            <div id="twofa-off" style="display:none;">
+              <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Προσθέστε ένα επιπλέον επίπεδο ασφάλειας στον λογαριασμό σας. Θα χρειάζεστε μια εφαρμογή Authenticator (π.χ. Google Authenticator, Authy).</p>
+              <button class="btn btn-primary btn-sm" onclick="setup2FA()">Ενεργοποίηση 2FA</button>
+            </div>
+
+            <!-- 2FA Setup State: QR code + verify -->
+            <div id="twofa-setup" style="display:none;">
+              <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">1. Σαρώστε το QR code με την εφαρμογή Authenticator σας:</p>
+              <div style="text-align:center;margin:16px 0;">
+                <img id="twofa-qr" src="" alt="QR Code" style="max-width:200px;border-radius:8px;background:#fff;padding:8px;"/>
+              </div>
+              <p style="font-size:11px;color:var(--text2);margin-bottom:4px;">Ή εισάγετε χειροκίνητα:</p>
+              <div style="background:var(--bg3);padding:8px 12px;border-radius:6px;font-family:'DM Mono',monospace;font-size:12px;margin-bottom:16px;word-break:break-all;user-select:all;" id="twofa-secret-display"></div>
+              <p style="font-size:13px;color:var(--text2);margin-bottom:8px;">2. Εισάγετε τον 6ψήφιο κωδικό από την εφαρμογή:</p>
+              <div class="form-group">
+                <input class="form-input" type="text" id="twofa-verify-code" placeholder="000000" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" style="text-align:center;font-size:20px;letter-spacing:8px;max-width:200px;"/>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary btn-sm" onclick="verify2FA()">Επαλήθευση & Ενεργοποίηση</button>
+                <button class="btn btn-secondary btn-sm" onclick="cancel2FA()">Ακύρωση</button>
+              </div>
+            </div>
+
+            <!-- 2FA Enabled State: Show disable button -->
+            <div id="twofa-on" style="display:none;">
+              <p style="font-size:13px;color:var(--accent);margin-bottom:12px;">✅ Το 2FA είναι ενεργοποιημένο. Ο λογαριασμός σας είναι προστατευμένος.</p>
+              <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
+                <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">Για απενεργοποίηση, εισάγετε τον κωδικό σας:</div>
+                <div class="form-group">
+                  <div style="position:relative;">
+                    <input class="form-input" type="password" id="twofa-disable-pw" placeholder="Κωδικός λογαριασμού..." autocomplete="current-password" style="padding-right:40px;"/>
+                    <button type="button" onclick="togglePw('twofa-disable-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
+                  </div>
+                </div>
+                <button class="btn btn-sm" style="background:var(--danger);color:#fff;" onclick="disable2FA()">Απενεργοποίηση 2FA</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: API Keys -->
           <div class="card">
             <div class="card-title">🔑 API Keys</div>
             <div id="keys-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
@@ -3033,6 +3078,8 @@ async function loadSettings() {
     api('GET','/health'),
     api('GET','/api/auth/me')
   ]);
+  // Load 2FA status
+  load2FAStatus();
 
   // Account info
   const accEl = document.getElementById('account-info');
@@ -3115,6 +3162,68 @@ async function changeEmail() {
     loadSettings();
   } else {
     toast(res.error || 'Σφάλμα αλλαγής email', 'error');
+  }
+}
+
+// ── 2FA Functions ───────────────────────────────────────────────────────────
+async function load2FAStatus() {
+  const res = await api('GET', '/api/auth/2fa/status');
+  const statusEl = document.getElementById('twofa-status');
+  const offEl = document.getElementById('twofa-off');
+  const setupEl = document.getElementById('twofa-setup');
+  const onEl = document.getElementById('twofa-on');
+  offEl.style.display = 'none';
+  setupEl.style.display = 'none';
+  onEl.style.display = 'none';
+  if (res.totp_enabled) {
+    statusEl.textContent = 'Κατάσταση: Ενεργό';
+    statusEl.style.color = 'var(--accent)';
+    onEl.style.display = 'block';
+  } else {
+    statusEl.textContent = 'Κατάσταση: Ανενεργό';
+    statusEl.style.color = 'var(--text2)';
+    offEl.style.display = 'block';
+  }
+}
+
+async function setup2FA() {
+  const res = await api('POST', '/api/auth/2fa/setup');
+  if (res.error) { toast(res.error, 'error'); return; }
+  document.getElementById('twofa-qr').src = 'data:image/png;base64,' + res.qr_code;
+  document.getElementById('twofa-secret-display').textContent = res.secret;
+  document.getElementById('twofa-off').style.display = 'none';
+  document.getElementById('twofa-setup').style.display = 'block';
+  document.getElementById('twofa-verify-code').value = '';
+  document.getElementById('twofa-verify-code').focus();
+}
+
+async function verify2FA() {
+  const code = document.getElementById('twofa-verify-code').value.trim();
+  if (!code || code.length !== 6) { toast('Εισάγετε 6ψήφιο κωδικό', 'error'); return; }
+  const res = await api('POST', '/api/auth/2fa/verify', { code: code });
+  if (res.success) {
+    toast(res.message || '2FA ενεργοποιήθηκε!', 'success');
+    load2FAStatus();
+  } else {
+    toast(res.error || 'Σφάλμα επαλήθευσης', 'error');
+  }
+}
+
+function cancel2FA() {
+  document.getElementById('twofa-setup').style.display = 'none';
+  document.getElementById('twofa-off').style.display = 'block';
+}
+
+async function disable2FA() {
+  const pw = document.getElementById('twofa-disable-pw').value;
+  if (!pw) { toast('Εισάγετε τον κωδικό σας', 'error'); return; }
+  const res = await api('POST', '/api/auth/2fa/disable', { password: pw });
+  if (res.success) {
+    toast(res.message || '2FA απενεργοποιήθηκε', 'success');
+    document.getElementById('twofa-disable-pw').value = '';
+    load2FAStatus();
+  } else {
+    toast(res.error || 'Σφάλμα', 'error');
   }
 }
 

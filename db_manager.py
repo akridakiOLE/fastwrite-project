@@ -140,14 +140,18 @@ class DatabaseManager:
                     is_active     INTEGER NOT NULL DEFAULT 1
                 )
             """)
-            # Migration: add email column if missing (safe for multiple workers)
+            # Migrations: add user columns if missing (safe for multiple workers)
             try:
                 cols = [row[1] for row in self.conn.execute("PRAGMA table_info(users)").fetchall()]
                 if 'email' not in cols:
                     self.conn.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''")
-                    self.conn.commit()
+                if 'totp_secret' not in cols:
+                    self.conn.execute("ALTER TABLE users ADD COLUMN totp_secret TEXT DEFAULT ''")
+                if 'totp_enabled' not in cols:
+                    self.conn.execute("ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0")
+                self.conn.commit()
             except Exception:
-                pass  # Column already exists (race condition with multiple workers)
+                pass  # Columns already exist (race condition with multiple workers)
 
     # ─── DOCUMENTS ────────────────────────────────────────────────────────────
 
@@ -383,6 +387,30 @@ class DatabaseManager:
         self.conn.execute(
             "UPDATE users SET email = ? WHERE id = ?",
             (email, user_id)
+        )
+        self.conn.commit()
+
+    def set_totp_secret(self, user_id: int, secret: str):
+        """Store TOTP secret for a user (not yet enabled)."""
+        self.conn.execute(
+            "UPDATE users SET totp_secret = ? WHERE id = ?",
+            (secret, user_id)
+        )
+        self.conn.commit()
+
+    def enable_totp(self, user_id: int):
+        """Enable TOTP 2FA for a user."""
+        self.conn.execute(
+            "UPDATE users SET totp_enabled = 1 WHERE id = ?",
+            (user_id,)
+        )
+        self.conn.commit()
+
+    def disable_totp(self, user_id: int):
+        """Disable TOTP 2FA and clear secret."""
+        self.conn.execute(
+            "UPDATE users SET totp_enabled = 0, totp_secret = '' WHERE id = ?",
+            (user_id,)
         )
         self.conn.commit()
 
