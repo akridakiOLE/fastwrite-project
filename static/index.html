@@ -48,6 +48,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .sidebar-footer{padding:16px;border-top:1px solid var(--border);}
 .pw-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--text3);padding:4px 6px;border-radius:4px;transition:color .15s;opacity:0.6;}
 .pw-eye:hover{color:var(--text);opacity:1;}
+.faq-item{background:var(--bg3);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.faq-q{padding:12px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:color .15s;user-select:none;}
+.faq-q:hover{color:var(--accent);}
+.faq-a{display:none;padding:0 16px 12px;font-size:13px;color:var(--text2);line-height:1.6;border-top:1px solid var(--border);}
+.faq-a strong{color:var(--text);}
+.tooltip-hint{position:relative;cursor:help;}
+.tooltip-hint::after{content:attr(data-hint);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--bg2);color:var(--text2);font-size:11px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;max-width:280px;white-space:normal;opacity:0;pointer-events:none;transition:opacity .2s;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,0.4);}
+.tooltip-hint:hover::after{opacity:1;}
 .status-dot{display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-right:6px;box-shadow:0 0 8px var(--accent);}
 .status-text{font-size:12px;color:var(--text2);}
 
@@ -273,6 +281,10 @@ select.form-input option{background:var(--bg2);}
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
         Ρυθμίσεις
       </button>
+      <button class="nav-item" onclick="showPage('faq')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 015.12 1.65c0 1.35-2.12 2.35-2.12 2.35M12 17h.01"/></svg>
+        Βοήθεια
+      </button>
     </nav>
     <div class="sidebar-footer">
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
@@ -280,7 +292,7 @@ select.form-input option{background:var(--bg2);}
           <span class="status-dot"></span>
           <span class="status-text" id="server-status">Σύνδεση...</span>
         </div>
-        <button onclick="doLogout()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 10px;font-size:11px;transition:all .15s;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'" title="Αποσύνδεση">⏻ Έξοδος</button>
+        <button class="tooltip-hint" data-hint="Αποσύνδεση από τον λογαριασμό σας" onclick="doLogout()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 10px;font-size:11px;transition:all .15s;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'" title="Αποσύνδεση">⏻ Έξοδος</button>
       </div>
     </div>
   </aside>
@@ -293,7 +305,7 @@ select.form-input option{background:var(--bg2);}
       <div class="topbar">
         <div class="page-title">Dashboard</div>
         <div class="topbar-actions">
-          <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">↻ Ανανέωση</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Ανανέωση στατιστικών Dashboard σε πραγματικό χρόνο" onclick="loadDashboard()">↻ Ανανέωση</button>
         </div>
       </div>
       <div class="content">
@@ -349,7 +361,7 @@ select.form-input option{background:var(--bg2);}
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-              <button class="btn btn-primary" style="flex:1;padding:12px 8px;font-size:13px;font-weight:600;" onclick="handleRegisterClick()" id="batch-btn">
+              <button class="btn btn-primary tooltip-hint" data-hint="Ανεβάστε PDF και ξεκινήστε αυτόματη εξαγωγή δεδομένων με AI" style="flex:1;padding:12px 8px;font-size:13px;font-weight:600;" onclick="handleRegisterClick()" id="batch-btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 Καταγραφή Εγγράφων
               </button>
@@ -373,18 +385,18 @@ select.form-input option{background:var(--bg2);}
         <div class="page-title">Έγγραφα</div>
         <div class="topbar-actions">
           <span id="doc-selected-count" style="font-size:12px;color:var(--accent);display:none;font-weight:500;margin-right:8px;"></span>
-          <button class="btn btn-primary btn-sm" onclick="openLabelEditor()" style="font-weight:600;">🏷 Ετικέτες</button>
-          <button class="btn btn-secondary btn-sm" onclick="openBatchFromDocs()" style="border-color:rgba(0,102,255,0.4);color:var(--accent2);font-weight:600;">⚡ Batch</button>
-          <button class="btn btn-primary btn-sm" onclick="openApprovalFromDocs()" style="background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.4);font-weight:600;">✓ Έγκριση</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportDocs('csv')">↓ CSV</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportDocs('xlsx')">↓ XLSX</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportLineItems()" style="border-color:rgba(0,229,160,0.3);color:var(--accent)">↓ Line Items XLSX</button>
+          <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Άνοιγμα επεξεργαστή ετικετών για ταξινόμηση και ομαδοποίηση εγγράφων" onclick="openLabelEditor()" style="font-weight:600;">🏷 Ετικέτες</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μαζική επεξεργασία πολλαπλών εγγράφων ταυτόχρονα (Batch Processing)" onclick="openBatchFromDocs()" style="border-color:rgba(0,102,255,0.4);color:var(--accent2);font-weight:600;">⚡ Batch</button>
+          <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Έλεγχος και έγκριση εξαγόμενων δεδομένων πριν την εξαγωγή" onclick="openApprovalFromDocs()" style="background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.4);font-weight:600;">✓ Έγκριση</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εξαγωγή επιλεγμένων εγγράφων σε μορφή CSV" onclick="exportDocs('csv')">↓ CSV</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εξαγωγή επιλεγμένων εγγράφων σε μορφή Excel (XLSX)" onclick="exportDocs('xlsx')">↓ XLSX</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εξαγωγή αναλυτικών γραμμών (line items) σε Excel για λογιστική χρήση" onclick="exportLineItems()" style="border-color:rgba(0,229,160,0.3);color:var(--accent)">↓ Line Items XLSX</button>
         </div>
       </div>
       <!-- Search bar full width -->
       <div style="padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;gap:8px;align-items:center;">
         <input class="form-input" style="flex:1;padding:8px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);" placeholder="🔍 Αναζήτηση σε όλα τα πεδία..." id="doc-search" oninput="filterDocs()"/>
-        <button class="btn btn-secondary btn-sm" onclick="clearDocFilters()" style="white-space:nowrap;padding:8px 14px;">✕ Καθαρισμός Φίλτρων</button>
+        <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Καθαρίστε όλα τα φίλτρα αναζήτησης και εμφανίστε όλα τα έγγραφα" onclick="clearDocFilters()" style="white-space:nowrap;padding:8px 14px;">✕ Καθαρισμός Φίλτρων</button>
       </div>
       <div class="content" style="padding:0;">
         <div class="table-wrap">
@@ -480,7 +492,7 @@ select.form-input option{background:var(--bg2);}
       <div class="topbar">
         <div class="page-title">Ετικέτες</div>
         <div class="topbar-actions">
-          <button class="btn btn-primary btn-sm" onclick="openTemplateModal()">+ Νέα Ετικέτα</button>
+          <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Δημιουργία νέας ετικέτας για εξαγωγή δεδομένων από συγκεκριμένο τύπο εγγράφου" onclick="openTemplateModal()">+ Νέα Ετικέτα</button>
         </div>
       </div>
       <div class="content">
@@ -488,7 +500,7 @@ select.form-input option{background:var(--bg2);}
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;">
           <input type="text" id="tf-name" placeholder="🔍 Ετικέτα..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
           <input type="text" id="tf-supplier" placeholder="🏢 Προμηθευτής Πωλητής..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
-          <button class="af-btn" onclick="clearTemplateFilters()" title="Καθαρισμός">✕ Καθαρισμός</button>
+          <button class="af-btn tooltip-hint" data-hint="Καθαρισμός φίλτρων αναζήτησης ετικετών" onclick="clearTemplateFilters()" title="Καθαρισμός">✕ Καθαρισμός</button>
         </div>
         <div id="templates-list"></div>
       </div>
@@ -519,7 +531,7 @@ select.form-input option{background:var(--bg2);}
                   <button type="button" onclick="togglePw('uname-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
                 </div>
               </div>
-              <button class="btn btn-primary btn-sm" onclick="changeUsername()">Αλλαγή Username</button>
+              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση νέου username — απαιτείται κωδικός επιβεβαίωσης" onclick="changeUsername()">Αλλαγή Username</button>
             </div>
 
             <!-- Αλλαγή Κωδικού -->
@@ -546,7 +558,7 @@ select.form-input option{background:var(--bg2);}
                   <button type="button" onclick="togglePw('pw-confirm',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
                 </div>
               </div>
-              <button class="btn btn-primary btn-sm" onclick="changePassword()">Αλλαγή Κωδικού</button>
+              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση νέου κωδικού — ελάχιστοι 6 χαρακτήρες" onclick="changePassword()">Αλλαγή Κωδικού</button>
             </div>
 
             <!-- Αλλαγή Email -->
@@ -563,7 +575,7 @@ select.form-input option{background:var(--bg2);}
                   <button type="button" onclick="togglePw('email-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
                 </div>
               </div>
-              <button class="btn btn-primary btn-sm" onclick="changeEmail()">Αλλαγή Email</button>
+              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση νέου email επικοινωνίας" onclick="changeEmail()">Αλλαγή Email</button>
             </div>
           </div>
 
@@ -575,7 +587,7 @@ select.form-input option{background:var(--bg2);}
             <!-- 2FA Disabled State: Show enable button -->
             <div id="twofa-off" style="display:none;">
               <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Προσθέστε ένα επιπλέον επίπεδο ασφάλειας στον λογαριασμό σας. Θα χρειάζεστε μια εφαρμογή Authenticator (π.χ. Google Authenticator, Authy).</p>
-              <button class="btn btn-primary btn-sm" onclick="setup2FA()">Ενεργοποίηση 2FA</button>
+              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Ξεκινήστε ρύθμιση 2FA — θα χρειαστείτε εφαρμογή Authenticator" onclick="setup2FA()">Ενεργοποίηση 2FA</button>
             </div>
 
             <!-- 2FA Setup State: QR code + verify -->
@@ -591,8 +603,8 @@ select.form-input option{background:var(--bg2);}
                 <input class="form-input" type="text" id="twofa-verify-code" placeholder="000000" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" style="text-align:center;font-size:20px;letter-spacing:8px;max-width:200px;"/>
               </div>
               <div style="display:flex;gap:8px;">
-                <button class="btn btn-primary btn-sm" onclick="verify2FA()">Επαλήθευση & Ενεργοποίηση</button>
-                <button class="btn btn-secondary btn-sm" onclick="cancel2FA()">Ακύρωση</button>
+                <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Επιβεβαίωση κωδικού και ενεργοποίηση 2FA" onclick="verify2FA()">Επαλήθευση & Ενεργοποίηση</button>
+                <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Ακύρωση ρύθμισης 2FA" onclick="cancel2FA()">Ακύρωση</button>
               </div>
             </div>
 
@@ -607,7 +619,7 @@ select.form-input option{background:var(--bg2);}
                     <button type="button" onclick="togglePw('twofa-disable-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
                   </div>
                 </div>
-                <button class="btn btn-sm" style="background:var(--danger);color:#fff;" onclick="disable2FA()">Απενεργοποίηση 2FA</button>
+                <button class="btn btn-sm tooltip-hint" data-hint="Απενεργοποίηση 2FA — θα χρειαστεί εκ νέου ρύθμιση αν ξαναενεργοποιηθεί" style="background:var(--danger);color:#fff;" onclick="disable2FA()">Απενεργοποίηση 2FA</button>
               </div>
             </div>
           </div>
@@ -629,7 +641,7 @@ select.form-input option{background:var(--bg2);}
               <label class="form-label">API Key</label>
               <input class="form-input" type="password" id="key-value" placeholder="Εισήγαγε το API key..."/>
             </div>
-            <button class="btn btn-primary" onclick="saveKey()">Αποθήκευση Key</button>
+            <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση κλειδιού AI — κρυπτογραφείται με Fernet encryption" onclick="saveKey()">Αποθήκευση Key</button>
           </div>
 
           <!-- Section 3: Πληροφορίες Συστήματος -->
@@ -652,17 +664,73 @@ select.form-input option{background:var(--bg2);}
       </div>
     </div>
 
+    <!-- FAQ / HELP -->
+    <div id="page-faq" class="page" style="display:none">
+      <div class="topbar"><div class="page-title">Βοήθεια &amp; Συχνές Ερωτήσεις</div></div>
+      <div class="content" style="max-width:800px;">
+        <div style="margin-bottom:16px;">
+          <input class="form-input" type="text" id="faq-search" placeholder="🔍 Αναζήτηση ερώτησης..." oninput="filterFAQ()" style="margin-bottom:0;"/>
+        </div>
+        <div id="faq-list" style="display:flex;flex-direction:column;gap:8px;">
+
+          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">📊 Dashboard</div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι βλέπω στο Dashboard;</div><div class="faq-a">Το Dashboard εμφανίζει συνοπτικά στατιστικά: Σύνολο Εγγράφων, Ολοκληρωμένα (εγκεκριμένα), Σε Αναμονή (χρειάζονται επεξεργασία), Αποτυχημένα. Πατήστε "Ανανέωση" για ενημερωμένα δεδομένα.</div></div>
+
+          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">📤 Upload &amp; Extract (Καταγραφή Τιμολογίων)</div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς ανεβάζω έγγραφα;</div><div class="faq-a">Πηγαίνετε στη σελίδα "Upload & Extract". Σύρετε ένα PDF αρχείο στην περιοχή upload ή κάντε κλικ για να το επιλέξετε. Το σύστημα δέχεται μόνο αρχεία PDF, μέχρι 200 τιμολόγια ανά αρχείο.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι η "Καταγραφή Εγγράφων";</div><div class="faq-a">Είναι η λειτουργία που ανεβάζει το PDF, αναγνωρίζει αυτόματα τα ξεχωριστά τιμολόγια μέσα σε αυτό, εντοπίζει τον προμηθευτή και αντιστοιχεί την κατάλληλη ετικέτα (template). Μπορεί να γίνει μόνο καταγραφή χωρίς εξαγωγή δεδομένων.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το Auto Match;</div><div class="faq-a">Το Auto Match αναγνωρίζει αυτόματα τον προμηθευτή κάθε τιμολογίου μέσω AI και αντιστοιχεί αυτόματα την σωστή ετικέτα (template). Αν δεν βρεθεί αντιστοιχία, χρησιμοποιείται η ετικέτα που επιλέξατε χειροκίνητα.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι σημαίνει "Registration Only";</div><div class="faq-a">Αν ενεργοποιήσετε αυτή την επιλογή, τα τιμολόγια καταχωρούνται στο σύστημα χωρίς να γίνει εξαγωγή δεδομένων. Χρήσιμο αν θέλετε πρώτα να δημιουργήσετε ετικέτες και μετά να κάνετε εξαγωγή.</div></div>
+
+          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">📄 Έγγραφα</div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς βλέπω τα έγγραφά μου;</div><div class="faq-a">Στη σελίδα "Έγγραφα" εμφανίζονται όλα τα έγγραφα σε πίνακα. Μπορείτε να χρησιμοποιήσετε φίλτρα (αρχείο, ετικέτα, προμηθευτής, ποσοστό, κατάσταση, batch, ημερομηνία) για να εντοπίσετε αυτά που θέλετε.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι σημαίνουν οι καταστάσεις (status);</div><div class="faq-a"><strong>Εκκρεμεί:</strong> Το έγγραφο περιμένει επεξεργασία ή έγκριση. <strong>Εγκρίθηκε (Completed):</strong> Τα δεδομένα ελέγχθηκαν και εγκρίθηκαν. <strong>Αποτυχημένο (Failed):</strong> Η εξαγωγή απέτυχε ή το έγγραφο απορρίφθηκε.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το ποσοστό (%) ;</div><div class="faq-a">Είναι το ποσοστό εμπιστοσύνης που δίνει η AI κατά την εξαγωγή δεδομένων. Υψηλότερο ποσοστό σημαίνει μεγαλύτερη βεβαιότητα στα εξαγόμενα στοιχεία. Συνιστάται να ελέγχετε πάντα τα αποτελέσματα πριν την έγκριση.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς εξάγω δεδομένα (export);</div><div class="faq-a">Επιλέξτε τα έγγραφα που θέλετε (checkbox) και πατήστε "CSV", "XLSX", ή "Line Items XLSX" στην μπάρα εργαλείων. Αν δεν επιλέξετε κανένα, εξάγονται όλα τα εγκεκριμένα έγγραφα.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς διαγράφω έγγραφα;</div><div class="faq-a">Επιλέξτε τα έγγραφα με το checkbox και πατήστε το κουμπί "Delete" που εμφανίζεται. Η διαγραφή είναι μόνιμη.</div></div>
+
+          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🏷 Ετικέτες (Templates)</div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι οι ετικέτες;</div><div class="faq-a">Οι ετικέτες (templates) καθορίζουν ποια πεδία θέλετε να εξάγετε από κάθε τύπο εγγράφου. Π.χ. για τιμολόγια COSMOTE μπορεί να θέλετε: Αριθμός Τιμολογίου, Ημερομηνία, Σύνολο, ΦΠΑ. Κάθε προμηθευτής μπορεί να έχει τη δική του ετικέτα.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς δημιουργώ νέα ετικέτα;</div><div class="faq-a">Πηγαίνετε στα "Ετικέτες" → "+ Νέα Ετικέτα". Εισάγετε όνομα, pattern προμηθευτή (π.χ. cosmote, ote), και τα πεδία χωρισμένα με κόμμα. Για line items, πατήστε "+ Array Line Items" και εισάγετε τις στήλες.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το "Supplier Pattern";</div><div class="faq-a">Είναι λέξεις-κλειδιά που βοηθούν το Auto Match να αντιστοιχίσει αυτόματα ένα τιμολόγιο με την σωστή ετικέτα. Π.χ. αν βάλετε "cosmote, ote, κοσμοτε", κάθε τιμολόγιο που αναγνωρίζεται ως COSMOTE θα πάρει αυτή την ετικέτα.</div></div>
+
+          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">✅ Έγκριση</div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς εγκρίνω έγγραφα;</div><div class="faq-a">Από τη σελίδα "Έγγραφα", επιλέξτε τα έγγραφα και πατήστε "Έγκριση". Στη σελίδα έγκρισης βλέπετε το έγγραφο (εικόνα) αριστερά και τα εξαγόμενα δεδομένα δεξιά. Μπορείτε να διορθώσετε τιμές πριν εγκρίνετε.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Μπορώ να επεξεργαστώ δεδομένα πριν εγκρίνω;</div><div class="faq-a">Ναι, στη σελίδα έγκρισης όλα τα πεδία (γενικά στοιχεία και line items) είναι επεξεργάσιμα. Κάντε τις αλλαγές σας και μετά πατήστε "Έγκριση". Οι αλλαγές αποθηκεύονται αυτόματα.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι κάνει η highlight sync;</div><div class="faq-a">Όταν περνάτε τον κέρσορα πάνω από μια γραμμή στα line items, το αντίστοιχο σημείο στο έγγραφο τονίζεται (highlight). Αυτό βοηθά να επαληθεύσετε ότι τα δεδομένα αντιστοιχούν στο σωστό σημείο του εγγράφου.</div></div>
+
+          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">⚙️ Ρυθμίσεις &amp; Λογαριασμός</div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς αλλάζω τον κωδικό μου;</div><div class="faq-a">Ρυθμίσεις → Λογαριασμός → Αλλαγή Κωδικού. Εισάγετε τον τρέχοντα κωδικό, τον νέο (τουλάχιστον 6 χαρακτήρες) και επιβεβαίωση.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το 2FA και πώς το ενεργοποιώ;</div><div class="faq-a">Η Ταυτοποίηση 2 Βημάτων (2FA) προσθέτει ένα επιπλέον επίπεδο ασφάλειας. Χρειάζεστε μια εφαρμογή Authenticator (π.χ. Google Authenticator). Πηγαίνετε στις Ρυθμίσεις → "Ενεργοποίηση 2FA", σαρώστε το QR code, εισάγετε τον 6ψήφιο κωδικό για επαλήθευση.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι γίνεται αν χάσω πρόσβαση στο 2FA;</div><div class="faq-a">Επικοινωνήστε με την υποστήριξη. Ο διαχειριστής μπορεί να επαναφέρει (reset) το 2FA για τον λογαριασμό σας χωρίς να έχει πρόσβαση στα δεδομένα σας.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το API Key;</div><div class="faq-a">Το API Key είναι ένα κλειδί πρόσβασης στην υπηρεσία AI (π.χ. Google Gemini) που χρησιμοποιείται για την εξαγωγή δεδομένων. Μπορείτε να χρησιμοποιήσετε το δικό σας κλειδί (BYOK) ώστε η χρέωση να γίνεται απευθείας από τον πάροχο AI.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιους AI παρόχους υποστηρίζει;</div><div class="faq-a">Αυτή τη στιγμή υποστηρίζεται κυρίως το Google Gemini. Σύντομα θα υποστηρίζονται και OpenAI, Claude (Anthropic), και Mistral.</div></div>
+
+          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🔒 Ασφάλεια &amp; Ιδιωτικότητα</div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιος βλέπει τα έγγραφά μου;</div><div class="faq-a">Κανείς. Τα έγγραφά σας είναι πλήρως απομονωμένα. Ούτε ο διαχειριστής του συστήματος μπορεί να δει τα δεδομένα σας. Κάθε χρήστης βλέπει και διαχειρίζεται μόνο τα δικά του έγγραφα.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς αποθηκεύονται τα δεδομένα μου;</div><div class="faq-a">Τα δεδομένα αποθηκεύονται σε κρυπτογραφημένη βάση δεδομένων σε ασφαλείς servers. Τα API keys κρυπτογραφούνται με Fernet encryption. Οι κωδικοί αποθηκεύονται ως bcrypt hashes — δεν αποθηκεύεται ποτέ ο πραγματικός κωδικός.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τα έγγραφά μου στέλνονται σε τρίτους;</div><div class="faq-a">Κατά την εξαγωγή δεδομένων, το περιεχόμενο του εγγράφου στέλνεται στον πάροχο AI (π.χ. Google Gemini) μόνο για επεξεργασία. Δεν αποθηκεύεται από τρίτους πέραν της στιγμιαίας επεξεργασίας.</div></div>
+
+          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">❓ Γενικά</div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι τύπους αρχείων δέχεται;</div><div class="faq-a">PDF, PNG, JPG, JPEG, WebP. Η batch λειτουργία (πολλαπλά τιμολόγια) δέχεται μόνο PDF.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιο είναι το μέγιστο μέγεθος αρχείου;</div><div class="faq-a">20MB ανά αρχείο.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Μπορώ να διαγράψω τον λογαριασμό μου;</div><div class="faq-a">Αυτή τη στιγμή η διαγραφή λογαριασμού γίνεται μέσω επικοινωνίας με την υποστήριξη. Ο διαχειριστής μπορεί να απενεργοποιήσει τον λογαριασμό σας.</div></div>
+
+        </div>
+      </div>
+    </div>
+
     <!-- LABEL EDITOR (Νέα Ετικέτα) -->
     <div id="page-label-editor" class="page" style="display:none">
       <div class="topbar" style="padding:8px 16px;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <button class="btn btn-secondary btn-sm" onclick="closeLabelEditor()">← Πίσω</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη σελίδα Εγγράφων" onclick="closeLabelEditor()">← Πίσω</button>
           <div class="page-title" style="font-size:15px;">Καταγραφή Εγγράφων</div>
         </div>
         <div class="topbar-actions" style="gap:6px;">
           <!-- Dropdown 1: Επιλεγμένα Έγγραφα -->
           <div style="position:relative;" id="le-docs-dd-wrap">
-            <button class="btn btn-secondary btn-sm" onclick="leToggleDocsDD(event)" style="font-size:11px;">
+            <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εμφάνιση λίστας επιλεγμένων εγγράφων για επεξεργασία" onclick="leToggleDocsDD(event)" style="font-size:11px;">
               📄 Έγγραφα <span id="le-doc-counter" style="color:var(--accent);">1/1</span> ▼
             </button>
             <div id="le-docs-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:300px;max-height:320px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
@@ -672,7 +740,7 @@ select.form-input option{background:var(--bg2);}
           </div>
           <!-- Dropdown 2: Υφιστάμενες Ετικέτες -->
           <div style="position:relative;" id="le-labels-dd-wrap">
-            <button class="btn btn-secondary btn-sm" onclick="leToggleLabelsDD(event)" style="font-size:11px;">
+            <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εμφάνιση υφιστάμενων ετικετών — επιλέξτε ή διαγράψτε" onclick="leToggleLabelsDD(event)" style="font-size:11px;">
               🏷 Ετικέτες ▼
             </button>
             <div id="le-labels-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:280px;max-height:320px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
@@ -680,10 +748,10 @@ select.form-input option{background:var(--bg2);}
               <div id="le-labels-list"></div>
             </div>
           </div>
-          <button class="btn btn-sm" id="le-panel-toggle-btn" onclick="leTogglePanel()" style="font-size:11px;background:rgba(0,229,160,0.1);color:var(--accent);border:1px solid rgba(0,229,160,0.3);display:none;">🏷 Πίνακας</button>
-          <button class="btn btn-secondary btn-sm" onclick="lePrevDoc()" id="le-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
-          <button class="btn btn-secondary btn-sm" onclick="leNextDoc()" id="le-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
-          <button class="btn btn-primary btn-sm" onclick="leResetForm()" id="le-clear-btn" style="font-size:11px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);">Καθαρισμός</button>
+          <button class="btn btn-sm tooltip-hint" data-hint="Εμφάνιση/Απόκρυψη πλαϊνού πίνακα ετικέτας" id="le-panel-toggle-btn" onclick="leTogglePanel()" style="font-size:11px;background:rgba(0,229,160,0.1);color:var(--accent);border:1px solid rgba(0,229,160,0.3);display:none;">🏷 Πίνακας</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο προηγούμενο έγγραφο" onclick="lePrevDoc()" id="le-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο επόμενο έγγραφο" onclick="leNextDoc()" id="le-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
+          <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Καθαρισμός φόρμας — ξεκινήστε νέα ετικέτα από την αρχή" onclick="leResetForm()" id="le-clear-btn" style="font-size:11px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);">Καθαρισμός</button>
         </div>
       </div>
       <div class="label-editor-container" style="position:relative;">
@@ -698,7 +766,7 @@ select.form-input option{background:var(--bg2);}
           <div class="label-editor-panel-header">
             <span class="title">🏷 Νέα Ετικέτα</span>
             <div style="display:flex;gap:6px;align-items:center;">
-              <button class="btn btn-sm" style="padding:4px 10px;font-size:11px;font-weight:600;background:rgba(255,179,0,0.15);color:var(--warn);border:1px solid rgba(255,179,0,0.4);" onclick="leToggleLineItems()" id="le-lineitems-toggle">+ Array Line Items</button>
+              <button class="btn btn-sm tooltip-hint" data-hint="Προσθήκη πίνακα γραμμών (line items) στην ετικέτα — για τιμολόγια με πολλές γραμμές" style="padding:4px 10px;font-size:11px;font-weight:600;background:rgba(255,179,0,0.15);color:var(--warn);border:1px solid rgba(255,179,0,0.4);" onclick="leToggleLineItems()" id="le-lineitems-toggle">+ Array Line Items</button>
               <button class="btn btn-sm" style="padding:4px 8px;font-size:13px;color:var(--text2);background:none;border:1px solid var(--border);" onclick="leTogglePanel()" title="Κρύψε πίνακα">✕</button>
             </div>
           </div>
@@ -715,15 +783,15 @@ select.form-input option{background:var(--bg2);}
                 <input class="le-input" id="le-lineitems-fields" placeholder="π.χ. Description, Quantity, Unit Price, Total" style="border-color:rgba(255,179,0,0.3);"/>
               </div>
               <div style="display:flex;gap:8px;margin-top:12px;">
-                <button class="btn btn-primary btn-sm" onclick="lePreview()" style="flex:1;">Προεπισκόπηση</button>
+                <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Προβολή δομής ετικέτας πριν την αποθήκευση" onclick="lePreview()" style="flex:1;">Προεπισκόπηση</button>
               </div>
             </div>
             <div id="le-preview-view" style="display:none;">
               <div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:8px;">Προεπισκόπηση Ετικέτας</div>
               <div id="le-preview-content"></div>
               <div style="display:flex;gap:8px;margin-top:12px;">
-                <button class="btn btn-secondary btn-sm" onclick="leBackToForm()" style="flex:1;">← Πίσω</button>
-                <button class="btn btn-primary btn-sm" onclick="leSaveLabel()" style="flex:1;">💾 Αποθήκευση</button>
+                <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη φόρμα για αλλαγές" onclick="leBackToForm()" style="flex:1;">← Πίσω</button>
+                <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση ετικέτας — θα είναι διαθέσιμη για αυτόματη αντιστοίχιση" onclick="leSaveLabel()" style="flex:1;">💾 Αποθήκευση</button>
               </div>
             </div>
           </div>
@@ -735,13 +803,13 @@ select.form-input option{background:var(--bg2);}
     <div id="page-approval" class="page" style="display:none">
       <div class="topbar" style="padding:8px 16px;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <button class="btn btn-secondary btn-sm" onclick="closeApprovalPage()">← Πίσω</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη σελίδα Εγγράφων" onclick="closeApprovalPage()">← Πίσω</button>
           <div class="page-title" style="font-size:15px;">Έγκριση Εγγράφων</div>
         </div>
         <div class="topbar-actions" style="gap:6px;">
           <!-- Document dropdown -->
           <div style="position:relative;" id="ap-docs-dd-wrap">
-            <button class="btn btn-secondary btn-sm" onclick="apToggleDocsDD(event)" style="font-size:11px;">
+            <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εμφάνιση λίστας εγγράφων προς έγκριση" onclick="apToggleDocsDD(event)" style="font-size:11px;">
               📄 Έγγραφα <span id="ap-doc-counter" style="color:var(--accent);">1/1</span> ▼
             </button>
             <div id="ap-docs-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:320px;max-height:340px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
@@ -749,8 +817,8 @@ select.form-input option{background:var(--bg2);}
               <div id="ap-docs-list"></div>
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="apPrevDoc()" id="ap-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
-          <button class="btn btn-secondary btn-sm" onclick="apNextDoc()" id="ap-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο προηγούμενο έγγραφο προς έγκριση" onclick="apPrevDoc()" id="ap-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο επόμενο έγγραφο προς έγκριση" onclick="apNextDoc()" id="ap-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
         </div>
       </div>
       <div style="display:flex;width:100%;height:calc(100vh - 52px);overflow:hidden;background:var(--bg);position:relative;">
@@ -801,7 +869,7 @@ select.form-input option{background:var(--bg2);}
       <div class="topbar">
         <div class="page-title" id="tb-title">Template Builder</div>
         <div class="topbar-actions">
-          <button class="btn btn-secondary btn-sm" onclick="showPage('documents')">← Πίσω</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη σελίδα Εγγράφων" onclick="showPage('documents')">← Πίσω</button>
         </div>
       </div>
       <div class="content">
@@ -828,7 +896,7 @@ select.form-input option{background:var(--bg2);}
                 <label class="form-label">Template</label>
                 <select class="form-input" id="tb-schema"></select>
               </div>
-              <button class="btn btn-primary" style="width:100%" id="tb-extract-btn" onclick="doTemplateBuilderExtract()">
+              <button class="btn btn-primary tooltip-hint" data-hint="Εκτέλεση AI εξαγωγής δεδομένων με το επιλεγμένο template" style="width:100%" id="tb-extract-btn" onclick="doTemplateBuilderExtract()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 Εξαγωγή Δεδομένων
               </button>
@@ -846,8 +914,8 @@ select.form-input option{background:var(--bg2);}
                 <input class="form-input" id="tb-new-supplier-pattern" placeholder="π.χ. cosmote, ote — πολλαπλές με κόμμα"/>
               </div>
               <div id="tb-new-fields"></div>
-              <button class="btn btn-secondary btn-sm" onclick="tbAddField()" style="margin-bottom:16px;">+ Προσθήκη Πεδίου</button>
-              <button class="btn btn-primary" style="width:100%" onclick="tbSaveTemplate()">Αποθήκευση Template</button>
+              <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Προσθήκη νέου πεδίου εξαγωγής στο template" onclick="tbAddField()" style="margin-bottom:16px;">+ Προσθήκη Πεδίου</button>
+              <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση template — θα χρησιμοποιηθεί για μελλοντικές εξαγωγές" style="width:100%" onclick="tbSaveTemplate()">Αποθήκευση Template</button>
             </div>
           </div>
 
@@ -888,10 +956,10 @@ select.form-input option{background:var(--bg2);}
     </div>
     <div id="tmpl-fields"></div>
     <div style="display:flex;gap:8px;margin-bottom:16px;">
-      <button class="btn btn-secondary btn-sm" onclick="addField()">+ Προσθήκη Πεδίου</button>
-      <button class="btn btn-secondary btn-sm" id="tmpl-paste-btn" onclick="pasteTemplateFromClipboard()" style="display:none;">📋 Επικόλληση</button>
+      <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Προσθήκη νέου πεδίου εξαγωγής στην ετικέτα" onclick="addField()">+ Προσθήκη Πεδίου</button>
+      <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επικόλληση ετικέτας από clipboard" id="tmpl-paste-btn" onclick="pasteTemplateFromClipboard()" style="display:none;">📋 Επικόλληση</button>
     </div>
-    <button class="btn btn-primary" id="tmpl-save-btn" style="width:100%" onclick="saveTemplate()">Αποθήκευση Template</button>
+    <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση ετικέτας — θα είναι διαθέσιμη για Auto Match" id="tmpl-save-btn" style="width:100%" onclick="saveTemplate()">Αποθήκευση Template</button>
   </div>
 </div>
 
@@ -947,7 +1015,7 @@ function showPage(name, fromEvent) {
   if (fromEvent !== false && typeof event !== 'undefined' && event && event.currentTarget) {
     event.currentTarget.classList.add('active');
   } else {
-    const pageNames = ['dashboard','upload','documents','templates','settings'];
+    const pageNames = ['dashboard','upload','documents','templates','settings','faq'];
     const idx = pageNames.indexOf(name);
     const btns = document.querySelectorAll('.nav-item');
     if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
@@ -3339,6 +3407,36 @@ async function saveKey() {
   const res = await api('POST','/api/keys/save',{service,api_key:key});
   if (res.success) { toast('Key αποθηκεύτηκε!','success'); document.getElementById('key-value').value=''; loadSettings(); }
   else toast(res.error||'Σφάλμα','error');
+}
+
+// ── FAQ Functions ────────────────────────────────────────────────────────────
+function toggleFaq(el) {
+  const ans = el.nextElementSibling;
+  const isOpen = ans.style.display === 'block';
+  // Close all
+  document.querySelectorAll('.faq-a').forEach(a => a.style.display = 'none');
+  document.querySelectorAll('.faq-q').forEach(q => q.textContent = q.textContent.replace('▾', '▸'));
+  if (!isOpen) {
+    ans.style.display = 'block';
+    el.textContent = el.textContent.replace('▸', '▾');
+  }
+}
+
+function filterFAQ() {
+  const q = (document.getElementById('faq-search').value || '').toLowerCase().trim();
+  document.querySelectorAll('.faq-item').forEach(item => {
+    const text = item.textContent.toLowerCase();
+    item.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+  document.querySelectorAll('.faq-category').forEach(cat => {
+    let next = cat.nextElementSibling;
+    let hasVisible = false;
+    while (next && !next.classList.contains('faq-category')) {
+      if (next.classList.contains('faq-item') && next.style.display !== 'none') hasVisible = true;
+      next = next.nextElementSibling;
+    }
+    cat.style.display = hasVisible || !q ? '' : 'none';
+  });
 }
 
 async function doLogout() {

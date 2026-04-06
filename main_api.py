@@ -1576,6 +1576,10 @@ def auth_register():
         user_id = db.create_user(username, hash_password(password), role="user")
         if email:
             db.update_user_email(user_id, email)
+        # Store terms acceptance timestamp
+        db.conn.execute("UPDATE users SET terms_accepted_at=? WHERE id=?",
+                        (datetime.utcnow().isoformat(), user_id))
+        db.conn.commit()
         # Auto-login: issue JWT token
         token = create_token(user_id, username, "user")
         resp = make_response(jsonify({"success": True, "username": username, "role": "user"}))
@@ -1717,9 +1721,114 @@ async function doLogin(e){
 </html>"""
 
 
+@app.get("/ui/terms")
+def serve_terms():
+    return TERMS_HTML, 200, {"Content-Type": "text/html"}
+
 @app.get("/ui/login")
 def serve_login():
     return LOGIN_HTML, 200, {"Content-Type": "text/html"}
+
+
+TERMS_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FastWrite — Terms &amp; Conditions</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--border:#1e2330;--accent:#00e5a0;--text:#e8eaf0;--text2:#7c8299;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:40px 20px;}
+.terms-wrap{max-width:800px;margin:0 auto;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:48px 40px;box-shadow:0 8px 32px rgba(0,0,0,0.5);}
+h1{font-size:28px;margin-bottom:8px;} h1 span{color:var(--accent);}
+.subtitle{color:var(--text2);font-size:13px;margin-bottom:32px;}
+h2{font-size:18px;margin:28px 0 12px;color:var(--accent);} h3{font-size:15px;margin:20px 0 8px;}
+p,li{font-size:14px;line-height:1.7;color:var(--text2);margin-bottom:8px;}
+ul{padding-left:24px;margin-bottom:12px;}
+a{color:var(--accent);text-decoration:none;} a:hover{text-decoration:underline;}
+.back-link{display:inline-block;margin-top:24px;padding:10px 20px;background:var(--accent);color:#0a0c10;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none;}
+.back-link:hover{opacity:.85;text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="terms-wrap">
+<h1>Fast<span>Write</span></h1>
+<p class="subtitle">Terms &amp; Conditions &middot; Privacy Policy &middot; Last updated: April 2026</p>
+
+<h2>1. Introduction</h2>
+<p>Welcome to FastWrite ("Service", "Platform", "we", "us"). FastWrite is an AI-powered document extraction tool operated as a Software-as-a-Service (SaaS) platform accessible at fastwrite.duckdns.org. By creating an account and using the Service, you ("User", "you") agree to be bound by these Terms &amp; Conditions.</p>
+
+<h2>2. Service Description</h2>
+<p>FastWrite provides automated document data extraction using artificial intelligence. The Service allows users to upload documents (PDF, images), extract structured data from them using AI models, organize documents with labels/templates, and export extracted data. The Service is provided on an "as-is" basis.</p>
+
+<h2>3. Account Registration &amp; Security</h2>
+<p>To use the Service, you must create an account with a valid username and password. You are responsible for maintaining the confidentiality of your credentials and for all activity under your account. You must notify us immediately of any unauthorized use. We recommend enabling Two-Factor Authentication (2FA) for enhanced security.</p>
+
+<h2>4. User Data &amp; Privacy</h2>
+<h3>4.1 Data You Upload</h3>
+<p>Documents and files you upload remain your property. We do not access, view, analyze, or share your uploaded documents or extracted data. Your data is isolated from other users' data. The Service operator (admin) does not have access to any user documents or extracted information.</p>
+
+<h3>4.2 Data We Collect</h3>
+<p>We collect only the minimum data necessary to provide the Service:</p>
+<ul>
+<li>Account information: username, email address (optional), password (stored as a bcrypt hash — we never store plain-text passwords)</li>
+<li>Usage metadata: account creation date, login timestamps</li>
+<li>Technical data: authentication tokens (JWT cookies) for session management</li>
+</ul>
+
+<h3>4.3 Third-Party AI Processing</h3>
+<p>Document extraction uses third-party AI services (such as Google Gemini). When you process a document, its content is sent to the configured AI provider for extraction. You acknowledge that third-party AI providers have their own terms of service and privacy policies. We recommend reviewing those policies. You may configure your own API key (BYOK — Bring Your Own Key) for direct billing with the AI provider.</p>
+
+<h3>4.4 Data Storage &amp; Security</h3>
+<p>Your data is stored on secure servers. Uploaded files and extracted data are stored per-user and are not shared across accounts. API keys are encrypted at rest using Fernet symmetric encryption. We use HTTPS for data in transit and JWT tokens with httpOnly cookies for authentication.</p>
+
+<h3>4.5 Data Retention &amp; Deletion</h3>
+<p>You may delete your documents at any time through the platform. Upon account deactivation, your data may be retained for a reasonable period for backup purposes before permanent deletion. You may request complete data deletion by contacting support.</p>
+
+<h2>5. Acceptable Use</h2>
+<p>You agree not to:</p>
+<ul>
+<li>Upload illegal, harmful, or infringing content</li>
+<li>Attempt to access other users' data or accounts</li>
+<li>Reverse engineer, decompile, or disassemble the Service</li>
+<li>Use the Service to process documents you do not have the right to process</li>
+<li>Overload the Service with excessive requests or abuse API endpoints</li>
+<li>Share your account credentials with others</li>
+</ul>
+
+<h2>6. Intellectual Property</h2>
+<p>The FastWrite platform, including its software, design, and documentation, is the intellectual property of the Service operator. Your documents and data remain your intellectual property. We claim no ownership over content you upload or data you extract.</p>
+
+<h2>7. AI Extraction Accuracy</h2>
+<p>AI-based document extraction is not 100% accurate. The Service provides confidence scores and an approval workflow for you to review extracted data. You are responsible for verifying the accuracy of extracted data before relying on it for business, legal, or financial purposes. We do not guarantee the accuracy, completeness, or reliability of AI-generated extractions.</p>
+
+<h2>8. Service Availability</h2>
+<p>We aim to maintain high availability but do not guarantee uninterrupted service. The Service may be temporarily unavailable due to maintenance, updates, or circumstances beyond our control. We are not liable for any loss resulting from service downtime.</p>
+
+<h2>9. Limitation of Liability</h2>
+<p>To the maximum extent permitted by applicable law, FastWrite and its operators shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to loss of profits, data, or business opportunities, arising from your use of the Service.</p>
+
+<h2>10. Termination</h2>
+<p>We reserve the right to suspend or terminate accounts that violate these terms. You may stop using the Service at any time. Upon termination, your right to use the Service ceases immediately.</p>
+
+<h2>11. Changes to Terms</h2>
+<p>We may update these Terms &amp; Conditions from time to time. Continued use of the Service after changes constitutes acceptance of the updated terms. We will make reasonable efforts to notify users of significant changes.</p>
+
+<h2>12. Governing Law</h2>
+<p>These terms are governed by and construed in accordance with applicable laws. Any disputes shall be resolved through good-faith negotiation first, and if necessary, through the courts of competent jurisdiction.</p>
+
+<h2>13. Contact</h2>
+<p>For questions about these Terms &amp; Conditions, or to request data deletion, please contact us through the platform or at the email address provided in your account settings.</p>
+
+<p style="margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--text2);">
+<strong>Disclaimer:</strong> This document is provided as a template and should be reviewed by a qualified legal professional before being relied upon. It is not legal advice.
+</p>
+
+<a href="/ui/login" class="back-link">← Back to Login</a>
+</div>
+</body>
+</html>"""
 
 
 REGISTER_HTML = """<!DOCTYPE html>
@@ -1765,6 +1874,12 @@ button:hover{opacity:.85;}
     <div style="position:relative">
       <input type="password" id="reg-password2" placeholder="repeat password" autocomplete="new-password" required minlength="6" style="padding-right:40px"/>
       <span onclick="var p=document.getElementById('reg-password2');p.type=p.type==='password'?'text':'password'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#7c8299;font-size:18px;">&#128065;</span>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;">
+      <input type="checkbox" id="reg-terms" required style="margin-top:3px;accent-color:#00e5a0;width:16px;height:16px;flex-shrink:0;cursor:pointer;"/>
+      <label for="reg-terms" style="font-size:12px;color:#7c8299;text-transform:none;letter-spacing:0;cursor:pointer;">
+        I have read and agree to the <a href="/ui/terms" target="_blank" style="color:#00e5a0;">Terms &amp; Conditions</a>
+      </label>
     </div>
     <button type="submit">Create Account</button>
   </form>

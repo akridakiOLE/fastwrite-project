@@ -167,6 +167,8 @@ class DatabaseManager:
                     self.conn.execute("ALTER TABLE users ADD COLUMN totp_secret TEXT DEFAULT ''")
                 if 'totp_enabled' not in cols:
                     self.conn.execute("ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0")
+                if 'terms_accepted_at' not in cols:
+                    self.conn.execute("ALTER TABLE users ADD COLUMN terms_accepted_at TEXT DEFAULT ''")
                 self.conn.commit()
             except Exception:
                 pass  # Columns already exist (race condition with multiple workers)
