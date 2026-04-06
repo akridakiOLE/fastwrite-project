@@ -410,12 +410,12 @@ select.form-input option{background:var(--bg2);}
 
           <!-- Batch -->
           <div class="card" style="display:flex;flex-direction:column;overflow:hidden;padding:12px;max-width:540px;width:100%;">
-            <div class="card-title" style="margin-bottom:6px;font-size:14px;" data-i18n="upload_batch_title">📦 Batch (Πολλαπλά Τιμολόγια)</div>
+            <div class="card-title" style="margin-bottom:6px;font-size:14px;">📦 Batch (Πολλαπλά Τιμολόγια)</div>
             <div class="upload-zone" id="batch-zone" onclick="document.getElementById('batch-file').click()" ondragover="dragOver(event,'batch-zone')" ondragleave="dragLeave('batch-zone')" ondrop="dropFile(event,'batch')" style="padding:10px 12px;">
               <input type="file" id="batch-file" accept=".pdf" onchange="fileSelected('batch')"/>
               <div class="upload-icon" style="font-size:20px;margin:0;">📦</div>
-              <div class="upload-title" style="font-size:11px;margin:2px 0 0;" data-i18n="upload_zone_title">PDF με πολλαπλά τιμολόγια</div>
-              <div class="upload-sub" style="font-size:9px;margin:0;" data-i18n="upload_zone_sub">Έως 200 τιμολόγια ανά αρχείο</div>
+              <div class="upload-title" style="font-size:11px;margin:2px 0 0;">PDF με πολλαπλά τιμολόγια</div>
+              <div class="upload-sub" style="font-size:9px;margin:0;">Έως 200 τιμολόγια ανά αρχείο</div>
             </div>
             <div id="batch-selected" style="display:none;margin-top:8px;">
               <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg3);border-radius:8px;font-size:12px;">
@@ -434,12 +434,12 @@ select.form-input option{background:var(--bg2);}
             <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
               <button class="btn btn-primary tooltip-hint" data-hint="Ανεβάστε PDF και ξεκινήστε αυτόματη εξαγωγή δεδομένων με AI" style="flex:1;padding:12px 8px;font-size:13px;font-weight:600;" onclick="handleRegisterClick()" id="batch-btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                <span data-i18n="upload_register_btn">Καταγραφή Εγγράφων</span>
+                Καταγραφή Εγγράφων
               </button>
             </div>
             <div id="batch-progress" style="margin-top:16px;display:none;">
               <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px;">
-                <span id="batch-status-text"><span data-i18n="upload_processing">Επεξεργασία...</span></span>
+                <span id="batch-status-text">Επεξεργασία...</span>
                 <span id="batch-pct">0%</span>
               </div>
               <div class="progress-bar"><div class="progress-fill" id="batch-fill" style="width:0%"></div></div>
@@ -501,7 +501,7 @@ select.form-input option{background:var(--bg2);}
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-supplier')"><span data-i18n="docs_th_supplier"><div>ΠΡΟΜΗΘΕΥΤΗΣ</div><div>ΠΩΛΗΤΗΣ</div></span> <span class="cf-arrow">▼</span></div>
                 <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-supplier" style="display:none;">
                   <select id="cff-supplier" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-                    <option value="" data-i18n="docs_filter_all">ΟΛΑ</option>
+                    <option value="">ΟΛΑ</option>
                   </select>
                 </div>
               </th>
@@ -509,21 +509,21 @@ select.form-input option{background:var(--bg2);}
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-pct')"><span data-i18n="docs_th_pct">ΠΟΣΟΣΤΟ</span> <span class="cf-arrow">▼</span></div>
                 <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-pct" style="display:none;">
                   <select id="cff-pct" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-                    <option value="" data-i18n="docs_filter_all">ΟΛΑ</option>
+                    <option value="">ΟΛΑ</option>
                     <option value="90">≥ 90%</option>
                     <option value="80">≥ 80%</option>
                     <option value="70">≥ 70%</option>
                   </select>
-                  <input type="number" id="cff-pct-custom" placeholder="Ποσοστό..." data-i18n-placeholder="docs_pct_placeholder" min="0" max="100" oninput="onPctCustom()" onkeydown="if(event.key==='Enter'){event.preventDefault();onPctCustom();}" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);margin-top:4px;"/>
+                  <input type="number" id="cff-pct-custom" placeholder="Ποσοστό..." min="0" max="100" oninput="onPctCustom()" onkeydown="if(event.key==='Enter'){event.preventDefault();onPctCustom();}" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);margin-top:4px;"/>
                 </div>
               </th>
               <th style="color:#fff;vertical-align:top;min-width:90px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-status')"><span data-i18n="docs_th_status">ΚΑΤΑΣΤΑΣΗ</span> <span class="cf-arrow">▼</span></div>
                 <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-status" style="display:none;">
                   <select id="cff-status" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-                    <option value="" data-i18n="docs_filter_all">ΟΛΑ</option>
-                    <option value="pending" data-i18n="docs_filter_pending">Εκκρεμεί</option>
-                    <option value="approved" data-i18n="docs_filter_approved">Εγκρίθηκε</option>
+                    <option value="">ΟΛΑ</option>
+                    <option value="pending">Εκκρεμεί</option>
+                    <option value="approved">Εγκρίθηκε</option>
                   </select>
                 </div>
               </th>
@@ -531,18 +531,18 @@ select.form-input option{background:var(--bg2);}
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-batch')">BATCH <span class="cf-arrow">▼</span></div>
                 <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-batch" style="display:none;">
                   <select id="cff-batch" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-                    <option value="" data-i18n="docs_filter_all">ΟΛΑ</option>
-                    <option value="done" data-i18n="docs_filter_completed">Ολοκληρώθηκε</option>
-                    <option value="pending" data-i18n="docs_filter_pending">Εκκρεμεί</option>
+                    <option value="">ΟΛΑ</option>
+                    <option value="done">Ολοκληρώθηκε</option>
+                    <option value="pending">Εκκρεμεί</option>
                   </select>
                 </div>
               </th>
               <th style="color:#fff;vertical-align:top;min-width:100px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-date')"><span data-i18n="docs_th_date">ΚΑΤΑΧΩΡΗΣΗ</span> <span class="cf-arrow">▼</span></div>
                 <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-date" style="display:none;">
-                  <div style="font-size:10px;color:var(--text2);margin-bottom:2px;" data-i18n="docs_filter_from">Από</div>
+                  <div style="font-size:10px;color:var(--text2);margin-bottom:2px;">Από</div>
                   <input type="date" id="cff-date-from" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);"/>
-                  <div style="font-size:10px;color:var(--text2);margin:4px 0 2px;" data-i18n="docs_filter_to">Μέχρι</div>
+                  <div style="font-size:10px;color:var(--text2);margin:4px 0 2px;">Μέχρι</div>
                   <input type="date" id="cff-date-to" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);"/>
                 </div>
               </th>
@@ -561,17 +561,17 @@ select.form-input option{background:var(--bg2);}
     <!-- TEMPLATES -->
     <div id="page-templates" class="page" style="display:none">
       <div class="topbar">
-        <div class="page-title"><span data-i18n="page_templates">Ετικέτες</span></div>
+        <div class="page-title">Ετικέτες</div>
         <div class="topbar-actions">
-          <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Δημιουργία νέας ετικέτας για εξαγωγή δεδομένων από συγκεκριμένο τύπο εγγράφου" data-i18n="tpl_new_btn" data-i18n-hint="tpl_new_hint" onclick="openTemplateModal()">+ Νέα Ετικέτα</button>
+          <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Δημιουργία νέας ετικέτας για εξαγωγή δεδομένων από συγκεκριμένο τύπο εγγράφου" onclick="openTemplateModal()">+ Νέα Ετικέτα</button>
         </div>
       </div>
       <div class="content">
         <!-- Templates Search Bar -->
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;">
-          <input type="text" id="tf-name" data-i18n-placeholder="tpl_search_name" placeholder="🔍 Ετικέτα..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
-          <input type="text" id="tf-supplier" data-i18n-placeholder="tpl_search_supplier" placeholder="🏢 Προμηθευτής Πωλητής..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
-          <button class="af-btn tooltip-hint" data-hint="Καθαρισμός φίλτρων αναζήτησης ετικετών" data-i18n-hint="tpl_clear_hint" onclick="clearTemplateFilters()" title="Καθαρισμός">✕ <span data-i18n="tpl_clear_btn">Καθαρισμός</span></button>
+          <input type="text" id="tf-name" placeholder="🔍 Ετικέτα..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
+          <input type="text" id="tf-supplier" placeholder="🏢 Προμηθευτής Πωλητής..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
+          <button class="af-btn tooltip-hint" data-hint="Καθαρισμός φίλτρων αναζήτησης ετικετών" onclick="clearTemplateFilters()" title="Καθαρισμός">✕ Καθαρισμός</button>
         </div>
         <div id="templates-list"></div>
       </div>
@@ -579,128 +579,128 @@ select.form-input option{background:var(--bg2);}
 
     <!-- SETTINGS -->
     <div id="page-settings" class="page" style="display:none">
-      <div class="topbar"><div class="page-title" data-i18n="page_settings">Ρυθμίσεις</div></div>
+      <div class="topbar"><div class="page-title">Ρυθμίσεις</div></div>
       <div class="content">
         <div style="max-width:600px;display:flex;flex-direction:column;gap:20px;">
 
           <!-- Section 1: Λογαριασμός -->
           <div class="card">
-            <div class="card-title" data-i18n="settings_account_title">👤 Λογαριασμός</div>
+            <div class="card-title">👤 Λογαριασμός</div>
             <div id="account-info" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
 
             <!-- Αλλαγή Username -->
             <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
-              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;" data-i18n="settings_change_username">👤 Αλλαγή Username</div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">👤 Αλλαγή Username</div>
               <div class="form-group">
-                <label class="form-label" data-i18n="settings_new_username">Νέο username</label>
-                <input class="form-input" type="text" id="uname-new" placeholder="Τουλάχιστον 3 χαρακτήρες..." autocomplete="username" data-i18n-placeholder="settings_new_username_placeholder"/>
-              </div>
-              <div class="form-group">
-                <label class="form-label" data-i18n="settings_password_confirm">Κωδικός (για επιβεβαίωση)</label>
-                <div style="position:relative;">
-                  <input class="form-input" type="password" id="uname-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="current-password" style="padding-right:40px;" data-i18n-placeholder="settings_password_placeholder"/>
-                  <button type="button" onclick="togglePw('uname-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη" data-i18n-title="settings_show_hide">👁</button>
-                </div>
-              </div>
-              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση νέου username — απαιτείται κωδικός επιβεβαίωσης" onclick="changeUsername()" data-i18n="settings_change_username_btn" data-i18n-hint="settings_change_username_hint">Αλλαγή Username</button>
-            </div>
-
-            <!-- Αλλαγή Κωδικού -->
-            <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
-              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;" data-i18n="settings_change_password">🔒 Αλλαγή Κωδικού</div>
-              <div class="form-group">
-                <label class="form-label" data-i18n="settings_current_password">Τρέχων κωδικός</label>
-                <div style="position:relative;">
-                  <input class="form-input" type="password" id="pw-current" placeholder="Εισήγαγε τον τρέχοντα κωδικό..." autocomplete="current-password" data-i18n-placeholder="settings_current_password_placeholder" style="padding-right:40px;"/>
-                  <button type="button" onclick="togglePw('pw-current',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη" data-i18n-title="settings_show_hide">👁</button>
-                </div>
-              </div>
-              <div class="form-group">
-                <label class="form-label" data-i18n="settings_new_password">Νέος κωδικός</label>
-                <div style="position:relative;">
-                  <input class="form-input" type="password" id="pw-new" placeholder="Τουλάχιστον 6 χαρακτήρες..." autocomplete="new-password" data-i18n-placeholder="settings_new_password_placeholder" style="padding-right:40px;"/>
-                  <button type="button" onclick="togglePw('pw-new',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη" data-i18n-title="settings_show_hide">👁</button>
-                </div>
-              </div>
-              <div class="form-group">
-                <label class="form-label" data-i18n="settings_confirm_password">Επιβεβαίωση νέου κωδικού</label>
-                <div style="position:relative;">
-                  <input class="form-input" type="password" id="pw-confirm" placeholder="Επανάλαβε τον νέο κωδικό..." autocomplete="new-password" data-i18n-placeholder="settings_confirm_password_placeholder" style="padding-right:40px;"/>
-                  <button type="button" onclick="togglePw('pw-confirm',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη" data-i18n-title="settings_show_hide">👁</button>
-                </div>
-              </div>
-              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση νέου κωδικού — ελάχιστοι 6 χαρακτήρες" onclick="changePassword()" data-i18n="settings_change_password_btn" data-i18n-hint="settings_change_password_hint">Αλλαγή Κωδικού</button>
-            </div>
-
-            <!-- Αλλαγή Email -->
-            <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
-              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;" data-i18n="settings_change_email">📧 Αλλαγή Email</div>
-              <div class="form-group">
-                <label class="form-label" data-i18n="settings_new_email">Νέο email</label>
-                <input class="form-input" type="email" id="email-new" placeholder="π.χ. user@example.com" data-i18n-placeholder="settings_new_email_placeholder"/>
+                <label class="form-label">Νέο username</label>
+                <input class="form-input" type="text" id="uname-new" placeholder="Τουλάχιστον 3 χαρακτήρες..." autocomplete="username"/>
               </div>
               <div class="form-group">
                 <label class="form-label">Κωδικός (για επιβεβαίωση)</label>
                 <div style="position:relative;">
-                  <input class="form-input" type="password" id="email-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="current-password" style="padding-right:40px;" data-i18n-placeholder="settings_password_placeholder"/>
-                  <button type="button" onclick="togglePw('email-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη" data-i18n-title="settings_show_hide">👁</button>
+                  <input class="form-input" type="password" id="uname-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="current-password" style="padding-right:40px;"/>
+                  <button type="button" onclick="togglePw('uname-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
                 </div>
               </div>
-              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση νέου email επικοινωνίας" onclick="changeEmail()" data-i18n="settings_change_email_btn" data-i18n-hint="settings_change_email_hint">Αλλαγή Email</button>
+              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση νέου username — απαιτείται κωδικός επιβεβαίωσης" onclick="changeUsername()">Αλλαγή Username</button>
+            </div>
+
+            <!-- Αλλαγή Κωδικού -->
+            <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
+              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">🔒 Αλλαγή Κωδικού</div>
+              <div class="form-group">
+                <label class="form-label">Τρέχων κωδικός</label>
+                <div style="position:relative;">
+                  <input class="form-input" type="password" id="pw-current" placeholder="Εισήγαγε τον τρέχοντα κωδικό..." autocomplete="current-password" style="padding-right:40px;"/>
+                  <button type="button" onclick="togglePw('pw-current',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Νέος κωδικός</label>
+                <div style="position:relative;">
+                  <input class="form-input" type="password" id="pw-new" placeholder="Τουλάχιστον 6 χαρακτήρες..." autocomplete="new-password" style="padding-right:40px;"/>
+                  <button type="button" onclick="togglePw('pw-new',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Επιβεβαίωση νέου κωδικού</label>
+                <div style="position:relative;">
+                  <input class="form-input" type="password" id="pw-confirm" placeholder="Επανάλαβε τον νέο κωδικό..." autocomplete="new-password" style="padding-right:40px;"/>
+                  <button type="button" onclick="togglePw('pw-confirm',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
+                </div>
+              </div>
+              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση νέου κωδικού — ελάχιστοι 6 χαρακτήρες" onclick="changePassword()">Αλλαγή Κωδικού</button>
+            </div>
+
+            <!-- Αλλαγή Email -->
+            <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
+              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">📧 Αλλαγή Email</div>
+              <div class="form-group">
+                <label class="form-label">Νέο email</label>
+                <input class="form-input" type="email" id="email-new" placeholder="π.χ. user@example.com"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Κωδικός (για επιβεβαίωση)</label>
+                <div style="position:relative;">
+                  <input class="form-input" type="password" id="email-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="current-password" style="padding-right:40px;"/>
+                  <button type="button" onclick="togglePw('email-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
+                </div>
+              </div>
+              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση νέου email επικοινωνίας" onclick="changeEmail()">Αλλαγή Email</button>
             </div>
           </div>
 
           <!-- Section 2: Ασφάλεια 2FA -->
           <div class="card">
-            <div class="card-title" data-i18n="settings_2fa_title">🛡️ Ταυτοποίηση 2 Βημάτων (2FA)</div>
+            <div class="card-title">🛡️ Ταυτοποίηση 2 Βημάτων (2FA)</div>
             <div id="twofa-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
 
             <!-- 2FA Disabled State: Show enable button -->
             <div id="twofa-off" style="display:none;">
-              <p style="font-size:13px;color:var(--text2);margin-bottom:12px;" data-i18n="settings_2fa_desc">Προσθέστε ένα επιπλέον επίπεδο ασφάλειας στον λογαριασμό σας. Θα χρειάζεστε μια εφαρμογή Authenticator (π.χ. Google Authenticator, Authy).</p>
-              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Ξεκινήστε ρύθμιση 2FA — θα χρειαστείτε εφαρμογή Authenticator" onclick="setup2FA()" data-i18n="settings_2fa_enable" data-i18n-hint="settings_2fa_enable_hint">Ενεργοποίηση 2FA</button>
+              <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Προσθέστε ένα επιπλέον επίπεδο ασφάλειας στον λογαριασμό σας. Θα χρειάζεστε μια εφαρμογή Authenticator (π.χ. Google Authenticator, Authy).</p>
+              <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Ξεκινήστε ρύθμιση 2FA — θα χρειαστείτε εφαρμογή Authenticator" onclick="setup2FA()">Ενεργοποίηση 2FA</button>
             </div>
 
             <!-- 2FA Setup State: QR code + verify -->
             <div id="twofa-setup" style="display:none;">
-              <p style="font-size:13px;color:var(--text2);margin-bottom:12px;" data-i18n="settings_2fa_step1">1. Σαρώστε το QR code με την εφαρμογή Authenticator σας:</p>
+              <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">1. Σαρώστε το QR code με την εφαρμογή Authenticator σας:</p>
               <div style="text-align:center;margin:16px 0;">
                 <img id="twofa-qr" src="" alt="QR Code" style="max-width:200px;border-radius:8px;background:#fff;padding:8px;"/>
               </div>
-              <p style="font-size:11px;color:var(--text2);margin-bottom:4px;" data-i18n="settings_2fa_manual">Ή εισάγετε χειροκίνητα:</p>
+              <p style="font-size:11px;color:var(--text2);margin-bottom:4px;">Ή εισάγετε χειροκίνητα:</p>
               <div style="background:var(--bg3);padding:8px 12px;border-radius:6px;font-family:'DM Mono',monospace;font-size:12px;margin-bottom:16px;word-break:break-all;user-select:all;" id="twofa-secret-display"></div>
-              <p style="font-size:13px;color:var(--text2);margin-bottom:8px;" data-i18n="settings_2fa_step2">2. Εισάγετε τον 6ψήφιο κωδικό από την εφαρμογή:</p>
+              <p style="font-size:13px;color:var(--text2);margin-bottom:8px;">2. Εισάγετε τον 6ψήφιο κωδικό από την εφαρμογή:</p>
               <div class="form-group">
                 <input class="form-input" type="text" id="twofa-verify-code" placeholder="000000" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" style="text-align:center;font-size:20px;letter-spacing:8px;max-width:200px;"/>
               </div>
               <div style="display:flex;gap:8px;">
-                <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Επιβεβαίωση κωδικού και ενεργοποίηση 2FA" onclick="verify2FA()" data-i18n="settings_2fa_verify" data-i18n-hint="settings_2fa_verify_hint">Επαλήθευση & Ενεργοποίηση</button>
-                <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Ακύρωση ρύθμισης 2FA" onclick="cancel2FA()" data-i18n="settings_2fa_cancel" data-i18n-hint="settings_2fa_cancel_hint">Ακύρωση</button>
+                <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Επιβεβαίωση κωδικού και ενεργοποίηση 2FA" onclick="verify2FA()">Επαλήθευση & Ενεργοποίηση</button>
+                <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Ακύρωση ρύθμισης 2FA" onclick="cancel2FA()">Ακύρωση</button>
               </div>
             </div>
 
             <!-- 2FA Enabled State: Show disable button -->
             <div id="twofa-on" style="display:none;">
-              <p style="font-size:13px;color:var(--accent);margin-bottom:12px;" data-i18n="settings_2fa_active">✅ Το 2FA είναι ενεργοποιημένο. Ο λογαριασμός σας είναι προστατευμένος.</p>
+              <p style="font-size:13px;color:var(--accent);margin-bottom:12px;">✅ Το 2FA είναι ενεργοποιημένο. Ο λογαριασμός σας είναι προστατευμένος.</p>
               <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
-                <div style="font-size:13px;color:var(--text2);margin-bottom:8px;" data-i18n="settings_2fa_disable_label">Για απενεργοποίηση, εισάγετε τον κωδικό σας:</div>
+                <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">Για απενεργοποίηση, εισάγετε τον κωδικό σας:</div>
                 <div class="form-group">
                   <div style="position:relative;">
-                    <input class="form-input" type="password" id="twofa-disable-pw" placeholder="Κωδικός λογαριασμού..." autocomplete="current-password" data-i18n-placeholder="settings_2fa_password_placeholder" style="padding-right:40px;"/>
-                    <button type="button" onclick="togglePw('twofa-disable-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη" data-i18n-title="settings_show_hide">👁</button>
+                    <input class="form-input" type="password" id="twofa-disable-pw" placeholder="Κωδικός λογαριασμού..." autocomplete="current-password" style="padding-right:40px;"/>
+                    <button type="button" onclick="togglePw('twofa-disable-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη">👁</button>
                   </div>
                 </div>
-                <button class="btn btn-sm tooltip-hint" data-hint="Απενεργοποίηση 2FA — θα χρειαστεί εκ νέου ρύθμιση αν ξαναενεργοποιηθεί" style="background:var(--danger);color:#fff;" onclick="disable2FA()" data-i18n="settings_2fa_disable" data-i18n-hint="settings_2fa_disable_hint">Απενεργοποίηση 2FA</button>
+                <button class="btn btn-sm tooltip-hint" data-hint="Απενεργοποίηση 2FA — θα χρειαστεί εκ νέου ρύθμιση αν ξαναενεργοποιηθεί" style="background:var(--danger);color:#fff;" onclick="disable2FA()">Απενεργοποίηση 2FA</button>
               </div>
             </div>
           </div>
 
           <!-- Section 3: API Keys -->
           <div class="card">
-            <div class="card-title" data-i18n="settings_api_title">🔑 API Keys</div>
+            <div class="card-title">🔑 API Keys</div>
             <div id="keys-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
             <div class="form-group">
-              <label class="form-label" data-i18n="settings_api_provider">Παροχέας</label>
+              <label class="form-label">Παροχέας</label>
               <select class="form-input" id="key-service">
                 <option value="gemini">Gemini (Google)</option>
                 <option value="openai">OpenAI</option>
@@ -709,24 +709,24 @@ select.form-input option{background:var(--bg2);}
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label" data-i18n="settings_api_key_label">API Key</label>
-              <input class="form-input" type="password" id="key-value" placeholder="Εισήγαγε το API key..." data-i18n-placeholder="settings_api_key_placeholder"/>
+              <label class="form-label">API Key</label>
+              <input class="form-input" type="password" id="key-value" placeholder="Εισήγαγε το API key..."/>
             </div>
-            <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση κλειδιού AI — κρυπτογραφείται με Fernet encryption" onclick="saveKey()" data-i18n="settings_api_save" data-i18n-hint="settings_api_save_hint">Αποθήκευση Key</button>
+            <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση κλειδιού AI — κρυπτογραφείται με Fernet encryption" onclick="saveKey()">Αποθήκευση Key</button>
           </div>
 
           <!-- Section 3: Πληροφορίες Συστήματος -->
           <div class="card">
-            <div class="card-title" data-i18n="settings_system_title">⚙️ Πληροφορίες Συστήματος</div>
+            <div class="card-title">⚙️ Πληροφορίες Συστήματος</div>
             <div id="system-info" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
           </div>
 
           <!-- Section 4: Διαχείριση Χρηστών (Admin only) -->
           <div class="card" id="admin-users-section" style="display:none;">
-            <div class="card-title" data-i18n="settings_users_title">👥 Διαχείριση Χρηστών</div>
+            <div class="card-title">👥 Διαχείριση Χρηστών</div>
             <div id="admin-users-count" style="font-size:13px;color:var(--text2);margin-bottom:12px;">Φόρτωση...</div>
             <div style="margin-bottom:12px;">
-              <input class="form-input" type="text" id="admin-users-search" placeholder="Αναζήτηση χρήστη (username ή email)..." data-i18n-placeholder="settings_users_search" oninput="filterAdminUsers()" style="margin-bottom:0;"/>
+              <input class="form-input" type="text" id="admin-users-search" placeholder="Αναζήτηση χρήστη (username ή email)..." oninput="filterAdminUsers()" style="margin-bottom:0;"/>
             </div>
             <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
@@ -737,11 +737,8 @@ select.form-input option{background:var(--bg2);}
 
     <!-- FAQ / HELP -->
     <div id="page-faq" class="page" style="display:none">
-      <div class="topbar"><div class="page-title" data-i18n="page_help">Βοήθεια &amp; Συχνές Ερωτήσεις</div></div>
+      <div class="topbar"><div class="page-title">Βοήθεια &amp; Συχνές Ερωτήσεις</div></div>
       <div class="content" style="max-width:800px;">
-
-        <!-- GREEK FAQ Content -->
-        <div class="faq-lang-content" data-faq-lang="el">
 
         <!-- Περιγραφή Συστήματος -->
         <div class="card" style="margin-bottom:24px;border:1px solid rgba(0,229,160,0.2);background:rgba(0,229,160,0.03);">
@@ -818,7 +815,7 @@ select.form-input option{background:var(--bg2);}
         <div style="margin-bottom:16px;">
           <input class="form-input" type="text" id="faq-search" placeholder="🔍 Αναζήτηση ερώτησης..." oninput="filterFAQ()" style="margin-bottom:0;"/>
         </div>
-        <div id="faq-list" class="faq-list-container" style="display:flex;flex-direction:column;gap:8px;">
+        <div id="faq-list" style="display:flex;flex-direction:column;gap:8px;">
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">📊 Dashboard</div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι βλέπω στο Dashboard;</div><div class="faq-a">Το Dashboard εμφανίζει συνοπτικά στατιστικά: Σύνολο Εγγράφων, Ολοκληρωμένα (εγκεκριμένα), Σε Αναμονή (χρειάζονται επεξεργασία), Αποτυχημένα. Πατήστε "Ανανέωση" για ενημερωμένα δεδομένα.</div></div>
@@ -862,132 +859,6 @@ select.form-input option{background:var(--bg2);}
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Μπορώ να διαγράψω τον λογαριασμό μου;</div><div class="faq-a">Αυτή τη στιγμή η διαγραφή λογαριασμού γίνεται μέσω επικοινωνίας με την υποστήριξη. Ο διαχειριστής μπορεί να απενεργοποιήσει τον λογαριασμό σας.</div></div>
 
         </div>
-        </div><!-- /faq-lang-content el -->
-
-        <!-- ENGLISH FAQ Content -->
-        <div class="faq-lang-content" data-faq-lang="en" style="display:none">
-
-        <!-- System Description -->
-        <div class="card" style="margin-bottom:24px;border:1px solid rgba(0,229,160,0.2);background:rgba(0,229,160,0.03);">
-          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--accent);margin-bottom:16px;">📋 System Description</div>
-
-          <div style="font-size:13px;color:var(--text);line-height:1.8;">
-            <p style="margin-bottom:14px;"><strong>FastWrite</strong> is a local tool for automatic data extraction from documents (invoices, receipts, vouchers) using artificial intelligence (AI). It runs exclusively on your own computer — your data is not shared with anyone, including the platform administrator.</p>
-
-            <p style="margin-bottom:14px;"><strong>What it does:</strong> You upload a PDF with one or multiple invoices. The system automatically identifies each individual invoice, detects the supplier, matches the appropriate label, and extracts the data you defined (invoice number, date, amounts, line items, etc.). Finally, you export the results to CSV or Excel.</p>
-
-            <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--accent2);margin:20px 0 12px;">🔄 Workflow — Step by Step</div>
-
-            <div style="display:flex;flex-direction:column;gap:12px;">
-
-              <div style="display:flex;gap:12px;align-items:flex-start;">
-                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">1</div>
-                <div>
-                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Set Up API Key</div>
-                  <div style="color:var(--text2);font-size:12px;">Go to <strong>Settings → API Keys</strong> and enter your own AI key (e.g. Google Gemini). This is mandatory — the platform does not provide its own key. Billing is done directly to your AI account.</div>
-                </div>
-              </div>
-
-              <div style="display:flex;gap:12px;align-items:flex-start;">
-                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">2</div>
-                <div>
-                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Upload Documents</div>
-                  <div style="color:var(--text2);font-size:12px;">Go to <strong>Upload &amp; Extract</strong>. Drag or select a PDF file (up to 200 invoices per file) and click <strong>"Register Documents"</strong>. The system automatically identifies individual invoices and suppliers.</div>
-                </div>
-              </div>
-
-              <div style="display:flex;gap:12px;align-items:flex-start;">
-                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">3</div>
-                <div>
-                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Create Labels</div>
-                  <div style="color:var(--text2);font-size:12px;">From the <strong>Documents</strong> page, select one or more documents and click <strong>"Labels"</strong>. You will be taken to a special page where you see the actual invoice on the left and the label form on the right. Define the fields you want extracted (e.g. invoice number, date, total, VAT) and line items. Alternatively, create a label from the <strong>Labels → + New Label</strong> page.</div>
-                </div>
-              </div>
-
-              <div style="display:flex;gap:12px;align-items:flex-start;">
-                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">4</div>
-                <div>
-                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Data Extraction (Batch)</div>
-                  <div style="color:var(--text2);font-size:12px;">From the <strong>Documents</strong> page, select documents and click <strong>"Batch"</strong>. The system uses AI to extract data based on each document's label. Results appear in the documents table.</div>
-                </div>
-              </div>
-
-              <div style="display:flex;gap:12px;align-items:flex-start;">
-                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">5</div>
-                <div>
-                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Review &amp; Approve</div>
-                  <div style="color:var(--text2);font-size:12px;">From the <strong>Documents</strong> page, select documents and click <strong>"Approve"</strong>. You see the document (image) on the left and extracted data on the right. Correct any errors and click <strong>"Approve Invoice"</strong>. Highlight sync highlights the corresponding area in the document as you hover over line item rows.</div>
-                </div>
-              </div>
-
-              <div style="display:flex;gap:12px;align-items:flex-start;">
-                <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">6</div>
-                <div>
-                  <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Export Files</div>
-                  <div style="color:var(--text2);font-size:12px;">After approving documents, return to the <strong>Documents</strong> page. Select approved documents and click <strong>"CSV"</strong>, <strong>"XLSX"</strong> or <strong>"Line Items XLSX"</strong> to export. If none selected, all approved documents are exported.</div>
-                </div>
-              </div>
-
-            </div>
-
-            <div style="margin-top:20px;padding:12px 16px;background:rgba(0,102,255,0.08);border:1px solid rgba(0,102,255,0.2);border-radius:8px;">
-              <div style="font-weight:600;color:var(--accent2);margin-bottom:6px;">💡 Tip</div>
-              <div style="color:var(--text2);font-size:12px;">The correct order is: <strong>Upload → Labels → Batch → Approve → Export</strong>. First create labels for each invoice type (e.g. DEI, COSMOTE, VODAFONE) then start bulk extraction. Once you create a label, the system automatically matches new invoices from the same supplier.</div>
-            </div>
-          </div>
-        </div>
-
-        <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px;">❓ Frequently Asked Questions</div>
-
-        <div style="margin-bottom:16px;">
-          <input class="form-input" type="text" id="faq-search-en" placeholder="🔍 Search questions..." oninput="filterFAQ()" style="margin-bottom:0;"/>
-        </div>
-        <div id="faq-list-en" class="faq-list-container" style="display:flex;flex-direction:column;gap:8px;">
-
-          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">📊 Dashboard</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What do I see on the Dashboard?</div><div class="faq-a">The Dashboard displays summary statistics: Total Documents, Completed (approved), Pending (awaiting processing), Failed. Click "Refresh" for updated data.</div></div>
-
-          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">📤 Upload &amp; Extract (Invoice Registration)</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I upload documents?</div><div class="faq-a">Go to the "Upload & Extract" page. Drag a PDF file to the upload area or click to select it. The system accepts only PDF files, up to 200 invoices per file.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is "Register Documents"?</div><div class="faq-a">It is the function that uploads the PDF, automatically identifies the individual invoices within it, detects the supplier, and matches the appropriate label (template). You can register documents without extracting data.</div></div>
-
-          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">📄 Documents</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I view my documents?</div><div class="faq-a">On the "Documents" page, all documents are displayed in a table. You can use filters (file, label, supplier, percentage, status, batch, date) to find what you need.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What do the statuses mean?</div><div class="faq-a"><strong>Pending:</strong> The document is awaiting processing or approval. <strong>Completed:</strong> Data has been reviewed and approved. <strong>Failed:</strong> Extraction failed or the document was rejected.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is the percentage (%)?</div><div class="faq-a">It is the confidence score given by the AI during data extraction. A higher percentage means greater certainty in the extracted data. It is recommended to always review results before approval.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I export data?</div><div class="faq-a">Select the documents you want (checkbox) and click "CSV", "XLSX", or "Line Items XLSX" in the toolbar. If none selected, all approved documents are exported.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I delete documents?</div><div class="faq-a">Select documents with the checkbox and click the "Delete" button that appears. Deletion is permanent.</div></div>
-
-          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🏷 Labels (Templates)</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What are labels?</div><div class="faq-a">Labels (templates) define which fields you want to extract from each document type. For example, for COSMOTE invoices you might want: Invoice Number, Date, Total, VAT. Each supplier can have its own label.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I create a new label?</div><div class="faq-a"><strong>Method 1 (Simple):</strong> Go to "Labels" → "+ New Label". Enter a name, supplier pattern (e.g. cosmote, ote), and fields separated by commas. For line items, click "+ Array Line Items" and enter the columns.<br><br><strong>Method 2 (Recommended):</strong> From the "Documents" page, select one or more documents and click "Labels". You are taken to a special page where you see the actual invoice on the left and the label form on the right. This method is more effective because you can see exactly which fields exist in the invoice and configure them correctly.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is "Supplier Pattern"?</div><div class="faq-a">These are keywords that help the system automatically match an invoice with the correct label during registration. For example, if you enter "cosmote, ote", any invoice recognized as COSMOTE will automatically get this label.</div></div>
-
-          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">✅ Approval</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I approve documents?</div><div class="faq-a">From the "Documents" page, select documents and click "Approve". On the approval page, you see the document (image) on the left and extracted data on the right. You can correct values before approving.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Can I edit data before approving?</div><div class="faq-a">Yes, on the approval page all fields (general data and line items) are editable. Make your changes and then click "Approve". Changes are saved automatically.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What does highlight sync do?</div><div class="faq-a">When you hover over a line item row, the corresponding area in the document is highlighted. This helps verify that the data corresponds to the correct part of the document.</div></div>
-
-          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">⚙️ Settings &amp; Account</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I change my password?</div><div class="faq-a">Settings → Account → Change Password. Enter your current password, the new one (at least 6 characters) and confirmation.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is 2FA and how do I enable it?</div><div class="faq-a">Two-Factor Authentication (2FA) adds an extra layer of security. You need an Authenticator app (e.g. Google Authenticator). Go to Settings → "Enable 2FA", scan the QR code, enter the 6-digit code to verify.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What if I lose access to 2FA?</div><div class="faq-a">Contact support. The administrator can reset 2FA for your account without having access to your data.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is an API Key?</div><div class="faq-a">An API Key is an access key to the AI service (e.g. Google Gemini) used for data extraction. <strong>You MUST use your own key (BYOK — Bring Your Own Key).</strong> Billing is done directly by the AI provider to your account. The FastWrite platform does not provide its own API Key and does not mediate the processing of your data — ensuring complete privacy and independence.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Which AI providers are supported?</div><div class="faq-a">Currently Google Gemini is primarily supported. OpenAI, Claude (Anthropic), and Mistral will be supported soon.</div></div>
-
-          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🔒 Security &amp; Privacy</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Who can see my documents?</div><div class="faq-a">No one. Your documents are fully isolated. Even the system administrator cannot see your data. Each user sees and manages only their own documents.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How is my data stored?</div><div class="faq-a">All data (documents, extracted data, labels) is stored <strong>locally on your computer</strong> in a secure database. API keys are encrypted with Fernet encryption. Passwords are stored as bcrypt hashes — the actual password is never stored. No one has access to your files, including the platform administrator.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Are my documents sent to third parties?</div><div class="faq-a"><strong>No.</strong> The FastWrite system operates locally. During data extraction, communication occurs directly between your computer and the AI provider (e.g. Google Gemini) via <strong>your own API Key</strong>. The FastWrite platform does not mediate, store, or have access to the content of your documents. No data is shared with third parties.</div></div>
-
-          <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">❓ General</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What file types are accepted?</div><div class="faq-a">PDF, PNG, JPG, JPEG, WebP. Batch processing (multiple invoices) accepts only PDF.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is the maximum file size?</div><div class="faq-a">20MB per file.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Can I delete my account?</div><div class="faq-a">Currently, account deletion is done by contacting support. The administrator can deactivate your account.</div></div>
-
-        </div>
-        </div><!-- /faq-lang-content en -->
-
       </div>
     </div>
 
@@ -995,8 +866,8 @@ select.form-input option{background:var(--bg2);}
     <div id="page-label-editor" class="page" style="display:none">
       <div class="topbar" style="padding:8px 16px;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη σελίδα Εγγράφων" data-i18n="le_back" data-i18n-hint="le_back_hint" onclick="closeLabelEditor()">← Πίσω</button>
-          <div class="page-title" style="font-size:15px;"><span data-i18n="le_page_title">Καταγραφή Εγγράφων</span></div>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη σελίδα Εγγράφων" onclick="closeLabelEditor()">← Πίσω</button>
+          <div class="page-title" style="font-size:15px;">Καταγραφή Εγγράφων</div>
         </div>
         <div class="topbar-actions" style="gap:6px;">
           <!-- Dropdown 1: Επιλεγμένα Έγγραφα -->
@@ -1005,7 +876,7 @@ select.form-input option{background:var(--bg2);}
               📄 Έγγραφα <span id="le-doc-counter" style="color:var(--accent);">1/1</span> ▼
             </button>
             <div id="le-docs-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:300px;max-height:320px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
-              <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;"><span data-i18n="le_docs_header">ΕΠΙΛΕΓΜΕΝΑ ΕΓΓΡΑΦΑ</span></div>
+              <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;">ΕΠΙΛΕΓΜΕΝΑ ΕΓΓΡΑΦΑ</div>
               <div id="le-docs-list"></div>
             </div>
           </div>
@@ -1015,14 +886,14 @@ select.form-input option{background:var(--bg2);}
               🏷 Ετικέτες ▼
             </button>
             <div id="le-labels-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:280px;max-height:320px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
-              <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;"><span data-i18n="le_labels_header">ΥΦΙΣΤΑΜΕΝΕΣ ΕΤΙΚΕΤΕΣ</span></div>
+              <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;">ΥΦΙΣΤΑΜΕΝΕΣ ΕΤΙΚΕΤΕΣ</div>
               <div id="le-labels-list"></div>
             </div>
           </div>
-          <button class="btn btn-sm tooltip-hint" data-hint="Εμφάνιση/Απόκρυψη πλαϊνού πίνακα ετικέτας" data-i18n="le_panel_btn" data-i18n-hint="le_panel_hint" id="le-panel-toggle-btn" onclick="leTogglePanel()" style="font-size:11px;background:rgba(0,229,160,0.1);color:var(--accent);border:1px solid rgba(0,229,160,0.3);display:none;">🏷 Πίνακας</button>
-          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο προηγούμενο έγγραφο" data-i18n="le_prev" data-i18n-hint="le_prev_hint" onclick="lePrevDoc()" id="le-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
-          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο επόμενο έγγραφο" data-i18n="le_next" data-i18n-hint="le_next_hint" onclick="leNextDoc()" id="le-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
-          <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Καθαρισμός φόρμας — ξεκινήστε νέα ετικέτα από την αρχή" data-i18n="le_clear" data-i18n-hint="le_clear_hint" onclick="leResetForm()" id="le-clear-btn" style="font-size:11px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);">Καθαρισμός</button>
+          <button class="btn btn-sm tooltip-hint" data-hint="Εμφάνιση/Απόκρυψη πλαϊνού πίνακα ετικέτας" id="le-panel-toggle-btn" onclick="leTogglePanel()" style="font-size:11px;background:rgba(0,229,160,0.1);color:var(--accent);border:1px solid rgba(0,229,160,0.3);display:none;">🏷 Πίνακας</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο προηγούμενο έγγραφο" onclick="lePrevDoc()" id="le-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο επόμενο έγγραφο" onclick="leNextDoc()" id="le-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
+          <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Καθαρισμός φόρμας — ξεκινήστε νέα ετικέτα από την αρχή" onclick="leResetForm()" id="le-clear-btn" style="font-size:11px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);">Καθαρισμός</button>
         </div>
       </div>
       <div class="label-editor-container" style="position:relative;">
@@ -1035,7 +906,7 @@ select.form-input option{background:var(--bg2);}
         <!-- Side Panel (fixed right, collapsible) -->
         <div class="le-panel-area" id="le-panel">
           <div class="label-editor-panel-header">
-            <span class="title">🏷 <span data-i18n="le_new_label">Νέα Ετικέτα</span></span>
+            <span class="title">🏷 Νέα Ετικέτα</span>
             <div style="display:flex;gap:6px;align-items:center;">
               <button class="btn btn-sm tooltip-hint" data-hint="Προσθήκη πίνακα γραμμών (line items) στην ετικέτα — για τιμολόγια με πολλές γραμμές" style="padding:4px 10px;font-size:11px;font-weight:600;background:rgba(255,179,0,0.15);color:var(--warn);border:1px solid rgba(255,179,0,0.4);" onclick="leToggleLineItems()" id="le-lineitems-toggle">+ Array Line Items</button>
               <button class="btn btn-sm" style="padding:4px 8px;font-size:13px;color:var(--text2);background:none;border:1px solid var(--border);" onclick="leTogglePanel()" title="Κρύψε πίνακα">✕</button>
@@ -1074,8 +945,8 @@ select.form-input option{background:var(--bg2);}
     <div id="page-approval" class="page" style="display:none">
       <div class="topbar" style="padding:8px 16px;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη σελίδα Εγγράφων" data-i18n="ap_back" data-i18n-hint="ap_back_hint" onclick="closeApprovalPage()">← Πίσω</button>
-          <div class="page-title" style="font-size:15px;"><span data-i18n="ap_page_title">Έγκριση Εγγράφων</span></div>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη σελίδα Εγγράφων" onclick="closeApprovalPage()">← Πίσω</button>
+          <div class="page-title" style="font-size:15px;">Έγκριση Εγγράφων</div>
         </div>
         <div class="topbar-actions" style="gap:6px;">
           <!-- Document dropdown -->
@@ -1084,12 +955,12 @@ select.form-input option{background:var(--bg2);}
               📄 Έγγραφα <span id="ap-doc-counter" style="color:var(--accent);">1/1</span> ▼
             </button>
             <div id="ap-docs-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:320px;max-height:340px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
-              <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;"><span data-i18n="ap_docs_header">ΕΓΓΡΑΦΑ ΠΡΟΣ ΕΓΚΡΙΣΗ</span></div>
+              <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;">ΕΓΓΡΑΦΑ ΠΡΟΣ ΕΓΚΡΙΣΗ</div>
               <div id="ap-docs-list"></div>
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο προηγούμενο έγγραφο προς έγκριση" data-i18n="ap_prev" data-i18n-hint="ap_prev_hint" onclick="apPrevDoc()" id="ap-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
-          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο επόμενο έγγραφο προς έγκριση" data-i18n="ap_next" data-i18n-hint="ap_next_hint" onclick="apNextDoc()" id="ap-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο προηγούμενο έγγραφο προς έγκριση" onclick="apPrevDoc()" id="ap-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο επόμενο έγγραφο προς έγκριση" onclick="apNextDoc()" id="ap-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
         </div>
       </div>
       <div style="display:flex;width:100%;height:calc(100vh - 52px);overflow:hidden;background:var(--bg);position:relative;">
@@ -1107,7 +978,7 @@ select.form-input option{background:var(--bg2);}
           <!-- Scalar fields -->
           <div style="flex-shrink:0;border-bottom:1px solid var(--border);">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);cursor:pointer;user-select:none;" onclick="apToggleScalars()">
-              <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;"><span data-i18n="ap_scalar_title">Γενικά Στοιχεία</span></span>
+              <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;">Γενικά Στοιχεία</span>
               <span style="font-size:10px;color:var(--accent);" id="ap-toggle-icon">▲ Απόκρυψη</span>
             </div>
             <div id="ap-scalar-fields" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px;"></div>
@@ -1115,7 +986,7 @@ select.form-input option{background:var(--bg2);}
           <!-- Line items table -->
           <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
             <div style="padding:6px 14px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;">
-              <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;flex:1;" id="ap-li-title"><span data-i18n="ap_line_items">LINE ITEMS</span></span>
+              <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;flex:1;" id="ap-li-title">LINE ITEMS</span>
               <div style="display:flex;align-items:center;gap:6px;">
                 <button style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:2px 9px;font-size:13px;cursor:pointer;" onclick="apNavRow(-1)">↑</button>
                 <button style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:2px 9px;font-size:13px;cursor:pointer;" onclick="apNavRow(1)">↓</button>
@@ -1138,9 +1009,9 @@ select.form-input option{background:var(--bg2);}
     <!-- TEMPLATE BUILDER -->
     <div id="page-template-builder" class="page" style="display:none">
       <div class="topbar">
-        <div class="page-title" id="tb-title" data-i18n="tb_page_title">Template Builder</div>
+        <div class="page-title" id="tb-title">Template Builder</div>
         <div class="topbar-actions">
-          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη σελίδα Εγγράφων" data-i18n="tb_back" data-i18n-hint="tb_back_hint" onclick="showPage(\'documents\')">← Πίσω</button>
+          <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη σελίδα Εγγράφων" onclick="showPage('documents')">← Πίσω</button>
         </div>
       </div>
       <div class="content">
@@ -1149,12 +1020,12 @@ select.form-input option{background:var(--bg2);}
           <!-- Left: Document Info -->
           <div>
             <div class="card" style="margin-bottom:16px;">
-              <div class="card-title">📄 <span data-i18n="tb_doc_info">Πληροφορίες Εγγράφου</span></div>
+              <div class="card-title">📄 Πληροφορίες Εγγράφου</div>
               <div id="tb-doc-info" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
             </div>
 
             <div class="card" id="tb-results-card" style="display:none;">
-              <div class="card-title">📊 <span data-i18n="tb_extracted">Εξαγόμενα Δεδομένα</span></div>
+              <div class="card-title">📊 Εξαγόμενα Δεδομένα</div>
               <div id="tb-results-body"></div>
             </div>
           </div>
@@ -1162,7 +1033,7 @@ select.form-input option{background:var(--bg2);}
           <!-- Right: Template & Extract -->
           <div>
             <div class="card" style="margin-bottom:16px;">
-              <div class="card-title">🔧 <span data-i18n="tb_select_extract">Επιλογή Template & Εξαγωγή</span></div>
+              <div class="card-title">🔧 Επιλογή Template & Εξαγωγή</div>
               <div class="form-group">
                 <label class="form-label">Template</label>
                 <select class="form-input" id="tb-schema"></select>
@@ -1363,22 +1234,22 @@ function updateDonutChart(total, completed, pending, failed) {
 function renderRecentActivity(activities) {
   const el = document.getElementById('activity-list');
   if (!activities.length) {
-    el.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:13px;padding:24px;">' + t('js_no_recent_activity') + '</div>';
+    el.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:13px;padding:24px;">Δεν υπάρχει πρόσφατη δραστηριότητα</div>';
     return;
   }
   const actionLabels = {
     'batch_upload': '📤 Batch Upload',
-    'upload': '📤 ' + t('js_activity_upload'),
+    'upload': '📤 Ανέβασμα',
     'batch_process': '⚡ Batch Process',
-    'export': '📊 ' + t('js_activity_export'),
-    'register': '📝 ' + t('js_activity_register'),
-    'approve': '✅ ' + t('js_activity_approve'),
-    'delete': '🗑 ' + t('js_activity_delete')
+    'export': '📊 Εξαγωγή',
+    'register': '📝 Καταγραφή',
+    'approve': '✅ Έγκριση',
+    'delete': '🗑 Διαγραφή'
   };
   el.innerHTML = activities.slice(0, 10).map(a => {
     const actionText = actionLabels[a.action] || ('📌 ' + (a.action || '—'));
     const fname = a.filename || '';
-    const invoices = a.total_invoices ? (' · ' + a.total_invoices + ' ' + t('js_invoices')) : '';
+    const invoices = a.total_invoices ? (' · ' + a.total_invoices + ' τιμολόγια') : '';
     const time = a.created_at ? formatActivityTime(a.created_at) : '';
     return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bg3);font-size:13px;">
       <span style="flex-shrink:0;min-width:120px;color:var(--accent);font-size:12px;">${actionText}</span>
@@ -1394,12 +1265,12 @@ function formatActivityTime(isoStr) {
     const now = new Date();
     const diffMs = now - d;
     const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return t('time_just_now');
-    if (diffMin < 60) return t('time_minutes_ago', {n: diffMin});
+    if (diffMin < 1) return 'Μόλις τώρα';
+    if (diffMin < 60) return diffMin + ' λεπτά πριν';
     const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return t('time_hours_ago', {n: diffHr});
+    if (diffHr < 24) return diffHr + ' ώρ' + (diffHr === 1 ? 'α' : 'ες') + ' πριν';
     const diffDay = Math.floor(diffHr / 24);
-    if (diffDay < 7) return t('time_days_ago', {n: diffDay});
+    if (diffDay < 7) return diffDay + ' ημέρ' + (diffDay === 1 ? 'α' : 'ες') + ' πριν';
     return d.toLocaleDateString('el-GR');
   } catch(e) { return ''; }
 }
@@ -1458,18 +1329,18 @@ function populateColumnFilters(docs) {
   // Files
   const files = [...new Set(docs.map(d => d.original_filename || d.filename).filter(Boolean))].sort();
   const fileSel = document.getElementById('cff-file');
-  if (fileSel) fileSel.innerHTML = '<option value="">' + t('js_all') + '</option>' + files.map(f => `<option value="${f}">${f}</option>`).join('');
+  if (fileSel) fileSel.innerHTML = '<option value="">ΟΛΑ</option>' + files.map(f => `<option value="${f}">${f}</option>`).join('');
   // Labels (templates)
   const labels = [...new Set(docs.map(d => d.schema_name).filter(Boolean))].sort();
   const labelSel = document.getElementById('cff-label');
-  if (labelSel) labelSel.innerHTML = '<option value="">' + t('js_all') + '</option>' + labels.map(l => `<option value="${l}">${l}</option>`).join('');
+  if (labelSel) labelSel.innerHTML = '<option value="">ΟΛΑ</option>' + labels.map(l => `<option value="${l}">${l}</option>`).join('');
   // Suppliers
   const suppliers = [...new Set(docs.map(d => {
     const rd = d.result_data || {};
     return rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || (rd._matched_supplier && rd._matched_supplier !== 'unknown' ? rd._matched_supplier : '') || '';
   }).filter(Boolean))].sort();
   const suppSel = document.getElementById('cff-supplier');
-  if (suppSel) suppSel.innerHTML = '<option value="">' + t('js_all') + '</option>' + suppliers.map(s => `<option value="${s}">${s}</option>`).join('');
+  if (suppSel) suppSel.innerHTML = '<option value="">ΟΛΑ</option>' + suppliers.map(s => `<option value="${s}">${s}</option>`).join('');
 }
 
 function filterDocs() {
@@ -1554,7 +1425,7 @@ function renderDocs(docs) {
   // doc-count removed from UI
 
   if (!docs.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:40px">' + t('js_no_docs_found') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:40px">Δεν βρέθηκαν έγγραφα</td></tr>';
     return;
   }
   tbody.innerHTML = docs.map(doc => {
@@ -1572,8 +1443,8 @@ function renderDocs(docs) {
     const hasExtractedData = Object.keys(rd).some(k => !metaKeys.has(k));
     const batchDone = hasExtractedData && (doc.status === 'pending' || doc.status === 'approved' || doc.status === 'Completed' || doc.status === 'pending_review');
     const batchStatus = batchDone
-      ? '<span style="color:var(--accent);font-size:12px;">' + t('status_completed') + '</span>'
-      : '<span style="color:var(--warn);font-size:12px;">' + t('status_pending') + '</span>';
+      ? '<span style="color:var(--accent);font-size:12px;">Ολοκληρώθηκε</span>'
+      : '<span style="color:var(--warn);font-size:12px;">Εκκρεμεί</span>';
     // Ποσοστό εμπιστοσύνης (υπολογίζεται κατά extraction)
     const confVal = rd._confidence_pct;
     const ocrPct = confVal !== undefined && confVal !== null ? confVal + '%' : '—';
@@ -1592,8 +1463,8 @@ function renderDocs(docs) {
       <td>${batchStatus}</td>
       <td><span style="font-size:12px;color:var(--text3)">${recDate}</span></td>
       <td style="display:flex;gap:5px">
-        <button class="btn btn-secondary btn-sm" onclick="viewDoc(${doc.id})" title="${t('js_view')}">👁</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteDoc(${doc.id})" title="${t('js_delete')}">🗑</button>
+        <button class="btn btn-secondary btn-sm" onclick="viewDoc(${doc.id})" title="Προβολή">👁</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteDoc(${doc.id})" title="Διαγραφή">🗑</button>
       </td>
     </tr>`;
   }).join('');
@@ -1641,30 +1512,30 @@ async function viewDoc(id) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;height:65vh;">
       <!-- Αριστερά: Εικόνα εγγράφου -->
       <div style="overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--bg3);display:flex;align-items:flex-start;justify-content:center;padding:8px;">
-        <img src="${imageUrl}" alt="${t('js_doc_label')}" style="max-width:100%;height:auto;border-radius:6px;" onerror="this.parentElement.innerHTML='<div style=\\'text-align:center;color:var(--text3);padding:40px;\\'>" + t('js_doc_image_not_found') + "</div>'"/>
+        <img src="${imageUrl}" alt="Έγγραφο" style="max-width:100%;height:auto;border-radius:6px;" onerror="this.parentElement.innerHTML='<div style=\\'text-align:center;color:var(--text3);padding:40px;\\'>Δεν βρέθηκε εικόνα εγγράφου</div>'"/>
       </div>
       <!-- Δεξιά: Εξαγόμενα δεδομένα -->
       <div style="overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--bg2);padding:16px;">
-        <div style="font-family:'Syne',sans-serif;font-weight:600;font-size:14px;margin-bottom:12px;color:var(--accent);">${t('js_extracted_data')}</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:600;font-size:14px;margin-bottom:12px;color:var(--accent);">Εξαγόμενα Δεδομένα</div>
         ${scalarHtml ? `<div class="data-grid">${scalarHtml}</div>` : ''}
         ${arraysHtml}
-        ${!scalarHtml && !arraysHtml ? '<p style="color:var(--text2);font-size:13px">' + t('js_no_extracted_data') + '</p>' : ''}
+        ${!scalarHtml && !arraysHtml ? '<p style="color:var(--text2);font-size:13px">Δεν υπάρχουν εξαγόμενα δεδομένα.</p>' : ''}
       </div>
     </div>`;
   openModal('doc-modal');
 }
 
 async function deleteDoc(id) {
-  if (!confirm(t('js_delete_doc_confirm', {id: id}))) return;
+  if (!confirm('Διαγραφή εγγράφου #'+id+';')) return;
   await api('DELETE',`/api/documents/${id}`);
-  toast(t('js_doc_deleted'),'success');
+  toast('Έγγραφο διαγράφηκε','success');
   loadDocuments();
 }
 
 async function deleteSelectedDocs() {
   const ids = getSelectedIds();
-  if (!ids.length) { toast(t('js_select_docs_first'), 'error'); return; }
-  if (!confirm(t('js_delete_selected_confirm', {n: ids.length}))) return;
+  if (!ids.length) { toast('Επιλέξτε έγγραφα πρώτα', 'error'); return; }
+  if (!confirm('Διαγραφή ' + ids.length + ' επιλεγμένων εγγράφων;')) return;
   let deleted = 0;
   for (const id of ids) {
     try {
@@ -1672,7 +1543,7 @@ async function deleteSelectedDocs() {
       deleted++;
     } catch(e) { console.error('Delete error for #' + id, e); }
   }
-  toast(t('js_docs_deleted', {n: deleted}), 'success');
+  toast(deleted + ' έγγραφα διαγράφηκαν', 'success');
   loadDocuments();
 }
 
@@ -1697,7 +1568,7 @@ function updateSelection() {
   }
   if (countEl) {
     if (selected.length > 0) {
-      countEl.textContent = t('js_n_selected', {n: selected.length});
+      countEl.textContent = `${selected.length} επιλεγμένα`;
       countEl.style.display = 'inline';
     } else {
       countEl.style.display = 'none';
@@ -1719,11 +1590,11 @@ async function exportSelected(fmt) {
     : [...document.querySelectorAll('.doc-checkbox')].map(cb => parseInt(cb.value));
 
   const label = selectedIds.length > 0
-    ? t('js_selected_count', {n: selectedIds.length})
-    : t('js_all_filtered');
+    ? `${selectedIds.length} επιλεγμένων`
+    : 'όλων';
 
   try {
-    toast(t('js_exporting', {label: label}), 'info');
+    toast(`Εξαγωγή ${label}...`, 'info');
     const url  = fmt === 'line-items' ? '/api/export/line-items/xlsx' : `/api/export/${fmt}`;
     const body = idsToExport.length > 0 ? {doc_ids: idsToExport} : {};
     const resp = await fetch(url, {
@@ -1731,7 +1602,7 @@ async function exportSelected(fmt) {
       body: JSON.stringify(body),
       credentials:'include'
     });
-    if (!resp.ok) { const e=await resp.json(); toast(e.error||t('error'),'error'); return; }
+    if (!resp.ok) { const e=await resp.json(); toast(e.error||'Σφάλμα','error'); return; }
     const blob = await resp.blob();
     const cd   = resp.headers.get('Content-Disposition') || '';
     const name = cd.match(/filename="?([^"]+)"?/)?.[1]
@@ -1741,8 +1612,8 @@ async function exportSelected(fmt) {
     a.download = name;
     a.click();
     URL.revokeObjectURL(a.href);
-    toast(t('js_download_success', {name: name}), 'success');
-  } catch(e) { toast(t('js_export_error') + ': ' + e.message, 'error'); }
+    toast(`✓ ${name} κατεβαίνει!`, 'success');
+  } catch(e) { toast('Σφάλμα εξαγωγής: ' + e.message, 'error'); }
 }
 
 // Legacy aliases (χρησιμοποιούνται από Dashboard)
@@ -1754,7 +1625,7 @@ async function loadSchemas() {
   const res = await api('GET','/api/templates');
   const opts = (res.templates||[]).map(t=>`<option value="${t.name}">${t.name}</option>`).join('');
   // Batch: προσθέτουμε επιλογή "Χωρίς Fallback" για Auto Match
-  const noFallback = '<option value="__none__">— ' + t('js_no_fallback') + ' —</option>';
+  const noFallback = '<option value="__none__">— Χωρίς Fallback (μόνο Auto Match) —</option>';
   document.getElementById('batch-schema').innerHTML = noFallback + (opts || '');
   onAutoMatchChange();
 }
@@ -1765,7 +1636,7 @@ function onAutoMatchChange() {
   const hint      = document.getElementById('batch-schema-hint');
   const schema    = document.getElementById('batch-schema');
   if (autoMatch) {
-    label.textContent = t('js_template_fallback');
+    label.textContent = 'Template Fallback (για Auto Match)';
     label.style.color = 'var(--accent2)';
     hint.style.display = 'block';
     schema.style.opacity = '0.7';
@@ -1868,11 +1739,11 @@ async function findDocsForActivity(data) {
 // Click handler for "Καταγραφή Εγγράφων" button
 async function handleRegisterClick() {
   const inp = document.getElementById('batch-file');
-  if (!inp.files.length) { toast(t('js_select_pdf_first'),'error'); return; }
+  if (!inp.files.length) { toast('Επίλεξε PDF πρώτα','error'); return; }
 
   const btn = document.getElementById('batch-btn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> ' + t('js_registration_progress');
+  btn.innerHTML = '<span class="spinner"></span> Καταγραφή σε εξέλιξη...';
 
   // Use first available template as fallback, or '__auto__' if none exist
   const schemaSelect = document.getElementById('batch-schema');
@@ -1891,10 +1762,10 @@ async function handleRegisterClick() {
 
   const res = await api('POST', '/api/batch', fd, true);
   btn.disabled = false;
-  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> ' + t('js_register_documents');
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Καταγραφή Εγγράφων';
 
-  if (!res.success) { toast(res.error || t('error'), 'error'); return; }
-  toast(t('js_registration_started'), 'success');
+  if (!res.success) { toast(res.error || 'Σφάλμα', 'error'); return; }
+  toast('Καταγραφή ξεκίνησε!', 'success');
   lastBatchJobId = res.job_id;
   pollBatchJob(res.job_id, true);  // true = registration mode
   document.getElementById('batch-progress').style.display = 'block';
@@ -1906,8 +1777,8 @@ async function doSingleExtract() {
     const modal = document.getElementById('precheck-modal');
     const body  = document.getElementById('precheck-modal-body');
     const title = document.getElementById('precheck-modal-title');
-    title.textContent = t('js_check_required');
-    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">' + t('js_follow_registration_first') + '</div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">' + t('js_ok') + '</button></div></div>';
+    title.textContent = 'Απαιτείται Έλεγχος';
+    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Ακολουθήστε πρώτα την διαδικασία <b>Καταγραφή Εγγράφων</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
     modal.classList.add('open');
     return;
   }
@@ -1916,32 +1787,32 @@ async function doSingleExtract() {
     const modal = document.getElementById('precheck-modal');
     const body  = document.getElementById('precheck-modal-body');
     const title = document.getElementById('precheck-modal-title');
-    title.textContent = t('js_template_required');
-    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">' + t('js_no_template_for_supplier') + '<br>' + t('js_follow_registration_first') + '</div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">' + t('js_ok') + '</button></div></div>';
+    title.textContent = 'Απαιτείται Δημιουργία Template';
+    body.innerHTML = '<div style="padding:16px;"><div style="font-size:13px;color:var(--warn);margin-bottom:16px;">Δεν βρέθηκε template για τον προμηθευτή αυτού του τιμολογίου.<br>Ακολουθήστε πρώτα την διαδικασία <b>Καταγραφή Εγγράφων</b></div><div style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">Εντάξει</button></div></div>';
     modal.classList.add('open');
     return;
   }
 
   const inp    = document.getElementById('single-file');
   const schema = document.getElementById('single-schema').value;
-  if (!inp.files.length) { toast(t('js_select_file_first'),'error'); return; }
-  if (!schema) { toast(t('js_select_label'),'error'); return; }
+  if (!inp.files.length) { toast('Επίλεξε αρχείο πρώτα','error'); return; }
+  if (!schema) { toast('Επίλεξε ετικέτα','error'); return; }
 
   const btn = document.getElementById('single-btn');
-  btn.disabled=true; btn.innerHTML=t('js_uploading_spinner');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Ανέβασμα...';
 
   const fd = new FormData();
   fd.append('file', inp.files[0]);
   fd.append('schema_name', schema);
 
   const up = await api('POST','/api/upload',fd,true);
-  if (!up.success) { toast(up.error||'Upload failed','error'); btn.disabled=false; btn.textContent=t('js_extract_data_btn'); return; }
+  if (!up.success) { toast(up.error||'Upload failed','error'); btn.disabled=false; btn.textContent='Εξαγωγή Δεδομένων'; return; }
 
-  btn.innerHTML=t('js_extracting_ai');
+  btn.innerHTML='<span class="spinner"></span> Εξαγωγή AI...';
   const ex = await api('POST',`/api/extract/${up.doc_id}`,{schema_name:schema});
 
   btn.disabled=false;
-  btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> ' + t('js_extract_data_btn');
+  btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Εξαγωγή Δεδομένων';
 
   const res = document.getElementById('single-result');
   if (ex.success) {
@@ -1961,12 +1832,12 @@ async function doSingleExtract() {
         </div>`;
     }).join('');
     res.style.display='block';
-    res.innerHTML=`<div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);border-radius:10px;padding:16px"><div style="color:var(--accent);font-weight:600;margin-bottom:12px;">✓ ` + t('js_extraction_success') + `</div><div class="data-grid">${scalarHtml}</div>${arraysHtml}</div>`;
-    toast(t('js_extraction_complete'),'success');
+    res.innerHTML=`<div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);border-radius:10px;padding:16px"><div style="color:var(--accent);font-weight:600;margin-bottom:12px;">✓ Επιτυχής Εξαγωγή</div><div class="data-grid">${scalarHtml}</div>${arraysHtml}</div>`;
+    toast('Εξαγωγή ολοκληρώθηκε!','success');
   } else {
     res.style.display='block';
     res.innerHTML=`<div style="background:rgba(255,68,68,0.06);border:1px solid rgba(255,68,68,0.2);border-radius:10px;padding:16px;color:var(--danger);">✕ ${ex.error}</div>`;
-    toast(t('js_extraction_error'),'error');
+    toast('Σφάλμα εξαγωγής','error');
   }
 }
 
@@ -1977,36 +1848,34 @@ async function doBatchUpload() {
   const inp       = document.getElementById('batch-file');
   const schemaRaw = document.getElementById('batch-schema').value;
   const autoMatch = document.getElementById('batch-auto-match').checked;
-  if (!inp.files.length) { toast(t('js_select_pdf_first'),'error'); return; }
+  if (!inp.files.length) { toast('Επίλεξε PDF πρώτα','error'); return; }
   if (schemaRaw === '__none__' && !autoMatch) {
-    toast(t('js_select_label_or_auto'),'error'); return;
+    toast('Επίλεξε ετικέτα ή ενεργοποίησε το Auto Template Matching','error'); return;
   }
   const schema = schemaRaw === '__none__'
     ? (document.getElementById('batch-schema').options[1]?.value || '')
     : schemaRaw;
-  if (!schema) { toast(t('js_no_labels_create'),'error'); return; }
+  if (!schema) { toast('Δεν υπάρχουν ετικέτες. Δημιούργησε πρώτα μια ετικέτα.','error'); return; }
 
   const btn = document.getElementById('batch-btn');
-  btn.disabled=true; btn.innerHTML=t('js_analyzing_file');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Ανάλυση αρχείου...';
 
-  // Pre-check
+  // ΒΗΜΑ 1: Pre-check
   const pcFd = new FormData();
   pcFd.append('file', inp.files[0]);
   const pcRes = await api('POST', '/api/batch/pre-check', pcFd, true);
 
-  const batchBtnDefault = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> ' + t('js_start_batch');
-
   if (!pcRes || pcRes.error) {
     btn.disabled=false;
-    btn.innerHTML=batchBtnDefault;
-    toast(pcRes?.error || t('js_file_analysis_error'), 'error');
+    btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Έναρξη Batch';
+    toast(pcRes?.error || 'Σφάλμα ανάλυσης αρχείου', 'error');
     return;
   }
 
   batchPreCheckData = pcRes;
 
-  // Batch extraction
-  btn.innerHTML=t('js_uploading_spinner');
+  // ΒΗΜΑ 2: Batch extraction
+  btn.innerHTML='<span class="spinner"></span> Ανέβασμα...';
 
   const fd = new FormData();
   fd.append('file', inp.files[0]);
@@ -2015,10 +1884,10 @@ async function doBatchUpload() {
 
   const res = await api('POST','/api/batch',fd,true);
   btn.disabled=false;
-  btn.innerHTML=batchBtnDefault;
+  btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Έναρξη Batch';
 
-  if (!res.success) { toast(res.error||t('error'),'error'); return; }
-  toast(t('js_batch_started'),'success');
+  if (!res.success) { toast(res.error||'Σφάλμα','error'); return; }
+  toast('Batch ξεκίνησε!','success');
   lastBatchJobId = res.job_id;
   pollBatchJob(res.job_id);
   document.getElementById('batch-progress').style.display='block';
@@ -2056,26 +1925,26 @@ function pollBatchJob(job_id, registrationMode) {
     const dots = processing ? ' ⟳' : '';
     if (registrationMode) {
       // Καταγραφή mode: δείχνε μόνο progress χωρίς processed/total
-      const phase = pct === 0 && !done ? t('phase_analyzing')
-                  : pct < 30           ? t('phase_detecting')
-                  : pct < 90           ? t('phase_registering')
-                  : done               ? t('phase_completed')
-                  : t('phase_finalizing');
+      const phase = pct === 0 && !done ? 'Ανάλυση σελίδων...'
+                  : pct < 30           ? 'Εντοπισμός τιμολογίων...'
+                  : pct < 90           ? 'Καταγραφή εγγράφων...'
+                  : done               ? 'Ολοκληρώθηκε'
+                  : 'Οριστικοποίηση...';
       document.getElementById('batch-status-text').textContent = phase + dots;
       document.getElementById('batch-detail').textContent =
-        `${t('js_pages')}: ${st.total_pages||0}`;
+        `Σελίδες: ${st.total_pages||0}`;
     } else {
-      const skippedTxt = (st.skipped || 0) > 0 ? ` (${st.skipped} ${t('js_skipped')})` : '';
+      const skippedTxt = (st.skipped || 0) > 0 ? ` (${st.skipped} παραλείφθηκαν)` : '';
       document.getElementById('batch-status-text').textContent =
-        `${st.processed||0}/${st.total_invoices||0} ${t('js_documents')}${skippedTxt}${dots}`;
-      const errTxt = st.failed > 0 ? ` | ${t('js_failures')}${st.failed}` : '';
-      const phase  = pct === 0 && !done ? ' — ' + t('phase_analyzing')
-                   : pct < 30          ? ' — ' + t('phase_detecting')
-                   : pct < 90          ? ' — ' + t('phase_extracting')
-                   : done              ? ' — ' + t('phase_completed')
-                   : ' — ' + t('phase_finalizing');
+        `${st.processed||0}/${st.total_invoices||0} έγγραφα${skippedTxt}${dots}`;
+      const errTxt = st.failed > 0 ? ` | Αποτυχίες: ${st.failed}` : '';
+      const phase  = pct === 0 && !done ? ' — Ανάλυση σελίδων...'
+                   : pct < 30          ? ' — Εντοπισμός τιμολογίων...'
+                   : pct < 90          ? ' — Εξαγωγή δεδομένων...'
+                   : done              ? ' — Ολοκληρώθηκε'
+                   : ' — Οριστικοποίηση...';
       document.getElementById('batch-detail').textContent =
-        `${t('js_pages')}: ${st.total_pages||0}${errTxt}${phase}`;
+        `Σελίδες: ${st.total_pages||0}${errTxt}${phase}`;
     }
 
     // Color change on completion
@@ -2093,14 +1962,14 @@ function pollBatchJob(job_id, registrationMode) {
       batchDoneHandled = true;
       if (st.status === 'completed') {
         if (registrationMode) {
-          toast(`✓ ` + t('js_register_done').replace('{}', st.total_invoices), 'success');
+          toast(`✓ Καταγραφή ολοκληρώθηκε: ${st.total_invoices} έγγραφα`, 'success');
           showRegistrationCompletionModal(st);
         } else {
-          toast(`✓ ` + t('js_batch_done').replace('{}', st.processed), 'success');
+          toast(`✓ Batch ολοκληρώθηκε: ${st.processed} έγγραφα`, 'success');
           showBatchCompletionModal(st);
         }
       } else {
-        toast('✕ ' + t('js_process_failed'), 'error');
+        toast('✕ Η διαδικασία απέτυχε', 'error');
       }
     }
   }, 1500);
@@ -2111,11 +1980,11 @@ function showCompletionMessage() {
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  title.textContent = t('js_process_complete');
+  title.textContent = 'Ολοκλήρωση Διαδικασίας';
 
   let html = '<div style="padding:20px;text-align:center;">';
   html += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:20px;">';
-  html += t('js_continue_extraction').replace('**Έγγραφα**', '<b style="color:var(--accent);">' + t('sidebar_documents') + '</b>').replace('**Documents**', '<b style="color:var(--accent);">' + t('sidebar_documents') + '</b>');
+  html += 'Αν θέλετε να συνεχίσετε την διαδικασία και να ολοκληρώσετε την εξαγωγή δεδομένων από το σύστημα παρακαλώ μετακινηθείτε στην σελίδα <b style="color:var(--accent);">Έγγραφα</b>';
   html += '</div>';
   html += '<button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="closeModal(\'precheck-modal\')">OK</button>';
   html += '</div>';
@@ -2132,15 +2001,15 @@ function showRegistrationCompletionModal(st) {
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  title.textContent = t('js_register_complete');
+  title.textContent = 'Καταγραφή Εγγράφων';
 
   const total = st.total_invoices || 0;
   const pages = st.total_pages || 0;
 
   let html = '<div style="padding:20px;text-align:center;">';
-  html += `<div style="font-size:14px;color:var(--text2);margin-bottom:16px;">${total} ${t('js_documents')} &nbsp;·&nbsp; ${pages} ${t('js_pages')}</div>`;
+  html += `<div style="font-size:14px;color:var(--text2);margin-bottom:16px;">${total} έγγραφα &nbsp;·&nbsp; ${pages} σελίδες</div>`;
   html += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:20px;">';
-  html += t('js_registration_done').replace('**Έγγραφα**', '<b style="color:var(--accent);">' + t('sidebar_documents') + '</b>').replace('**Documents**', '<b style="color:var(--accent);">' + t('sidebar_documents') + '</b>');
+  html += 'Ολοκληρώθηκε η καταγραφή των εγγράφων.<br>Παρακαλώ μετακινηθείτε στην σελίδα <b style="color:var(--accent);">Έγγραφα</b> για να ολοκληρώσετε τη διαδικασία.';
   html += '</div>';
   html += '<button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="closeModal(\'precheck-modal\')">OK</button>';
   html += '</div>';
@@ -2154,7 +2023,7 @@ async function showBatchCompletionModal(st) {
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  title.textContent = t('js_batch_complete');
+  title.textContent = 'Ολοκλήρωση Batch';
 
   const total = st.total_invoices || 0;
   const successful = st.processed || 0;        // only truly extracted docs
@@ -2165,17 +2034,17 @@ async function showBatchCompletionModal(st) {
   const pages = st.total_pages || 0;
 
   let detailParts = [];
-  if (pages > 0) detailParts.push(t('js_pages') + ': ' + pages);
-  if (noTemplate > 0) detailParts.push(t('js_without_label') + noTemplate);
-  if (failed > 0) detailParts.push(t('js_failures') + failed);
-  if (skipped > 0) detailParts.push(t('js_skipped') + ': ' + skipped);
+  if (pages > 0) detailParts.push('Σελίδες: ' + pages);
+  if (noTemplate > 0) detailParts.push('Χωρίς ετικέτα: ' + noTemplate);
+  if (failed > 0) detailParts.push('Αποτυχίες: ' + failed);
+  if (skipped > 0) detailParts.push('Παραλείφθηκαν: ' + skipped);
 
   let html = '<div style="padding:20px;text-align:center;">';
   html += `<div style="font-size:36px;font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);margin-bottom:8px;">${successful}/${total}</div>`;
   html += `<div style="font-size:16px;color:var(--text);margin-bottom:4px;">${pct}%</div>`;
   if (detailParts.length) html += `<div style="font-size:12px;color:var(--text2);margin-bottom:16px;">${detailParts.join(' | ')}</div>`;
   html += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:20px;">';
-  html += t('js_continue_docs').replace('**Έγγραφα**', '<b style="color:var(--accent);">' + t('sidebar_documents') + '</b>').replace('**Documents**', '<b style="color:var(--accent);">' + t('sidebar_documents') + '</b>');
+  html += 'Για να ολοκληρώσετε τις διαδικασίες συνεχίστε στην σελίδα <b style="color:var(--accent);">Έγγραφα</b>';
   html += '</div>';
   html += '<button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="closeModal(\'precheck-modal\')">OK</button>';
   html += '</div>';
@@ -2227,14 +2096,14 @@ function renderActivityList(items) {
   const el = document.getElementById('activity-list');
   if (!el) return;
   if (!items.length) {
-    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">' + t('js_no_results_found') + '</div>';
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Δεν βρέθηκαν αποτελέσματα</div>';
     return;
   }
   el.innerHTML = items.map((a, idx) => {
     const num = allActivityItems.length - allActivityItems.indexOf(a);
     const date = formatLocalDate(a.created_at);
     const icon = a.action === 'pre-check' ? '🔍' : '▶';
-    const label = a.action === 'pre-check' ? t('js_register_label') : t('js_start_batch_label');
+    const label = a.action === 'pre-check' ? 'Καταγραφή Εγγράφων' : 'Έναρξη Batch';
     const color = a.action === 'pre-check' ? 'var(--accent2)' : 'var(--accent)';
     const isSelected = selectedActivityId === a.id;
     return `<div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;${isSelected ? 'background:rgba(0,229,160,0.06);' : ''}">
@@ -2243,9 +2112,9 @@ function renderActivityList(items) {
       <div style="flex:1;min-width:0;">
         <div style="font-size:12px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${a.filename}">${icon} ${a.filename}</div>
         <div style="font-size:11px;color:${color};margin-top:2px;">${label}</div>
-        <div style="font-size:10px;color:var(--text2);margin-top:2px;">${date} · ${t('sidebar_documents')}: ${a.total_invoices}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px;">${date} · Έγγραφα: ${a.total_invoices}</div>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="showActivityDetail(${a.id})" style="font-size:10px;padding:3px 8px;" title="${t('js_results_title')}">📊</button>
+      <button class="btn btn-secondary btn-sm" onclick="showActivityDetail(${a.id})" style="font-size:10px;padding:3px 8px;" title="Αποτελέσματα">📊</button>
     </div>`;
   }).join('');
 }
@@ -2293,16 +2162,16 @@ function clearActivityFilters() {
 
 async function showActivityDetail(activityId) {
   const res = await api('GET', '/api/activity/' + activityId);
-  if (!res || res.error) { toast(t('js_loading_error'), 'error'); return; }
+  if (!res || res.error) { toast('Σφάλμα φόρτωσης', 'error'); return; }
 
   const modal = document.getElementById('precheck-modal');
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  const label = res.action === 'pre-check' ? t('js_register_label') : t('js_start_batch_label');
+  const label = res.action === 'pre-check' ? 'Καταγραφή Εγγράφων' : 'Έναρξη Batch';
   const date  = formatLocalDate(res.updated_at || res.created_at);
 
-  title.textContent = t('js_results_title') + label;
+  title.textContent = 'Αποτελέσματα — ' + label;
 
   // Φέρε live data από τα documents αν υπάρχουν doc_ids
   // Τα counts (without_template, needs_approval, no_approval) ενημερώνονται
@@ -2339,15 +2208,15 @@ async function showActivityDetail(activityId) {
   const batchPend = batchPending || withoutTmpl;
 
   let html = '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">';
-  html += '<b>' + res.filename + '</b><br>' + date + ' <span style="color:var(--accent);font-size:11px;">(' + t('js_last_update') + ')</span>';
+  html += '<b>' + res.filename + '</b><br>' + date + ' <span style="color:var(--accent);font-size:11px;">(τελευταία ενημέρωση)</span>';
   html += '</div>';
   html += '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">' + t('js_total_docs_file') + '</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + totalInv + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">' + t('js_docs_without_label') + '</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTmpl + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">' + t('js_docs_without_approval') + '</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noAppr + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent2);">' + t('js_docs_with_approval') + '</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent2);">' + needsAppr + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:500;">' + t('js_completed_count') + ' Batch</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + batchComp + '</td></tr>';
-  html += '<tr><td style="padding:8px 12px;color:var(--warn);font-weight:500;">' + t('js_incomplete_batch') + '</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--warn);">' + batchPend + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);">Συνολικά έγγραφα αρχείου</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--text);">' + totalInv + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--warn);">Έγγραφα χωρίς ετικέτα</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--warn);">' + withoutTmpl + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);">Έγγραφα χωρίς έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + noAppr + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent2);">Έγγραφα με έγκριση</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent2);">' + needsAppr + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--accent);font-weight:500;">Ολοκληρωμένα Batch</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600;text-align:right;color:var(--accent);">' + batchComp + '</td></tr>';
+  html += '<tr><td style="padding:8px 12px;color:var(--warn);font-weight:500;">Μη Ολοκληρωμένα Batch</td><td style="padding:8px 12px;font-weight:600;text-align:right;color:var(--warn);">' + batchPend + '</td></tr>';
   html += '</table>';
   html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">';
   html += '<button class="btn btn-primary btn-sm" onclick="closeModal(\'precheck-modal\')">OK</button>';
@@ -2365,7 +2234,7 @@ let leCurrentIndex = 0;
 function openLabelEditor() {
   const ids = getSelectedIds();
   if (!ids.length) {
-    toast(t('js_select_docs_checkbox'), 'error');
+    toast('Επιλέξτε έγγραφα πρώτα (checkbox ή φίλτρα)', 'error');
     return;
   }
   leDocIds = ids;
@@ -2402,7 +2271,7 @@ function closeLabelEditor() {
 
 async function openBatchFromDocs() {
   const ids = getSelectedIds();
-  if (!ids.length) { toast(t('js_select_docs_first'), 'error'); return; }
+  if (!ids.length) { toast('Επιλέξτε έγγραφα πρώτα', 'error'); return; }
 
   // Ανάλυση επιλεγμένων εγγράφων
   const selectedDocs = allDocs.filter(d => ids.includes(d.id));
@@ -2416,18 +2285,18 @@ async function openBatchFromDocs() {
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  title.textContent = t('js_batch_export_title');
+  title.textContent = 'Εξαγωγή Δεδομένων (Batch)';
 
   if (toExtract.length === 0) {
     let reason = '';
-    if (completed.length > 0 && noLabel.length === 0) reason = t('js_all_completed_msg');
-    else if (noLabel.length > 0 && completed.length === 0) reason = t('js_no_label_msg');
-    else reason = t('js_no_docs_to_export');
+    if (completed.length > 0 && noLabel.length === 0) reason = 'Όλα τα επιλεγμένα έγγραφα έχουν ήδη ολοκληρωθεί.';
+    else if (noLabel.length > 0 && completed.length === 0) reason = 'Τα επιλεγμένα έγγραφα δεν έχουν ετικέτα. Δημιουργήστε πρώτα ετικέτες.';
+    else reason = 'Δεν υπάρχουν έγγραφα για εξαγωγή. Ελέγξτε ότι έχουν ετικέτα και δεν έχουν ήδη ολοκληρωθεί.';
     body.innerHTML = `<div style="padding:20px;text-align:center;">
       <div style="font-size:14px;color:var(--warn);margin-bottom:16px;">${reason}</div>
-      ${completed.length > 0 ? `<div style="font-size:12px;color:var(--text3);margin-bottom:8px;">${t('js_completed_count')}: ${completed.length}</div>` : ''}
-      ${noLabel.length > 0 ? `<div style="font-size:12px;color:var(--text3);margin-bottom:8px;">${t('js_without_label')}${noLabel.length}</div>` : ''}
-      <button class="btn btn-primary btn-sm" style="padding:8px 24px;" onclick="closeModal('precheck-modal')">${t('js_ok')}</button>
+      ${completed.length > 0 ? `<div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Ολοκληρωμένα: ${completed.length}</div>` : ''}
+      ${noLabel.length > 0 ? `<div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Χωρίς ετικέτα: ${noLabel.length}</div>` : ''}
+      <button class="btn btn-primary btn-sm" style="padding:8px 24px;" onclick="closeModal('precheck-modal')">Εντάξει</button>
     </div>`;
     modal.classList.add('open');
     return;
@@ -2435,13 +2304,13 @@ async function openBatchFromDocs() {
 
   let summaryHtml = `<div style="padding:20px;">`;
   summaryHtml += `<div style="font-size:14px;color:var(--text);margin-bottom:16px;text-align:center;">`;
-  summaryHtml += `<span style="font-size:24px;font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);">${toExtract.length}</span> ${t('js_documents')}`;
+  summaryHtml += `<span style="font-size:24px;font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);">${toExtract.length}</span> έγγραφα θα εξαχθούν`;
   summaryHtml += `</div>`;
-  if (completed.length > 0) summaryHtml += `<div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:4px;">${t('js_already_completed')}${completed.length}</div>`;
-  if (noLabel.length > 0) summaryHtml += `<div style="font-size:12px;color:var(--warn);text-align:center;margin-bottom:4px;">${t('js_without_label')}${noLabel.length}</div>`;
+  if (completed.length > 0) summaryHtml += `<div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:4px;">Αγνοούνται: ${completed.length} (ήδη ολοκληρωμένα)</div>`;
+  if (noLabel.length > 0) summaryHtml += `<div style="font-size:12px;color:var(--warn);text-align:center;margin-bottom:4px;">Χωρίς ετικέτα: ${noLabel.length} (παραλείπονται)</div>`;
   summaryHtml += `<div style="display:flex;justify-content:center;gap:8px;margin-top:20px;">`;
-  summaryHtml += `<button class="btn btn-secondary btn-sm" style="padding:8px 20px;" onclick="closeModal('precheck-modal')">${t('btn_cancel')}</button>`;
-  summaryHtml += `<button class="btn btn-primary btn-sm" style="padding:8px 20px;" onclick="executeBatchFromDocs()">${t('btn_export')}</button>`;
+  summaryHtml += `<button class="btn btn-secondary btn-sm" style="padding:8px 20px;" onclick="closeModal('precheck-modal')">Ακύρωση</button>`;
+  summaryHtml += `<button class="btn btn-primary btn-sm" style="padding:8px 20px;" onclick="executeBatchFromDocs()">Εξαγωγή</button>`;
   summaryHtml += `</div></div>`;
 
   body.innerHTML = summaryHtml;
@@ -2454,37 +2323,37 @@ async function executeBatchFromDocs() {
   const title = document.getElementById('precheck-modal-title');
   const body  = document.getElementById('precheck-modal-body');
 
-  title.textContent = t('js_export_progress');
+  title.textContent = 'Εξαγωγή σε εξέλιξη...';
   body.innerHTML = `<div style="text-align:center;padding:30px;">
     <span class="spinner" style="display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;"></span>
-    <div style="margin-top:12px;color:var(--text2);font-size:13px;">${t('js_export_progress')}</div>
+    <div style="margin-top:12px;color:var(--text2);font-size:13px;">Εξαγωγή δεδομένων...</div>
   </div>`;
 
   try {
     const res = await api('POST', '/api/batch/extract-selected', { doc_ids: ids });
 
     if (!res.success) {
-      body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">${res.error || t('error')}</div>
-        <div style="text-align:center;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="closeModal('precheck-modal')">${t('btn_close')}</button></div>`;
+      body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">${res.error || 'Σφάλμα'}</div>
+        <div style="text-align:center;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="closeModal('precheck-modal')">Κλείσιμο</button></div>`;
       return;
     }
 
-    title.textContent = t('js_batch_complete');
+    title.textContent = 'Ολοκλήρωση Batch';
     const total = res.total || 0;
     const extracted = res.extracted || 0;
     const pct = total > 0 ? ((extracted / total) * 100).toFixed(1) : 0;
 
     let detailParts = [];
-    if (res.skipped_completed > 0) detailParts.push(t('js_already_completed') + res.skipped_completed);
-    if (res.skipped_no_label > 0) detailParts.push(t('js_without_label') + res.skipped_no_label);
-    if (res.failed > 0) detailParts.push(t('js_failures') + res.failed);
+    if (res.skipped_completed > 0) detailParts.push('Ήδη ολοκληρωμένα: ' + res.skipped_completed);
+    if (res.skipped_no_label > 0) detailParts.push('Χωρίς ετικέτα: ' + res.skipped_no_label);
+    if (res.failed > 0) detailParts.push('Αποτυχίες: ' + res.failed);
 
     let html = '<div style="padding:20px;text-align:center;">';
     html += `<div style="font-size:36px;font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);margin-bottom:8px;">${extracted}/${total}</div>`;
     html += `<div style="font-size:16px;color:var(--text);margin-bottom:4px;">${pct}%</div>`;
     if (detailParts.length) html += `<div style="font-size:12px;color:var(--text2);margin-bottom:16px;">${detailParts.join(' | ')}</div>`;
     html += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:20px;">';
-    html += t('js_extraction_done');
+    html += 'Η εξαγωγή δεδομένων ολοκληρώθηκε.';
     html += '</div>';
     html += '<button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="closeModal(\'precheck-modal\');loadDocuments();">OK</button>';
     html += '</div>';
@@ -2494,8 +2363,8 @@ async function executeBatchFromDocs() {
     // Refresh documents table
     await loadDocuments();
   } catch(e) {
-    body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">${t('error')}: ${e.message || e}</div>
-      <div style="text-align:center;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="closeModal('precheck-modal')">${t('btn_close')}</button></div>`;
+    body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">Σφάλμα: ${e.message || e}</div>
+      <div style="text-align:center;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="closeModal('precheck-modal')">Κλείσιμο</button></div>`;
   }
 }
 
@@ -2512,7 +2381,7 @@ let apLineData = {};
 
 function openApprovalFromDocs() {
   const ids = getSelectedIds();
-  if (!ids.length) { toast(t('js_select_docs_first'), 'error'); return; }
+  if (!ids.length) { toast('Επιλέξτε έγγραφα πρώτα', 'error'); return; }
 
   const selectedDocs = allDocs.filter(d => ids.includes(d.id));
 
@@ -2525,7 +2394,7 @@ function openApprovalFromDocs() {
   });
 
   if (notReady.length > 0) {
-    toast(t('js_batch_not_ready', {n: notReady.length}), 'error');
+    toast(`${notReady.length} έγγραφα δεν έχουν ολοκληρώσει Batch. Εκτελέστε πρώτα Batch.`, 'error');
     return;
   }
 
@@ -2578,7 +2447,7 @@ function apRenderDocsList() {
     const rd = info.result_data;
     const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer
                      || (rd._matched_supplier && rd._matched_supplier !== 'unknown' ? rd._matched_supplier : '')
-                     || t('js_unknown_supplier');
+                     || 'Άγνωστος προμηθευτής';
     const pageNum = i + 1;
     const isCurrent = i === apCurrentIdx;
     const isApproved = ['approved','Approved','Completed','completed'].includes(doc.status);
@@ -2587,12 +2456,12 @@ function apRenderDocsList() {
       border-left:3px solid ${isCurrent ? 'var(--accent)' : 'transparent'};
       ${isCurrent ? 'color:var(--accent);font-weight:600;' : 'color:var(--text2);'}">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">${t('js_page_abbr')} ${pageNum}</span>
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">σελ. ${pageNum}</span>
         ${isApproved
-          ? '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,160,0.15);color:var(--accent);">✓ ' + t('status_completed') + '</span>'
-          : '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(255,179,0,0.1);color:var(--warn);">' + t('status_pending') + '</span>'}
+          ? '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,160,0.15);color:var(--accent);">✓ Εγκρίθηκε</span>'
+          : '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(255,179,0,0.1);color:var(--warn);">Εκκρεμεί</span>'}
       </div>
-      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;margin-top:2px;font-weight:500;${!supplier || supplier === t('js_unknown_supplier') ? 'color:var(--text3);font-style:italic;' : ''}">${supplier}</div>
+      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;margin-top:2px;font-weight:500;${!supplier || supplier === 'Άγνωστος προμηθευτής' ? 'color:var(--text3);font-style:italic;' : ''}">${supplier}</div>
     </div>`;
   }).join('');
 }
@@ -2640,7 +2509,7 @@ async function apLoadDoc(idx) {
       </div>`;
     }
   }
-  scalarEl.innerHTML = scalarHtml || '<div style="padding:8px;color:var(--text3);font-size:12px;">' + t('js_no_fields') + '</div>';
+  scalarEl.innerHTML = scalarHtml || '<div style="padding:8px;color:var(--text3);font-size:12px;">Δεν υπάρχουν πεδία</div>';
 
   // Line items
   apCurRow = -1;
@@ -2656,7 +2525,7 @@ async function apLoadDoc(idx) {
   } else {
     document.getElementById('ap-li-title').textContent = 'LINE ITEMS';
     document.querySelector('#ap-li-thead tr').innerHTML = '';
-    document.getElementById('ap-li-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">' + t('js_no_rows') + '</td></tr>';
+    document.getElementById('ap-li-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">Δεν υπάρχουν γραμμές</td></tr>';
   }
   apUpdateNavLabel();
 
@@ -2670,7 +2539,7 @@ async function apLoadDoc(idx) {
 function apRenderTable(key, rows) {
   if (!rows.length) {
     document.querySelector('#ap-li-thead tr').innerHTML = '';
-    document.getElementById('ap-li-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">' + t('js_no_rows') + '</td></tr>';
+    document.getElementById('ap-li-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">Δεν υπάρχουν γραμμές</td></tr>';
     return;
   }
   const cols = Object.keys(rows[0]);
@@ -2711,8 +2580,8 @@ function apNavRow(dir) {
 
 function apUpdateNavLabel() {
   const lbl = document.getElementById('ap-li-nav-label');
-  if (apCurRow < 0) { lbl.textContent = apNumRows + ' ' + t('js_rows'); return; }
-  lbl.textContent = t('js_row_of', {current: apCurRow + 1, total: apNumRows});
+  if (apCurRow < 0) { lbl.textContent = apNumRows + ' γραμμές'; return; }
+  lbl.textContent = 'Γραμμή ' + (apCurRow + 1) + ' / ' + apNumRows;
 }
 
 function apOnImgLoad() {
@@ -2768,7 +2637,7 @@ function apToggleScalars() {
   const i = document.getElementById('ap-toggle-icon');
   const collapsed = f.style.display === 'none';
   f.style.display = collapsed ? 'flex' : 'none';
-  i.textContent = collapsed ? '▲ ' + t('js_hide') : '▼ ' + t('js_show');
+  i.textContent = collapsed ? '▲ Απόκρυψη' : '▼ Εμφάνιση';
 }
 
 function apToggleSidebar() {
@@ -2835,7 +2704,7 @@ async function apDoApprove() {
         credentials: 'include',
         body: JSON.stringify(apCollectData())
       });
-      if (!sr.ok) { toast(t('js_save_error') + sr.status, 'error'); apUpdateApproveBar('pending'); return; }
+      if (!sr.ok) { toast('Σφάλμα αποθήκευσης: ' + sr.status, 'error'); apUpdateApproveBar('pending'); return; }
     }
     // Approve
     const r = await fetch(`/api/documents/${id}/approve`, {method: 'POST', credentials: 'include'});
@@ -2849,7 +2718,7 @@ async function apDoApprove() {
       // Update allDocs too
       const ad = allDocs.find(d => d.id === id);
       if (ad) ad.status = newStatus;
-      toast(t('js_approved'), 'success');
+      toast('Εγκρίθηκε!', 'success');
       apDirty = false;
       apRenderDocsList();
 
@@ -2860,11 +2729,11 @@ async function apDoApprove() {
         setTimeout(() => apLoadDoc(nextIdx), 800);
       }
     } else {
-      toast(t('error') + ': ' + (j.error || ''), 'error');
+      toast('Σφάλμα: ' + (j.error || ''), 'error');
       apUpdateApproveBar('pending');
     }
   } catch(err) {
-    toast(t('error') + ': ' + err.message, 'error');
+    toast('Σφάλμα: ' + err.message, 'error');
     apUpdateApproveBar('pending');
   }
 }
@@ -2873,13 +2742,13 @@ function apUpdateApproveBar(status) {
   const bar = document.getElementById('ap-approve-bar');
   if (status === 'approved' || status === 'Approved' || status === 'Completed') {
     bar.style.background = 'rgba(0,229,160,0.06)';
-    bar.innerHTML = '<div style="text-align:center;padding:6px;font-size:13px;color:var(--accent);font-weight:600;">✓ ' + t('js_approve_done') + '</div>';
+    bar.innerHTML = '<div style="text-align:center;padding:6px;font-size:13px;color:var(--accent);font-weight:600;">✓ Εγκρίθηκε</div>';
   } else if (status === 'approving') {
     bar.style.background = 'rgba(0,229,160,0.04)';
-    bar.innerHTML = '<div style="text-align:center;padding:8px;font-size:13px;color:var(--text3);">' + t('js_approving') + '</div>';
+    bar.innerHTML = '<div style="text-align:center;padding:8px;font-size:13px;color:var(--text3);">Έγκριση...</div>';
   } else {
     bar.style.background = 'rgba(0,229,160,0.08)';
-    bar.innerHTML = `<button class="btn btn-primary" onclick="apDoApprove()" style="width:100%;padding:10px;font-size:13px;font-weight:700;border-radius:8px;">✓ ${t('js_approve_invoice')}</button>`;
+    bar.innerHTML = `<button class="btn btn-primary" onclick="apDoApprove()" style="width:100%;padding:10px;font-size:13px;font-weight:700;border-radius:8px;">✓ Έγκριση Τιμολογίου</button>`;
   }
 }
 
@@ -2964,10 +2833,10 @@ function leRenderDocsDropdown() {
       border-left:3px solid ${isCurrent ? 'var(--accent)' : 'transparent'};
       ${isCurrent ? 'color:var(--accent);font-weight:600;' : 'color:var(--text2);'}">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">${t('js_page_abbr')} ${pageNum}</span>
-        ${hasLabel ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,160,0.15);color:var(--accent);">✓ ${label}</span>` : '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(255,179,0,0.1);color:var(--warn);">' + t('status_pending') + '</span>'}
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">σελ. ${pageNum}</span>
+        ${hasLabel ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,160,0.15);color:var(--accent);">✓ ${label}</span>` : '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(255,179,0,0.1);color:var(--warn);">Εκκρεμεί</span>'}
       </div>
-      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;margin-top:2px;font-weight:500;${!supplier ? 'color:var(--text3);font-style:italic;' : ''}">${supplier || t('js_unknown_supplier')}</div>
+      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;margin-top:2px;font-weight:500;${!supplier ? 'color:var(--text3);font-style:italic;' : ''}">${supplier || 'Άγνωστος προμηθευτής'}</div>
     </div>`;
   }).join('');
 }
@@ -3000,7 +2869,7 @@ function leToggleLabelsDD(e) {
 function leRenderLabelsDropdown() {
   const el = document.getElementById('le-labels-list');
   if (!leExistingLabels.length) {
-    el.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--text3);text-align:center;">${t('js_no_labels')}</div>`;
+    el.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--text3);text-align:center;">Δεν υπάρχουν ετικέτες</div>';
     return;
   }
   el.innerHTML = leExistingLabels.map(t => {
@@ -3010,7 +2879,7 @@ function leRenderLabelsDropdown() {
       onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background='transparent'">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <b style="color:var(--text);font-size:12px;">${t.name}</b>
-        <span style="font-size:10px;color:var(--text3);">${fieldCount} ${t('js_fields')}</span>
+        <span style="font-size:10px;color:var(--text3);">${fieldCount} πεδία</span>
       </div>
       ${sp ? `<div style="font-size:10px;color:var(--accent);margin-top:2px;">🏢 ${sp}</div>` : ''}
     </div>`;
@@ -3018,15 +2887,15 @@ function leRenderLabelsDropdown() {
 }
 
 function leLoadExistingLabel(name) {
-  const label = leExistingLabels.find(l => l.name === name);
-  if (!label) return;
-  document.getElementById('le-label-name').value = label.name;
-  document.getElementById('le-supplier').value = label.supplier_pattern || '';
+  const t = leExistingLabels.find(l => l.name === name);
+  if (!t) return;
+  document.getElementById('le-label-name').value = t.name;
+  document.getElementById('le-supplier').value = t.supplier_pattern || '';
 
   // Parse fields from template
   const regularFields = [];
   let lineItemFields = [];
-  (label.fields || []).forEach(f => {
+  (t.fields || []).forEach(f => {
     if (f.type === 'array' && f.items) {
       lineItemFields = f.items.map(i => i.name);
     } else {
@@ -3047,7 +2916,7 @@ function leLoadExistingLabel(name) {
   document.getElementById('le-form-view').style.display = '';
   document.getElementById('le-preview-view').style.display = 'none';
   document.getElementById('le-labels-dropdown').style.display = 'none';
-  toast(t('js_label_loaded', {name: name}), 'info');
+  toast(`Ετικέτα "${name}" φορτώθηκε`, 'info');
 }
 
 // Close dropdowns on outside click
@@ -3091,19 +2960,19 @@ function lePreview() {
   const fieldsRaw = document.getElementById('le-fields').value.trim();
   const lineItemsRaw = document.getElementById('le-lineitems-fields').value.trim();
 
-  if (!labelName) { toast(t('js_enter_label_name'), 'error'); return; }
-  if (!fieldsRaw)  { toast(t('js_add_at_least_one_field'), 'error'); return; }
+  if (!labelName) { toast('Γράψε ένα όνομα ετικέτας', 'error'); return; }
+  if (!fieldsRaw)  { toast('Πρόσθεσε τουλάχιστον ένα πεδίο', 'error'); return; }
 
   const fields = fieldsRaw.split(',').map(f => f.trim()).filter(f => f);
   const lineItems = lineItemsRaw ? lineItemsRaw.split(',').map(f => f.trim()).filter(f => f) : [];
 
   let html = '';
-  html += `<div style="margin-bottom:8px;"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);">${t('js_label_colon')}</span> <b style="color:var(--text);">${labelName}</b></div>`;
+  html += `<div style="margin-bottom:8px;"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);">Ετικέτα:</span> <b style="color:var(--text);">${labelName}</b></div>`;
   if (supplier) {
-    html += `<div style="margin-bottom:12px;"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);">${t('js_supplier_colon')}</span> <span style="color:var(--accent);">${supplier}</span></div>`;
+    html += `<div style="margin-bottom:12px;"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);">Προμηθευτής:</span> <span style="color:var(--accent);">${supplier}</span></div>`;
   }
 
-  html += '<table class="le-preview-table"><thead><tr><th>' + t('js_field') + '</th><th>' + t('js_type') + '</th></tr></thead><tbody>';
+  html += '<table class="le-preview-table"><thead><tr><th>Πεδίο</th><th>Τύπος</th></tr></thead><tbody>';
   fields.forEach(f => {
     const type = guessFieldType(f);
     const typeColor = type === 'string' ? 'var(--text2)' : type === 'number' ? 'var(--accent)' : type === 'date' ? 'var(--warn)' : 'var(--accent2)';
@@ -3113,7 +2982,7 @@ function lePreview() {
 
   if (lineItems.length) {
     html += '<div style="margin-top:12px;font-size:12px;color:var(--warn);font-weight:600;">📋 Line Items</div>';
-    html += '<table class="le-preview-table"><thead><tr><th>' + t('js_column') + '</th><th>' + t('js_type') + '</th></tr></thead><tbody>';
+    html += '<table class="le-preview-table"><thead><tr><th>Στήλη</th><th>Τύπος</th></tr></thead><tbody>';
     lineItems.forEach(f => {
       const type = guessFieldType(f);
       const typeColor = type === 'string' ? 'var(--text2)' : type === 'number' ? 'var(--accent)' : type === 'date' ? 'var(--warn)' : 'var(--accent2)';
@@ -3138,7 +3007,7 @@ async function leSaveLabel() {
   const fieldsRaw    = document.getElementById('le-fields').value.trim();
   const lineItemsRaw = document.getElementById('le-lineitems-fields').value.trim();
 
-  if (!labelName || !fieldsRaw) { toast(t('js_fill_required'), 'error'); return; }
+  if (!labelName || !fieldsRaw) { toast('Συμπλήρωσε τα υποχρεωτικά πεδία', 'error'); return; }
 
   const fields = fieldsRaw.split(',').map(f => f.trim()).filter(f => f);
   const lineItems = lineItemsRaw ? lineItemsRaw.split(',').map(f => f.trim()).filter(f => f) : [];
@@ -3155,7 +3024,7 @@ async function leSaveLabel() {
 
   try {
     await api('POST', '/api/templates', payload);
-    toast(t('js_label_saved', {name: labelName}), 'success');
+    toast(`Ετικέτα "${labelName}" αποθηκεύτηκε!`, 'success');
 
     // Assign label to current document
     const docId = leDocIds[leCurrentIndex];
@@ -3179,7 +3048,7 @@ async function leSaveLabel() {
       leLoadDoc(leCurrentIndex);
     } else {
       // Last doc — just reset form, user leaves manually via Πίσω button
-      toast(t('js_saved_continue'), 'success');
+      toast('Αποθηκεύτηκε! Μπορείτε να συνεχίσετε ή να πατήσετε Πίσω.', 'success');
     }
     // Reset form fields for next label
     document.getElementById('le-label-name').value = '';
@@ -3187,7 +3056,7 @@ async function leSaveLabel() {
     document.getElementById('le-fields').value = '';
     document.getElementById('le-lineitems-fields').value = '';
   } catch(e) {
-    toast(t('js_save_error') + (e.message || e), 'error');
+    toast('Σφάλμα αποθήκευσης: ' + (e.message || e), 'error');
   }
 }
 
@@ -3241,7 +3110,7 @@ async function loadTemplates() {
 function renderTemplatesList(templates) {
   const el = document.getElementById('templates-list');
   if (!templates.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">${t('js_no_labels_found')}</div><div class="empty-sub">${t('js_create_first_label')}</div></div>`;
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Δεν βρέθηκαν ετικέτες</div><div class="empty-sub">Δημιούργησε την πρώτη σου ετικέτα</div></div>';
     return;
   }
   el.innerHTML = templates.map(t=>`
@@ -3249,9 +3118,9 @@ function renderTemplatesList(templates) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <div class="card-title" style="margin:0">${t.name}</div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-secondary btn-sm" onclick="editTemplate('${t.name}')">✏️ ${t('js_edit')}</button>
-          <button class="btn btn-secondary btn-sm" onclick="copyTemplateToClipboard('${t.name}')" title="${t('js_copy_hint')}">📋 ${t('js_copy')}</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${t.name}')">${t('btn_delete')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="editTemplate('${t.name}')">✏️ Επεξεργασία</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyTemplateToClipboard('${t.name}')" title="Αντιγραφή template">📋 Αντιγραφή</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${t.name}')">Διαγραφή</button>
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
@@ -3287,8 +3156,8 @@ function openTemplateModal() {
   document.getElementById('tmpl-original-name').value='';
   document.getElementById('tmpl-supplier-pattern').value='';
   document.getElementById('tmpl-fields').innerHTML='';
-  document.querySelector('#tmpl-modal .modal-title').textContent=t('js_new_template');
-  document.getElementById('tmpl-save-btn').textContent=t('js_save_template');
+  document.querySelector('#tmpl-modal .modal-title').textContent='Νέο Template';
+  document.getElementById('tmpl-save-btn').textContent='Αποθήκευση Template';
   // Εμφάνιση κουμπιού Επικόλληση μόνο αν υπάρχει αντιγραμμένο template
   const pasteBtn = document.getElementById('tmpl-paste-btn');
   if (pasteBtn) pasteBtn.style.display = copiedTemplateData ? '' : 'none';
@@ -3298,13 +3167,13 @@ function openTemplateModal() {
 
 async function editTemplate(name) {
   const tmpl = await api('GET', `/api/templates/${name}`);
-  if (!tmpl || tmpl.error) { toast(t('js_template_load_error'),'error'); return; }
+  if (!tmpl || tmpl.error) { toast('Σφάλμα φόρτωσης template','error'); return; }
 
   document.getElementById('tmpl-name').value = tmpl.name;
   document.getElementById('tmpl-name').readOnly = false;  // Επιτρέπεται αλλαγή ονόματος
   document.getElementById('tmpl-original-name').value = tmpl.name;  // Αποθήκευση παλιού ονόματος
-  document.querySelector('#tmpl-modal .modal-title').textContent = t('js_edit_template') + tmpl.name;
-  document.getElementById('tmpl-save-btn').textContent = t('js_save_changes');
+  document.querySelector('#tmpl-modal .modal-title').textContent = '✏️ Επεξεργασία: ' + tmpl.name;
+  document.getElementById('tmpl-save-btn').textContent = 'Αποθήκευση Αλλαγών';
   document.getElementById('tmpl-supplier-pattern').value = tmpl.supplier_pattern || '';
   document.getElementById('tmpl-fields').innerHTML = '';
 
@@ -3341,13 +3210,13 @@ let copiedTemplateData = null;
 
 async function copyTemplateToClipboard(name) {
   const tmpl = await api('GET', `/api/templates/${encodeURIComponent(name)}`);
-  if (!tmpl || tmpl.error) { toast(t('js_template_load_error'),'error'); return; }
+  if (!tmpl || tmpl.error) { toast('Σφάλμα φόρτωσης template','error'); return; }
   copiedTemplateData = tmpl;
-  toast(t('js_copied_template', {name: name}), 'success');
+  toast('📋 Αντιγράφηκε: ' + name, 'success');
 }
 
 function pasteTemplateFromClipboard() {
-  if (!copiedTemplateData) { toast(t('js_no_copied_template'),'error'); return; }
+  if (!copiedTemplateData) { toast('Δεν υπάρχει αντιγραμμένο template','error'); return; }
   const tmpl = copiedTemplateData;
   document.getElementById('tmpl-supplier-pattern').value = tmpl.supplier_pattern || '';
   document.getElementById('tmpl-fields').innerHTML = '';
@@ -3374,14 +3243,14 @@ function pasteTemplateFromClipboard() {
       }
     }
   });
-  toast(t('js_pasted', {name: tmpl.name}), 'success');
+  toast('📋 Επικολλήθηκε: ' + tmpl.name, 'success');
 }
 
 function addField() {
   const div = document.createElement('div');
   div.className='field-row';
   div.innerHTML=`
-    <input class="form-input" placeholder="${t('js_field_name_placeholder')}" style="font-size:13px"/>
+    <input class="form-input" placeholder="Όνομα πεδίου" style="font-size:13px"/>
     <select class="form-input" style="font-size:13px" onchange="onFieldTypeChange(this)">
       <option value="string">string</option>
       <option value="number">number</option>
@@ -3407,14 +3276,14 @@ function onFieldTypeChange(sel) {
     const panel = document.createElement('div');
     panel.className = 'array-subfields';
     panel.innerHTML = `
-      <div class="array-subfields-title">${t('js_line_items_cols')}</div>
+      <div class="array-subfields-title">📋 Στήλες Line Items</div>
       <div class="subfield-list">
         ${defaultSubfieldRow('description','string')}
         ${defaultSubfieldRow('quantity','number')}
         ${defaultSubfieldRow('unit_price','number')}
         ${defaultSubfieldRow('total','number')}
       </div>
-      <button type="button" onclick="addSubfield(this)" style="font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;margin-top:4px;">${t('js_add_column')}</button>`;
+      <button type="button" onclick="addSubfield(this)" style="font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;margin-top:4px;">+ Προσθήκη στήλης</button>`;
     wrap.appendChild(panel);
   }
 }
@@ -3423,7 +3292,7 @@ function defaultSubfieldRow(name, type) {
   const types = ['string','number','integer','date','boolean'];
   const opts = types.map(t=>`<option value="${t}" ${t===type?'selected':''}>${t}</option>`).join('');
   return `<div class="subfield-row">
-    <input class="form-input" value="${name}" placeholder="${t('js_column_name_placeholder')}" style="font-size:12px"/>
+    <input class="form-input" value="${name}" placeholder="Όνομα στήλης" style="font-size:12px"/>
     <select class="form-input" style="font-size:12px">${opts}</select>
     <button type="button" onclick="this.closest('.subfield-row').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:4px">✕</button>
   </div>`;
@@ -3439,15 +3308,15 @@ function addSubfield(btn) {
 async function saveTemplate() {
   const nameEl = document.getElementById('tmpl-name');
   const name = nameEl.value.trim();
-  if (!name) { toast(t('js_enter_template_name'),'error'); return; }
+  if (!name) { toast('Εισήγαγε όνομα template','error'); return; }
   const wraps = document.querySelectorAll('#tmpl-fields .field-row-wrap');
   const fields = [];
   wraps.forEach(wrap => {
     const inputs = wrap.querySelectorAll('.field-row input, .field-row select');
     const n = inputs[0].value.trim();
-    const fType = inputs[1].value;
+    const t = inputs[1].value;
     if (!n) return;
-    if (fType === 'array') {
+    if (t === 'array') {
       const subRows = wrap.querySelectorAll('.subfield-row');
       const items = [];
       subRows.forEach(sr => {
@@ -3461,10 +3330,10 @@ async function saveTemplate() {
         {name:'unit_price',type:'number'},{name:'total',type:'number'}
       ]});
     } else {
-      fields.push({name:n, type:fType, required:true});
+      fields.push({name:n, type:t, required:true});
     }
   });
-  if (!fields.length) { toast(t('js_add_at_least_one_field'),'error'); return; }
+  if (!fields.length) { toast('Πρόσθεσε τουλάχιστον ένα πεδίο','error'); return; }
   const require_review   = false;
   const supplier_pattern = document.getElementById('tmpl-supplier-pattern').value.trim();
   const originalName     = document.getElementById('tmpl-original-name').value;
@@ -3476,33 +3345,33 @@ async function saveTemplate() {
     // Αν άλλαξε το όνομα → διαγραφή του παλιού template
     if (isRename) {
       await api('DELETE', `/api/templates/${encodeURIComponent(originalName)}`);
-      toast(t('js_template_renamed', {name: name}), 'success');
+      toast('Template μετονομάστηκε σε "' + name + '"!', 'success');
     } else {
-      toast(isEdit ? t('js_template_updated') : t('js_template_saved'), 'success');
+      toast(isEdit ? 'Template ενημερώθηκε!' : 'Template αποθηκεύτηκε!', 'success');
     }
     // Template saved successfully
     closeModal('tmpl-modal');
     loadTemplates();
   }
-  else toast(res.error||t('error'),'error');
+  else toast(res.error||'Σφάλμα','error');
 }
 
 async function deleteTemplate(name) {
-  if (!confirm(t('js_delete_template_confirm', {name: name}))) return;
+  if (!confirm('Διαγραφή template "'+name+'"; Θα ενημερωθούν τα αποτελέσματα του ιστορικού.')) return;
   try {
     const res = await api('DELETE',`/api/templates/${name}`);
     if (res.error) {
-      toast(t('error') + ': ' + res.error, 'error');
+      toast('Σφάλμα: ' + res.error, 'error');
       return;
     }
-    toast(t('js_template_deleted'),'success');
+    toast('Template διαγράφηκε','success');
     const updCount = (res.updated_activities || []).length;
     if (updCount > 0) {
-      toast(t('js_activities_updated', {count: updCount}), 'success');
+      toast('Ενημερώθηκαν ' + updCount + ' εγγραφές ιστορικού', 'success');
     }
   } catch(e) {
     console.error('deleteTemplate error:', e);
-    toast(t('js_delete_error'), 'error');
+    toast('Σφάλμα κατά τη διαγραφή', 'error');
   }
   await loadTemplates();
 }
@@ -3523,10 +3392,10 @@ async function loadSettings() {
   if (me && me.username) {
     accEl.innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="data-item"><div class="data-key">${t('js_user_label')}</div><div class="data-val">${me.username}</div></div>
-        <div class="data-item"><div class="data-key">${t('js_role_label')}</div><div class="data-val">${me.role || '—'}</div></div>
-        <div class="data-item"><div class="data-key">${t('js_email_label_info')}</div><div class="data-val">${me.email || '<span style="color:var(--text3)">' + t('js_no_email_set') + '</span>'}</div></div>
-        <div class="data-item"><div class="data-key">${t('js_registration_date')}</div><div class="data-val">${me.created_at?.split('T')[0] || '—'}</div></div>
+        <div class="data-item"><div class="data-key">Χρήστης</div><div class="data-val">${me.username}</div></div>
+        <div class="data-item"><div class="data-key">Ρόλος</div><div class="data-val">${me.role || '—'}</div></div>
+        <div class="data-item"><div class="data-key">Email</div><div class="data-val">${me.email || '<span style="color:var(--text3)">Δεν έχει οριστεί</span>'}</div></div>
+        <div class="data-item"><div class="data-key">Εγγραφή</div><div class="data-val">${me.created_at?.split('T')[0] || '—'}</div></div>
       </div>`;
   }
 
@@ -3534,7 +3403,7 @@ async function loadSettings() {
   const services = keys.configured_services||[];
   document.getElementById('keys-status').innerHTML = services.length
     ? services.map(s=>`<span class="badge badge-green" style="margin-right:6px">✓ ${s}</span>`).join('')
-    : '<span style="color:var(--text3)">' + t('js_no_saved_keys') + '</span>';
+    : '<span style="color:var(--text3)">Δεν υπάρχουν αποθηκευμένα keys</span>';
 
   // System info
   document.getElementById('system-info').innerHTML = `
@@ -3555,16 +3424,16 @@ function togglePw(inputId, btn) {
 async function changeUsername() {
   const newName = document.getElementById('uname-new').value.trim();
   const pw      = document.getElementById('uname-pw').value;
-  if (!newName || !pw) { toast(t('js_fill_username_password'), 'error'); return; }
-  if (newName.length < 3) { toast(t('js_username_min_length'), 'error'); return; }
+  if (!newName || !pw) { toast('Συμπλήρωσε username και κωδικό', 'error'); return; }
+  if (newName.length < 3) { toast('Το username πρέπει να έχει τουλάχιστον 3 χαρακτήρες', 'error'); return; }
   const res = await api('POST', '/api/auth/change-username', { username: newName, password: pw });
   if (res.success) {
-    toast(t('js_username_changed'), 'success');
+    toast('Το username άλλαξε επιτυχώς!', 'success');
     document.getElementById('uname-new').value = '';
     document.getElementById('uname-pw').value = '';
     loadSettings();
   } else {
-    toast(res.error || t('js_username_change_error'), 'error');
+    toast(res.error || 'Σφάλμα αλλαγής username', 'error');
   }
 }
 
@@ -3572,33 +3441,33 @@ async function changePassword() {
   const current = document.getElementById('pw-current').value;
   const newPw   = document.getElementById('pw-new').value;
   const confirm = document.getElementById('pw-confirm').value;
-  if (!current || !newPw || !confirm) { toast(t('js_fill_all_fields'), 'error'); return; }
-  if (newPw !== confirm) { toast(t('js_passwords_mismatch'), 'error'); return; }
-  if (newPw.length < 6) { toast(t('js_password_min_length'), 'error'); return; }
+  if (!current || !newPw || !confirm) { toast('Συμπλήρωσε όλα τα πεδία', 'error'); return; }
+  if (newPw !== confirm) { toast('Οι κωδικοί δεν ταιριάζουν', 'error'); return; }
+  if (newPw.length < 6) { toast('Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες', 'error'); return; }
   const res = await api('POST', '/api/auth/change-password', { current_password: current, new_password: newPw });
   if (res.success) {
-    toast(t('js_password_changed'), 'success');
+    toast('Ο κωδικός άλλαξε επιτυχώς!', 'success');
     document.getElementById('pw-current').value = '';
     document.getElementById('pw-new').value = '';
     document.getElementById('pw-confirm').value = '';
   } else {
-    toast(res.error || t('js_password_change_error'), 'error');
+    toast(res.error || 'Σφάλμα αλλαγής κωδικού', 'error');
   }
 }
 
 async function changeEmail() {
   const email = document.getElementById('email-new').value.trim();
   const pw    = document.getElementById('email-pw').value;
-  if (!email || !pw) { toast(t('js_fill_email_password'), 'error'); return; }
-  if (!email.includes('@')) { toast(t('js_invalid_email'), 'error'); return; }
+  if (!email || !pw) { toast('Συμπλήρωσε email και κωδικό', 'error'); return; }
+  if (!email.includes('@')) { toast('Μη έγκυρη μορφή email', 'error'); return; }
   const res = await api('POST', '/api/auth/change-email', { email: email, password: pw });
   if (res.success) {
-    toast(t('js_email_updated'), 'success');
+    toast('Το email ενημερώθηκε!', 'success');
     document.getElementById('email-new').value = '';
     document.getElementById('email-pw').value = '';
     loadSettings();
   } else {
-    toast(res.error || t('js_email_change_error'), 'error');
+    toast(res.error || 'Σφάλμα αλλαγής email', 'error');
   }
 }
 
@@ -3613,11 +3482,11 @@ async function load2FAStatus() {
   setupEl.style.display = 'none';
   onEl.style.display = 'none';
   if (res.totp_enabled) {
-    statusEl.textContent = t('js_2fa_status_active');
+    statusEl.textContent = 'Κατάσταση: Ενεργό';
     statusEl.style.color = 'var(--accent)';
     onEl.style.display = 'block';
   } else {
-    statusEl.textContent = t('js_2fa_status_inactive');
+    statusEl.textContent = 'Κατάσταση: Ανενεργό';
     statusEl.style.color = 'var(--text2)';
     offEl.style.display = 'block';
   }
@@ -3636,13 +3505,13 @@ async function setup2FA() {
 
 async function verify2FA() {
   const code = document.getElementById('twofa-verify-code').value.trim();
-  if (!code || code.length !== 6) { toast(t('js_enter_6digit_code'), 'error'); return; }
+  if (!code || code.length !== 6) { toast('Εισάγετε 6ψήφιο κωδικό', 'error'); return; }
   const res = await api('POST', '/api/auth/2fa/verify', { code: code });
   if (res.success) {
-    toast(res.message || t('js_2fa_enabled'), 'success');
+    toast(res.message || '2FA ενεργοποιήθηκε!', 'success');
     load2FAStatus();
   } else {
-    toast(res.error || t('js_verification_error'), 'error');
+    toast(res.error || 'Σφάλμα επαλήθευσης', 'error');
   }
 }
 
@@ -3653,14 +3522,14 @@ function cancel2FA() {
 
 async function disable2FA() {
   const pw = document.getElementById('twofa-disable-pw').value;
-  if (!pw) { toast(t('js_enter_password'), 'error'); return; }
+  if (!pw) { toast('Εισάγετε τον κωδικό σας', 'error'); return; }
   const res = await api('POST', '/api/auth/2fa/disable', { password: pw });
   if (res.success) {
-    toast(res.message || t('js_2fa_disabled'), 'success');
+    toast(res.message || '2FA απενεργοποιήθηκε', 'success');
     document.getElementById('twofa-disable-pw').value = '';
     load2FAStatus();
   } else {
-    toast(res.error || t('error'), 'error');
+    toast(res.error || 'Σφάλμα', 'error');
   }
 }
 
@@ -3677,7 +3546,7 @@ async function loadAdminUsers() {
 
   const users = await api('GET', '/api/admin/users');
   if (!Array.isArray(users)) {
-    document.getElementById('admin-users-count').textContent = t('js_load_error');
+    document.getElementById('admin-users-count').textContent = 'Σφάλμα φόρτωσης';
     return;
   }
   allAdminUsers = users;
@@ -3698,30 +3567,30 @@ function filterAdminUsers() {
 function renderAdminUsers(users) {
   const active = allAdminUsers.filter(u => u.is_active).length;
   document.getElementById('admin-users-count').textContent =
-    t('js_users_summary', {total: allAdminUsers.length, active: active}) +
-    (users.length !== allAdminUsers.length ? ` (${t('js_showing')} ${users.length})` : '');
+    `${allAdminUsers.length} χρήστες συνολικά, ${active} ενεργοί` +
+    (users.length !== allAdminUsers.length ? ` (εμφάνιση ${users.length})` : '');
 
   const list = document.getElementById('admin-users-list');
   list.innerHTML = users.map(u => {
     const isMe = u.id === adminMeId;
     const statusBadge = u.is_active
-      ? `<span class="badge badge-green" style="font-size:10px;">${t('js_active')}</span>`
-      : `<span class="badge badge-red" style="font-size:10px;">${t('js_inactive')}</span>`;
+      ? '<span class="badge badge-green" style="font-size:10px;">Ενεργός</span>'
+      : '<span class="badge badge-red" style="font-size:10px;">Ανενεργός</span>';
     const roleBadge = u.role === 'admin'
       ? '<span class="badge" style="font-size:10px;background:rgba(168,85,247,0.15);color:#a855f7;">Admin</span>'
-      : `<span class="badge" style="font-size:10px;background:rgba(0,229,160,0.1);color:var(--accent);">${t('js_user')}</span>`;
+      : '<span class="badge" style="font-size:10px;background:rgba(0,229,160,0.1);color:var(--accent);">User</span>';
     const twofaBadge = u.totp_enabled
       ? '<span style="font-size:10px;color:var(--accent);">2FA ✓</span>'
       : '';
-    const actions = isMe ? `<span style="font-size:11px;color:var(--text3);">(${t('js_you')})</span>` : `
-      <button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" onclick="adminToggleActive(${u.id})">${u.is_active ? t('js_deactivate') : t('js_activate')}</button>
+    const actions = isMe ? '<span style="font-size:11px;color:var(--text3);">(εσύ)</span>' : `
+      <button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" onclick="adminToggleActive(${u.id})">${u.is_active ? 'Απενεργ.' : 'Ενεργοπ.'}</button>
       ${u.totp_enabled ? `<button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" onclick="adminReset2FA(${u.id})">Reset 2FA</button>` : ''}
-      <button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" onclick="adminChangeRole(${u.id},'${u.role==='admin'?'user':'admin'}')">${u.role==='admin'?'→ '+t('js_user'):'→ Admin'}</button>
+      <button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" onclick="adminChangeRole(${u.id},'${u.role==='admin'?'user':'admin'}')">${u.role==='admin'?'→ User':'→ Admin'}</button>
     `;
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
       <div style="display:flex;flex-direction:column;gap:4px;">
         <div style="font-size:13px;font-weight:600;">${u.username} ${roleBadge} ${statusBadge} ${twofaBadge}</div>
-        <div style="font-size:11px;color:var(--text3);">${u.email || t('js_no_email')} · ${u.created_at?.split('T')[0] || '—'}</div>
+        <div style="font-size:11px;color:var(--text3);">${u.email || 'Χωρίς email'} · ${u.created_at?.split('T')[0] || '—'}</div>
       </div>
       <div style="display:flex;gap:4px;align-items:center;">${actions}</div>
     </div>`;
@@ -3731,40 +3600,40 @@ function renderAdminUsers(users) {
 async function adminToggleActive(userId) {
   const res = await api('POST', `/api/admin/users/${userId}/toggle-active`);
   if (res.success) {
-    toast(res.is_active ? t('js_user_activated') : t('js_user_deactivated'), 'success');
+    toast(res.is_active ? 'Ο χρήστης ενεργοποιήθηκε' : 'Ο χρήστης απενεργοποιήθηκε', 'success');
     loadAdminUsers();
   } else {
-    toast(res.error || t('error'), 'error');
+    toast(res.error || 'Σφάλμα', 'error');
   }
 }
 
 async function adminReset2FA(userId) {
   const res = await api('POST', `/api/admin/users/${userId}/reset-2fa`);
   if (res.success) {
-    toast(res.message || t('js_2fa_reset'), 'success');
+    toast(res.message || '2FA reset!', 'success');
     loadAdminUsers();
   } else {
-    toast(res.error || t('error'), 'error');
+    toast(res.error || 'Σφάλμα', 'error');
   }
 }
 
 async function adminChangeRole(userId, newRole) {
   const res = await api('POST', `/api/admin/users/${userId}/change-role`, { role: newRole });
   if (res.success) {
-    toast(t('js_role_changed', {role: newRole}), 'success');
+    toast(`Ο ρόλος άλλαξε σε ${newRole}`, 'success');
     loadAdminUsers();
   } else {
-    toast(res.error || t('error'), 'error');
+    toast(res.error || 'Σφάλμα', 'error');
   }
 }
 
 async function saveKey() {
   const service = document.getElementById('key-service').value;
   const key     = document.getElementById('key-value').value.trim();
-  if (!key) { toast(t('js_enter_api_key'),'error'); return; }
+  if (!key) { toast('Εισήγαγε API key','error'); return; }
   const res = await api('POST','/api/keys/save',{service,api_key:key});
-  if (res.success) { toast(t('js_key_saved'),'success'); document.getElementById('key-value').value=''; loadSettings(); }
-  else toast(res.error||t('error'),'error');
+  if (res.success) { toast('Key αποθηκεύτηκε!','success'); document.getElementById('key-value').value=''; loadSettings(); }
+  else toast(res.error||'Σφάλμα','error');
 }
 
 // ── FAQ Functions ────────────────────────────────────────────────────────────
@@ -3781,12 +3650,7 @@ function toggleFaq(el) {
 }
 
 function filterFAQ() {
-  // Get search value from whichever search box is visible
-  const searchEl = document.getElementById('faq-search');
-  const searchEnEl = document.getElementById('faq-search-en');
-  const q1 = searchEl ? searchEl.value : '';
-  const q2 = searchEnEl ? searchEnEl.value : '';
-  const q = (q1 || q2 || '').toLowerCase().trim();
+  const q = (document.getElementById('faq-search').value || '').toLowerCase().trim();
   document.querySelectorAll('.faq-item').forEach(item => {
     const text = item.textContent.toLowerCase();
     item.style.display = (!q || text.includes(q)) ? '' : 'none';
@@ -3819,17 +3683,17 @@ function badgeHtml(status) {
     'Failed':'badge-red','failed':'badge-red',
   };
   const labelMap = {
-    'pending': t('status_pending'),
-    'Pending': t('status_pending'),
-    'pending_review': t('status_pending'),
-    'no_template': t('status_pending'),
-    'registered': t('status_pending'),
-    'Completed': t('status_completed'),
-    'completed': t('status_completed'),
-    'approved': t('status_completed'),
-    'Approved': t('status_completed'),
-    'Failed': t('status_failed'),
-    'failed': t('status_failed'),
+    'pending': 'Εκκρεμεί',
+    'Pending': 'Εκκρεμεί',
+    'pending_review': 'Εκκρεμεί',
+    'no_template': 'Εκκρεμεί',
+    'registered': 'Εκκρεμεί',
+    'Completed': 'Εγκρίθηκε',
+    'completed': 'Εγκρίθηκε',
+    'approved': 'Εγκρίθηκε',
+    'Approved': 'Εγκρίθηκε',
+    'Failed': 'Αποτυχία',
+    'failed': 'Αποτυχία',
   };
   const label = labelMap[status] || status;
   return `<span class="badge ${map[status]||'badge-gray'}">${label}</span>`;
@@ -3892,7 +3756,7 @@ function _updateRowNavLabel(docId, arrIdx, ri) {
   if (!label) return;
   const tbl = document.getElementById(`li-tbl-${docId}-${arrIdx}`);
   const total = tbl ? tbl.querySelectorAll('tbody tr').length : 0;
-  label.textContent = (ri !== undefined && ri !== null) ? t('js_row_label', {current: ri + 1, total: total}) : t('js_rows_total', {total: total});
+  label.textContent = (ri !== undefined && ri !== null) ? `Γραμμή ${ri + 1} / ${total}` : `${total} γραμμές`;
 }
 
 function updateLineItem(docId, arrayKey, rowIdx, col, value) {
@@ -3922,7 +3786,7 @@ function nextPage(docId) {
 function _updatePageView(docId) {
   const {current, total} = pageState[docId];
   const label = document.getElementById(`page-label-${docId}`);
-  if (label) label.textContent = t('js_page_label', {current: current, total: total});
+  if (label) label.textContent = `Σελίδα ${current} / ${total}`;
   const iframe = document.querySelector(`#review-frame-${docId}`);
   if (iframe) iframe.src = `/api/documents/${docId}/file?page=${current}`;
 }
@@ -3932,10 +3796,10 @@ async function checkServer() {
   try {
     const r = await api('GET','/health');
     document.getElementById('server-status').textContent =
-      r.status==='healthy' ? t('js_server_available') : t('js_server_limited');
+      r.status==='healthy' ? 'Διαθέσιμο' : 'Μειωμένη λειτουργία';
   } catch {
     document.getElementById('server-status').innerHTML =
-      `<span style="color:var(--danger)">● ${t('js_server_unavailable')}</span>`;
+      '<span style="color:var(--danger)">● Αδύνατη σύνδεση</span>';
   }
 }
 
@@ -3951,7 +3815,7 @@ let preCheckResult = { single: null, batch: null };
 async function doPreCheck(type) {
   const fileInput = document.getElementById(type + '-file');
   if (!fileInput || !fileInput.files.length) {
-    toast(t('js_select_file_first'), 'error'); return;
+    toast('Επίλεξε αρχείο πρώτα', 'error'); return;
   }
 
   const file = fileInput.files[0];
@@ -3959,8 +3823,8 @@ async function doPreCheck(type) {
   const body  = document.getElementById('precheck-modal-body');
   const title = document.getElementById('precheck-modal-title');
 
-  title.textContent = t('js_file_analysis');
-  body.innerHTML = `<div style="text-align:center;padding:30px;"><span class="spinner" style="display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;"></span><div style="margin-top:12px;color:var(--text2);font-size:13px;">${t('js_file_analyzing')}<br><span style="font-size:11px;color:var(--text3);">Segmentation & ${t('js_supplier_detection')}</span></div></div>`;
+  title.textContent = 'Ανάλυση Αρχείου';
+  body.innerHTML = '<div style="text-align:center;padding:30px;"><span class="spinner" style="display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;"></span><div style="margin-top:12px;color:var(--text2);font-size:13px;">Ανάλυση αρχείου σε εξέλιξη...<br><span style="font-size:11px;color:var(--text3);">Segmentation & ανίχνευση προμηθευτών</span></div></div>';
   modal.classList.add('open');
 
   // Κλήση API
@@ -3970,7 +3834,7 @@ async function doPreCheck(type) {
   const res = await api('POST', endpoint, fd, true);
 
   if (!res || res.error) {
-    body.innerHTML = `<div style="color:var(--danger);padding:16px;font-size:13px;">${t('error')}: ` + (res?.error || t('js_unknown_error')) + `</div><div style="text-align:right;margin-top:16px;"><button class="btn btn-secondary btn-sm" onclick="closeModal('precheck-modal')">${t('js_close')}</button></div>`;
+    body.innerHTML = '<div style="color:var(--danger);padding:16px;font-size:13px;">Σφάλμα: ' + (res?.error || 'Άγνωστο σφάλμα') + '</div><div style="text-align:right;margin-top:16px;"><button class="btn btn-secondary btn-sm" onclick="closeModal(\'precheck-modal\')">Κλείσιμο</button></div>';
     return;
   }
 
@@ -4026,19 +3890,19 @@ async function loadTemplateBuilder(docId) {
   // Fetch document info
   const doc = await api('GET', `/api/documents/${docId}`);
   if (doc.error) {
-    document.getElementById('tb-doc-info').innerHTML = `<span style="color:var(--danger);">${t('error')}: ${doc.error}</span>`;
+    document.getElementById('tb-doc-info').innerHTML = `<span style="color:var(--danger);">Σφάλμα: ${doc.error}</span>`;
     return;
   }
 
   const rd = doc.result_data || {};
-  document.getElementById('tb-title').textContent = t('js_template_builder_title') + (doc.filename || t('js_doc_hash') + docId);
+  document.getElementById('tb-title').textContent = `Template Builder — ${doc.filename || 'Έγγραφο #'+docId}`;
   document.getElementById('tb-doc-info').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:8px;">
-      <div><strong>${t('js_file_label')}</strong> ${doc.original_filename || doc.filename || '—'}</div>
+      <div><strong>Αρχείο:</strong> ${doc.original_filename || doc.filename || '—'}</div>
       <div><strong>ID:</strong> #${docId}</div>
-      <div><strong>Status:</strong> ${badgeHtml(doc.status)}</div>
+      <div><strong>Κατάσταση:</strong> ${badgeHtml(doc.status)}</div>
       <div><strong>Template:</strong> ${doc.schema_name || '—'}</div>
-      <div><strong>Date:</strong> ${doc.created_at?.split('T')[0] || '—'}</div>
+      <div><strong>Ημ/νία:</strong> ${doc.created_at?.split('T')[0] || '—'}</div>
     </div>`;
 
   // Show extracted data if available
@@ -4069,7 +3933,7 @@ async function loadTemplateBuilder(docId) {
   const res = await api('GET', '/api/templates');
   const templates = res.templates || [];
   const opts = templates.map(t => `<option value="${t.name}" ${t.name===doc.schema_name?'selected':''}>${t.name}</option>`).join('');
-  document.getElementById('tb-schema').innerHTML = opts || `<option value="">— ${t('js_no_templates')} —</option>`;
+  document.getElementById('tb-schema').innerHTML = opts || '<option value="">— Δεν υπάρχουν ετικέτες —</option>';
 
   // Reset extract result
   document.getElementById('tb-extract-result').style.display = 'none';
@@ -4086,28 +3950,28 @@ function openTemplateBuilderById(docId) {
 }
 
 async function doTemplateBuilderExtract() {
-  if (!tbCurrentDocId) { toast(t('js_document_not_found'), 'error'); return; }
+  if (!tbCurrentDocId) { toast('Δεν βρέθηκε έγγραφο', 'error'); return; }
   const schema = document.getElementById('tb-schema').value;
-  if (!schema) { toast(t('js_select_template'), 'error'); return; }
+  if (!schema) { toast('Επίλεξε ετικέτα', 'error'); return; }
 
   const btn = document.getElementById('tb-extract-btn');
-  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> ${t('js_extracting')}...`;
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Εξαγωγή AI...';
 
   const ex = await api('POST', `/api/extract/${tbCurrentDocId}`, {schema_name: schema});
 
   btn.disabled = false;
-  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> '+t('js_extract_data');
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Εξαγωγή Δεδομένων';
 
   const resEl = document.getElementById('tb-extract-result');
   if (ex.success) {
-    toast(t('js_extraction_complete'), 'success');
+    toast('Εξαγωγή ολοκληρώθηκε!', 'success');
     resEl.style.display = 'block';
-    resEl.innerHTML = `<div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);border-radius:10px;padding:12px;color:var(--accent);font-weight:600;font-size:13px;">✓ ${t('js_successful_extraction')}</div>`;
+    resEl.innerHTML = '<div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);border-radius:10px;padding:12px;color:var(--accent);font-weight:600;font-size:13px;">✓ Επιτυχής εξαγωγή!</div>';
     loadTemplateBuilder(tbCurrentDocId);
   } else {
     resEl.style.display = 'block';
     resEl.innerHTML = `<div style="background:rgba(255,68,68,0.06);border:1px solid rgba(255,68,68,0.2);border-radius:10px;padding:12px;color:var(--danger);font-size:13px;">✕ ${ex.error}</div>`;
-    toast(t('js_extraction_error'), 'error');
+    toast('Σφάλμα εξαγωγής', 'error');
   }
 }
 
@@ -4115,7 +3979,7 @@ function tbAddField() {
   const div = document.createElement('div');
   div.className = 'field-row';
   div.innerHTML = `
-    <input class="form-input" placeholder="${t('js_field_name_placeholder')}" style="font-size:13px"/>
+    <input class="form-input" placeholder="Όνομα πεδίου" style="font-size:13px"/>
     <select class="form-input" style="font-size:13px" onchange="onFieldTypeChange(this)">
       <option value="string">string</option>
       <option value="number">number</option>
@@ -4133,7 +3997,7 @@ function tbAddField() {
 
 async function tbSaveTemplate() {
   const name = document.getElementById('tb-new-tmpl-name').value.trim();
-  if (!name) { toast(t('js_enter_template_name'), 'error'); return; }
+  if (!name) { toast('Δώσε όνομα template', 'error'); return; }
   const supplierPattern = document.getElementById('tb-new-supplier-pattern').value.trim();
   const fields = [];
   document.querySelectorAll('#tb-new-fields .field-row-wrap').forEach(wrap => {
@@ -4151,21 +4015,21 @@ async function tbSaveTemplate() {
     }
     fields.push(field);
   });
-  if (!fields.length) { toast(t('js_add_at_least_one_field'), 'error'); return; }
+  if (!fields.length) { toast('Πρόσθεσε τουλάχιστον ένα πεδίο', 'error'); return; }
   const body = { name, fields };
   if (supplierPattern) body.supplier_pattern = supplierPattern;
   const r = await api('POST', '/api/templates', body);
   if (r.success) {
     if (r.updated_activities && r.updated_activities.length > 0) {
-      toast(t('js_template_saved_and_activities_updated', {count: r.updated_activities.length}), 'success');
+      toast('Template αποθηκεύτηκε! Ενημερώθηκαν ' + r.updated_activities.length + ' εγγραφές ιστορικού', 'success');
     } else {
-      toast(t('js_template_saved'), 'success');
+      toast('Template αποθηκεύτηκε!', 'success');
     }
     const res = await api('GET', '/api/templates');
     const opts = (res.templates||[]).map(t => `<option value="${t.name}" ${t.name===name?'selected':''}>${t.name}</option>`).join('');
     document.getElementById('tb-schema').innerHTML = opts;
   } else {
-    toast(r.error || t('js_save_error'), 'error');
+    toast(r.error || 'Σφάλμα αποθήκευσης', 'error');
   }
 }
 
@@ -4186,13 +4050,13 @@ async function openTemplateBuilder(type) {
     }
     // Batch δεν έχει τρέξει — ανέβασε το αρχείο ως preview
     const file = document.getElementById('batch-file').files[0];
-    if (!file) { toast(t('js_select_file_first'), 'error'); return; }
-    toast(t('js_uploading_preview'), 'info');
+    if (!file) { toast('Επέλεξε αρχείο πρώτα', 'error'); return; }
+    toast('Ανέβασμα για προεπισκόπηση...', 'info');
     const fd = new FormData();
     fd.append('file', file);
     const r = await fetch('/api/upload', {method:'POST', body:fd, credentials:'include'});
     const data = await r.json();
-    if (!data.doc_id) { toast(t('js_upload_error'), 'error'); return; }
+    if (!data.doc_id) { toast('Σφάλμα ανεβάσματος', 'error'); return; }
     uploadedDocIds['batch'] = data.doc_id;
     openTemplateBuilderById(data.doc_id);
     return;
@@ -4204,16 +4068,16 @@ async function openTemplateBuilder(type) {
   }
   // First upload the file if not already uploaded
   const file = document.getElementById(type+'-file').files[0];
-  if (!file) { toast(t('js_select_file_first'), 'error'); return; }
+  if (!file) { toast('Επέλεξε αρχείο πρώτα', 'error'); return; }
 
   // Upload the file to get a doc_id
-  toast(t('js_uploading_file'), 'info');
+  toast('Ανέβασμα αρχείου...', 'info');
   const fd = new FormData();
   fd.append('file', file);
   // No schema_name needed for preview
   const r = await fetch('/api/upload', {method:'POST', body:fd, credentials:'include'});
   const data = await r.json();
-  if (!data.doc_id) { toast(t('js_upload_error'), 'error'); return; }
+  if (!data.doc_id) { toast('Σφάλμα ανεβάσματος', 'error'); return; }
 
   uploadedDocIds[type] = data.doc_id;
   // Open template builder in new tab
