@@ -441,5 +441,8 @@
   "no_data": "Veri yok",
   "lang_label": "Dil",
   "lang_el": "Ελληνικά",
-  "lang_en": "English"
+  "lang_en": "English",
+  "js_server_available": "Kullanılabilir",
+  "js_server_limited": "Sınırlı",
+  "js_server_unavailable": "Kullanılamıyor"
 }

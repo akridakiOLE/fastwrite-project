@@ -441,5 +441,8 @@
   "no_data": "Δεν υπάρχουν δεδομένα",
   "lang_label": "Γλώσσα",
   "lang_el": "Ελληνικά",
-  "lang_en": "English"
+  "lang_en": "English",
+  "js_server_available": "Διαθέσιμο",
+  "js_server_limited": "Περιορισμένο",
+  "js_server_unavailable": "Μη διαθέσιμο"
 }

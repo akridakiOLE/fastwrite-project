@@ -441,5 +441,8 @@
   "no_data": "Sin datos disponibles",
   "lang_label": "Idioma",
   "lang_el": "Ελληνικά",
-  "lang_en": "English"
+  "lang_en": "English",
+  "js_server_available": "Disponible",
+  "js_server_limited": "Limitado",
+  "js_server_unavailable": "No disponible"
 }

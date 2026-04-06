@@ -441,5 +441,8 @@
   "no_data": "利用可能なデータがありません",
   "lang_label": "言語",
   "lang_el": "Ελληνικά",
-  "lang_en": "English"
+  "lang_en": "English",
+  "js_server_available": "利用可能",
+  "js_server_limited": "制限あり",
+  "js_server_unavailable": "利用不可"
 }

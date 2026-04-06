@@ -366,17 +366,17 @@ select.form-input option{background:var(--bg2);}
             <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;width:100%;">
               <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
                 <span style="width:10px;height:10px;border-radius:50%;background:#00e5a0;flex-shrink:0;"></span>
-                <span style="color:var(--text2);flex:1;">Ολοκληρωμένα</span>
+                <span style="color:var(--text2);flex:1;" data-i18n="donut_completed">Ολοκληρωμένα</span>
                 <span id="donut-leg-completed" style="color:var(--text);font-weight:600;">0</span>
               </div>
               <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
                 <span style="width:10px;height:10px;border-radius:50%;background:#f0c040;flex-shrink:0;"></span>
-                <span style="color:var(--text2);flex:1;">Σε Αναμονή</span>
+                <span style="color:var(--text2);flex:1;" data-i18n="donut_pending">Σε Αναμονή</span>
                 <span id="donut-leg-pending" style="color:var(--text);font-weight:600;">0</span>
               </div>
               <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
                 <span style="width:10px;height:10px;border-radius:50%;background:#ff4757;flex-shrink:0;"></span>
-                <span style="color:var(--text2);flex:1;">Αποτυχημένα</span>
+                <span style="color:var(--text2);flex:1;" data-i18n="donut_failed">Αποτυχημένα</span>
                 <span id="donut-leg-failed" style="color:var(--text);font-weight:600;">0</span>
               </div>
             </div>
@@ -1410,7 +1410,7 @@ function formatActivityTime(isoStr) {
     if (diffHr < 24) return t('time_hours_ago', {n: diffHr});
     const diffDay = Math.floor(diffHr / 24);
     if (diffDay < 7) return t('time_days_ago', {n: diffDay});
-    return d.toLocaleDateString('el-GR');
+    return d.toLocaleDateString(I18N.currentLang === 'el' ? 'el-GR' : I18N.currentLang);
   } catch(e) { return ''; }
 }
 

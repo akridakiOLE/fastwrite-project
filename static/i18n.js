@@ -474,6 +474,9 @@ const I18N = {
       js_no_email_set: 'Δεν έχει οριστεί',
       js_no_saved_keys: 'Δεν υπάρχουν αποθηκευμένα keys',
       js_file_label: 'Αρχείο:',
+      js_server_available: 'Διαθέσιμο',
+      js_server_limited: 'Περιορισμένο',
+      js_server_unavailable: 'Μη διαθέσιμο',
 
       // ── Common ──
       btn_save: 'Αποθήκευση',
@@ -959,6 +962,9 @@ const I18N = {
       js_no_email_set: 'Not set',
       js_no_saved_keys: 'No saved keys',
       js_file_label: 'File:',
+      js_server_available: 'Available',
+      js_server_limited: 'Limited',
+      js_server_unavailable: 'Unavailable',
 
       // ── Common ──
       btn_save: 'Save',
@@ -1135,19 +1141,58 @@ const I18N = {
   },
 
   /**
-   * Build the language selector dropdown with all supported languages
+   * Build the language selector dropdown with search + alphabetical sort
    */
   buildLangSelector() {
     const container = document.getElementById('lang-dropdown');
     if (!container) return;
     container.innerHTML = '';
-    Object.entries(this.supportedLanguages).forEach(([code, info]) => {
+
+    // Search input
+    const searchWrap = document.createElement('div');
+    searchWrap.style.cssText = 'padding:8px;border-bottom:1px solid rgba(255,255,255,0.08);position:sticky;top:0;background:#1a1f2e;z-index:1;';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = '🔍 Search...';
+    searchInput.id = 'lang-search-input';
+    searchInput.style.cssText = 'width:100%;padding:6px 10px;border:1px solid #2a3042;border-radius:5px;background:#12162a;color:#e0e0e0;font-size:12px;outline:none;box-sizing:border-box;';
+    searchInput.oninput = () => this._filterLangOptions(searchInput.value);
+    // Prevent dropdown from closing when clicking search
+    searchInput.onclick = (e) => e.stopPropagation();
+    searchWrap.appendChild(searchInput);
+    container.appendChild(searchWrap);
+
+    // Options container
+    const optionsWrap = document.createElement('div');
+    optionsWrap.id = 'lang-options-list';
+    container.appendChild(optionsWrap);
+
+    // Sort alphabetically by native name
+    const sorted = Object.entries(this.supportedLanguages)
+      .sort((a, b) => a[1].native.localeCompare(b[1].native));
+
+    sorted.forEach(([code, info]) => {
       const item = document.createElement('div');
       item.className = 'lang-option' + (code === this.currentLang ? ' active' : '');
       item.dataset.lang = code;
-      item.textContent = info.native;
-      item.onclick = () => this.setLanguage(code);
-      container.appendChild(item);
+      item.innerHTML = `<span style="font-weight:600;margin-right:8px;opacity:0.5;font-size:11px;">${code.toUpperCase()}</span> ${info.native}`;
+      item.onclick = () => {
+        this.setLanguage(code);
+        document.getElementById('lang-dropdown').classList.remove('show');
+      };
+      optionsWrap.appendChild(item);
+    });
+  },
+
+  _filterLangOptions(query) {
+    const q = query.toLowerCase();
+    const list = document.getElementById('lang-options-list');
+    if (!list) return;
+    list.querySelectorAll('.lang-option').forEach(opt => {
+      const code = opt.dataset.lang;
+      const info = this.supportedLanguages[code];
+      const match = !q || code.includes(q) || info.native.toLowerCase().includes(q) || info.name.toLowerCase().includes(q);
+      opt.style.display = match ? '' : 'none';
     });
   },
 
