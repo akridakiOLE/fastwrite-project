@@ -831,7 +831,9 @@ def export_csv():
     records = _get_clean_records_for_export(data.get("doc_ids"), user_id=uid)
     if not records:
         return jsonify({"error": "Δεν βρέθηκαν έγγραφα."}), 404
-    result = exporter.export_csv(records, filename=data.get("filename"), columns=data.get("columns"))
+    # Αφαίρεση line_items — εξάγονται ξεχωριστά μέσω Line Items XLSX
+    clean = [{k: v for k, v in r.items() if k != "line_items"} for r in records]
+    result = exporter.export_csv(clean, filename=data.get("filename"), columns=data.get("columns"))
     if not result.success:
         return jsonify({"error": result.error}), 500
     return send_file(str(result.file_path), mimetype="text/csv",
@@ -845,7 +847,9 @@ def export_xlsx():
     records = _get_clean_records_for_export(data.get("doc_ids"), user_id=uid)
     if not records:
         return jsonify({"error": "Δεν βρέθηκαν έγγραφα."}), 404
-    result = exporter.export_xlsx(records, filename=data.get("filename"), columns=data.get("columns"))
+    # Αφαίρεση line_items — εξάγονται ξεχωριστά μέσω Line Items XLSX
+    clean = [{k: v for k, v in r.items() if k != "line_items"} for r in records]
+    result = exporter.export_xlsx(clean, filename=data.get("filename"), columns=data.get("columns"))
     if not result.success:
         return jsonify({"error": result.error}), 500
     return send_file(str(result.file_path),
