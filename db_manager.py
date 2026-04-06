@@ -362,6 +362,14 @@ class DatabaseManager:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def update_user_username(self, user_id: int, username: str):
+        """Update a user's username. Raises if duplicate."""
+        self.conn.execute(
+            "UPDATE users SET username = ? WHERE id = ?",
+            (username, user_id)
+        )
+        self.conn.commit()
+
     def update_user_password(self, user_id: int, password_hash: str):
         """Update a user's password hash."""
         self.conn.execute(

@@ -1315,6 +1315,35 @@ def auth_me():
                      "role": user["role"], "email": user.get("email", ""),
                      "created_at": user["created_at"]})
 
+@app.post("/api/auth/change-username")
+@require_auth
+def auth_change_username():
+    data = request.get_json(force=True)
+    new_username = data.get("username", "").strip()
+    password = data.get("password", "")
+    if not new_username or not password:
+        return jsonify({"error": "Απαιτείται νέο username και κωδικός"}), 400
+    if len(new_username) < 3:
+        return jsonify({"error": "Το username πρέπει να έχει τουλάχιστον 3 χαρακτήρες"}), 400
+    user = db.get_user_by_id(request.current_user["user_id"])
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if not check_password(password, user["password_hash"]):
+        return jsonify({"error": "Λάθος κωδικός"}), 401
+    # Check if username already taken
+    existing = db.get_user_by_username(new_username)
+    if existing and existing["id"] != user["id"]:
+        return jsonify({"error": "Το username χρησιμοποιείται ήδη"}), 409
+    try:
+        db.update_user_username(user["id"], new_username)
+    except Exception:
+        return jsonify({"error": "Το username χρησιμοποιείται ήδη"}), 409
+    # Issue new token with updated username
+    token = create_token(user["id"], new_username)
+    resp = make_response(jsonify({"success": True}))
+    resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="Lax", secure=False, max_age=86400, path="/")
+    return resp
+
 @app.post("/api/auth/change-password")
 @require_auth
 def auth_change_password():
