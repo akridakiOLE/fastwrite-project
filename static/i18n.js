@@ -978,6 +978,32 @@ const I18N = {
     }
   },
 
+  // ── Supported languages registry ──
+  // Built-in: el, en (loaded instantly from above)
+  // External: loaded on-demand from /static/lang/XX.json
+  supportedLanguages: {
+    el: { name: 'Ελληνικά', native: 'Ελληνικά', builtin: true },
+    en: { name: 'English', native: 'English', builtin: true },
+    fr: { name: 'French', native: 'Français' },
+    de: { name: 'German', native: 'Deutsch' },
+    es: { name: 'Spanish', native: 'Español' },
+    it: { name: 'Italian', native: 'Italiano' },
+    pt: { name: 'Portuguese', native: 'Português' },
+    nl: { name: 'Dutch', native: 'Nederlands' },
+    pl: { name: 'Polish', native: 'Polski' },
+    ro: { name: 'Romanian', native: 'Română' },
+    tr: { name: 'Turkish', native: 'Türkçe' },
+    ar: { name: 'Arabic', native: 'العربية', rtl: true },
+    ja: { name: 'Japanese', native: '日本語' },
+    zh: { name: 'Chinese', native: '中文' },
+    ko: { name: 'Korean', native: '한국어' },
+    ru: { name: 'Russian', native: 'Русский' },
+    sv: { name: 'Swedish', native: 'Svenska' }
+  },
+
+  // Track loading state to avoid duplicate fetches
+  _loading: {},
+
   /**
    * Get translated string
    */
@@ -993,32 +1019,83 @@ const I18N = {
   },
 
   /**
+   * Load external language JSON on demand
+   * Returns a promise that resolves when translations are loaded
+   */
+  async loadLanguage(lang) {
+    // Already loaded (built-in or previously fetched)
+    if (this.translations[lang]) return true;
+    // Not a supported language
+    if (!this.supportedLanguages[lang]) return false;
+    // Already loading — wait for it
+    if (this._loading[lang]) return this._loading[lang];
+
+    this._loading[lang] = fetch(`/static/lang/${lang}.json`)
+      .then(resp => {
+        if (!resp.ok) throw new Error(`Language file not found: ${lang}`);
+        return resp.json();
+      })
+      .then(data => {
+        this.translations[lang] = data;
+        delete this._loading[lang];
+        return true;
+      })
+      .catch(err => {
+        console.error(`[i18n] Failed to load ${lang}:`, err);
+        delete this._loading[lang];
+        return false;
+      });
+
+    return this._loading[lang];
+  },
+
+  /**
    * Detect language from URL > localStorage > browser > default
    */
   detectLanguage() {
     const urlParams = new URLSearchParams(window.location.search);
     const urlLang = urlParams.get('lang');
-    if (urlLang && this.translations[urlLang]) return urlLang;
+    if (urlLang && this.supportedLanguages[urlLang]) return urlLang;
     const stored = localStorage.getItem('fw_lang');
-    if (stored && this.translations[stored]) return stored;
+    if (stored && this.supportedLanguages[stored]) return stored;
     const browserLang = (navigator.language || navigator.userLanguage || '').substring(0, 2).toLowerCase();
-    if (browserLang === 'en') return 'en';
+    if (this.supportedLanguages[browserLang]) return browserLang;
     return 'el';
   },
 
-  init() {
+  async init() {
     this.currentLang = this.detectLanguage();
     localStorage.setItem('fw_lang', this.currentLang);
+    // If detected language is external, load it first
+    if (!this.translations[this.currentLang]) {
+      const loaded = await this.loadLanguage(this.currentLang);
+      if (!loaded) this.currentLang = 'el';
+    }
     this.applyTranslations();
+    this.buildLangSelector();
   },
 
-  setLanguage(lang) {
-    if (!this.translations[lang]) return;
+  async setLanguage(lang) {
+    if (!this.supportedLanguages[lang]) return;
+    // Load if external and not yet loaded
+    if (!this.translations[lang]) {
+      const loaded = await this.loadLanguage(lang);
+      if (!loaded) {
+        console.error(`[i18n] Could not switch to ${lang}`);
+        return;
+      }
+    }
     this.currentLang = lang;
     localStorage.setItem('fw_lang', lang);
     const url = new URL(window.location);
     url.searchParams.set('lang', lang);
     window.history.replaceState({}, '', url);
+    // Handle RTL
+    if (this.supportedLanguages[lang] && this.supportedLanguages[lang].rtl) {
+      document.documentElement.setAttribute('dir', 'rtl');
+    } else {
+      document.documentElement.removeAttribute('dir');
+    }
     this.applyTranslations();
     this.updateLangSelector();
   },
@@ -1050,14 +1127,40 @@ const I18N = {
       if (translated !== key) el.setAttribute('title', translated);
     });
     // Dual language containers (FAQ, legal, etc.)
+    // For built-in (el/en) show matching container; for external languages show EN as fallback
+    const faqLang = (this.currentLang === 'el') ? 'el' : 'en';
     document.querySelectorAll('.faq-lang-content').forEach(el => {
-      el.style.display = el.dataset.faqLang === this.currentLang ? '' : 'none';
+      el.style.display = el.dataset.faqLang === faqLang ? '' : 'none';
+    });
+  },
+
+  /**
+   * Build the language selector dropdown with all supported languages
+   */
+  buildLangSelector() {
+    const container = document.getElementById('lang-dropdown');
+    if (!container) return;
+    container.innerHTML = '';
+    Object.entries(this.supportedLanguages).forEach(([code, info]) => {
+      const item = document.createElement('div');
+      item.className = 'lang-option' + (code === this.currentLang ? ' active' : '');
+      item.dataset.lang = code;
+      item.textContent = info.native;
+      item.onclick = () => this.setLanguage(code);
+      container.appendChild(item);
     });
   },
 
   updateLangSelector() {
     const el = document.getElementById('lang-selector-current');
     if (el) el.textContent = this.currentLang.toUpperCase();
+    // Update active state in dropdown
+    const container = document.getElementById('lang-dropdown');
+    if (container) {
+      container.querySelectorAll('.lang-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.lang === this.currentLang);
+      });
+    }
   }
 };
 

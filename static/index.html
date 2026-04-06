@@ -46,6 +46,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .nav-item .icon{width:18px;height:18px;opacity:.7;flex-shrink:0;}
 .nav-item.active .icon{opacity:1;}
 .sidebar-footer{padding:16px;border-top:1px solid var(--border);}
+#lang-dropdown.show{display:block!important;}
+.lang-option{padding:8px 12px;font-size:12px;cursor:pointer;color:var(--text2);transition:background .15s,color .15s;}
+.lang-option:hover{background:rgba(0,229,160,0.1);color:var(--text);}
+.lang-option.active{background:rgba(0,229,160,0.15);color:var(--accent);font-weight:600;}
 .pw-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--text3);padding:4px 6px;border-radius:4px;transition:color .15s;opacity:0.6;}
 .pw-eye:hover{color:var(--text);opacity:1;}
 .faq-item{background:var(--bg3);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
@@ -288,9 +292,14 @@ select.form-input option{background:var(--bg2);}
       </button>
     </nav>
     <!-- Language Selector -->
-    <div style="display:flex;justify-content:center;gap:4px;padding:0 16px 8px;">
-      <button onclick="I18N.setLanguage('el')" id="lang-btn-el" style="flex:1;padding:4px 0;border:1px solid var(--border);border-radius:6px 0 0 6px;background:rgba(0,229,160,0.1);color:var(--accent);font-size:11px;font-weight:600;cursor:pointer;">EL</button>
-      <button onclick="I18N.setLanguage('en')" id="lang-btn-en" style="flex:1;padding:4px 0;border:1px solid var(--border);border-radius:0 6px 6px 0;background:transparent;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;">EN</button>
+    <div style="position:relative;padding:0 16px 8px;" id="lang-selector-wrap">
+      <button id="lang-selector-btn" onclick="document.getElementById('lang-dropdown').classList.toggle('show')" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+        <span>🌐 <span id="lang-selector-current">EL</span></span>
+        <span style="font-size:10px;">▼</span>
+      </button>
+      <div id="lang-dropdown" style="display:none;position:absolute;bottom:100%;left:16px;right:16px;max-height:280px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 -4px 16px rgba(0,0,0,0.4);z-index:999;margin-bottom:4px;">
+        <!-- Populated dynamically by I18N.buildLangSelector() -->
+      </div>
     </div>
     <div class="sidebar-footer">
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
@@ -4224,26 +4233,16 @@ async function openTemplateBuilder(type) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 checkServer();
 setInterval(checkServer, 30000);
-// ── i18n initialization ──
-I18N.init();
-// Update language selector buttons
-function updateLangButtons() {
-  const elBtn = document.getElementById('lang-btn-el');
-  const enBtn = document.getElementById('lang-btn-en');
-  if (elBtn && enBtn) {
-    if (I18N.currentLang === 'el') {
-      elBtn.style.background = 'rgba(0,229,160,0.1)'; elBtn.style.color = 'var(--accent)';
-      enBtn.style.background = 'transparent'; enBtn.style.color = 'var(--text2)';
-    } else {
-      enBtn.style.background = 'rgba(0,229,160,0.1)'; enBtn.style.color = 'var(--accent)';
-      elBtn.style.background = 'transparent'; elBtn.style.color = 'var(--text2)';
-    }
+// ── i18n initialization (async for dynamic language loading) ──
+(async function() { await I18N.init(); })();
+// Close lang dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('lang-selector-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    const dd = document.getElementById('lang-dropdown');
+    if (dd) dd.classList.remove('show');
   }
-}
-// Override setLanguage to also update buttons
-const _origSetLang = I18N.setLanguage.bind(I18N);
-I18N.setLanguage = function(lang) { _origSetLang(lang); updateLangButtons(); };
-updateLangButtons();
+});
 
 // URL-based routing: αν το URL είναι /ui/template-builder/<id>, άνοιξε το Template Builder
 (function() {
