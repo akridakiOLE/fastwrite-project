@@ -328,6 +328,52 @@ select.form-input option{background:var(--bg2);}
           </div>
         </div>
 
+        <!-- Donut Chart + Recent Activity -->
+        <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;margin-top:20px;">
+          <!-- Donut Chart -->
+          <div class="card" style="padding:20px;display:flex;flex-direction:column;align-items:center;">
+            <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;">Κατανομή Εγγράφων</div>
+            <div style="position:relative;width:180px;height:180px;">
+              <svg id="donut-chart" viewBox="0 0 36 36" style="width:100%;height:100%;transform:rotate(-90deg);">
+                <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg3)" stroke-width="3.5"/>
+                <circle id="donut-completed" cx="18" cy="18" r="15.9155" fill="none" stroke="#00e5a0" stroke-width="3.5" stroke-dasharray="0 100" stroke-dashoffset="0" style="transition:stroke-dasharray 0.6s ease;"/>
+                <circle id="donut-pending" cx="18" cy="18" r="15.9155" fill="none" stroke="#f0c040" stroke-width="3.5" stroke-dasharray="0 100" stroke-dashoffset="0" style="transition:stroke-dasharray 0.6s ease;"/>
+                <circle id="donut-failed" cx="18" cy="18" r="15.9155" fill="none" stroke="#ff4757" stroke-width="3.5" stroke-dasharray="0 100" stroke-dashoffset="0" style="transition:stroke-dasharray 0.6s ease;"/>
+              </svg>
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+                <div id="donut-center-value" style="font-size:24px;font-weight:700;color:var(--text);">—</div>
+                <div style="font-size:10px;color:var(--text2);">Σύνολο</div>
+              </div>
+            </div>
+            <!-- Legend -->
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;width:100%;">
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+                <span style="width:10px;height:10px;border-radius:50%;background:#00e5a0;flex-shrink:0;"></span>
+                <span style="color:var(--text2);flex:1;">Ολοκληρωμένα</span>
+                <span id="donut-leg-completed" style="color:var(--text);font-weight:600;">0</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+                <span style="width:10px;height:10px;border-radius:50%;background:#f0c040;flex-shrink:0;"></span>
+                <span style="color:var(--text2);flex:1;">Σε Αναμονή</span>
+                <span id="donut-leg-pending" style="color:var(--text);font-weight:600;">0</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+                <span style="width:10px;height:10px;border-radius:50%;background:#ff4757;flex-shrink:0;"></span>
+                <span style="color:var(--text2);flex:1;">Αποτυχημένα</span>
+                <span id="donut-leg-failed" style="color:var(--text);font-weight:600;">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card" style="padding:20px;overflow:hidden;">
+            <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;">Πρόσφατη Δραστηριότητα</div>
+            <div id="activity-list" style="display:flex;flex-direction:column;gap:0;">
+              <div style="text-align:center;color:var(--text2);font-size:13px;padding:24px;">Φόρτωση...</div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -335,7 +381,25 @@ select.form-input option{background:var(--bg2);}
     <div id="page-upload" class="page" style="display:none">
       <div class="topbar"><div class="page-title">Upload & Extract</div></div>
       <div class="content">
-        <div style="display:flex;justify-content:center;align-items:flex-start;height:calc(100vh - 140px);">
+        <!-- Mini Workflow Guide -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:20px;padding:16px 20px;background:rgba(0,229,160,0.03);border:1px solid rgba(0,229,160,0.15);border-radius:12px;max-width:640px;margin-left:auto;margin-right:auto;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#0a0c10;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">1</div>
+            <div style="font-size:12px;color:var(--text);">Ανεβάστε PDF</div>
+          </div>
+          <div style="flex:0 0 40px;height:2px;background:rgba(0,229,160,0.3);margin:0 6px;"></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--accent2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">2</div>
+            <div style="font-size:12px;color:var(--text);">Ορίστε Ετικέτες</div>
+          </div>
+          <div style="flex:0 0 40px;height:2px;background:rgba(0,102,255,0.3);margin:0 6px;"></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#f0c040;color:#0a0c10;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">3</div>
+            <div style="font-size:12px;color:var(--text);">Εξαγωγή Batch</div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:center;align-items:flex-start;">
 
           <!-- Batch -->
           <div class="card" style="display:flex;flex-direction:column;overflow:hidden;padding:12px;max-width:540px;width:100%;">
@@ -1105,18 +1169,103 @@ function showPage(name, fromEvent) {
 
 // ── Dashboard ───────────────────────────────────────────────────────────────
 async function loadDashboard() {
-  const [docs, stats] = await Promise.all([
+  const [docs, stats, actRes] = await Promise.all([
     api('GET','/api/documents'),
-    api('GET','/api/stats')
+    api('GET','/api/stats'),
+    api('GET','/api/activity?limit=10')
   ]);
   const d = docs.documents || [];
   const completed = d.filter(x=>x.status==='Completed').length;
   const pending   = d.filter(x=>x.status==='Pending').length;
   const failed    = d.filter(x=>x.status==='Failed').length;
-  document.getElementById('stat-total').textContent     = d.length;
+  const total = d.length;
+  document.getElementById('stat-total').textContent     = total;
   document.getElementById('stat-completed').textContent = completed;
   document.getElementById('stat-pending').textContent   = pending;
   document.getElementById('stat-failed').textContent    = failed;
+
+  // Donut chart
+  updateDonutChart(total, completed, pending, failed);
+
+  // Recent activity
+  renderRecentActivity(actRes.activities || []);
+}
+
+function updateDonutChart(total, completed, pending, failed) {
+  document.getElementById('donut-center-value').textContent = total;
+  document.getElementById('donut-leg-completed').textContent = completed;
+  document.getElementById('donut-leg-pending').textContent = pending;
+  document.getElementById('donut-leg-failed').textContent = failed;
+
+  if (total === 0) {
+    ['donut-completed','donut-pending','donut-failed'].forEach(id => {
+      document.getElementById(id).setAttribute('stroke-dasharray','0 100');
+      document.getElementById(id).setAttribute('stroke-dashoffset','0');
+    });
+    return;
+  }
+
+  const circumference = 100;
+  const pctCompleted = (completed / total) * circumference;
+  const pctPending   = (pending / total) * circumference;
+  const pctFailed    = (failed / total) * circumference;
+
+  const elC = document.getElementById('donut-completed');
+  const elP = document.getElementById('donut-pending');
+  const elF = document.getElementById('donut-failed');
+
+  elC.setAttribute('stroke-dasharray', pctCompleted + ' ' + (circumference - pctCompleted));
+  elC.setAttribute('stroke-dashoffset', '0');
+
+  elP.setAttribute('stroke-dasharray', pctPending + ' ' + (circumference - pctPending));
+  elP.setAttribute('stroke-dashoffset', '-' + pctCompleted);
+
+  elF.setAttribute('stroke-dasharray', pctFailed + ' ' + (circumference - pctFailed));
+  elF.setAttribute('stroke-dashoffset', '-' + (pctCompleted + pctPending));
+}
+
+function renderRecentActivity(activities) {
+  const el = document.getElementById('activity-list');
+  if (!activities.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:13px;padding:24px;">Δεν υπάρχει πρόσφατη δραστηριότητα</div>';
+    return;
+  }
+  const actionLabels = {
+    'batch_upload': '📤 Batch Upload',
+    'upload': '📤 Ανέβασμα',
+    'batch_process': '⚡ Batch Process',
+    'export': '📊 Εξαγωγή',
+    'register': '📝 Καταγραφή',
+    'approve': '✅ Έγκριση',
+    'delete': '🗑 Διαγραφή'
+  };
+  el.innerHTML = activities.slice(0, 10).map(a => {
+    const actionText = actionLabels[a.action] || ('📌 ' + (a.action || '—'));
+    const fname = a.filename || '';
+    const invoices = a.total_invoices ? (' · ' + a.total_invoices + ' τιμολόγια') : '';
+    const time = a.created_at ? formatActivityTime(a.created_at) : '';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bg3);font-size:13px;">
+      <span style="flex-shrink:0;min-width:120px;color:var(--accent);font-size:12px;">${actionText}</span>
+      <span style="flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${fname}${invoices}</span>
+      <span style="color:var(--text2);font-size:11px;flex-shrink:0;white-space:nowrap;">${time}</span>
+    </div>`;
+  }).join('');
+}
+
+function formatActivityTime(isoStr) {
+  try {
+    const d = new Date(isoStr);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'Μόλις τώρα';
+    if (diffMin < 60) return diffMin + ' λεπτά πριν';
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return diffHr + ' ώρ' + (diffHr === 1 ? 'α' : 'ες') + ' πριν';
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return diffDay + ' ημέρ' + (diffDay === 1 ? 'α' : 'ες') + ' πριν';
+    return d.toLocaleDateString('el-GR');
+  } catch(e) { return ''; }
 }
 
 // ── Documents ───────────────────────────────────────────────────────────────
