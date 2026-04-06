@@ -277,6 +277,107 @@ class DocumentExporter:
 
         return result
 
+    # ── Εξαγωγή Line Items XLSX ─────────────────────────────────────────────
+
+    def export_line_items_xlsx(self, records: List[Dict[str, Any]],
+                               filename: str = None) -> ExportResult:
+        """
+        Εξαγωγή line items σε Excel. Κάθε line item γίνεται ξεχωριστή γραμμή,
+        με τα βασικά πεδία του εγγράφου (αρχείο, προμηθευτής, ετικέτα κλπ)
+        να επαναλαμβάνονται σε κάθε γραμμή.
+        """
+        result = ExportResult(format="xlsx")
+
+        if not records:
+            result.error = "Δεν υπάρχουν δεδομένα για εξαγωγή."
+            return result
+
+        try:
+            rows = []
+            for rec in records:
+                # Βασικά πεδία εγγράφου
+                base = {
+                    "doc_id": rec.get("id", ""),
+                    "filename": rec.get("filename", ""),
+                    "label": rec.get("label", rec.get("schema_name", "")),
+                    "supplier": rec.get("supplier", rec.get("vendor_name", "")),
+                    "status": rec.get("status", ""),
+                }
+                # Scalar πεδία από result_json (π.χ. invoice_number, date, total)
+                scalar_fields = {}
+                for k, v in rec.items():
+                    if k in ("id", "filename", "label", "schema_name", "supplier",
+                             "vendor_name", "status", "result_json", "file_path",
+                             "user_id", "confidence", "batch_id", "created_at",
+                             "page_count", "page_index"):
+                        continue
+                    if isinstance(v, (str, int, float, type(None))):
+                        scalar_fields[k] = v
+
+                # Line items
+                li = rec.get("line_items", [])
+                if isinstance(li, str):
+                    try:
+                        import json as _json
+                        li = _json.loads(li)
+                    except:
+                        li = []
+
+                if li and isinstance(li, list):
+                    for item in li:
+                        if isinstance(item, dict):
+                            row = {**base, **scalar_fields}
+                            for ik, iv in item.items():
+                                row[f"li_{ik}"] = iv
+                            rows.append(row)
+                else:
+                    # Αν δεν υπάρχουν line items, βάλε μία γραμμή με τα scalars
+                    rows.append({**base, **scalar_fields})
+
+            if not rows:
+                result.error = "Δεν βρέθηκαν line items."
+                return result
+
+            df = pd.DataFrame(rows)
+            out_path = self._make_output_path(filename, "xlsx")
+
+            with pd.ExcelWriter(str(out_path), engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, sheet_name="Line Items")
+
+                from openpyxl.styles import Font, PatternFill, Alignment
+                ws = writer.sheets["Line Items"]
+
+                # Header styling
+                header_font = Font(bold=True, color="FFFFFF")
+                header_fill = PatternFill(
+                    start_color="059669", end_color="059669",
+                    fill_type="solid"
+                )
+                for cell in ws[1]:
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = Alignment(horizontal="center")
+
+                # Auto-width
+                for col in ws.columns:
+                    max_len = max(
+                        (len(str(cell.value)) if cell.value else 0)
+                        for cell in col
+                    )
+                    ws.column_dimensions[col[0].column_letter].width = (
+                        min(max_len + 4, 40)
+                    )
+
+            result.success = True
+            result.file_path = out_path
+            result.record_count = len(df)
+            result.exported_at = datetime.utcnow().isoformat()
+
+        except Exception as e:
+            result.error = str(e)
+
+        return result
+
     # ── Εξαγωγή JSON ─────────────────────────────────────────────────────────
 
     def export_json(self, records: List[Dict[str, Any]],

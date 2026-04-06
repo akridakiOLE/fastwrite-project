@@ -832,6 +832,21 @@ def export_xlsx():
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True, download_name=result.file_path.name)
 
+@app.post("/api/export/line-items/xlsx")
+@require_auth
+def export_line_items_xlsx():
+    uid = request.current_user["user_id"]
+    data    = request.get_json(force=True) or {}
+    records = _get_records_for_export(data.get("doc_ids"), user_id=uid)
+    if not records:
+        return jsonify({"error": "Δεν βρέθηκαν έγγραφα."}), 404
+    result = exporter.export_line_items_xlsx(records, filename=data.get("filename"))
+    if not result.success:
+        return jsonify({"error": result.error}), 500
+    return send_file(str(result.file_path),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True, download_name=result.file_path.name)
+
 # ── Search & Stats ────────────────────────────────────────────────────────────
 @app.get("/api/search")
 @require_auth
