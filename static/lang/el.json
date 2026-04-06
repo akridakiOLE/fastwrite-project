@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "Διαθέσιμο",
   "js_server_limited": "Περιορισμένο",
-  "js_server_unavailable": "Μη διαθέσιμο"
+  "js_server_unavailable": "Μη διαθέσιμο",
+  "sidebar_logout_hint": "Αποσύνδεση από τον λογαριασμό σας"
 }

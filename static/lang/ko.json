@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "사용 가능",
   "js_server_limited": "제한됨",
-  "js_server_unavailable": "사용 불가"
+  "js_server_unavailable": "사용 불가",
+  "sidebar_logout_hint": "계정에서 로그아웃"
 }

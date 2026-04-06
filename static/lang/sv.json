@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "Tillgänglig",
   "js_server_limited": "Begränsad",
-  "js_server_unavailable": "Otillgänglig"
+  "js_server_unavailable": "Otillgänglig",
+  "sidebar_logout_hint": "Logga ut från ditt konto"
 }

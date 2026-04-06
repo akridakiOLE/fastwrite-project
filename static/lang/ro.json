@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "Disponibil",
   "js_server_limited": "Limitat",
-  "js_server_unavailable": "Indisponibil"
+  "js_server_unavailable": "Indisponibil",
+  "sidebar_logout_hint": "Deconectare din cont"
 }

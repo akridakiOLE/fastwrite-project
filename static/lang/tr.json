@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "Kullanılabilir",
   "js_server_limited": "Sınırlı",
-  "js_server_unavailable": "Kullanılamıyor"
+  "js_server_unavailable": "Kullanılamıyor",
+  "sidebar_logout_hint": "Hesabınızdan çıkış yapın"
 }

@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "Beschikbaar",
   "js_server_limited": "Beperkt",
-  "js_server_unavailable": "Niet beschikbaar"
+  "js_server_unavailable": "Niet beschikbaar",
+  "sidebar_logout_hint": "Afmelden van uw account"
 }

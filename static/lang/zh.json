@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "可用",
   "js_server_limited": "受限",
-  "js_server_unavailable": "不可用"
+  "js_server_unavailable": "不可用",
+  "sidebar_logout_hint": "退出您的账户"
 }

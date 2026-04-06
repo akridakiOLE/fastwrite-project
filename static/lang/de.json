@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "Verfügbar",
   "js_server_limited": "Eingeschränkt",
-  "js_server_unavailable": "Nicht verfügbar"
+  "js_server_unavailable": "Nicht verfügbar",
+  "sidebar_logout_hint": "Von Ihrem Konto abmelden"
 }

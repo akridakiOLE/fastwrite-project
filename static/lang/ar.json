@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "متاح",
   "js_server_limited": "محدود",
-  "js_server_unavailable": "غير متاح"
+  "js_server_unavailable": "غير متاح",
+  "sidebar_logout_hint": "تسجيل الخروج من حسابك"
 }

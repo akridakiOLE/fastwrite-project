@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "Доступен",
   "js_server_limited": "Ограничен",
-  "js_server_unavailable": "Недоступен"
+  "js_server_unavailable": "Недоступен",
+  "sidebar_logout_hint": "Выйти из аккаунта"
 }

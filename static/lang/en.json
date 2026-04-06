@@ -444,5 +444,6 @@
   "lang_en": "English",
   "js_server_available": "Available",
   "js_server_limited": "Limited",
-  "js_server_unavailable": "Unavailable"
+  "js_server_unavailable": "Unavailable",
+  "sidebar_logout_hint": "Sign out of your account"
 }
