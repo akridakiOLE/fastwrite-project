@@ -17,6 +17,7 @@ from file_processor import FileProcessor
 from schema_builder import SchemaBuilder
 from validator      import InvoiceValidator
 from exporter       import DocumentExporter
+import billing_manager
 
 # ── Logging setup — εξασφαλίζει ότι τα logs φτάνουν στο journalctl ──
 logging.basicConfig(
@@ -44,6 +45,9 @@ processor  = FileProcessor(output_dir=PROCESSED_DIR)
 schema_bld = SchemaBuilder()
 validator  = InvoiceValidator()
 exporter   = DocumentExporter(export_dir=EXPORT_DIR)
+
+# ── Seed default pricing plans on startup ──
+db.seed_default_plans()
 
 ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 ALLOWED_ORIGINS = [
@@ -367,6 +371,11 @@ def delete_template(name):
 @require_auth
 def upload_file():
     uid = request.current_user["user_id"]
+    # ── Usage limit check ──
+    limit_check = db.check_usage_limit(uid, 'doc_processed', 1)
+    if not limit_check['allowed']:
+        return jsonify({"error": limit_check['message'], "limit_reached": True,
+                        "usage": limit_check}), 403
     if "file" not in request.files:
         return jsonify({"error": "Δεν βρέθηκε αρχείο."}), 400
     f      = request.files["file"]
@@ -377,6 +386,8 @@ def upload_file():
     dest = UPLOAD_DIR / f.filename
     f.save(str(dest))
     doc_id = db.insert_document(filename=f.filename, file_path=str(dest), schema_name=schema_name, user_id=uid)
+    # ── Record usage event ──
+    db.record_usage_event(uid, 'doc_processed', 1)
     return jsonify({"success":True,"doc_id":doc_id,"filename":f.filename,
                     "file_path":str(dest),"schema_name":schema_name,"status":"Pending"})
 
@@ -931,11 +942,20 @@ def extract_document(doc_id):
     if not processed.is_ok():
         return jsonify({"success": False, "error": processed.error_message}), 500
 
+    # ── Page usage limit check ──
+    page_count = len(processed.pages)
+    page_check = db.check_usage_limit(uid, 'page_processed', page_count)
+    if not page_check['allowed']:
+        return jsonify({"success": False, "error": page_check['message'],
+                        "limit_reached": True, "usage": page_check}), 403
+
     extractor = AIExtractor(api_key=api_key)
     result    = extractor.extract(image_paths=processed.pages, schema=schema)
 
     if result.is_ok():
         db.update_document_status(doc_id, status="pending_review", result_json=json.dumps(result.extracted_data))
+        # ── Record page usage ──
+        db.record_usage_event(uid, 'page_processed', page_count)
         return jsonify({"success": True, "doc_id": doc_id, "data": result.extracted_data, "status": "pending_review"})
     else:
         db.update_document_status(doc_id, status="Failed")
@@ -1220,6 +1240,15 @@ def batch_pre_check():
 def batch_upload():
     """Δέχεται file upload Ή file_path (για αρχεία από ιστορικό)."""
     uid = request.current_user["user_id"]
+    # ── Feature check: batch_upload requires paid plan ──
+    if not billing_manager.check_feature(db, uid, 'batch_upload'):
+        return jsonify({"error": "Batch upload requires a paid plan. Please upgrade.",
+                        "limit_reached": True}), 403
+    # ── Usage limit check ──
+    limit_check = db.check_usage_limit(uid, 'doc_processed', 1)
+    if not limit_check['allowed']:
+        return jsonify({"error": limit_check['message'], "limit_reached": True,
+                        "usage": limit_check}), 403
     file_path_param = request.form.get("file_path", "").strip()
     if file_path_param and Path(file_path_param).exists():
         dest = Path(file_path_param)
@@ -1435,13 +1464,40 @@ def auth_logout():
 @app.get("/api/auth/me")
 @require_auth
 def auth_me():
-    user = db.get_user_by_id(request.current_user["user_id"])
+    uid = request.current_user["user_id"]
+    user = db.get_user_by_id(uid)
     if not user:
         return jsonify({"error": "User not found"}), 404
-    return jsonify({"id": user["id"], "username": user["username"],
-                     "role": user["role"], "email": user.get("email", ""),
-                     "totp_enabled": bool(user.get("totp_enabled", 0)),
-                     "created_at": user["created_at"]})
+    result = {"id": user["id"], "username": user["username"],
+              "role": user["role"], "email": user.get("email", ""),
+              "totp_enabled": bool(user.get("totp_enabled", 0)),
+              "created_at": user["created_at"]}
+    # ── Subscription & usage info ──
+    sub = db.get_active_subscription(uid)
+    if sub:
+        result["plan"] = {
+            "name": sub["plan_name"],
+            "display_name": sub["plan_display_name"],
+            "status": sub["status"],
+            "doc_limit": sub["doc_limit"],
+            "page_limit": sub["page_limit"],
+            "period_end": sub["current_period_end"],
+            "cancel_at_period_end": bool(sub.get("cancel_at_period_end", 0)),
+        }
+        features_str = sub.get("features_json", "{}")
+        try:
+            result["plan"]["features"] = json.loads(features_str) if features_str else {}
+        except (json.JSONDecodeError, TypeError):
+            result["plan"]["features"] = {}
+        summary = db.get_usage_summary(uid)
+        if summary:
+            result["usage"] = {
+                "docs_used": summary["docs_used"],
+                "doc_limit": summary["doc_limit"],
+                "pages_used": summary["pages_used"],
+                "page_limit": summary["page_limit"],
+            }
+    return jsonify(result)
 
 @app.post("/api/auth/change-username")
 @require_auth
@@ -1619,6 +1675,9 @@ def auth_register():
         db.conn.execute("UPDATE users SET terms_accepted_at=? WHERE id=?",
                         (datetime.utcnow().isoformat(), user_id))
         db.conn.commit()
+        # ── Auto-assign Free plan ──
+        db.assign_free_plan(user_id)
+        logger.info("Free plan assigned to new user: %s (id=%s)", username, user_id)
         # Auto-login: issue JWT token
         token = create_token(user_id, username, "user")
         resp = make_response(jsonify({"success": True, "username": username, "role": "user"}))
@@ -1684,6 +1743,244 @@ def admin_change_role(user_id):
         return jsonify({"error": "Ο χρήστης δεν βρέθηκε"}), 404
     db.update_user_role(user_id, new_role)
     return jsonify({"success": True, "role": new_role})
+
+
+# ── Billing & Usage Endpoints ─────────────────────────────────────────────────
+
+@app.get("/api/billing/plans")
+def billing_list_plans():
+    """Public: list active pricing plans."""
+    plans = db.list_plans(active_only=True)
+    result = []
+    for p in plans:
+        features = {}
+        try:
+            features = json.loads(p['features_json']) if p.get('features_json') else {}
+        except (json.JSONDecodeError, TypeError):
+            pass
+        result.append({
+            'id': p['id'], 'name': p['name'],
+            'display_name': p['display_name'],
+            'price_cents': p['price_cents'],
+            'doc_limit': p['doc_limit'], 'page_limit': p['page_limit'],
+            'features': features,
+        })
+    return jsonify(result)
+
+
+@app.get("/api/billing/subscription")
+@require_auth
+def billing_get_subscription():
+    """Get current user subscription + usage."""
+    uid = request.current_user["user_id"]
+    sub = db.get_active_subscription(uid)
+    if not sub:
+        return jsonify({"error": "No active subscription"}), 404
+    summary = db.get_usage_summary(uid)
+    features = {}
+    try:
+        features = json.loads(sub['features_json']) if sub.get('features_json') else {}
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return jsonify({
+        'plan': {
+            'name': sub['plan_name'],
+            'display_name': sub['plan_display_name'],
+            'price_cents': sub['price_cents'],
+            'doc_limit': sub['doc_limit'],
+            'page_limit': sub['page_limit'],
+            'features': features,
+        },
+        'status': sub['status'],
+        'period_start': sub['current_period_start'],
+        'period_end': sub['current_period_end'],
+        'cancel_at_period_end': bool(sub.get('cancel_at_period_end', 0)),
+        'usage': {
+            'docs_used': summary['docs_used'] if summary else 0,
+            'doc_limit': summary['doc_limit'] if summary else sub['doc_limit'],
+            'pages_used': summary['pages_used'] if summary else 0,
+            'page_limit': summary['page_limit'] if summary else sub['page_limit'],
+        }
+    })
+
+
+@app.post("/api/billing/checkout")
+@require_auth
+def billing_checkout():
+    """Create a Stripe Checkout Session for plan upgrade."""
+    uid = request.current_user["user_id"]
+    data = request.get_json(force=True)
+    plan_id = data.get("plan_id")
+    if not plan_id:
+        return jsonify({"error": "plan_id required"}), 400
+    if not billing_manager.is_stripe_configured():
+        return jsonify({"error": "Stripe not configured"}), 503
+    base_url = request.host_url.rstrip("/")
+    result = billing_manager.create_checkout_session(
+        db, uid, plan_id,
+        success_url=f"{base_url}/ui/billing?success=1",
+        cancel_url=f"{base_url}/ui/billing?canceled=1",
+    )
+    if not result:
+        return jsonify({"error": "Failed to create checkout session"}), 500
+    return jsonify(result)
+
+
+@app.post("/api/billing/portal")
+@require_auth
+def billing_portal():
+    """Create a Stripe Customer Portal session."""
+    uid = request.current_user["user_id"]
+    sub = db.get_active_subscription(uid)
+    if not sub or not sub.get("stripe_customer_id"):
+        return jsonify({"error": "No Stripe customer found. Only paid plans have portal access."}), 400
+    base_url = request.host_url.rstrip("/")
+    portal_url = billing_manager.create_portal_session(
+        sub["stripe_customer_id"],
+        return_url=f"{base_url}/ui/billing",
+    )
+    if not portal_url:
+        return jsonify({"error": "Failed to create portal session"}), 500
+    return jsonify({"portal_url": portal_url})
+
+
+@app.post("/api/billing/webhook")
+def billing_webhook():
+    """Stripe webhook endpoint. Signature-verified."""
+    payload = request.get_data()
+    sig_header = request.headers.get("Stripe-Signature", "")
+    event = billing_manager.verify_webhook(payload, sig_header)
+    if not event:
+        return jsonify({"error": "Invalid signature"}), 400
+    success = billing_manager.handle_webhook_event(db, event)
+    return jsonify({"received": True}), 200 if success else 500
+
+
+@app.get("/api/billing/invoices")
+@require_auth
+def billing_invoices():
+    """List billing history for current user."""
+    uid = request.current_user["user_id"]
+    history = db.list_billing_history(uid)
+    return jsonify(history)
+
+
+@app.get("/api/usage/current")
+@require_auth
+def usage_current():
+    """Get current period usage + limits + percentage."""
+    uid = request.current_user["user_id"]
+    summary = db.get_usage_summary(uid)
+    if not summary:
+        return jsonify({"error": "No active subscription"}), 404
+    doc_pct = 0
+    if summary['doc_limit'] > 0:
+        doc_pct = round(summary['docs_used'] / summary['doc_limit'] * 100, 1)
+    elif summary['doc_limit'] == -1:
+        doc_pct = 0  # Unlimited
+    page_pct = 0
+    if summary['page_limit'] > 0:
+        page_pct = round(summary['pages_used'] / summary['page_limit'] * 100, 1)
+    elif summary['page_limit'] == -1:
+        page_pct = 0  # Unlimited
+    return jsonify({
+        'docs_used': summary['docs_used'],
+        'doc_limit': summary['doc_limit'],
+        'doc_percentage': doc_pct,
+        'pages_used': summary['pages_used'],
+        'page_limit': summary['page_limit'],
+        'page_percentage': page_pct,
+        'period_start': summary.get('period_start'),
+        'period_end': summary.get('period_end'),
+    })
+
+
+@app.get("/api/usage/history")
+@require_auth
+def usage_history():
+    """Get usage history by period."""
+    uid = request.current_user["user_id"]
+    history = db.get_usage_history(uid)
+    return jsonify(history)
+
+
+# ── Admin Billing Endpoints ──────────────────────────────────────────────────
+
+@app.get("/api/admin/plans")
+@require_admin
+def admin_list_plans():
+    """List all plans including inactive. Admin only."""
+    return jsonify(db.list_plans(active_only=False))
+
+
+@app.post("/api/admin/plans")
+@require_admin
+def admin_create_plan():
+    """Create a new pricing plan. Admin only."""
+    data = request.get_json(force=True)
+    name = data.get("name", "").strip()
+    display_name = data.get("display_name", "").strip()
+    if not name or not display_name:
+        return jsonify({"error": "name and display_name required"}), 400
+    try:
+        plan_id = db.create_plan(
+            name=name, display_name=display_name,
+            price_cents=data.get("price_cents", 0),
+            doc_limit=data.get("doc_limit", 50),
+            page_limit=data.get("page_limit", 500),
+            features_json=json.dumps(data.get("features", {})),
+            stripe_price_id=data.get("stripe_price_id"),
+            sort_order=data.get("sort_order", 0),
+        )
+        return jsonify({"success": True, "plan_id": plan_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/admin/plans/<int:plan_id>", methods=["PATCH"])
+@require_admin
+def admin_update_plan(plan_id):
+    """Update a plan. Admin only."""
+    data = request.get_json(force=True)
+    kwargs = {}
+    for k in ['display_name', 'price_cents', 'doc_limit', 'page_limit',
+              'stripe_price_id', 'is_active', 'sort_order']:
+        if k in data:
+            kwargs[k] = data[k]
+    if 'features' in data:
+        kwargs['features_json'] = json.dumps(data['features'])
+    if not kwargs:
+        return jsonify({"error": "No fields to update"}), 400
+    db.update_plan(plan_id, **kwargs)
+    return jsonify({"success": True})
+
+
+@app.get("/api/admin/subscriptions")
+@require_admin
+def admin_list_subscriptions():
+    """List all subscriptions. Admin only."""
+    status = request.args.get("status")
+    return jsonify(db.list_subscriptions(status=status))
+
+
+@app.get("/api/admin/usage-report")
+@require_admin
+def admin_usage_report():
+    """Aggregated usage report across all users. Admin only."""
+    rows = db.conn.execute("""
+        SELECT u.id, u.username, u.email, p.name as plan_name,
+               s.status as sub_status,
+               COALESCE(us.docs_used, 0) as docs_used,
+               COALESCE(us.pages_used, 0) as pages_used,
+               p.doc_limit, p.page_limit
+        FROM users u
+        LEFT JOIN subscriptions s ON s.user_id = u.id AND s.status IN ('active', 'trialing', 'past_due')
+        LEFT JOIN plans p ON s.plan_id = p.id
+        LEFT JOIN usage_summary us ON us.user_id = u.id AND us.period_start = s.current_period_start
+        WHERE u.is_active = 1
+        ORDER BY docs_used DESC
+    """).fetchall()
+    return jsonify([dict(r) for r in rows])
 
 
 # ── Login Page ────────────────────────────────────────────────────────────────

@@ -173,6 +173,88 @@ class DatabaseManager:
             except Exception:
                 pass  # Columns already exist (race condition with multiple workers)
 
+            # ── Plans table: pricing tiers ──
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS plans (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name            TEXT    NOT NULL UNIQUE,
+                    display_name    TEXT    NOT NULL,
+                    price_cents     INTEGER NOT NULL DEFAULT 0,
+                    doc_limit       INTEGER NOT NULL DEFAULT 50,
+                    page_limit      INTEGER NOT NULL DEFAULT 500,
+                    features_json   TEXT,
+                    stripe_price_id TEXT,
+                    is_active       INTEGER NOT NULL DEFAULT 1,
+                    sort_order      INTEGER NOT NULL DEFAULT 0,
+                    created_at      TEXT    NOT NULL,
+                    updated_at      TEXT    NOT NULL
+                )
+            """)
+
+            # ── Subscriptions table: user plan assignments ──
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS subscriptions (
+                    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id                 INTEGER NOT NULL,
+                    plan_id                 INTEGER NOT NULL,
+                    status                  TEXT    NOT NULL DEFAULT 'active',
+                    stripe_subscription_id  TEXT,
+                    stripe_customer_id      TEXT,
+                    current_period_start    TEXT    NOT NULL,
+                    current_period_end      TEXT    NOT NULL,
+                    cancel_at_period_end    INTEGER NOT NULL DEFAULT 0,
+                    created_at              TEXT    NOT NULL,
+                    updated_at              TEXT    NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    FOREIGN KEY (plan_id) REFERENCES plans(id)
+                )
+            """)
+
+            # ── Usage events table: telemetry (counters only, NEVER content) ──
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS usage_events (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id         INTEGER NOT NULL,
+                    event_type      TEXT    NOT NULL,
+                    quantity         INTEGER NOT NULL DEFAULT 1,
+                    metadata_json   TEXT,
+                    created_at      TEXT    NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+
+            # ── Usage summary table: pre-aggregated per billing period ──
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS usage_summary (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id         INTEGER NOT NULL,
+                    period_start    TEXT    NOT NULL,
+                    period_end      TEXT    NOT NULL,
+                    docs_used       INTEGER NOT NULL DEFAULT 0,
+                    pages_used      INTEGER NOT NULL DEFAULT 0,
+                    updated_at      TEXT    NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    UNIQUE(user_id, period_start)
+                )
+            """)
+
+            # ── Billing history table: mirrors Stripe invoices ──
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS billing_history (
+                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id             INTEGER NOT NULL,
+                    stripe_invoice_id   TEXT,
+                    amount_cents        INTEGER NOT NULL DEFAULT 0,
+                    currency            TEXT    NOT NULL DEFAULT 'eur',
+                    status              TEXT    NOT NULL DEFAULT 'open',
+                    period_start        TEXT,
+                    period_end          TEXT,
+                    invoice_url         TEXT,
+                    created_at          TEXT    NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+
             # Migration: assign orphan data (user_id IS NULL) to first admin user
             try:
                 admin = self.conn.execute(
@@ -512,6 +594,423 @@ class DatabaseManager:
             "UPDATE users SET role = ? WHERE id = ?", (role, user_id)
         )
         self.conn.commit()
+
+    # ─── PLANS ────────────────────────────────────────────────────────────────
+
+    def create_plan(self, name: str, display_name: str, price_cents: int = 0,
+                    doc_limit: int = 50, page_limit: int = 500,
+                    features_json: str = None, stripe_price_id: str = None,
+                    sort_order: int = 0) -> int:
+        """Create a new pricing plan. Returns the plan id."""
+        now = datetime.utcnow().isoformat()
+        cursor = self.conn.execute(
+            """INSERT INTO plans
+               (name, display_name, price_cents, doc_limit, page_limit,
+                features_json, stripe_price_id, is_active, sort_order,
+                created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)""",
+            (name, display_name, price_cents, doc_limit, page_limit,
+             features_json, stripe_price_id, sort_order, now, now)
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def get_plan(self, plan_id: int) -> Optional[Dict[str, Any]]:
+        """Fetch a plan by ID."""
+        row = self.conn.execute(
+            "SELECT * FROM plans WHERE id = ?", (plan_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def get_plan_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Fetch a plan by internal name."""
+        row = self.conn.execute(
+            "SELECT * FROM plans WHERE name = ?", (name,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def list_plans(self, active_only: bool = True) -> List[Dict[str, Any]]:
+        """Return plans, optionally only active ones."""
+        if active_only:
+            rows = self.conn.execute(
+                "SELECT * FROM plans WHERE is_active = 1 ORDER BY sort_order"
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM plans ORDER BY sort_order"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_plan(self, plan_id: int, **kwargs) -> bool:
+        """Update a plan. Allowed: display_name, price_cents, doc_limit,
+        page_limit, features_json, stripe_price_id, is_active, sort_order."""
+        allowed = {'display_name', 'price_cents', 'doc_limit', 'page_limit',
+                   'features_json', 'stripe_price_id', 'is_active', 'sort_order'}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return False
+        fields['updated_at'] = datetime.utcnow().isoformat()
+        set_clause = ', '.join(f"{k} = ?" for k in fields)
+        values = list(fields.values()) + [plan_id]
+        self.conn.execute(
+            f"UPDATE plans SET {set_clause} WHERE id = ?", values
+        )
+        self.conn.commit()
+        return True
+
+    # ─── SUBSCRIPTIONS ────────────────────────────────────────────────────────
+
+    def create_subscription(self, user_id: int, plan_id: int,
+                            period_start: str, period_end: str,
+                            status: str = 'active',
+                            stripe_subscription_id: str = None,
+                            stripe_customer_id: str = None) -> int:
+        """Create a new subscription. Returns the subscription id."""
+        now = datetime.utcnow().isoformat()
+        cursor = self.conn.execute(
+            """INSERT INTO subscriptions
+               (user_id, plan_id, status, stripe_subscription_id,
+                stripe_customer_id, current_period_start, current_period_end,
+                cancel_at_period_end, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)""",
+            (user_id, plan_id, status, stripe_subscription_id,
+             stripe_customer_id, period_start, period_end, now, now)
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def get_active_subscription(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Fetch the active subscription for a user (most recent active/trialing)."""
+        row = self.conn.execute(
+            """SELECT s.*, p.name as plan_name, p.display_name as plan_display_name,
+                      p.price_cents, p.doc_limit, p.page_limit, p.features_json
+               FROM subscriptions s
+               JOIN plans p ON s.plan_id = p.id
+               WHERE s.user_id = ? AND s.status IN ('active', 'trialing', 'past_due')
+               ORDER BY s.created_at DESC LIMIT 1""",
+            (user_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def update_subscription(self, sub_id: int, **kwargs) -> bool:
+        """Update a subscription. Allowed: plan_id, status,
+        stripe_subscription_id, stripe_customer_id, current_period_start,
+        current_period_end, cancel_at_period_end."""
+        allowed = {'plan_id', 'status', 'stripe_subscription_id',
+                   'stripe_customer_id', 'current_period_start',
+                   'current_period_end', 'cancel_at_period_end'}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return False
+        fields['updated_at'] = datetime.utcnow().isoformat()
+        set_clause = ', '.join(f"{k} = ?" for k in fields)
+        values = list(fields.values()) + [sub_id]
+        self.conn.execute(
+            f"UPDATE subscriptions SET {set_clause} WHERE id = ?", values
+        )
+        self.conn.commit()
+        return True
+
+    def get_subscription_by_stripe_id(self, stripe_sub_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch subscription by Stripe subscription ID."""
+        row = self.conn.execute(
+            "SELECT * FROM subscriptions WHERE stripe_subscription_id = ?",
+            (stripe_sub_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def list_subscriptions(self, status: str = None) -> List[Dict[str, Any]]:
+        """List all subscriptions (admin), optionally filtered by status."""
+        if status:
+            rows = self.conn.execute(
+                """SELECT s.*, u.username, u.email, p.name as plan_name
+                   FROM subscriptions s
+                   JOIN users u ON s.user_id = u.id
+                   JOIN plans p ON s.plan_id = p.id
+                   WHERE s.status = ?
+                   ORDER BY s.created_at DESC""",
+                (status,)
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                """SELECT s.*, u.username, u.email, p.name as plan_name
+                   FROM subscriptions s
+                   JOIN users u ON s.user_id = u.id
+                   JOIN plans p ON s.plan_id = p.id
+                   ORDER BY s.created_at DESC"""
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ─── USAGE TRACKING (TELEMETRY) ──────────────────────────────────────────
+
+    def record_usage_event(self, user_id: int, event_type: str,
+                           quantity: int = 1,
+                           metadata_json: str = None) -> int:
+        """Record a usage event AND update the summary. Returns event id."""
+        now = datetime.utcnow().isoformat()
+        # Insert event
+        cursor = self.conn.execute(
+            """INSERT INTO usage_events
+               (user_id, event_type, quantity, metadata_json, created_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (user_id, event_type, quantity, metadata_json, now)
+        )
+        event_id = cursor.lastrowid
+        # Update summary
+        sub = self.get_active_subscription(user_id)
+        if sub:
+            p_start = sub['current_period_start']
+            p_end = sub['current_period_end']
+            if event_type == 'doc_processed':
+                self.conn.execute(
+                    """INSERT INTO usage_summary (user_id, period_start, period_end, docs_used, pages_used, updated_at)
+                       VALUES (?, ?, ?, ?, 0, ?)
+                       ON CONFLICT(user_id, period_start) DO UPDATE SET
+                       docs_used = docs_used + ?, updated_at = ?""",
+                    (user_id, p_start, p_end, quantity, now, quantity, now)
+                )
+            elif event_type == 'page_processed':
+                self.conn.execute(
+                    """INSERT INTO usage_summary (user_id, period_start, period_end, docs_used, pages_used, updated_at)
+                       VALUES (?, ?, ?, 0, ?, ?)
+                       ON CONFLICT(user_id, period_start) DO UPDATE SET
+                       pages_used = pages_used + ?, updated_at = ?""",
+                    (user_id, p_start, p_end, quantity, now, quantity, now)
+                )
+        self.conn.commit()
+        return event_id
+
+    def get_usage_summary(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get current period usage summary for a user."""
+        sub = self.get_active_subscription(user_id)
+        if not sub:
+            return None
+        row = self.conn.execute(
+            """SELECT * FROM usage_summary
+               WHERE user_id = ? AND period_start = ?""",
+            (user_id, sub['current_period_start'])
+        ).fetchone()
+        if row:
+            result = dict(row)
+            result['doc_limit'] = sub['doc_limit']
+            result['page_limit'] = sub['page_limit']
+            return result
+        # No usage yet this period
+        return {
+            'user_id': user_id,
+            'period_start': sub['current_period_start'],
+            'period_end': sub['current_period_end'],
+            'docs_used': 0,
+            'pages_used': 0,
+            'doc_limit': sub['doc_limit'],
+            'page_limit': sub['page_limit'],
+        }
+
+    def check_usage_limit(self, user_id: int, event_type: str,
+                          quantity: int = 1) -> Dict[str, Any]:
+        """Check if user can perform action within plan limits.
+        Returns: {allowed: bool, docs_used, doc_limit, pages_used, page_limit, message}"""
+        summary = self.get_usage_summary(user_id)
+        if not summary:
+            return {'allowed': False, 'message': 'No active subscription'}
+
+        doc_limit = summary['doc_limit']
+        page_limit = summary['page_limit']
+        docs_used = summary['docs_used']
+        pages_used = summary['pages_used']
+
+        if event_type == 'doc_processed' and doc_limit != -1:
+            if docs_used + quantity > doc_limit:
+                return {
+                    'allowed': False,
+                    'docs_used': docs_used, 'doc_limit': doc_limit,
+                    'pages_used': pages_used, 'page_limit': page_limit,
+                    'message': f'Document limit reached ({docs_used}/{doc_limit})'
+                }
+        elif event_type == 'page_processed' and page_limit != -1:
+            if pages_used + quantity > page_limit:
+                return {
+                    'allowed': False,
+                    'docs_used': docs_used, 'doc_limit': doc_limit,
+                    'pages_used': pages_used, 'page_limit': page_limit,
+                    'message': f'Page limit reached ({pages_used}/{page_limit})'
+                }
+
+        return {
+            'allowed': True,
+            'docs_used': docs_used, 'doc_limit': doc_limit,
+            'pages_used': pages_used, 'page_limit': page_limit,
+            'message': 'OK'
+        }
+
+    def get_usage_history(self, user_id: int, limit: int = 12) -> List[Dict[str, Any]]:
+        """Get usage history by period (last N periods)."""
+        rows = self.conn.execute(
+            """SELECT * FROM usage_summary
+               WHERE user_id = ?
+               ORDER BY period_start DESC LIMIT ?""",
+            (user_id, limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def reset_usage_for_period(self, user_id: int, period_start: str,
+                               period_end: str):
+        """Create a fresh usage summary for a new billing period."""
+        now = datetime.utcnow().isoformat()
+        self.conn.execute(
+            """INSERT INTO usage_summary
+               (user_id, period_start, period_end, docs_used, pages_used, updated_at)
+               VALUES (?, ?, ?, 0, 0, ?)
+               ON CONFLICT(user_id, period_start) DO UPDATE SET
+               docs_used = 0, pages_used = 0, updated_at = ?""",
+            (user_id, period_start, period_end, now, now)
+        )
+        self.conn.commit()
+
+    # ─── BILLING HISTORY ──────────────────────────────────────────────────────
+
+    def insert_billing_record(self, user_id: int, amount_cents: int,
+                              status: str = 'open', currency: str = 'eur',
+                              stripe_invoice_id: str = None,
+                              period_start: str = None,
+                              period_end: str = None,
+                              invoice_url: str = None) -> int:
+        """Insert a billing history record. Returns the record id."""
+        now = datetime.utcnow().isoformat()
+        cursor = self.conn.execute(
+            """INSERT INTO billing_history
+               (user_id, stripe_invoice_id, amount_cents, currency, status,
+                period_start, period_end, invoice_url, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (user_id, stripe_invoice_id, amount_cents, currency, status,
+             period_start, period_end, invoice_url, now)
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def update_billing_record_by_stripe_id(self, stripe_invoice_id: str,
+                                           **kwargs) -> bool:
+        """Update a billing record by Stripe invoice ID."""
+        allowed = {'amount_cents', 'status', 'invoice_url'}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return False
+        set_clause = ', '.join(f"{k} = ?" for k in fields)
+        values = list(fields.values()) + [stripe_invoice_id]
+        self.conn.execute(
+            f"UPDATE billing_history SET {set_clause} WHERE stripe_invoice_id = ?",
+            values
+        )
+        self.conn.commit()
+        return True
+
+    def list_billing_history(self, user_id: int,
+                             limit: int = 20) -> List[Dict[str, Any]]:
+        """List billing history for a user."""
+        rows = self.conn.execute(
+            """SELECT * FROM billing_history
+               WHERE user_id = ?
+               ORDER BY created_at DESC LIMIT ?""",
+            (user_id, limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ─── PLAN SEEDING ────────────────────────────────────────────────────────
+
+    def seed_default_plans(self):
+        """Insert default pricing plans if none exist."""
+        existing = self.conn.execute("SELECT COUNT(*) as c FROM plans").fetchone()
+        if existing['c'] > 0:
+            return  # Plans already seeded
+
+        defaults = [
+            {
+                'name': 'free', 'display_name': 'Free',
+                'price_cents': 0, 'doc_limit': 50, 'page_limit': 500,
+                'features_json': json.dumps({
+                    'batch_upload': False, 'export_csv': True,
+                    'export_xlsx': False, 'template_limit': 1,
+                    'api_access': False, 'priority_processing': False,
+                    'approval_workflow': False, 'label_editor': False
+                }),
+                'sort_order': 0
+            },
+            {
+                'name': 'starter', 'display_name': 'Starter',
+                'price_cents': 1900, 'doc_limit': 500, 'page_limit': 5000,
+                'features_json': json.dumps({
+                    'batch_upload': True, 'export_csv': True,
+                    'export_xlsx': True, 'template_limit': 10,
+                    'api_access': False, 'priority_processing': False,
+                    'approval_workflow': True, 'label_editor': True
+                }),
+                'sort_order': 1
+            },
+            {
+                'name': 'professional', 'display_name': 'Professional',
+                'price_cents': 4900, 'doc_limit': 2000, 'page_limit': 20000,
+                'features_json': json.dumps({
+                    'batch_upload': True, 'export_csv': True,
+                    'export_xlsx': True, 'template_limit': -1,
+                    'api_access': True, 'priority_processing': True,
+                    'approval_workflow': True, 'label_editor': True
+                }),
+                'sort_order': 2
+            },
+            {
+                'name': 'business', 'display_name': 'Business',
+                'price_cents': 9900, 'doc_limit': 10000, 'page_limit': 100000,
+                'features_json': json.dumps({
+                    'batch_upload': True, 'export_csv': True,
+                    'export_xlsx': True, 'template_limit': -1,
+                    'api_access': True, 'priority_processing': True,
+                    'approval_workflow': True, 'label_editor': True
+                }),
+                'sort_order': 3
+            },
+            {
+                'name': 'enterprise', 'display_name': 'Enterprise',
+                'price_cents': 0, 'doc_limit': -1, 'page_limit': -1,
+                'features_json': json.dumps({
+                    'batch_upload': True, 'export_csv': True,
+                    'export_xlsx': True, 'template_limit': -1,
+                    'api_access': True, 'priority_processing': True,
+                    'approval_workflow': True, 'label_editor': True
+                }),
+                'sort_order': 4
+            },
+        ]
+        now = datetime.utcnow().isoformat()
+        for p in defaults:
+            self.conn.execute(
+                """INSERT INTO plans
+                   (name, display_name, price_cents, doc_limit, page_limit,
+                    features_json, stripe_price_id, is_active, sort_order,
+                    created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?, ?)""",
+                (p['name'], p['display_name'], p['price_cents'],
+                 p['doc_limit'], p['page_limit'], p['features_json'],
+                 p['sort_order'], now, now)
+            )
+        self.conn.commit()
+
+    def assign_free_plan(self, user_id: int) -> int:
+        """Assign the Free plan to a user. Returns the subscription id."""
+        from datetime import timedelta
+        free_plan = self.get_plan_by_name('free')
+        if not free_plan:
+            self.seed_default_plans()
+            free_plan = self.get_plan_by_name('free')
+        now = datetime.utcnow()
+        period_start = now.isoformat()
+        period_end = (now + timedelta(days=30)).isoformat()
+        return self.create_subscription(
+            user_id=user_id,
+            plan_id=free_plan['id'],
+            period_start=period_start,
+            period_end=period_end,
+            status='active'
+        )
 
     # ─── UTILITIES ────────────────────────────────────────────────────────────
 
