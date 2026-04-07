@@ -53,6 +53,8 @@ ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 ALLOWED_ORIGINS = [
     "http://localhost:3000","http://localhost:5173","http://localhost:8080",
     "https://fastwrite.duckdns.org","http://fastwrite.duckdns.org",
+    "https://fastwrite.tech","http://fastwrite.tech",
+    "https://www.fastwrite.tech","http://www.fastwrite.tech",
 ]
 
 @app.after_request
@@ -75,8 +77,7 @@ def options_handler(p=""):
 # ── Root & Health ─────────────────────────────────────────────────────────────
 @app.get("/")
 def root():
-    return jsonify({"app":"FastWrite API","version":"1.0.0",
-                    "domain":"fastwrite.duckdns.org","docs":"/docs","status":"running"})
+    return redirect("/ui")
 
 @app.get("/health")
 def health_check():
