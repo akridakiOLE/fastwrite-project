@@ -526,6 +526,51 @@ class DatabaseManager:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def user_stats(self) -> Dict[str, Any]:
+        """Return detailed user statistics for admin dashboard."""
+        now = self.conn.execute("SELECT datetime('now')").fetchone()[0]
+        today = now[:10]
+        # Week start (Monday)
+        week_start = self.conn.execute(
+            "SELECT date(?, '-' || ((strftime('%w', ?) + 6) % 7) || ' days')",
+            (today, today)
+        ).fetchone()[0]
+        month_start = today[:7] + "-01"
+
+        total     = self.conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        active    = self.conn.execute("SELECT COUNT(*) FROM users WHERE is_active = 1").fetchone()[0]
+        inactive  = total - active
+        admins    = self.conn.execute("SELECT COUNT(*) FROM users WHERE role = 'admin'").fetchone()[0]
+        with_2fa  = self.conn.execute("SELECT COUNT(*) FROM users WHERE totp_enabled = 1").fetchone()[0]
+        with_email = self.conn.execute("SELECT COUNT(*) FROM users WHERE email IS NOT NULL AND email != ''").fetchone()[0]
+
+        today_count = self.conn.execute(
+            "SELECT COUNT(*) FROM users WHERE created_at >= ?", (today + "T00:00:00",)
+        ).fetchone()[0]
+        week_count = self.conn.execute(
+            "SELECT COUNT(*) FROM users WHERE created_at >= ?", (week_start + "T00:00:00",)
+        ).fetchone()[0]
+        month_count = self.conn.execute(
+            "SELECT COUNT(*) FROM users WHERE created_at >= ?", (month_start + "T00:00:00",)
+        ).fetchone()[0]
+
+        # Registrations per day (last 30 days)
+        daily = self.conn.execute("""
+            SELECT date(created_at) as day, COUNT(*) as cnt
+            FROM users
+            WHERE created_at >= date('now', '-30 days')
+            GROUP BY day ORDER BY day
+        """).fetchall()
+
+        return {
+            "total": total, "active": active, "inactive": inactive,
+            "admins": admins, "with_2fa": with_2fa, "with_email": with_email,
+            "registered_today": today_count,
+            "registered_this_week": week_count,
+            "registered_this_month": month_count,
+            "daily_registrations": [{"date": r[0], "count": r[1]} for r in daily],
+        }
+
     def update_user_username(self, user_id: int, username: str):
         """Update a user's username. Raises if duplicate."""
         self.conn.execute(

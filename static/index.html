@@ -751,7 +751,53 @@ select.form-input option{background:var(--bg2);}
 
           <!-- Section 4: Διαχείριση Χρηστών (Admin only) -->
           <div class="card" id="admin-users-section" style="display:none;">
-            <div class="card-title" data-i18n="settings_users_title">👥 Διαχείριση Χρηστών</div>
+            <div class="card-title" data-i18n="settings_users_title">Διαχείριση Χρηστών</div>
+
+            <!-- User Statistics Dashboard -->
+            <div id="admin-stats-dashboard" style="margin-bottom:16px;">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;">
+                <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+                  <div style="font-size:22px;font-weight:700;color:var(--accent);" id="stat-total">—</div>
+                  <div style="font-size:11px;color:var(--text3);" data-i18n="stat_total">Σύνολο</div>
+                </div>
+                <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+                  <div style="font-size:22px;font-weight:700;color:#22c55e;" id="stat-active">—</div>
+                  <div style="font-size:11px;color:var(--text3);" data-i18n="stat_active">Ενεργοί</div>
+                </div>
+                <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+                  <div style="font-size:22px;font-weight:700;color:#ef4444;" id="stat-inactive">—</div>
+                  <div style="font-size:11px;color:var(--text3);" data-i18n="stat_inactive">Ανενεργοί</div>
+                </div>
+                <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+                  <div style="font-size:22px;font-weight:700;color:#a855f7;" id="stat-admins">—</div>
+                  <div style="font-size:11px;color:var(--text3);" data-i18n="stat_admins">Admins</div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;">
+                <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+                  <div style="font-size:22px;font-weight:700;color:var(--text1);" id="stat-today">—</div>
+                  <div style="font-size:11px;color:var(--text3);" data-i18n="stat_today">Σήμερα</div>
+                </div>
+                <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+                  <div style="font-size:22px;font-weight:700;color:var(--text1);" id="stat-week">—</div>
+                  <div style="font-size:11px;color:var(--text3);" data-i18n="stat_week">Εβδομάδα</div>
+                </div>
+                <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+                  <div style="font-size:22px;font-weight:700;color:var(--text1);" id="stat-month">—</div>
+                  <div style="font-size:11px;color:var(--text3);" data-i18n="stat_month">Μήνας</div>
+                </div>
+                <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+                  <div style="font-size:22px;font-weight:700;color:#3b82f6;" id="stat-2fa">—</div>
+                  <div style="font-size:11px;color:var(--text3);" data-i18n="stat_2fa">Με 2FA</div>
+                </div>
+              </div>
+              <!-- Registration chart (last 30 days) -->
+              <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;">
+                <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;" data-i18n="stat_chart_title">Εγγραφές τελευταίων 30 ημερών</div>
+                <canvas id="admin-reg-chart" height="120" style="width:100%;"></canvas>
+              </div>
+            </div>
+
             <div id="admin-users-count" style="font-size:13px;color:var(--text2);margin-bottom:12px;">Φόρτωση...</div>
             <div style="margin-bottom:12px;">
               <input class="form-input" type="text" id="admin-users-search" placeholder="Αναζήτηση χρήστη (username ή email)..." data-i18n-placeholder="settings_users_search" oninput="filterAdminUsers()" style="margin-bottom:0;"/>
@@ -3804,6 +3850,66 @@ async function loadAdminUsers() {
   allAdminUsers = users;
   document.getElementById('admin-users-search').value = '';
   renderAdminUsers(users);
+
+  // Load stats
+  const stats = await api('GET', '/api/admin/users/stats');
+  if (stats && !stats.error) renderAdminStats(stats);
+}
+
+function renderAdminStats(s) {
+  document.getElementById('stat-total').textContent   = s.total ?? '—';
+  document.getElementById('stat-active').textContent   = s.active ?? '—';
+  document.getElementById('stat-inactive').textContent = s.inactive ?? '—';
+  document.getElementById('stat-admins').textContent   = s.admins ?? '—';
+  document.getElementById('stat-today').textContent    = s.registered_today ?? '—';
+  document.getElementById('stat-week').textContent     = s.registered_this_week ?? '—';
+  document.getElementById('stat-month').textContent    = s.registered_this_month ?? '—';
+  document.getElementById('stat-2fa').textContent      = s.with_2fa ?? '—';
+
+  // Draw registration chart (simple canvas bar chart)
+  const canvas = document.getElementById('admin-reg-chart');
+  if (!canvas || !s.daily_registrations) return;
+  const ctx = canvas.getContext('2d');
+  const data = s.daily_registrations;
+  const w = canvas.width = canvas.offsetWidth;
+  const h = canvas.height = 120;
+  ctx.clearRect(0, 0, w, h);
+  if (data.length === 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(t('stat_no_data') || 'No data', w/2, h/2);
+    return;
+  }
+  const maxVal = Math.max(...data.map(d => d.count), 1);
+  const barW = Math.max(4, (w - 20) / 30 - 2);
+  const startX = (w - (barW + 2) * data.length) / 2;
+
+  data.forEach((d, i) => {
+    const barH = (d.count / maxVal) * (h - 30);
+    const x = startX + i * (barW + 2);
+    const y = h - 18 - barH;
+    ctx.fillStyle = d.count > 0 ? 'rgba(0,229,160,0.7)' : 'rgba(255,255,255,0.08)';
+    ctx.fillRect(x, y, barW, barH || 2);
+    if (d.count > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(d.count, x + barW/2, y - 3);
+    }
+  });
+  // X-axis labels (first, middle, last)
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'center';
+  if (data.length > 0) {
+    ctx.fillText(data[0].date.slice(5), startX + barW/2, h - 4);
+    if (data.length > 2) {
+      const mid = Math.floor(data.length / 2);
+      ctx.fillText(data[mid].date.slice(5), startX + mid * (barW + 2) + barW/2, h - 4);
+    }
+    ctx.fillText(data[data.length-1].date.slice(5), startX + (data.length-1) * (barW + 2) + barW/2, h - 4);
+  }
 }
 
 function filterAdminUsers() {

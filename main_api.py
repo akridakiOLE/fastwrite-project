@@ -1699,6 +1699,13 @@ def admin_list_users():
     return jsonify(users)
 
 
+@app.get("/api/admin/users/stats")
+@require_admin
+def admin_user_stats():
+    """Return detailed user statistics. Admin only."""
+    return jsonify(db.user_stats())
+
+
 @app.post("/api/admin/users/<int:user_id>/toggle-active")
 @require_admin
 def admin_toggle_active(user_id):
