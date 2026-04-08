@@ -18,6 +18,8 @@ from schema_builder import SchemaBuilder
 from validator      import InvoiceValidator
 from exporter       import DocumentExporter
 import billing_manager
+import random
+import email_service
 
 # ── Logging setup — εξασφαλίζει ότι τα logs φτάνουν στο journalctl ──
 logging.basicConfig(
@@ -1689,6 +1691,65 @@ def auth_register():
         return jsonify({"error": "Σφάλμα κατά την εγγραφή"}), 500
 
 
+# ── Password Reset Endpoints ─────────────────────────────────────────────────
+
+@app.post("/api/auth/forgot-password")
+def auth_forgot_password():
+    """Send a 6-digit OTP to the user's email for password reset."""
+    data = request.get_json(silent=True) or {}
+    email_addr = (data.get("email") or "").strip().lower()
+    if not email_addr:
+        return jsonify({"error": "Εισάγετε το email σας"}), 400
+
+    user = db.get_user_by_email(email_addr)
+    if not user:
+        # Don't reveal whether email exists - always return success
+        logger.info(f"Password reset requested for unknown email: {email_addr}")
+        return jsonify({"success": True, "message": "Αν υπάρχει λογαριασμός με αυτό το email, θα λάβετε κωδικό επαναφοράς."})
+
+    # Generate 6-digit OTP
+    otp_code = f"{random.randint(100000, 999999)}"
+    db.create_password_reset(user["id"], otp_code, expires_minutes=10)
+
+    # Send email
+    try:
+        email_service.send_password_reset_otp(email_addr, otp_code, user["username"])
+        logger.info(f"Password reset OTP sent to {email_addr} for user {user['username']}")
+    except Exception as e:
+        logger.error(f"Failed to send password reset email to {email_addr}: {e}")
+        return jsonify({"error": "Αποτυχία αποστολής email. Δοκιμάστε ξανά."}), 500
+
+    return jsonify({"success": True, "message": "Αν υπάρχει λογαριασμός με αυτό το email, θα λάβετε κωδικό επαναφοράς."})
+
+
+@app.post("/api/auth/reset-password")
+def auth_reset_password():
+    """Verify OTP and set new password."""
+    data = request.get_json(silent=True) or {}
+    email_addr = (data.get("email") or "").strip().lower()
+    otp_code = (data.get("otp") or "").strip()
+    new_password = data.get("new_password", "")
+
+    if not email_addr or not otp_code or not new_password:
+        return jsonify({"error": "Συμπληρώστε όλα τα πεδία"}), 400
+
+    if len(otp_code) != 6 or not otp_code.isdigit():
+        return jsonify({"error": "Ο κωδικός OTP πρέπει να είναι 6 ψηφία"}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"error": "Ο νέος κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες"}), 400
+
+    user = db.verify_password_reset_otp(email_addr, otp_code)
+    if not user:
+        return jsonify({"error": "Μη έγκυρος ή ληγμένος κωδικός OTP"}), 400
+
+    # Update password
+    db.update_user_password(user["id"], hash_password(new_password))
+    logger.info(f"Password reset successful for user {user['username']}")
+
+    return jsonify({"success": True, "message": "Ο κωδικός σας άλλαξε επιτυχώς. Μπορείτε να συνδεθείτε."})
+
+
 # ── Admin Endpoints ──────────────────────────────────────────────────────────
 
 @app.get("/api/admin/users")
@@ -2033,13 +2094,59 @@ button:hover{opacity:.85;}
     </div>
     <button type="submit" id="login-btn">Sign In</button>
   </form>
-  <div style="text-align:center;margin-top:20px;font-size:13px;color:#7c8299;">
+  <div style="text-align:center;margin-top:12px;font-size:13px;">
+    <a href="#" onclick="showForgot();return false;" style="color:var(--text2);text-decoration:none;font-size:12px;">Ξέχασα τον κωδικό μου</a>
+  </div>
+  <div style="text-align:center;margin-top:12px;font-size:13px;color:#7c8299;">
     Δεν έχεις λογαριασμό; <a href="/ui/register" style="color:#00e5a0;text-decoration:none;">Εγγραφή</a>
   </div>
   <div style="text-align:center;margin-top:12px;font-size:11px;color:#555;">
     <a href="/legal" target="_blank" style="color:#7c8299;text-decoration:none;">Όροι Χρήσης &amp; Πολιτική Απορρήτου</a>
   </div>
 </div>
+
+<!-- Forgot Password Modal -->
+<div id="forgot-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center;">
+<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:40px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+  <h2 style="font-size:20px;margin-bottom:8px;">Επαναφορά <span style="color:var(--accent);">Κωδικού</span></h2>
+
+  <!-- Step 1: Enter email -->
+  <div id="fp-step1">
+    <p style="color:var(--text2);font-size:13px;margin-bottom:20px;">Εισάγετε το email του λογαριασμού σας.</p>
+    <div class="error-msg" id="fp-error" style="display:none;"></div>
+    <div id="fp-success" style="display:none;color:var(--accent);font-size:13px;margin-bottom:16px;"></div>
+    <label>Email</label>
+    <input type="email" id="fp-email" placeholder="you@example.com" required/>
+    <button type="button" onclick="doForgot()" id="fp-btn1">Αποστολή Κωδικού</button>
+  </div>
+
+  <!-- Step 2: Enter OTP + new password -->
+  <div id="fp-step2" style="display:none;">
+    <p style="color:var(--text2);font-size:13px;margin-bottom:20px;">Ελέγξτε το email σας για τον 6ψήφιο κωδικό.</p>
+    <div class="error-msg" id="fp-error2" style="display:none;"></div>
+    <label>Κωδικός OTP</label>
+    <input type="text" id="fp-otp" placeholder="123456" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" style="text-align:center;font-size:22px;letter-spacing:10px;"/>
+    <label>Νέος Κωδικός</label>
+    <div style="position:relative">
+      <input type="password" id="fp-newpass" placeholder="Τουλάχιστον 6 χαρακτήρες" required style="width:100%;padding-right:40px"/>
+      <span onclick="var p=document.getElementById('fp-newpass');p.type=p.type==='password'?'text':'password'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#7c8299;font-size:18px;">&#128065;</span>
+    </div>
+    <button type="button" onclick="doReset()" id="fp-btn2">Αλλαγή Κωδικού</button>
+  </div>
+
+  <!-- Step 3: Success -->
+  <div id="fp-step3" style="display:none;text-align:center;padding:20px 0;">
+    <div style="font-size:48px;margin-bottom:16px;">&#9989;</div>
+    <p style="font-size:16px;margin-bottom:20px;">Ο κωδικός άλλαξε επιτυχώς!</p>
+    <button type="button" onclick="closeForgot()">Σύνδεση</button>
+  </div>
+
+  <div style="text-align:center;margin-top:16px;">
+    <a href="#" onclick="closeForgot();return false;" style="color:var(--text2);font-size:12px;text-decoration:none;">Ακύρωση</a>
+  </div>
+</div>
+</div>
+
 <script>
 let needs2fa=false;
 async function doLogin(e){
@@ -2062,6 +2169,65 @@ async function doLogin(e){
     else{err.textContent=d.error||'Login failed';err.style.display='block';}
   }catch(ex){err.textContent='Connection error';err.style.display='block';}
   return false;
+}
+
+/* ── Forgot Password Flow ── */
+let fpEmail='';
+function showForgot(){
+  document.getElementById('forgot-overlay').style.display='flex';
+  document.getElementById('fp-step1').style.display='block';
+  document.getElementById('fp-step2').style.display='none';
+  document.getElementById('fp-step3').style.display='none';
+  document.getElementById('fp-error').style.display='none';
+  document.getElementById('fp-success').style.display='none';
+  document.getElementById('fp-email').value='';
+  document.getElementById('fp-email').focus();
+}
+function closeForgot(){
+  document.getElementById('forgot-overlay').style.display='none';
+}
+async function doForgot(){
+  const err=document.getElementById('fp-error');
+  const suc=document.getElementById('fp-success');
+  err.style.display='none'; suc.style.display='none';
+  fpEmail=document.getElementById('fp-email').value.trim();
+  if(!fpEmail){err.textContent='Εισάγετε το email σας';err.style.display='block';return;}
+  const btn=document.getElementById('fp-btn1');
+  btn.disabled=true;btn.textContent='Αποστολή...';
+  try{
+    const r=await fetch('/api/auth/forgot-password',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:fpEmail})});
+    const d=await r.json();
+    if(r.ok&&d.success){
+      document.getElementById('fp-step1').style.display='none';
+      document.getElementById('fp-step2').style.display='block';
+      document.getElementById('fp-otp').focus();
+    } else {
+      err.textContent=d.error||'Σφάλμα';err.style.display='block';
+    }
+  }catch(ex){err.textContent='Σφάλμα σύνδεσης';err.style.display='block';}
+  btn.disabled=false;btn.textContent='Αποστολή Κωδικού';
+}
+async function doReset(){
+  const err=document.getElementById('fp-error2');
+  err.style.display='none';
+  const otp=document.getElementById('fp-otp').value.trim();
+  const np=document.getElementById('fp-newpass').value;
+  if(!otp||!np){err.textContent='Συμπληρώστε όλα τα πεδία';err.style.display='block';return;}
+  if(otp.length!==6){err.textContent='Ο κωδικός OTP είναι 6 ψηφία';err.style.display='block';return;}
+  if(np.length<6){err.textContent='Ο νέος κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες';err.style.display='block';return;}
+  const btn=document.getElementById('fp-btn2');
+  btn.disabled=true;btn.textContent='Αλλαγή...';
+  try{
+    const r=await fetch('/api/auth/reset-password',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:fpEmail,otp:otp,new_password:np})});
+    const d=await r.json();
+    if(r.ok&&d.success){
+      document.getElementById('fp-step2').style.display='none';
+      document.getElementById('fp-step3').style.display='block';
+    } else {
+      err.textContent=d.error||'Μη έγκυρος κωδικός';err.style.display='block';
+    }
+  }catch(ex){err.textContent='Σφάλμα σύνδεσης';err.style.display='block';}
+  btn.disabled=false;btn.textContent='Αλλαγή Κωδικού';
 }
 </script>
 </body>

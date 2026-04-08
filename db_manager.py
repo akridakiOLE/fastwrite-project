@@ -5,7 +5,7 @@ SQLite-based persistence layer for document metadata, user settings, and templat
 
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -172,6 +172,20 @@ class DatabaseManager:
                 self.conn.commit()
             except Exception:
                 pass  # Columns already exist (race condition with multiple workers)
+
+            # ── Password resets table: OTP tokens ──
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS password_resets (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id    INTEGER NOT NULL,
+                    otp_code   TEXT    NOT NULL,
+                    created_at TEXT    NOT NULL,
+                    expires_at TEXT    NOT NULL,
+                    used       INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+            self.conn.commit()
 
             # ── Plans table: pricing tiers ──
             self.conn.execute("""
@@ -639,6 +653,53 @@ class DatabaseManager:
             "UPDATE users SET role = ? WHERE id = ?", (role, user_id)
         )
         self.conn.commit()
+
+    # ─── PASSWORD RESET ────────────────────────────────────────────────────────
+
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Fetch a user by email address."""
+        row = self.conn.execute(
+            "SELECT * FROM users WHERE email = ? AND email != '' AND is_active = 1",
+            (email,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def create_password_reset(self, user_id: int, otp_code: str, expires_minutes: int = 10) -> int:
+        """Create a password reset OTP. Invalidates any previous unused OTPs for this user."""
+        self.conn.execute(
+            "UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0",
+            (user_id,)
+        )
+        now = datetime.utcnow()
+        expires = now + timedelta(minutes=expires_minutes)
+        cursor = self.conn.execute(
+            """INSERT INTO password_resets (user_id, otp_code, created_at, expires_at, used)
+               VALUES (?, ?, ?, ?, 0)""",
+            (user_id, otp_code, now.isoformat(), expires.isoformat())
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def verify_password_reset_otp(self, email: str, otp_code: str) -> Optional[Dict[str, Any]]:
+        """Verify an OTP code for password reset. Returns user dict if valid, None otherwise."""
+        user = self.get_user_by_email(email)
+        if not user:
+            return None
+        row = self.conn.execute(
+            """SELECT * FROM password_resets
+               WHERE user_id = ? AND otp_code = ? AND used = 0
+               AND expires_at > ?
+               ORDER BY created_at DESC LIMIT 1""",
+            (user['id'], otp_code, datetime.utcnow().isoformat())
+        ).fetchone()
+        if not row:
+            return None
+        # Mark OTP as used
+        self.conn.execute(
+            "UPDATE password_resets SET used = 1 WHERE id = ?", (row['id'],)
+        )
+        self.conn.commit()
+        return user
 
     # ─── PLANS ────────────────────────────────────────────────────────────────
 
