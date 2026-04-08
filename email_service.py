@@ -43,6 +43,7 @@ def send_email(to: str, subject: str, html: str) -> dict:
     req = Request(RESEND_API_URL, data=payload, method="POST")
     req.add_header("Authorization", f"Bearer {api_key}")
     req.add_header("Content-Type", "application/json")
+    req.add_header("User-Agent", "FastWrite/1.0")
 
     try:
         with urlopen(req, timeout=10) as resp:
