@@ -290,11 +290,11 @@ class BatchProcessor:
                 extra_instructions=SUPPLIER_DETECT_PROMPT
             )
             if not result.is_ok():
-                return default_schema_name, "unknown"
+                return default_schema_name, "unknown", False
 
             detected = (result.extracted_data.get("supplier_name") or "").strip()
             if not detected or detected.upper() == "UNKNOWN":
-                return default_schema_name, "unknown"
+                return default_schema_name, "unknown", False
 
             # Fuzzy match: ψάχνουμε templates με supplier_pattern
             templates = self.db.list_templates(user_id=self._current_user_id)
