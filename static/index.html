@@ -621,12 +621,12 @@ select.form-input option{background:var(--bg2);}
               <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;" data-i18n="settings_change_username">👤 Αλλαγή Username</div>
               <div class="form-group">
                 <label class="form-label" data-i18n="settings_new_username">Νέο username</label>
-                <input class="form-input" type="text" id="uname-new" placeholder="Τουλάχιστον 3 χαρακτήρες..." autocomplete="username" data-i18n-placeholder="settings_new_username_placeholder"/>
+                <input class="form-input" type="text" id="uname-new" placeholder="Τουλάχιστον 3 χαρακτήρες..." autocomplete="off" data-i18n-placeholder="settings_new_username_placeholder"/>
               </div>
               <div class="form-group">
                 <label class="form-label" data-i18n="settings_password_confirm">Κωδικός (για επιβεβαίωση)</label>
                 <div style="position:relative;">
-                  <input class="form-input" type="password" id="uname-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="current-password" style="padding-right:40px;" data-i18n-placeholder="settings_password_placeholder"/>
+                  <input class="form-input" type="password" id="uname-pw" placeholder="Εισήγαγε τον κωδικό σου..." autocomplete="off" style="padding-right:40px;" data-i18n-placeholder="settings_password_placeholder"/>
                   <button type="button" onclick="togglePw('uname-pw',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη" data-i18n-title="settings_show_hide">👁</button>
                 </div>
               </div>
@@ -639,21 +639,21 @@ select.form-input option{background:var(--bg2);}
               <div class="form-group">
                 <label class="form-label" data-i18n="settings_current_password">Τρέχων κωδικός</label>
                 <div style="position:relative;">
-                  <input class="form-input" type="password" id="pw-current" placeholder="Εισήγαγε τον τρέχοντα κωδικό..." autocomplete="current-password" data-i18n-placeholder="settings_current_password_placeholder" style="padding-right:40px;"/>
+                  <input class="form-input" type="password" id="pw-current" placeholder="Εισήγαγε τον τρέχοντα κωδικό..." autocomplete="off" data-i18n-placeholder="settings_current_password_placeholder" style="padding-right:40px;"/>
                   <button type="button" onclick="togglePw('pw-current',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη" data-i18n-title="settings_show_hide">👁</button>
                 </div>
               </div>
               <div class="form-group">
                 <label class="form-label" data-i18n="settings_new_password">Νέος κωδικός</label>
                 <div style="position:relative;">
-                  <input class="form-input" type="password" id="pw-new" placeholder="Τουλάχιστον 6 χαρακτήρες..." autocomplete="new-password" data-i18n-placeholder="settings_new_password_placeholder" style="padding-right:40px;"/>
+                  <input class="form-input" type="password" id="pw-new" placeholder="Τουλάχιστον 6 χαρακτήρες..." autocomplete="off" data-i18n-placeholder="settings_new_password_placeholder" style="padding-right:40px;"/>
                   <button type="button" onclick="togglePw('pw-new',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη" data-i18n-title="settings_show_hide">👁</button>
                 </div>
               </div>
               <div class="form-group">
                 <label class="form-label" data-i18n="settings_confirm_password">Επιβεβαίωση νέου κωδικού</label>
                 <div style="position:relative;">
-                  <input class="form-input" type="password" id="pw-confirm" placeholder="Επανάλαβε τον νέο κωδικό..." autocomplete="new-password" data-i18n-placeholder="settings_confirm_password_placeholder" style="padding-right:40px;"/>
+                  <input class="form-input" type="password" id="pw-confirm" placeholder="Επανάλαβε τον νέο κωδικό..." autocomplete="off" data-i18n-placeholder="settings_confirm_password_placeholder" style="padding-right:40px;"/>
                   <button type="button" onclick="togglePw('pw-confirm',this)" class="pw-eye" title="Εμφάνιση/Απόκρυψη" data-i18n-title="settings_show_hide">👁</button>
                 </div>
               </div>
