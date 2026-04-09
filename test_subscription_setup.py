@@ -20,13 +20,16 @@ Test helper για subscription enforcement.
   # Reset usage στο 0 (για νέα δοκιμή)
   python3 test_subscription_setup.py --user testuser --reset
 
+  # Αλλαγή plan σε Starter (ΧΩΡΙΣ Stripe — μόνο για test)
+  python3 test_subscription_setup.py --user testuser --plan starter
+
   # Full status χωρίς αλλαγές
   python3 test_subscription_setup.py --user testuser --status
 """
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -125,6 +128,46 @@ def reset_usage(db: DatabaseManager, user_id: int):
     print("  [OK] Usage reset στο 0.")
 
 
+def switch_plan(db: DatabaseManager, user_id: int, plan_name: str) -> bool:
+    """Switch a user to a different plan WITHOUT going through Stripe.
+    Only για testing purposes. Deactivates old subscription and creates
+    a new active one με fresh 30-day period."""
+    plan = db.get_plan_by_name(plan_name)
+    if not plan:
+        print(f"  [ERROR] Δεν βρέθηκε plan '{plan_name}'.")
+        available = [p['name'] for p in db.list_plans(active_only=False)]
+        print(f"  [INFO] Διαθέσιμα plans: {', '.join(available)}")
+        return False
+
+    # Deactivate current active subscription (if any)
+    old_sub = db.get_active_subscription(user_id)
+    if old_sub:
+        db.update_subscription(old_sub['id'], status='canceled')
+        print(f"  [OK] Παλιά subscription (id={old_sub['id']}, "
+              f"plan={old_sub.get('plan_name')}) έγινε canceled.")
+
+    # Create new subscription με fresh 30-day period
+    now = datetime.utcnow()
+    period_start = now.isoformat()
+    period_end = (now + timedelta(days=30)).isoformat()
+    new_sub_id = db.create_subscription(
+        user_id=user_id,
+        plan_id=plan['id'],
+        period_start=period_start,
+        period_end=period_end,
+        status='active',
+    )
+    print(f"  [OK] Νέα subscription (id={new_sub_id}) → plan='{plan_name}' "
+          f"({plan.get('display_name')}).")
+    print(f"       doc_limit={plan.get('doc_limit')}, "
+          f"page_limit={plan.get('page_limit')}")
+
+    # Reset usage summary για το νέο period
+    db.reset_usage_for_period(user_id, period_start, period_end)
+    print(f"  [OK] Usage summary reset για το νέο period.")
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="FastWrite subscription enforcement test helper"
@@ -142,6 +185,9 @@ def main():
                              "πριν ξεπεραστεί το όριο")
     parser.add_argument("--leave-docs", type=int, default=None,
                         help="Ρύθμισε docs_used ώστε να απομένουν N documents")
+    parser.add_argument("--plan", type=str, default=None,
+                        help="Άλλαξε plan (π.χ. free, starter, professional) "
+                             "ΧΩΡΙΣ Stripe — μόνο για test")
     args = parser.parse_args()
 
     db = DatabaseManager(db_path=args.db)
@@ -156,7 +202,13 @@ def main():
     if args.status:
         return
 
-    # 1. Templates (πάντα εκτός αν --status)
+    # 1. Plan switch (αν ζητήθηκε) — ΠΡΩΤΟ γιατί αλλάζει limits/subscription
+    if args.plan:
+        print(f"\n=== Plan Switch → {args.plan} ===")
+        if not switch_plan(db, user["id"], args.plan):
+            sys.exit(1)
+
+    # 2. Templates (πάντα εκτός αν --status)
     print(f"\n=== Templates ===")
     ensure_test_template(db, user["id"])
 
@@ -165,7 +217,7 @@ def main():
         print_status(db, user)
         return
 
-    # 2. Reset ή force usage
+    # 3. Reset ή force usage (πρέπει να υπάρχει active subscription)
     sub = db.get_active_subscription(user["id"])
     if not sub:
         print("[ERROR] No active subscription — cannot modify usage.")
