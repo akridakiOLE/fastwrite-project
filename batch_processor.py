@@ -419,6 +419,13 @@ class BatchProcessor:
                     self.db.update_document_status(
                         doc_id, status="registered",
                         result_json=json.dumps(reg_data) if reg_data else None)
+                    # ── Record doc usage (registered, no extraction) ──
+                    try:
+                        self.db.record_usage_event(
+                            self._current_user_id, 'doc_processed', 1)
+                    except Exception as e:
+                        logger.error("Failed to record doc usage (registered) "
+                                     "for doc %d: %s", doc_id, e)
                     print(f"[extract_one] doc_id={doc_id} REGISTERED (no extraction). "
                           f"supplier={detected_supplier}, template={used_schema_name}", flush=True)
                     return {"success": True, "doc_id": doc_id,
@@ -430,10 +437,11 @@ class BatchProcessor:
                 if result.is_ok():
                     final_status = "pending"
                     extracted = result.extracted_data
-                    # _confidence_pct υπολογίζεται αυτόματα από ai_extractor (logprobs)
+                    # _confidence_pct υπολογίζεται αυτόματα από ai_extractor (self-assessment)
                     if detected_supplier and detected_supplier != "unknown":
                         extracted.setdefault("_matched_supplier", detected_supplier)
                         extracted.setdefault("_matched_template", used_schema_name)
+                    conf_pct = extracted.get("_confidence_pct", 0)
                     print(f"[extract_one] doc_id={doc_id} EXTRACTED. confidence={conf_pct}%", flush=True)
                     self.db.update_document_status(
                         doc_id, status=final_status,
@@ -456,6 +464,16 @@ class BatchProcessor:
                             self.db.conn.commit()
                         except Exception:
                             pass
+                    # ── Record usage: 1 doc + N pages for this extracted segment ──
+                    try:
+                        self.db.record_usage_event(
+                            self._current_user_id, 'doc_processed', 1)
+                        self.db.record_usage_event(
+                            self._current_user_id, 'page_processed',
+                            len(segment.pages))
+                    except Exception as e:
+                        logger.error("Failed to record usage for doc %d: %s",
+                                     doc_id, e)
                     return {"success": True, "doc_id": doc_id,
                             "matched_template": used_schema_name}
                 else:

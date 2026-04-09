@@ -59,6 +59,57 @@ ALLOWED_ORIGINS = [
     "https://www.fastwrite.tech","http://www.fastwrite.tech",
 ]
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Subscription-limit helpers (used by /api/batch & /api/batch/extract-selected)
+# ─────────────────────────────────────────────────────────────────────────────
+def _count_pdf_pages(pdf_path) -> int:
+    """Fast page count for a PDF. Returns 1 if the file can't be read.
+    Used for pre-flight page-limit checks before batch processing."""
+    try:
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            from PyPDF2 import PdfReader
+        return max(1, len(PdfReader(str(pdf_path)).pages))
+    except Exception as e:
+        logger.warning("[_count_pdf_pages] failed for %s: %s", pdf_path, e)
+        return 1
+
+
+def _enforce_page_limit(user_id: int, pages: int):
+    """Check if a user can process N more pages under their current plan.
+    Returns a Flask (response, status) tuple if blocked, or None if allowed."""
+    if pages <= 0:
+        return None
+    check = db.check_usage_limit(user_id, 'page_processed', pages)
+    if not check.get('allowed'):
+        return jsonify({
+            "error": check.get('message', 'Ξεπέρασες το όριο του plan σου.'),
+            "limit_reached": True,
+            "limit_type": "pages",
+            "requested_pages": pages,
+            "usage": check,
+        }), 403
+    return None
+
+
+def _enforce_doc_limit(user_id: int, docs: int):
+    """Check if a user can process N more documents under their current plan.
+    Returns a Flask (response, status) tuple if blocked, or None if allowed."""
+    if docs <= 0:
+        return None
+    check = db.check_usage_limit(user_id, 'doc_processed', docs)
+    if not check.get('allowed'):
+        return jsonify({
+            "error": check.get('message', 'Ξεπέρασες το όριο του plan σου.'),
+            "limit_reached": True,
+            "limit_type": "docs",
+            "requested_docs": docs,
+            "usage": check,
+        }), 403
+    return None
+
 @app.after_request
 def add_cors(response):
     origin = request.headers.get("Origin", "")
@@ -984,39 +1035,56 @@ def batch_extract_selected():
 
     from ai_extractor import AIExtractor
 
-    results = {"total": len(doc_ids), "extracted": 0, "skipped_completed": 0,
-               "skipped_no_label": 0, "failed": 0, "details": []}
-
+    # ── Subscription enforcement: pre-count pages for docs that WILL actually
+    # be extracted (exclude already-completed / no-label / wrong-user docs).
+    eligible_docs = []  # list of (doc_id, doc, template, page_count)
+    pre_results = {"total": len(doc_ids), "extracted": 0, "skipped_completed": 0,
+                   "skipped_no_label": 0, "failed": 0, "details": []}
     for doc_id in doc_ids:
         doc = db.get_document(doc_id)
         if not doc:
-            results["failed"] += 1
-            results["details"].append({"doc_id": doc_id, "status": "not_found"})
+            pre_results["failed"] += 1
+            pre_results["details"].append({"doc_id": doc_id, "status": "not_found"})
             continue
         if doc.get("user_id") != uid:
-            results["failed"] += 1
-            results["details"].append({"doc_id": doc_id, "status": "access_denied"})
+            pre_results["failed"] += 1
+            pre_results["details"].append({"doc_id": doc_id, "status": "access_denied"})
             continue
-
-        # Skip already completed/approved
         if doc.get("status") in ("Completed", "pending_review", "completed", "approved"):
-            results["skipped_completed"] += 1
-            results["details"].append({"doc_id": doc_id, "status": "already_completed"})
+            pre_results["skipped_completed"] += 1
+            pre_results["details"].append({"doc_id": doc_id, "status": "already_completed"})
             continue
-
-        # Skip if no label assigned
-        sname = doc.get("schema_name", "").strip()
+        sname = (doc.get("schema_name") or "").strip()
         if not sname:
-            results["skipped_no_label"] += 1
-            results["details"].append({"doc_id": doc_id, "status": "no_label"})
+            pre_results["skipped_no_label"] += 1
+            pre_results["details"].append({"doc_id": doc_id, "status": "no_label"})
             continue
-
         template = db.get_template(sname, user_id=uid)
         if not template:
-            results["skipped_no_label"] += 1
-            results["details"].append({"doc_id": doc_id, "status": "label_not_found"})
+            pre_results["skipped_no_label"] += 1
+            pre_results["details"].append({"doc_id": doc_id, "status": "label_not_found"})
             continue
+        # Fast page count (images = 1 page, PDF = pypdf count)
+        fp = Path(doc["file_path"])
+        if fp.suffix.lower() == ".pdf":
+            n_pages = _count_pdf_pages(fp)
+        else:
+            n_pages = 1
+        eligible_docs.append((doc_id, doc, template, n_pages))
 
+    total_pages_to_process = sum(n for _, _, _, n in eligible_docs)
+    if total_pages_to_process > 0:
+        blocked = _enforce_page_limit(uid, total_pages_to_process)
+        if blocked is not None:
+            logger.warning("[batch_extract_selected] uid=%s BLOCKED: %d pages across "
+                           "%d docs exceeds plan limit",
+                           uid, total_pages_to_process, len(eligible_docs))
+            return blocked
+
+    results = pre_results
+
+    for doc_id, doc, template, _n_pages in eligible_docs:
+        sname = (doc.get("schema_name") or "").strip()
         try:
             schema = schema_bld.build_from_list(template["fields"])
             schema.pop("additionalProperties", None)
@@ -1048,6 +1116,12 @@ def batch_extract_selected():
                 final_status = "pending"
                 db.update_document_status(doc_id, status=final_status,
                                           result_json=json.dumps(extracted))
+                # ── Record usage: pages actually sent to AI ──
+                try:
+                    db.record_usage_event(uid, 'page_processed',
+                                          len(processed_result.pages))
+                except Exception as e:
+                    logger.error("Failed to record page usage for doc %d: %s", doc_id, e)
                 results["extracted"] += 1
                 results["details"].append({"doc_id": doc_id, "status": final_status})
             else:
@@ -1247,11 +1321,6 @@ def batch_upload():
     if not billing_manager.check_feature(db, uid, 'batch_upload'):
         return jsonify({"error": "Batch upload requires a paid plan. Please upgrade.",
                         "limit_reached": True}), 403
-    # ── Usage limit check ──
-    limit_check = db.check_usage_limit(uid, 'doc_processed', 1)
-    if not limit_check['allowed']:
-        return jsonify({"error": limit_check['message'], "limit_reached": True,
-                        "usage": limit_check}), 403
     file_path_param = request.form.get("file_path", "").strip()
     if file_path_param and Path(file_path_param).exists():
         dest = Path(file_path_param)
@@ -1266,6 +1335,14 @@ def batch_upload():
         original_filename = f.filename
     else:
         return jsonify({"error": "Δεν βρέθηκε αρχείο."}), 400
+
+    # ── Subscription enforcement: count PDF pages & block if over limit ──
+    pdf_pages = _count_pdf_pages(dest)
+    blocked = _enforce_page_limit(uid, pdf_pages)
+    if blocked is not None:
+        logger.warning("[batch_upload] uid=%s BLOCKED: %d pages exceeds plan limit",
+                       uid, pdf_pages)
+        return blocked
     schema_name       = request.form.get("schema_name", "invoice")
     auto_match        = request.form.get("auto_match", "false").lower() == "true"
     skip_completed    = request.form.get("skip_completed", "false").lower() == "true"
