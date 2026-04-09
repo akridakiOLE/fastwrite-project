@@ -382,6 +382,18 @@ class BatchProcessor:
                                 "_matched_supplier": detected_supplier or "unknown"}))
                         self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
                         self.db.conn.commit()
+                        # ── Record usage: doc + pages ακόμα και για no_template ──
+                        # Ο χρήστης κατανάλωσε Gemini API call + pages, οπότε
+                        # πρέπει να μετρηθούν για το subscription enforcement.
+                        try:
+                            self.db.record_usage_event(
+                                self._current_user_id, 'doc_processed', 1)
+                            self.db.record_usage_event(
+                                self._current_user_id, 'page_processed',
+                                len(segment.pages))
+                        except Exception as e:
+                            logger.error("Failed to record no_template usage "
+                                         "for doc %d: %s", doc_id, e)
                         return {"success": True, "doc_id": doc_id,
                                 "matched_template": None, "skipped": True}
                 else:
@@ -393,6 +405,16 @@ class BatchProcessor:
                                 "_matched_supplier": "unknown"}))
                         self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
                         self.db.conn.commit()
+                        # ── Record usage: doc + pages ακόμα και χωρίς ετικέτα ──
+                        try:
+                            self.db.record_usage_event(
+                                self._current_user_id, 'doc_processed', 1)
+                            self.db.record_usage_event(
+                                self._current_user_id, 'page_processed',
+                                len(segment.pages))
+                        except Exception as e:
+                            logger.error("Failed to record no_template usage "
+                                         "for doc %d: %s", doc_id, e)
                         return {"success": True, "doc_id": doc_id,
                                 "matched_template": None, "skipped": True}
                     seg_schema       = default_schema
