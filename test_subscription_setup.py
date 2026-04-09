@@ -83,11 +83,30 @@ def print_status(db: DatabaseManager, user: dict):
 
 
 def ensure_test_template(db: DatabaseManager, user_id: int,
-                          name: str = "invoice") -> int:
+                          name: str = None) -> int:
+    """Create or reuse a test invoice template.
+    NOTE: templates.name has a GLOBAL UNIQUE constraint in SQLite,
+    so we suffix with user_id to avoid collisions between users.
+    """
+    if name is None:
+        name = f"invoice_u{user_id}"
+
+    # 1. Try per-user lookup
     existing = db.get_template(name, user_id=user_id)
     if existing:
         print(f"  [OK] Template '{name}' υπάρχει ήδη (id={existing.get('id')}).")
         return existing.get("id")
+
+    # 2. Guard: check if the name is globally taken by ANOTHER user
+    global_row = db.conn.execute(
+        "SELECT id, user_id FROM templates WHERE name=?", (name,)
+    ).fetchone()
+    if global_row and global_row["user_id"] != user_id:
+        # Very unlikely given the u{user_id} suffix, but be safe
+        import time
+        name = f"invoice_u{user_id}_{int(time.time())}"
+        print(f"  [WARN] Name collision — using '{name}' instead.")
+
     tid = db.save_template(
         name=name,
         fields=TEST_INVOICE_FIELDS,
