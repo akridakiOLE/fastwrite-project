@@ -1024,6 +1024,7 @@ def batch_extract_selected():
     Εξάγει δεδομένα μόνο για docs με schema_name (ετικέτα).
     """
     uid = request.current_user["user_id"]
+    is_admin = request.current_user.get("role") == "admin"
     data = request.get_json(force=True) or {}
     doc_ids = data.get("doc_ids", [])
     if not doc_ids:
@@ -1073,7 +1074,7 @@ def batch_extract_selected():
         eligible_docs.append((doc_id, doc, template, n_pages))
 
     total_pages_to_process = sum(n for _, _, _, n in eligible_docs)
-    if total_pages_to_process > 0:
+    if not is_admin and total_pages_to_process > 0:
         blocked = _enforce_page_limit(uid, total_pages_to_process)
         if blocked is not None:
             logger.warning("[batch_extract_selected] uid=%s BLOCKED: %d pages across "
@@ -1317,8 +1318,9 @@ def batch_pre_check():
 def batch_upload():
     """Δέχεται file upload Ή file_path (για αρχεία από ιστορικό)."""
     uid = request.current_user["user_id"]
-    # ── Feature check: batch_upload requires paid plan ──
-    if not billing_manager.check_feature(db, uid, 'batch_upload'):
+    is_admin = request.current_user.get("role") == "admin"
+    # ── Feature check: batch_upload requires paid plan (admins exempt) ──
+    if not is_admin and not billing_manager.check_feature(db, uid, 'batch_upload'):
         return jsonify({"error": "Batch upload requires a paid plan. Please upgrade.",
                         "limit_reached": True}), 403
     file_path_param = request.form.get("file_path", "").strip()
@@ -1336,13 +1338,14 @@ def batch_upload():
     else:
         return jsonify({"error": "Δεν βρέθηκε αρχείο."}), 400
 
-    # ── Subscription enforcement: count PDF pages & block if over limit ──
-    pdf_pages = _count_pdf_pages(dest)
-    blocked = _enforce_page_limit(uid, pdf_pages)
-    if blocked is not None:
-        logger.warning("[batch_upload] uid=%s BLOCKED: %d pages exceeds plan limit",
-                       uid, pdf_pages)
-        return blocked
+    # ── Subscription enforcement: count PDF pages & block if over limit (admins exempt) ──
+    if not is_admin:
+        pdf_pages = _count_pdf_pages(dest)
+        blocked = _enforce_page_limit(uid, pdf_pages)
+        if blocked is not None:
+            logger.warning("[batch_upload] uid=%s BLOCKED: %d pages exceeds plan limit",
+                           uid, pdf_pages)
+            return blocked
     schema_name       = request.form.get("schema_name", "invoice")
     auto_match        = request.form.get("auto_match", "false").lower() == "true"
     skip_completed    = request.form.get("skip_completed", "false").lower() == "true"
