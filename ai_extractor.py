@@ -97,7 +97,8 @@ class AIExtractor:
 
     def extract(self, image_paths: List[Path],
                 schema: Dict[str, Any],
-                extra_instructions: str = "") -> ExtractionResult:
+                extra_instructions: str = "",
+                skip_confidence: bool = False) -> ExtractionResult:
         start_time = time.time()
         result     = ExtractionResult()
 
@@ -115,12 +116,14 @@ class AIExtractor:
             return self._error(result, "Άκυρο JSON Schema.",
                                ExtractionStatus.FAILED, start_time)
 
-        prompt = self._build_prompt(schema, extra_instructions)
+        prompt = self._build_prompt(schema, extra_instructions,
+                                    skip_confidence=skip_confidence)
 
         last_error = ""
         for attempt in range(1, self.max_retries + 1):
             try:
-                api_result = self._call_api(image_paths, prompt, schema)
+                api_result = self._call_api(image_paths, prompt, schema,
+                                            skip_confidence=skip_confidence)
                 api_result.pages_processed = len(image_paths)
                 api_result.processing_time = round(time.time() - start_time, 3)
                 api_result.extracted_at    = datetime.utcnow().isoformat()
@@ -149,7 +152,8 @@ class AIExtractor:
             status, start_time)
 
     def _call_api(self, image_paths: List[Path],
-                  prompt: str, schema: Dict) -> ExtractionResult:
+                  prompt: str, schema: Dict,
+                  skip_confidence: bool = False) -> ExtractionResult:
         """Κλήση με νέο google.genai SDK."""
         from google import genai
         from google.genai import types
@@ -179,7 +183,9 @@ class AIExtractor:
         _ds(clean_schema)
 
         # Προσθήκη _confidence_pct στο schema — ζητάμε self-assessment
-        if "properties" in clean_schema:
+        # Εξαίρεση: lightweight detection calls (π.χ. supplier detection)
+        # δεν χρειάζονται confidence και μπερδεύουν το model.
+        if not skip_confidence and "properties" in clean_schema:
             clean_schema["properties"]["_confidence_pct"] = {
                 "type": "number",
                 "description": "Overall confidence score 0-100 for the entire extraction. "
@@ -225,7 +231,8 @@ class AIExtractor:
 
         return result
 
-    def _build_prompt(self, schema: Dict, extra: str) -> str:
+    def _build_prompt(self, schema: Dict, extra: str,
+                      skip_confidence: bool = False) -> str:
         schema_str = json.dumps(schema, ensure_ascii=False, indent=2)
         prompt = (
             f"Extract the data from the document according to the JSON Schema below:\n\n"
@@ -235,11 +242,14 @@ class AIExtractor:
             f"- If a field is not present in the document, use null.\n"
             f"- Monetary amounts must be numbers (float), not strings.\n"
             f"- Dates must be in YYYY-MM-DD format.\n"
-            f"- For _confidence_pct: rate your overall confidence in the extraction from 0 to 100.\n"
-            f"  Score HIGH (90-100) if all text is clear and unambiguous.\n"
-            f"  Score MEDIUM (60-89) if some fields are unclear or estimated.\n"
-            f"  Score LOW (0-59) if the document is poor quality or many fields are missing.\n"
         )
+        if not skip_confidence:
+            prompt += (
+                f"- For _confidence_pct: rate your overall confidence in the extraction from 0 to 100.\n"
+                f"  Score HIGH (90-100) if all text is clear and unambiguous.\n"
+                f"  Score MEDIUM (60-89) if some fields are unclear or estimated.\n"
+                f"  Score LOW (0-59) if the document is poor quality or many fields are missing.\n"
+            )
         if extra:
             prompt += f"\nAdditional instructions: {extra}\n"
         return prompt

@@ -96,8 +96,12 @@ Example for 4 pages where page 1-2 are one invoice, page 3 and 4 are separate in
 {"pages": [{"page":1,"new_doc":true},{"page":2,"new_doc":false},{"page":3,"new_doc":true},{"page":4,"new_doc":true}]}"""
 
 # Prompt για εξαγωγή ονόματος προμηθευτή (Auto Template Matching)
-SUPPLIER_DETECT_PROMPT = """Κοίτα το παρακάτω τιμολόγιο και εξήγαγε ΜΟΝΟ το όνομα του προμηθευτή/εκδότη.
-Επίστρεψε ΜΟΝΟ το όνομα, χωρίς εξηγήσεις. Αν δεν βρεθεί, επίστρεψε 'UNKNOWN'."""
+# ΣΗΜΕΙΩΣΗ: Χρησιμοποιείται με skip_confidence=True στο extract()
+# ώστε να μην μπερδεύεται το Gemini με _confidence_pct instructions.
+SUPPLIER_DETECT_PROMPT = """Look at the document image and identify the SUPPLIER / VENDOR / ISSUER of this invoice.
+The supplier is the company that ISSUED the invoice (the seller), NOT the recipient/buyer.
+Look for: company name at the top, letterhead, logo text, or 'From:' section.
+Return the company name as-is from the document. If the document is not an invoice or no supplier is visible, return 'UNKNOWN'."""
 
 
 @dataclass
@@ -284,15 +288,20 @@ class BatchProcessor:
                 "required": ["supplier_name"]
             }
             # Χρησιμοποιούμε μόνο την 1η σελίδα για ταχύτητα
+            # skip_confidence=True: ΔΕΝ προσθέτουμε _confidence_pct
+            # στο schema/prompt — μπερδεύει τη supplier detection.
             result = extractor.extract(
                 image_paths=segment_pages[:1],
                 schema=supplier_schema,
-                extra_instructions=SUPPLIER_DETECT_PROMPT
+                extra_instructions=SUPPLIER_DETECT_PROMPT,
+                skip_confidence=True
             )
             if not result.is_ok():
+                print(f"[_match_template] Gemini FAILED: {result.error_message}", flush=True)
                 return default_schema_name, "unknown", False
 
             detected = (result.extracted_data.get("supplier_name") or "").strip()
+            print(f"[_match_template] Gemini raw supplier_name='{detected}'", flush=True)
             if not detected or detected.upper() == "UNKNOWN":
                 return default_schema_name, "unknown", False
 
