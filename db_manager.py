@@ -5,6 +5,7 @@ SQLite-based persistence layer for document metadata, user settings, and templat
 
 import sqlite3
 import json
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -27,6 +28,12 @@ class DatabaseManager:
         """
         self.db_path = db_path
         self.conn: Optional[sqlite3.Connection] = None
+        # Reentrant lock για serialization γραφών/αναγνώσεων σε multi-thread
+        # περιβάλλοντα (π.χ. ThreadPoolExecutor στο batch_processor).
+        # Η sqlite3 connection δημιουργείται με check_same_thread=False,
+        # οπότε είμαστε υπεύθυνοι εμείς να σειριοποιήσουμε την πρόσβαση
+        # όπου χρειάζεται.
+        self._write_lock = threading.RLock()
         self._connect()
         self._create_tables()
 
@@ -852,39 +859,47 @@ class DatabaseManager:
     def record_usage_event(self, user_id: int, event_type: str,
                            quantity: int = 1,
                            metadata_json: str = None) -> int:
-        """Record a usage event AND update the summary. Returns event id."""
-        now = datetime.utcnow().isoformat()
-        # Insert event
-        cursor = self.conn.execute(
-            """INSERT INTO usage_events
-               (user_id, event_type, quantity, metadata_json, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            (user_id, event_type, quantity, metadata_json, now)
-        )
-        event_id = cursor.lastrowid
-        # Update summary
-        sub = self.get_active_subscription(user_id)
-        if sub:
-            p_start = sub['current_period_start']
-            p_end = sub['current_period_end']
-            if event_type == 'doc_processed':
-                self.conn.execute(
-                    """INSERT INTO usage_summary (user_id, period_start, period_end, docs_used, pages_used, updated_at)
-                       VALUES (?, ?, ?, ?, 0, ?)
-                       ON CONFLICT(user_id, period_start) DO UPDATE SET
-                       docs_used = docs_used + ?, updated_at = ?""",
-                    (user_id, p_start, p_end, quantity, now, quantity, now)
-                )
-            elif event_type == 'page_processed':
-                self.conn.execute(
-                    """INSERT INTO usage_summary (user_id, period_start, period_end, docs_used, pages_used, updated_at)
-                       VALUES (?, ?, ?, 0, ?, ?)
-                       ON CONFLICT(user_id, period_start) DO UPDATE SET
-                       pages_used = pages_used + ?, updated_at = ?""",
-                    (user_id, p_start, p_end, quantity, now, quantity, now)
-                )
-        self.conn.commit()
-        return event_id
+        """Record a usage event AND update the summary. Returns event id.
+
+        Thread-safe: χρησιμοποιεί self._write_lock για σειριοποίηση
+        της πρόσβασης στη SQLite connection. Αυτό είναι απαραίτητο όταν
+        η συνάρτηση καλείται παράλληλα από ThreadPoolExecutor (π.χ.
+        batch_processor._extract_parallel), καθώς η shared connection
+        με check_same_thread=False δεν είναι thread-safe από μόνη της.
+        """
+        with self._write_lock:
+            now = datetime.utcnow().isoformat()
+            # Insert event
+            cursor = self.conn.execute(
+                """INSERT INTO usage_events
+                   (user_id, event_type, quantity, metadata_json, created_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (user_id, event_type, quantity, metadata_json, now)
+            )
+            event_id = cursor.lastrowid
+            # Update summary
+            sub = self.get_active_subscription(user_id)
+            if sub:
+                p_start = sub['current_period_start']
+                p_end = sub['current_period_end']
+                if event_type == 'doc_processed':
+                    self.conn.execute(
+                        """INSERT INTO usage_summary (user_id, period_start, period_end, docs_used, pages_used, updated_at)
+                           VALUES (?, ?, ?, ?, 0, ?)
+                           ON CONFLICT(user_id, period_start) DO UPDATE SET
+                           docs_used = docs_used + ?, updated_at = ?""",
+                        (user_id, p_start, p_end, quantity, now, quantity, now)
+                    )
+                elif event_type == 'page_processed':
+                    self.conn.execute(
+                        """INSERT INTO usage_summary (user_id, period_start, period_end, docs_used, pages_used, updated_at)
+                           VALUES (?, ?, ?, 0, ?, ?)
+                           ON CONFLICT(user_id, period_start) DO UPDATE SET
+                           pages_used = pages_used + ?, updated_at = ?""",
+                        (user_id, p_start, p_end, quantity, now, quantity, now)
+                    )
+            self.conn.commit()
+            return event_id
 
     def get_usage_summary(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Get current period usage summary for a user."""
