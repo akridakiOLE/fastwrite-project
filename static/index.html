@@ -2710,6 +2710,9 @@ function openApprovalFromDocs() {
   document.querySelectorAll('.page').forEach(p => p.style.display='none');
   document.getElementById('page-approval').style.display='block';
 
+  // Auto-hide sidebar για περισσότερο χώρο στο PNG (Step 1 βελτίωσης Έγκρισης)
+  if (apSidebarVisible) apToggleSidebar();
+
   apCurrentIdx = 0;
   apRenderDocsList();
   apLoadDoc(0);
