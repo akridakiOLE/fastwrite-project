@@ -1172,10 +1172,16 @@ select.form-input option{background:var(--bg2);}
         <!-- Toggle sidebar button — positioned at left edge of PDF area -->
         <button id="ap-sidebar-toggle" onclick="apToggleSidebar()" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:all .3s ease;" title="Εμφάνιση/Απόκρυψη μενού">◀</button>
         <!-- PDF Area (PNG + canvas highlight + page number overlay) -->
-        <div id="ap-pdf-area" style="flex:1;height:100%;overflow:hidden;min-width:0;display:flex;flex-direction:column;">
+        <div id="ap-pdf-area" style="flex:1;height:100%;overflow:hidden;min-width:0;display:flex;flex-direction:column;position:relative;">
           <div id="ap-img-wrap" style="flex:1;overflow:auto;position:relative;cursor:crosshair;">
             <img id="ap-doc-img" src="" style="display:block;width:100%;user-select:none;" onload="apOnImgLoad()"/>
             <canvas id="ap-hl-canvas" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
+          </div>
+          <!-- Zoom controls (Step 3) -->
+          <div id="ap-zoom-controls" style="position:absolute;top:10px;right:10px;z-index:30;display:flex;flex-direction:column;gap:4px;background:rgba(15,15,15,0.85);border:1px solid var(--border);border-radius:8px;padding:6px;backdrop-filter:blur(6px);">
+            <button onclick="apZoomBy(0.2)" title="Μεγέθυνση (Ctrl + scroll up)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 10px;font-size:15px;font-weight:600;cursor:pointer;line-height:1;">+</button>
+            <button onclick="apZoomReset()" id="ap-zoom-label" title="Επαναφορά (διπλό κλικ)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:3px 6px;font-size:10px;cursor:pointer;line-height:1;font-family:'DM Mono',monospace;">100%</button>
+            <button onclick="apZoomBy(-0.2)" title="Σμίκρυνση (Ctrl + scroll down)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 10px;font-size:15px;font-weight:600;cursor:pointer;line-height:1;">−</button>
           </div>
         </div>
         <!-- Data Panel (right side) -->
@@ -2677,6 +2683,8 @@ let apNumRows = 0;
 let apDirty = false;
 let apSidebarVisible = true;
 let apLineData = {};
+let apZoom = 1.0;          // Step 3: τρέχον επίπεδο zoom (1.0 = 100%)
+let apZoomInited = false;  // Step 3: flag ώστε τα event listeners να μπουν μία φορά
 
 function openApprovalFromDocs() {
   const ids = getSelectedIds();
@@ -2714,6 +2722,9 @@ function openApprovalFromDocs() {
 
   // Auto-hide sidebar για περισσότερο χώρο στο PNG (Step 1 βελτίωσης Έγκρισης)
   if (apSidebarVisible) apToggleSidebar();
+
+  // Init zoom event listeners (Step 3) — εκτελείται μία φορά
+  apInitZoom();
 
   apCurrentIdx = 0;
   apRenderDocsList();
@@ -2780,6 +2791,9 @@ async function apLoadDoc(idx) {
   const info = apDocData[id];
   const doc = info.doc;
   const rd = info.result_data;
+
+  // Step 3: reset zoom στο 100% σε κάθε αλλαγή doc
+  if (apZoom !== 1.0) apZoomReset();
 
   // Update nav
   document.getElementById('ap-doc-counter').textContent = (idx + 1) + '/' + apDocIds.length;
@@ -2894,6 +2908,85 @@ function apOnImgLoad() {
   canvas.style.width = img.clientWidth + 'px';
   canvas.style.height = img.clientHeight + 'px';
   if (apCurRow >= 0) apDrawHighlight(apCurRow);
+}
+
+// ── Zoom για το PNG στη σελίδα Έγκρισης (Step 3) ───────────────────────────
+function apSetZoom(z, anchorClientX, anchorClientY) {
+  z = Math.max(0.5, Math.min(5.0, z));
+  const wrap = document.getElementById('ap-img-wrap');
+  const img = document.getElementById('ap-doc-img');
+  if (!wrap || !img) return;
+  // Κράτα το point κάτω από τον κέρσορα σταθερό κατά το zoom
+  let aImgFracX = null, aImgFracY = null, aCx = null, aCy = null;
+  if (anchorClientX != null && img.clientWidth > 0 && img.clientHeight > 0) {
+    const rect = img.getBoundingClientRect();
+    aImgFracX = (anchorClientX - rect.left) / img.clientWidth;
+    aImgFracY = (anchorClientY - rect.top)  / img.clientHeight;
+    aCx = anchorClientX; aCy = anchorClientY;
+  }
+  apZoom = z;
+  img.style.width = (z * 100) + '%';
+  img.style.maxWidth = 'none';
+  // Μετά το reflow: resize canvas, redraw highlight, update label, restore anchor
+  setTimeout(() => {
+    const canvas = document.getElementById('ap-hl-canvas');
+    if (canvas) {
+      canvas.style.width  = img.clientWidth  + 'px';
+      canvas.style.height = img.clientHeight + 'px';
+      if (apCurRow >= 0) apDrawHighlight(apCurRow);
+    }
+    const lbl = document.getElementById('ap-zoom-label');
+    if (lbl) lbl.textContent = Math.round(z * 100) + '%';
+    wrap.style.cursor = z > 1.0 ? 'grab' : 'crosshair';
+    if (aImgFracX != null) {
+      const wrapRect = wrap.getBoundingClientRect();
+      wrap.scrollLeft = aImgFracX * img.clientWidth  - (aCx - wrapRect.left);
+      wrap.scrollTop  = aImgFracY * img.clientHeight - (aCy - wrapRect.top);
+    }
+  }, 0);
+}
+
+function apZoomBy(delta) { apSetZoom(apZoom + delta); }
+function apZoomReset() {
+  apSetZoom(1.0);
+  const wrap = document.getElementById('ap-img-wrap');
+  if (wrap) { wrap.scrollLeft = 0; wrap.scrollTop = 0; }
+}
+
+function apInitZoom() {
+  if (apZoomInited) return;
+  const wrap = document.getElementById('ap-img-wrap');
+  const img  = document.getElementById('ap-doc-img');
+  if (!wrap || !img) return;
+  apZoomInited = true;
+  // Ctrl + wheel = zoom με anchor στο cursor
+  wrap.addEventListener('wheel', function(e) {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    apSetZoom(apZoom + (e.deltaY < 0 ? 0.2 : -0.2), e.clientX, e.clientY);
+  }, {passive: false});
+  // Διπλό κλικ = reset
+  img.addEventListener('dblclick', function() { apZoomReset(); });
+  // Drag-to-pan όταν είναι zoomed in
+  let panning = false; let ps = {x:0,y:0,sx:0,sy:0};
+  wrap.addEventListener('mousedown', function(e) {
+    if (apZoom <= 1.0 || e.button !== 0) return;
+    panning = true;
+    ps.x = e.clientX; ps.y = e.clientY;
+    ps.sx = wrap.scrollLeft; ps.sy = wrap.scrollTop;
+    wrap.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!panning) return;
+    wrap.scrollLeft = ps.sx - (e.clientX - ps.x);
+    wrap.scrollTop  = ps.sy - (e.clientY - ps.y);
+  });
+  document.addEventListener('mouseup', function() {
+    if (!panning) return;
+    panning = false;
+    wrap.style.cursor = apZoom > 1.0 ? 'grab' : 'crosshair';
+  });
 }
 
 function apDrawHighlight(ri) {
