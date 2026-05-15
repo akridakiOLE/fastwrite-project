@@ -1192,7 +1192,7 @@ select.form-input option{background:var(--bg2);}
               <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;"><span data-i18n="ap_scalar_title">Γενικά Στοιχεία</span></span>
               <span style="font-size:10px;color:var(--accent);" id="ap-toggle-icon">▲ Απόκρυψη</span>
             </div>
-            <div id="ap-scalar-fields" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px;"></div>
+            <div id="ap-scalar-fields" style="display:flex;flex-wrap:wrap;gap:14px;padding:14px 16px;"></div>
           </div>
           <!-- Line items table -->
           <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
@@ -1205,7 +1205,7 @@ select.form-input option{background:var(--bg2);}
               </div>
             </div>
             <div style="flex:1;overflow:auto;">
-              <table style="width:100%;border-collapse:collapse;font-size:12px;" id="ap-li-table">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;" id="ap-li-table">
                 <thead id="ap-li-thead"><tr></tr></thead>
                 <tbody id="ap-li-tbody"></tbody>
               </table>
@@ -2819,9 +2819,9 @@ async function apLoadDoc(idx) {
     if (Array.isArray(v)) {
       apLineData[k] = v;
     } else {
-      scalarHtml += `<div style="display:flex;flex-direction:column;gap:3px;min-width:140px;flex:1;">
-        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;">${k}</div>
-        <input class="le-input ap-field-input" data-key="${k}" value="${v != null ? v : ''}" oninput="apMarkDirty()" style="margin:0;padding:6px 9px;font-size:12px;"/>
+      scalarHtml += `<div style="display:flex;flex-direction:column;gap:5px;min-width:170px;flex:1;">
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:.9px;text-transform:uppercase;">${k}</div>
+        <input class="le-input ap-field-input" data-key="${k}" value="${v != null ? v : ''}" oninput="apMarkDirty()" style="margin:0;padding:9px 12px;font-size:14px;"/>
       </div>`;
     }
   }
@@ -2860,11 +2860,11 @@ function apRenderTable(key, rows) {
   }
   const cols = Object.keys(rows[0]);
   document.querySelector('#ap-li-thead tr').innerHTML = cols.map(c =>
-    `<th style="background:var(--bg3);padding:6px 8px;text-align:left;color:var(--text3);font-family:'DM Mono',monospace;font-size:9px;border-bottom:1px solid var(--border);white-space:nowrap;text-transform:uppercase;letter-spacing:.8px;">${c}</th>`
+    `<th style="background:var(--bg3);padding:8px 10px;text-align:left;color:var(--text3);font-family:'DM Mono',monospace;font-size:10px;border-bottom:1px solid var(--border);white-space:nowrap;text-transform:uppercase;letter-spacing:.9px;">${c}</th>`
   ).join('');
   document.getElementById('ap-li-tbody').innerHTML = rows.map((row, ri) =>
     `<tr id="ap-row-${ri}" onclick="apSelectRow(${ri})" style="cursor:pointer;transition:background .1s;border-bottom:1px solid var(--border);">` +
-    cols.map(c => `<td contenteditable="true" data-key="${key}" data-col="${c}" data-ri="${ri}" oninput="apMarkDirty()" style="padding:6px 8px;color:var(--text2);min-width:50px;">${row[c] != null ? row[c] : ''}</td>`).join('') +
+    cols.map(c => `<td contenteditable="true" data-key="${key}" data-col="${c}" data-ri="${ri}" oninput="apMarkDirty()" style="padding:9px 10px;color:var(--text2);min-width:50px;">${row[c] != null ? row[c] : ''}</td>`).join('') +
     '</tr>'
   ).join('');
 }
