@@ -37,6 +37,9 @@ SECRETS_DIR   = BASE_DIR / "secrets"
 UPLOAD_DIR    = BASE_DIR / "uploads"
 PROCESSED_DIR = BASE_DIR / "processed"
 EXPORT_DIR    = BASE_DIR / "exports"
+# Phase 1 Desktop: PROJECT_ROOT για static files (κώδικας του project, ΟΧΙ user data)
+PROJECT_ROOT  = Path(__file__).resolve().parent
+STATIC_DIR    = PROJECT_ROOT / "static"
 for _d in [UPLOAD_DIR, PROCESSED_DIR, EXPORT_DIR]:
     _d.mkdir(parents=True, exist_ok=True)
 
@@ -2666,7 +2669,7 @@ def serve_ui():
     token = request.cookies.get(COOKIE_NAME)
     if not token or not verify_token(token):
         return redirect("/ui/login")
-    return send_file("/app/projects/static/index.html")
+    return send_file(str(STATIC_DIR / "index.html"))
 
 
 @app.get("/ui/<path:subpath>")
@@ -2675,7 +2678,7 @@ def serve_ui_spa(subpath):
     token = request.cookies.get(COOKIE_NAME)
     if not token or not verify_token(token):
         return redirect("/ui/login")
-    return send_file("/app/projects/static/index.html")
+    return send_file(str(STATIC_DIR / "index.html"))
 
 # ── App Start ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
