@@ -1142,6 +1142,20 @@ def batch_extract_selected():
                     extracted.setdefault("_matched_supplier", rd["_matched_supplier"])
                 extracted.setdefault("_matched_template", sname)
 
+                # ── Tour Mode (Sprint 1.3): bbox extraction (soft fail) ──
+                try:
+                    bboxes = extractor.extract_bboxes(
+                        image_paths=processed_result.pages,
+                        extracted_values=extracted
+                    )
+                    if bboxes:
+                        extracted["_bboxes"] = bboxes
+                        logger.info("[extract-selected] doc %d BBOXES: %d fields",
+                                    doc_id, len(bboxes))
+                except Exception as e:
+                    logger.warning("[extract-selected] doc %d bbox failed (soft): %s",
+                                   doc_id, e)
+
                 # Μετά extraction: πάντα Εκκρεμεί (pending) — ο χρήστης εγκρίνει χειροκίνητα
                 final_status = "pending"
                 db.update_document_status(doc_id, status=final_status,
