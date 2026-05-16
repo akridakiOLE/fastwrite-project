@@ -474,6 +474,20 @@ class BatchProcessor:
                         extracted.setdefault("_matched_template", used_schema_name)
                     conf_pct = extracted.get("_confidence_pct", 0)
                     print(f"[extract_one] doc_id={doc_id} EXTRACTED. confidence={conf_pct}%", flush=True)
+                    # ── Tour Mode (Sprint 1.3): bbox extraction για scalar fields ──
+                    # Δεν χαλάει το extraction αν αποτύχει — soft fail
+                    try:
+                        bboxes = extractor.extract_bboxes(
+                            image_paths=segment.pages,
+                            extracted_values=extracted
+                        )
+                        if bboxes:
+                            extracted["_bboxes"] = bboxes
+                            print(f"[extract_one] doc_id={doc_id} BBOXES extracted: "
+                                  f"{len(bboxes)} fields", flush=True)
+                    except Exception as e:
+                        print(f"[extract_one] doc_id={doc_id} bbox extraction failed (soft): {e}",
+                              flush=True)
                     self.db.update_document_status(
                         doc_id, status=final_status,
                         result_json=json.dumps(extracted))

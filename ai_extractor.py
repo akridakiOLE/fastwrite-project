@@ -263,3 +263,132 @@ class AIExtractor:
         result.processing_time = round(time.time() - start_time, 3)
         result.extracted_at    = datetime.utcnow().isoformat()
         return result
+
+    # ── Tour Mode: Bounding box extraction (Sprint 1.1) ──────────────────────
+    def extract_bboxes(self, image_paths: List[Path],
+                       extracted_values: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Tour Mode: Βρίσκει bounding boxes ανά πεδίο μέσα στο PNG.
+        Καλείται ΜΕΤΑ από το κανονικό extract() — δέχεται τα ήδη εξαχθέντα values
+        και ζητάει από το Gemini τη θέση του καθενός μέσα στην εικόνα.
+
+        Επιστρέφει:
+            {
+              "field_name": {"x": 0.12, "y": 0.34, "w": 0.20, "h": 0.04, "page": 1},
+              ...
+            }
+        Όλες οι συντεταγμένες είναι normalized 0-1 (% του πλάτους/ύψους του PNG).
+        Αν αποτύχει ή κάποιο πεδίο δεν εντοπιστεί, επιστρέφει κενό dict ή παραλείπει πεδίο.
+        """
+        if not image_paths or not extracted_values:
+            return {}
+
+        # Φιλτράρισμα: μόνο scalar values (όχι arrays όπως line_items)
+        scalars = {k: v for k, v in extracted_values.items()
+                   if not isinstance(v, (list, dict)) and v not in (None, "", "null")
+                   and not k.startswith("_")}
+        if not scalars:
+            return {}
+
+        # Schema: λίστα από bbox objects
+        bbox_schema = {
+            "type": "object",
+            "properties": {
+                "boxes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "field": {"type": "string", "description": "Field name"},
+                            "page":  {"type": "integer", "description": "1-indexed page"},
+                            "ymin":  {"type": "number", "description": "Top edge (0-1000 normalized)"},
+                            "xmin":  {"type": "number", "description": "Left edge (0-1000 normalized)"},
+                            "ymax":  {"type": "number", "description": "Bottom edge (0-1000 normalized)"},
+                            "xmax":  {"type": "number", "description": "Right edge (0-1000 normalized)"},
+                        },
+                        "required": ["field", "page", "ymin", "xmin", "ymax", "xmax"]
+                    }
+                }
+            },
+            "required": ["boxes"]
+        }
+
+        # Build prompt
+        fields_list = "\n".join(f'- {k}: "{v}"' for k, v in scalars.items())
+        prompt = (
+            "For EACH of the following fields, locate it inside the document image(s) "
+            "and return its bounding box.\n\n"
+            f"Fields with their already-extracted values:\n{fields_list}\n\n"
+            "Rules:\n"
+            "- Return bbox as [ymin, xmin, ymax, xmax] normalized to 0-1000 scale.\n"
+            "- ymin/ymax are the top/bottom Y coordinates (0=top of page, 1000=bottom).\n"
+            "- xmin/xmax are the left/right X coordinates (0=left, 1000=right).\n"
+            "- page is 1-indexed. If only 1 image given, use page=1.\n"
+            "- Locate the VALUE of each field (not the label).\n"
+            "- If a field cannot be located, skip it (do NOT include it).\n"
+            "- Return ONLY the JSON object."
+        )
+
+        try:
+            from google import genai
+            from google.genai import types
+
+            client = self._get_client()
+
+            content_parts = []
+            for img_path in image_paths:
+                img_bytes = Path(img_path).read_bytes()
+                suffix    = Path(img_path).suffix.lower().lstrip(".")
+                mime_type = f"image/{'jpeg' if suffix == 'jpg' else suffix}"
+                content_parts.append(
+                    types.Part.from_bytes(data=img_bytes, mime_type=mime_type)
+                )
+            content_parts.append(prompt)
+
+            config = types.GenerateContentConfig(
+                system_instruction="You are a spatial analysis specialist. Locate text in document images.",
+                response_mime_type="application/json",
+                response_schema=bbox_schema,
+                temperature=0.0,
+                max_output_tokens=2048,
+            )
+
+            response = client.models.generate_content(
+                model=self.model,
+                contents=content_parts,
+                config=config,
+            )
+
+            raw = response.text.strip() if response.text else ""
+            data = json.loads(raw)
+            boxes = data.get("boxes", [])
+
+            # Μετατροπή σε normalized 0-1 (από 0-1000 του Gemini)
+            result = {}
+            for b in boxes:
+                fname = b.get("field")
+                if not fname or fname not in scalars:
+                    continue
+                ymin = b.get("ymin", 0) / 1000.0
+                xmin = b.get("xmin", 0) / 1000.0
+                ymax = b.get("ymax", 0) / 1000.0
+                xmax = b.get("xmax", 0) / 1000.0
+                # Sanity check
+                if ymax <= ymin or xmax <= xmin:
+                    continue
+                result[fname] = {
+                    "x":    round(xmin, 4),
+                    "y":    round(ymin, 4),
+                    "w":    round(xmax - xmin, 4),
+                    "h":    round(ymax - ymin, 4),
+                    "page": int(b.get("page", 1))
+                }
+            return result
+
+        except Exception as e:
+            # Soft fail: log και επιστροφή κενού. Δεν χαλάει το data extraction.
+            import logging
+            logging.getLogger(__name__).warning(
+                "extract_bboxes failed (soft): %s", e
+            )
+            return {}

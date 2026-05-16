@@ -785,6 +785,23 @@ def serve_filtered_pdf():
         logging.error("filtered-pdf error: %s", e)
         return jsonify({"error": str(e)}), 500
 
+@app.get("/api/documents/<int:doc_id>/field-positions")
+@require_auth
+def get_field_positions(doc_id):
+    """Tour Mode (Sprint 1.3): Επιστρέφει bounding boxes ανά πεδίο.
+    Format: { "FIELD_NAME": {x, y, w, h, page}, ... }
+    Όλα normalized 0-1. Αν δεν υπάρχουν bbox (παλιό doc), επιστρέφει {}."""
+    uid = request.current_user["user_id"]
+    doc = db.get_document(doc_id)
+    if not doc:
+        return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
+    if doc.get("user_id") != uid:
+        return jsonify({"error": "Access denied"}), 403
+    rd = doc.get("result_data") or {}
+    bboxes = rd.get("_bboxes", {}) if isinstance(rd, dict) else {}
+    return jsonify({"bboxes": bboxes})
+
+
 @app.get("/api/documents/<int:doc_id>/line-positions")
 @require_auth
 def get_line_positions(doc_id):
