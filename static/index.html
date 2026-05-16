@@ -3001,20 +3001,30 @@ function apDrawHighlight(ri) {
 
   const id = apDocIds[apCurrentIdx];
   const positions = apDocData[id].linePositions;
-  let y, bandH;
+  let x, y, bandW, bandH;
   if (positions.length > ri) {
     const pos = positions[ri];
     y = canvas.height * pos.top_pct;
     bandH = canvas.height * (pos.bottom_pct - pos.top_pct);
+    // Στενότερο highlight που πιάνει μόνο τον πίνακα (αν υπάρχουν x-positions)
+    if (pos.left_pct != null && pos.right_pct != null) {
+      x = canvas.width * pos.left_pct;
+      bandW = canvas.width * (pos.right_pct - pos.left_pct);
+    } else {
+      x = 0;
+      bandW = canvas.width;
+    }
   } else {
     bandH = canvas.height / apNumRows;
     y = ri * bandH;
+    x = 0;
+    bandW = canvas.width;
   }
   ctx.fillStyle = 'rgba(0, 229, 160, 0.25)';
   ctx.strokeStyle = 'rgba(0, 229, 160, 0.80)';
   ctx.lineWidth = 2;
-  ctx.fillRect(0, y, canvas.width, bandH);
-  ctx.strokeRect(1, y + 1, canvas.width - 2, bandH - 2);
+  ctx.fillRect(x, y, bandW, bandH);
+  ctx.strokeRect(x + 1, y + 1, bandW - 2, bandH - 2);
 }
 
 window.addEventListener('resize', function() {

@@ -810,6 +810,7 @@ def get_line_positions(doc_id):
                 return jsonify({"positions": []})
             page = pdf.pages[page_num - 1]
             page_h = page.height
+            page_w = page.width
 
             # Find the table with most rows (the line items table)
             tables = page.find_tables()
@@ -820,6 +821,10 @@ def get_line_positions(doc_id):
                     best = t
 
             if best:
+                # Πλάτος πίνακα ως % της σελίδας (για στενότερο highlight)
+                tb = best.bbox  # (x0, top, x1, bottom)
+                left_pct  = round(tb[0] / page_w, 4)
+                right_pct = round(tb[2] / page_w, 4)
                 rows = best.rows
                 for ri, row in enumerate(rows):
                     if ri == 0: continue  # skip header
@@ -828,7 +833,9 @@ def get_line_positions(doc_id):
                     y_bot = row.cells[0][3]
                     positions.append({
                         "top_pct":    round(y_top / page_h, 4),
-                        "bottom_pct": round(y_bot / page_h, 4)
+                        "bottom_pct": round(y_bot / page_h, 4),
+                        "left_pct":   left_pct,
+                        "right_pct":  right_pct
                     })
         return jsonify({"positions": positions, "page": page_num})
     except Exception as e:
