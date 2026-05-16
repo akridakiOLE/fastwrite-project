@@ -3,6 +3,7 @@ Module 8: Τοπικός Διακομιστής (Flask) & Σύνδεση με Fr
 Domain: fastwrite.duckdns.org
 """
 import json
+import os
 import sys
 import io
 import base64
@@ -29,7 +30,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-BASE_DIR      = Path("/app/projects")
+# Phase 1 Desktop: BASE_DIR διαβάζεται από env var με fallback στο production path
+BASE_DIR      = Path(os.environ.get("FASTWRITE_BASE_DIR", "/app/projects"))
 DB_PATH       = BASE_DIR / "data"    / "app.db"
 SECRETS_DIR   = BASE_DIR / "secrets"
 UPLOAD_DIR    = BASE_DIR / "uploads"
