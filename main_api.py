@@ -797,7 +797,12 @@ def get_field_positions(doc_id):
         return jsonify({"error": f"Έγγραφο #{doc_id} δεν βρέθηκε."}), 404
     if doc.get("user_id") != uid:
         return jsonify({"error": "Access denied"}), 403
-    rd = doc.get("result_data") or {}
+    # result_json είναι string στη DB → parse σε dict
+    raw = doc.get("result_json") or "{}"
+    try:
+        rd = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        rd = {}
     bboxes = rd.get("_bboxes", {}) if isinstance(rd, dict) else {}
     return jsonify({"bboxes": bboxes})
 

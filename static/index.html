@@ -214,6 +214,26 @@ select.form-input option{background:var(--bg2);}
 .le-input::placeholder{color:var(--text3);}
 /* Approval: active scalar field highlight (Step 2) */
 .ap-field-input:focus{border-color:var(--accent)!important;box-shadow:0 0 0 2px rgba(0,229,160,0.25);background:rgba(0,229,160,0.05);}
+/* ── Tour Mode (Sprint 2): split-screen + floating card ───────────────── */
+#page-approval.tour-mode-active #ap-panel{display:none!important;}
+#page-approval.tour-mode-active #ap-pdf-area{flex:1!important;}
+.tour-card{position:fixed;background:var(--bg2);border:2px solid var(--accent);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.6);padding:18px 22px;min-width:340px;max-width:480px;z-index:60;user-select:none;transition:left .15s ease,top .15s ease,box-shadow .15s;}
+.tour-card.dragging{transition:none;box-shadow:0 16px 50px rgba(0,229,160,0.35);}
+.tour-card-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;cursor:move;}
+.tour-card-title{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;}
+.tour-card-counter{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);}
+.tour-card-close{background:transparent;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:0 4px;}
+.tour-card-close:hover{color:var(--danger);}
+.tour-card-field{font-family:'DM Mono',monospace;font-size:13px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
+.tour-card-value{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px 16px;color:var(--text);font-size:20px;font-family:'DM Sans',sans-serif;width:100%;box-sizing:border-box;}
+.tour-card-value:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,229,160,0.25);}
+.tour-card-nav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:14px;}
+.tour-card-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;}
+.tour-card-btn:hover:not(:disabled){border-color:var(--accent);}
+.tour-card-btn:disabled{opacity:.4;cursor:not-allowed;}
+.tour-card-btn.primary{background:var(--accent);color:#0a0c10;border-color:var(--accent);font-weight:600;}
+.tour-toggle-btn{background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.4);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;}
+.tour-toggle-btn.active{background:var(--accent);color:#0a0c10;}
 .le-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:.5px;margin-bottom:4px;display:block;}
 .le-doc-nav{display:flex;align-items:center;justify-content:space-between;padding:8px 18px;background:var(--bg3);border-top:1px solid var(--border);font-size:12px;color:var(--text2);}
 .le-preview-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;}
@@ -745,6 +765,21 @@ select.form-input option{background:var(--bg2);}
             <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση κλειδιού AI — κρυπτογραφείται με Fernet encryption" onclick="saveKey()" data-i18n="settings_api_save" data-i18n-hint="settings_api_save_hint">Αποθήκευση Key</button>
           </div>
 
+          <!-- Section 3b: UX Preferences (Sprint 3: Tour Mode toggle) -->
+          <div class="card">
+            <div class="card-title">🎯 Εμφάνιση Σελίδας Έγκρισης</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;">
+              <div style="flex:1;">
+                <div style="font-size:14px;color:var(--text);font-weight:600;margin-bottom:4px;">Καθοδηγούμενη Έγκριση (Tour Mode)</div>
+                <div style="font-size:12px;color:var(--text3);">Όταν είναι ενεργό, η σελίδα Έγκρισης ανοίγει αυτόματα σε λειτουργία Tour Mode (ένα πεδίο τη φορά με highlight πάνω στο τιμολόγιο).</div>
+              </div>
+              <label style="display:inline-flex;align-items:center;cursor:pointer;gap:8px;">
+                <input type="checkbox" id="setting-tour-default" onchange="saveTourPreference(this.checked)" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;"/>
+                <span id="setting-tour-label" style="font-size:13px;color:var(--text2);">Ανενεργό</span>
+              </label>
+            </div>
+          </div>
+
           <!-- Section 3: Πληροφορίες Συστήματος -->
           <div class="card">
             <div class="card-title" data-i18n="settings_system_title">⚙️ Πληροφορίες Συστήματος</div>
@@ -1166,6 +1201,10 @@ select.form-input option{background:var(--bg2);}
           </div>
           <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο προηγούμενο έγγραφο προς έγκριση" data-i18n="ap_prev" data-i18n-hint="ap_prev_hint" onclick="apPrevDoc()" id="ap-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
           <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο επόμενο έγγραφο προς έγκριση" data-i18n="ap_next" data-i18n-hint="ap_next_hint" onclick="apNextDoc()" id="ap-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
+          <!-- Tour Mode toggle (Sprint 2) -->
+          <button class="tour-toggle-btn tooltip-hint" id="ap-tour-toggle" data-hint="Καθοδηγούμενη Έγκριση — δείχνει ένα πεδίο τη φορά μεγάλο πάνω στο τιμολόγιο" onclick="apToggleTour()">
+            <span id="ap-tour-toggle-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#555;margin-right:6px;vertical-align:middle;"></span>Tour Mode: <span id="ap-tour-toggle-state">OFF</span>
+          </button>
         </div>
       </div>
       <div style="display:flex;width:100%;height:calc(100vh - 52px);overflow:hidden;background:var(--bg);position:relative;">
@@ -1182,6 +1221,21 @@ select.form-input option{background:var(--bg2);}
             <button onclick="apZoomBy(0.2)" title="Μεγέθυνση (Ctrl + scroll up)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 10px;font-size:15px;font-weight:600;cursor:pointer;line-height:1;">+</button>
             <button onclick="apZoomReset()" id="ap-zoom-label" title="Επαναφορά (διπλό κλικ)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:3px 6px;font-size:10px;cursor:pointer;line-height:1;font-family:'DM Mono',monospace;">100%</button>
             <button onclick="apZoomBy(-0.2)" title="Σμίκρυνση (Ctrl + scroll down)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 10px;font-size:15px;font-weight:600;cursor:pointer;line-height:1;">−</button>
+          </div>
+        </div>
+        <!-- Tour Mode floating card (Sprint 2) -->
+        <div id="ap-tour-card" class="tour-card" style="display:none;">
+          <div class="tour-card-header" id="ap-tour-drag-handle">
+            <span class="tour-card-title">Πεδίο</span>
+            <span class="tour-card-counter" id="ap-tour-counter">1 / 1</span>
+            <button class="tour-card-close" onclick="apToggleTour()" title="Έξοδος (Esc)">×</button>
+          </div>
+          <div class="tour-card-label" id="ap-tour-field-label" style="color:var(--text);font-size:18px;font-weight:600;margin-bottom:2px;">Field</div>
+          <div class="tour-card-field" id="ap-tour-field-name">FIELD</div>
+          <input type="text" class="tour-card-value" id="ap-tour-value" oninput="apTourMarkDirty()"/>
+          <div class="tour-card-nav">
+            <button class="tour-card-btn" id="ap-tour-prev" onclick="apTourNav(-1)">← Προηγ.</button>
+            <button class="tour-card-btn primary" onclick="apTourNav(1)" id="ap-tour-next">Επόμ. →</button>
           </div>
         </div>
         <!-- Data Panel (right side) -->
@@ -2716,9 +2770,19 @@ function openApprovalFromDocs() {
     apDocData[d.id] = { doc: d, result_data: rd, linePositions: [] };
   });
 
+  // Sprint 3: Pre-apply (ή remove) το tour-mode-active class ΠΡΙΝ το display:block
+  // ώστε όταν εμφανιστεί η σελίδα να είναι ήδη στο σωστό layout (no flicker)
+  const tourPref = loadTourPreference();
+  const pgApproval = document.getElementById('page-approval');
+  if (tourPref) {
+    pgApproval.classList.add('tour-mode-active');
+  } else {
+    pgApproval.classList.remove('tour-mode-active');
+  }
+
   // Show approval page
   document.querySelectorAll('.page').forEach(p => p.style.display='none');
-  document.getElementById('page-approval').style.display='block';
+  pgApproval.style.display='block';
 
   // Auto-hide sidebar για περισσότερο χώρο στο PNG (Step 1 βελτίωσης Έγκρισης)
   if (apSidebarVisible) apToggleSidebar();
@@ -2728,7 +2792,12 @@ function openApprovalFromDocs() {
 
   apCurrentIdx = 0;
   apRenderDocsList();
-  apLoadDoc(0);
+  apLoadDoc(0).then(() => {
+    // Αν preference=ON, ενεργοποίησε το Tour αφού φορτώσει το PNG
+    if (tourPref && !apTourActive) {
+      setTimeout(() => apToggleTour(), 100); // μικρό delay για canvas init
+    }
+  });
 }
 
 function closeApprovalPage() {
@@ -2794,6 +2863,8 @@ async function apLoadDoc(idx) {
 
   // Step 3: reset zoom στο 100% σε κάθε αλλαγή doc
   if (apZoom !== 1.0) apZoomReset();
+  // Sprint 2: exit Tour Mode όταν αλλάζει doc
+  if (apTourActive) apTourExit();
 
   // Update nav
   document.getElementById('ap-doc-counter').textContent = (idx + 1) + '/' + apDocIds.length;
@@ -2989,6 +3060,251 @@ function apInitZoom() {
   });
 }
 
+// ── Tour Mode preferences (Sprint 3) ───────────────────────────────────────
+const TOUR_PREF_KEY = 'fastwrite_tour_default';
+
+function loadTourPreference() {
+  try { return localStorage.getItem(TOUR_PREF_KEY) === '1'; }
+  catch (e) { return false; }
+}
+
+function saveTourPreference(enabled) {
+  try { localStorage.setItem(TOUR_PREF_KEY, enabled ? '1' : '0'); }
+  catch (e) { /* localStorage μπορεί να είναι disabled — ignore */ }
+  const lbl = document.getElementById('setting-tour-label');
+  if (lbl) lbl.textContent = enabled ? 'Ενεργό' : 'Ανενεργό';
+}
+
+function syncTourPreferenceUI() {
+  const cb = document.getElementById('setting-tour-default');
+  if (!cb) return;
+  const enabled = loadTourPreference();
+  cb.checked = enabled;
+  const lbl = document.getElementById('setting-tour-label');
+  if (lbl) lbl.textContent = enabled ? 'Ενεργό' : 'Ανενεργό';
+}
+
+// ── Tour Mode (Sprint 2) ───────────────────────────────────────────────────
+let apTourActive = false;
+let apTourBboxes = {};       // {fieldName: {x,y,w,h,page}}
+let apTourFields = [];       // ordered list of field names
+let apTourIdx = 0;
+let apTourDragInited = false;
+
+// Human-readable labels για συνήθη πεδία τιμολογίων
+const FIELD_LABELS = {
+  BUYER_AFM:         'Buyer VAT Number',
+  BUYER_NAME:        'Buyer Name',
+  BUYER_ADDRESS:     'Buyer Address',
+  VENDOR_AFM:        'Supplier VAT Number',
+  VENDOR_NAME:       'Supplier Name',
+  VENDOR_ADDRESS:    'Supplier Address',
+  SUPPLIER_AFM:      'Supplier VAT Number',
+  SUPPLIER_NAME:     'Supplier Name',
+  INVOICE_NUMBER:    'Invoice Number',
+  INVOICE_DATE:      'Invoice Date',
+  ISSUE_DATE:        'Issue Date',
+  DUE_DATE:          'Due Date',
+  NET_AMOUNT:        'Net Amount',
+  TOTAL_AMOUNT:      'Total Amount',
+  GROSS_AMOUNT:      'Gross Amount',
+  VAT_AMOUNT:        'VAT Amount',
+  VAT_RATE:          'VAT Rate',
+  CURRENCY:          'Currency',
+  PAYMENT_TERMS:     'Payment Terms',
+  IBAN:              'IBAN',
+};
+
+function humanizeFieldName(name) {
+  if (!name) return '';
+  const upper = name.toUpperCase();
+  if (FIELD_LABELS[upper]) return FIELD_LABELS[upper];
+  // Fallback: UPPER_SNAKE_CASE → Title Case
+  return name.replace(/_/g, ' ')
+             .split(' ')
+             .filter(Boolean)
+             .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+             .join(' ');
+}
+
+async function apToggleTour() {
+  if (apTourActive) {
+    apTourExit();
+    saveTourPreference(false); // sync global setting όταν user γυρνά σε Classic
+    return;
+  }
+  // Ενεργοποίηση: φόρτωση bbox
+  const id = apDocIds[apCurrentIdx];
+  if (!id) return;
+  try {
+    const res = await fetch(`/api/documents/${id}/field-positions`, {credentials:'include'});
+    const data = await res.json();
+    apTourBboxes = data.bboxes || {};
+  } catch(e) { apTourBboxes = {}; }
+
+  if (!Object.keys(apTourBboxes).length) {
+    toast('Δεν υπάρχουν θέσεις πεδίων για αυτό το έγγραφο. Ξαναεξαγάγετε για να δημιουργηθούν.', 'error');
+    // cleanup πιθανού preemptive class από auto-activation
+    document.getElementById('page-approval').classList.remove('tour-mode-active');
+    return;
+  }
+  // Λίστα πεδίων: μόνο όσα έχουν bbox ΚΑΙ υπάρχουν στο extracted data
+  // (case-insensitive matching: Gemini επιστρέφει lowercase keys, τα rd μπορεί να είναι UPPERCASE)
+  const rd = apDocData[id].result_data || {};
+  const rdKeys = Object.keys(rd);
+  const normalizedBboxes = {};
+  for (const bk of Object.keys(apTourBboxes)) {
+    const match = rdKeys.find(rk => rk.toLowerCase() === bk.toLowerCase());
+    if (match && !Array.isArray(rd[match]) && !match.startsWith('_')) {
+      normalizedBboxes[match] = apTourBboxes[bk];
+    }
+  }
+  apTourBboxes = normalizedBboxes;
+  apTourFields = Object.keys(normalizedBboxes);
+  if (!apTourFields.length) {
+    toast('Δεν βρέθηκαν εξαγόμενα πεδία με γνωστές θέσεις.', 'error');
+    document.getElementById('page-approval').classList.remove('tour-mode-active');
+    return;
+  }
+  apTourActive = true;
+  apTourIdx = 0;
+  document.getElementById('page-approval').classList.add('tour-mode-active');
+  document.getElementById('ap-tour-card').style.display = 'block';
+  document.getElementById('ap-tour-toggle').classList.add('active');
+  const stateEl2 = document.getElementById('ap-tour-toggle-state');
+  const dotEl2 = document.getElementById('ap-tour-toggle-dot');
+  if (stateEl2) stateEl2.textContent = 'ON';
+  if (dotEl2) dotEl2.style.background = '#fff';
+  saveTourPreference(true); // sync global setting όταν user ενεργοποιεί Tour
+  // Ξεκίνα στο κέντρο της οθόνης
+  const card = document.getElementById('ap-tour-card');
+  card.style.left = (window.innerWidth - 420) + 'px';
+  card.style.top  = '80px';
+  apTourInitDrag();
+  apTourRender();
+}
+
+function apTourExit() {
+  apTourActive = false;
+  document.getElementById('page-approval').classList.remove('tour-mode-active');
+  document.getElementById('ap-tour-card').style.display = 'none';
+  document.getElementById('ap-tour-toggle').classList.remove('active');
+  const stateEl = document.getElementById('ap-tour-toggle-state');
+  const dotEl = document.getElementById('ap-tour-toggle-dot');
+  if (stateEl) stateEl.textContent = 'OFF';
+  if (dotEl) dotEl.style.background = '#555';
+  // καθαρισμός highlight που τυχόν έβαλε το tour
+  if (apCurRow < 0) apDrawHighlight(-1);
+}
+
+function apTourRender() {
+  if (!apTourActive || !apTourFields.length) return;
+  const field = apTourFields[apTourIdx];
+  const id = apDocIds[apCurrentIdx];
+  const rd = apDocData[id].result_data || {};
+  const value = rd[field];
+  // Update card content
+  document.getElementById('ap-tour-field-label').textContent = humanizeFieldName(field);
+  document.getElementById('ap-tour-field-name').textContent = field;
+  document.getElementById('ap-tour-counter').textContent = (apTourIdx + 1) + ' / ' + apTourFields.length;
+  const valInput = document.getElementById('ap-tour-value');
+  valInput.value = value != null ? value : '';
+  valInput.focus();
+  valInput.select();
+  // Buttons enable/disable
+  document.getElementById('ap-tour-prev').disabled = (apTourIdx === 0);
+  document.getElementById('ap-tour-next').textContent = (apTourIdx === apTourFields.length - 1) ? '✓ Τέλος' : 'Επόμ. →';
+  // Highlight bbox στο PNG (η γραμμή σύνδεσης αφαιρέθηκε — αρκεί το highlight)
+  apTourDrawHighlight();
+}
+
+function apTourDrawHighlight() {
+  const field = apTourFields[apTourIdx];
+  const bbox = apTourBboxes[field];
+  if (!bbox) return;
+  const img = document.getElementById('ap-doc-img');
+  const canvas = document.getElementById('ap-hl-canvas');
+  if (!img.complete || canvas.width === 0) return;
+  canvas.style.width  = img.clientWidth  + 'px';
+  canvas.style.height = img.clientHeight + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const x = bbox.x * canvas.width;
+  const y = bbox.y * canvas.height;
+  const w = bbox.w * canvas.width;
+  const h = bbox.h * canvas.height;
+  ctx.fillStyle   = 'rgba(0, 229, 160, 0.30)';
+  ctx.strokeStyle = 'rgba(0, 229, 160, 1.0)';
+  ctx.lineWidth   = 3;
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeRect(x, y, w, h);
+}
+
+function apTourNav(dir) {
+  if (!apTourActive) return;
+  // Πρώτα αποθήκευσε την τρέχουσα τιμή
+  apTourCommitCurrent();
+  const next = apTourIdx + dir;
+  if (next < 0) return;
+  if (next >= apTourFields.length) {
+    // Τέλος του tour → exit
+    apTourExit();
+    return;
+  }
+  apTourIdx = next;
+  apTourRender();
+}
+
+function apTourCommitCurrent() {
+  const field = apTourFields[apTourIdx];
+  if (!field) return;
+  const valInput = document.getElementById('ap-tour-value');
+  const id = apDocIds[apCurrentIdx];
+  if (!apDocData[id].result_data) apDocData[id].result_data = {};
+  apDocData[id].result_data[field] = valInput.value;
+  // sync με το classic panel input (αν υπάρχει)
+  const classic = document.querySelector(`.ap-field-input[data-key="${field}"]`);
+  if (classic) classic.value = valInput.value;
+  apMarkDirty();
+}
+
+function apTourMarkDirty() {
+  apMarkDirty();
+}
+
+function apTourInitDrag() {
+  if (apTourDragInited) return;
+  apTourDragInited = true;
+  const card = document.getElementById('ap-tour-card');
+  const handle = document.getElementById('ap-tour-drag-handle');
+  if (!card || !handle) return;
+  let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  handle.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'BUTTON') return; // μη κάνεις drag στο × κουμπί
+    dragging = true;
+    card.classList.add('dragging');
+    sx = e.clientX; sy = e.clientY;
+    const r = card.getBoundingClientRect();
+    ox = r.left; oy = r.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    card.style.left = Math.max(0, Math.min(window.innerWidth - card.offsetWidth, ox + (e.clientX - sx))) + 'px';
+    card.style.top  = Math.max(0, Math.min(window.innerHeight - card.offsetHeight, oy + (e.clientY - sy))) + 'px';
+  });
+  document.addEventListener('mouseup', function() {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove('dragging');
+  });
+}
+
+// Επανυπολογισμός highlight σε resize (η γραμμή σύνδεσης αφαιρέθηκε)
+window.addEventListener('resize', function() {
+  if (apTourActive) apTourDrawHighlight();
+});
+
 function apDrawHighlight(ri) {
   const img = document.getElementById('ap-doc-img');
   const canvas = document.getElementById('ap-hl-canvas');
@@ -3183,9 +3499,17 @@ function apFocusScalarField(dir) {
   return true;
 }
 
-// Keyboard shortcuts for approval page (Step 2: εκτεταμένη πλοήγηση)
+// Keyboard shortcuts for approval page (Step 2: εκτεταμένη πλοήγηση + Sprint 2 Tour Mode)
 document.addEventListener('keydown', function(e) {
   if (document.getElementById('page-approval').style.display === 'none') return;
+  // Tour Mode keyboard handling (←/→/Enter/Esc)
+  if (apTourActive) {
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); apTourNav(-1); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); apTourNav(1);  return; }
+    if (e.key === 'Enter')      { e.preventDefault(); apTourNav(1);  return; }
+    if (e.key === 'Escape')     { e.preventDefault(); apTourExit();  return; }
+    return;
+  }
   const target = e.target;
   const inScalar = target.classList && target.classList.contains('ap-field-input');
   // Όταν είμαστε μέσα σε scalar input — βελάκια/Enter κάνουν πλοήγηση πεδίων
@@ -3831,6 +4155,8 @@ async function loadSettings() {
   // Load 2FA status + Admin users
   load2FAStatus();
   loadAdminUsers();
+  // Sprint 3: Sync Tour Mode toggle UI
+  syncTourPreferenceUI();
 
   // Account info
   const accEl = document.getElementById('account-info');
