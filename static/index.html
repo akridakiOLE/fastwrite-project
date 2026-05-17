@@ -232,15 +232,17 @@ select.form-input option{background:var(--bg2);}
 .tour-card-btn:hover:not(:disabled){border-color:var(--accent);}
 .tour-card-btn:disabled{opacity:.4;cursor:not-allowed;}
 .tour-card-btn.primary{background:var(--accent);color:#0a0c10;border-color:var(--accent);font-weight:600;}
-/* Tour Row Card (Line Items horizontal bar) */
-.tour-row-card{position:fixed;background:var(--bg2);border:2px solid var(--accent);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6);padding:12px 16px;z-index:60;user-select:none;max-width:96vw;}
+/* Tour Row Card (Line Items horizontal bar) - full width edge-to-edge */
+.tour-row-card{position:fixed;background:var(--bg2);border:2px solid var(--accent);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6);padding:12px 16px;z-index:60;user-select:none;}
 .tour-row-card.dragging{transition:none;}
-.tour-row-card-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;cursor:move;font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:.8px;}
-.tour-row-card-cells{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;}
-.tour-row-cell{display:flex;flex-direction:column;gap:3px;min-width:110px;flex-shrink:0;}
-.tour-row-cell-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.7px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.tour-row-cell-value{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;width:100%;box-sizing:border-box;}
+.tour-row-card-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;cursor:move;font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);letter-spacing:.8px;}
+.tour-row-card-cells{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;}
+.tour-row-cell{display:flex;flex-direction:column;gap:4px;flex:1;min-width:90px;}
+.tour-row-cell.unmapped{opacity:0.55;}
+.tour-row-cell-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+.tour-row-cell-value{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;width:100%;box-sizing:border-box;}
 .tour-row-cell-value:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,229,160,0.2);}
+.tour-row-cell-value:disabled{background:var(--bg);color:var(--text3);cursor:not-allowed;}
 .tour-row-card-nav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;}
 .tour-row-card-nav .left{display:flex;gap:8px;}
 .tour-toggle-btn{background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.4);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;}
@@ -3292,25 +3294,59 @@ function apTourRender() {
 }
 
 // Line Items Tour v2: horizontal bar με ΟΛΑ τα cells της γραμμής
+// Cells = όσα τα PDF columns (όχι τα extracted keys), smart matching values
 function apTourRenderLineItem() {
   const row = apTourLineData[apTourLineRow];
   if (!row) { apTourExit(); return; }
-  const keys = Object.keys(row);
-  // Build cells HTML
-  let html = '';
-  for (let i = 0; i < keys.length; i++) {
-    const k = keys[i];
-    const v = row[k];
-    let label = humanizeFieldName(k);
-    if (apTourLinePositions[apTourLineRow] && apTourLinePositions[apTourLineRow].cells) {
-      const cellInfo = apTourLinePositions[apTourLineRow].cells[i];
-      if (cellInfo && cellInfo.col_name) label = cellInfo.col_name;
+  const pos = apTourLinePositions[apTourLineRow];
+  const pdfCells = (pos && pos.cells && pos.cells.length) ? pos.cells : null;
+  const extractedKeys = Object.keys(row);
+  // Helper: normalize string για matching (lowercase, no special chars)
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  // Smart matching: για κάθε PDF column βρες το extracted key που ταιριάζει καλύτερα
+  const usedKeys = new Set();
+  const matchedKeys = [];
+  if (pdfCells) {
+    for (const c of pdfCells) {
+      const colN = norm(c.col_name);
+      // exact match πρώτα
+      let m = extractedKeys.find(k => !usedKeys.has(k) && norm(k) === colN);
+      // substring match
+      if (!m) m = extractedKeys.find(k =>
+        !usedKeys.has(k) && (norm(k).includes(colN) || (colN && colN.includes(norm(k))))
+      );
+      if (m) usedKeys.add(m);
+      matchedKeys.push(m || null);
     }
-    const esc = (s) => String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;');
-    html += `<div class="tour-row-cell">
-      <div class="tour-row-cell-label" title="${esc(label)}">${esc(label)}</div>
-      <input class="tour-row-cell-value" data-cell-key="${esc(k)}" value="${v != null ? esc(v) : ''}" oninput="apTourMarkDirty()"/>
-    </div>`;
+  }
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Build cells: βασισμένα είτε στα PDF columns είτε στα extracted keys (fallback)
+  let html = '';
+  if (pdfCells) {
+    for (let i = 0; i < pdfCells.length; i++) {
+      const c = pdfCells[i];
+      const label = c.col_name || ('Col ' + (i + 1));
+      const mKey = matchedKeys[i];
+      const v = mKey != null ? row[mKey] : '';
+      const dataKey = mKey || ('_pdf_' + i);
+      const mapped = mKey ? '1' : '0';
+      const cls = mKey ? 'tour-row-cell' : 'tour-row-cell unmapped';
+      const dis = mKey ? '' : 'disabled title="Δεν υπάρχει αντίστοιχο πεδίο στο template"';
+      html += `<div class="${cls}">
+        <div class="tour-row-cell-label" title="${esc(label)}">${esc(label)}</div>
+        <input class="tour-row-cell-value" data-cell-key="${esc(dataKey)}" data-mapped="${mapped}" value="${v != null ? esc(v) : ''}" oninput="apTourMarkDirty()" ${dis}/>
+      </div>`;
+    }
+  } else {
+    // Fallback: αν δεν έχουμε PDF cells, χρησιμοποιούμε extracted keys
+    for (const k of extractedKeys) {
+      const v = row[k];
+      const label = humanizeFieldName(k);
+      html += `<div class="tour-row-cell">
+        <div class="tour-row-cell-label" title="${esc(label)}">${esc(label)}</div>
+        <input class="tour-row-cell-value" data-cell-key="${esc(k)}" data-mapped="1" value="${v != null ? esc(v) : ''}" oninput="apTourMarkDirty()"/>
+      </div>`;
+    }
   }
   document.getElementById('ap-tour-row-cells').innerHTML = html;
   document.getElementById('ap-tour-row-counter').textContent =
@@ -3322,20 +3358,31 @@ function apTourRenderLineItem() {
   document.getElementById('ap-tour-approve-btn').style.display = isLastRow ? 'inline-block' : 'none';
   // Show row card, hide normal card
   document.getElementById('ap-tour-card').style.display = 'none';
-  document.getElementById('ap-tour-row-card').style.display = 'block';
-  // Position: αν δεν έχει set, βάλε το πάνω-κέντρο του pdf area
-  const card = document.getElementById('ap-tour-row-card');
-  if (!card.style.left || card.style.left === '0px') {
-    const pdfArea = document.getElementById('ap-pdf-area');
-    const rect = pdfArea.getBoundingClientRect();
-    card.style.left = Math.max(10, rect.left + (rect.width - card.offsetWidth) / 2) + 'px';
-    card.style.top = (rect.top + 20) + 'px';
-  }
+  const rowCard = document.getElementById('ap-tour-row-card');
+  rowCard.style.display = 'block';
+  // Full-width: edge-to-edge στο PDF area
+  apTourPositionRowCard();
   apTourInitRowDrag();
   apTourDrawHighlight();
-  // Focus first input
-  const firstInput = document.querySelector('#ap-tour-row-cells .tour-row-cell-value');
+  // Focus first mapped input
+  const firstInput = document.querySelector('#ap-tour-row-cells .tour-row-cell-value:not(:disabled)');
   if (firstInput) firstInput.focus();
+}
+
+// Positioning helper: full-width card πάνω στο PDF area
+function apTourPositionRowCard() {
+  const card = document.getElementById('ap-tour-row-card');
+  const pdfArea = document.getElementById('ap-pdf-area');
+  if (!card || !pdfArea) return;
+  const rect = pdfArea.getBoundingClientRect();
+  // Full-width: από αριστερό edge έως δεξί edge του pdf area
+  card.style.left  = rect.left + 'px';
+  card.style.width = rect.width + 'px';
+  card.style.right = 'auto';
+  // Διατήρηση τρέχουσας top τιμής (αν έχει set από drag), αλλιώς default top
+  if (!card.style.top || card.style.top === '0px') {
+    card.style.top = (rect.top + 20) + 'px';
+  }
 }
 
 // Commit row cells από τα inputs + sync με classic line items table
@@ -3345,8 +3392,9 @@ function apTourCommitRow() {
   const inputs = document.querySelectorAll('#ap-tour-row-cells .tour-row-cell-value');
   const tr = document.getElementById('ap-row-' + apTourLineRow);
   inputs.forEach(inp => {
+    if (inp.dataset.mapped !== '1') return; // skip unmapped (PDF column χωρίς αντίστοιχο extracted key)
     const k = inp.dataset.cellKey;
-    if (k === undefined) return;
+    if (!k || k.startsWith('_pdf_')) return;
     row[k] = inp.value;
     // sync με classic line items table cell (αν είναι rendered)
     if (tr) {
@@ -3371,7 +3419,7 @@ function apTourApproveDoc() {
   }
 }
 
-// Drag handlers για το row card (μία φορά setup)
+// Drag handlers για το row card — μόνο vertical movement (full-width οριζόντια)
 let apTourRowDragInited = false;
 function apTourInitRowDrag() {
   if (apTourRowDragInited) return;
@@ -3379,20 +3427,19 @@ function apTourInitRowDrag() {
   const card = document.getElementById('ap-tour-row-card');
   const handle = document.getElementById('ap-tour-row-drag');
   if (!card || !handle) return;
-  let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  let dragging = false, sy = 0, oy = 0;
   handle.addEventListener('mousedown', function(e) {
     if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
     dragging = true;
     card.classList.add('dragging');
-    sx = e.clientX; sy = e.clientY;
-    const r = card.getBoundingClientRect();
-    ox = r.left; oy = r.top;
+    sy = e.clientY;
+    oy = card.getBoundingClientRect().top;
     e.preventDefault();
   });
   document.addEventListener('mousemove', function(e) {
     if (!dragging) return;
-    card.style.left = Math.max(0, Math.min(window.innerWidth - card.offsetWidth, ox + (e.clientX - sx))) + 'px';
-    card.style.top  = Math.max(0, Math.min(window.innerHeight - card.offsetHeight, oy + (e.clientY - sy))) + 'px';
+    // Μόνο vertical movement — full-width left/right μένει σταθερό
+    card.style.top = Math.max(0, Math.min(window.innerHeight - card.offsetHeight, oy + (e.clientY - sy))) + 'px';
   });
   document.addEventListener('mouseup', function() {
     if (!dragging) return;
@@ -3400,6 +3447,11 @@ function apTourInitRowDrag() {
     card.classList.remove('dragging');
   });
 }
+
+// Resize handler για το row card (διατήρηση full-width)
+window.addEventListener('resize', function() {
+  if (apTourActive && apTourMode === 'lineitem') apTourPositionRowCard();
+});
 
 function apTourDrawHighlight() {
   const img = document.getElementById('ap-doc-img');
