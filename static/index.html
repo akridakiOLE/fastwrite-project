@@ -238,11 +238,11 @@ select.form-input option{background:var(--bg2);}
 .tour-row-card-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;cursor:move;font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);letter-spacing:.8px;}
 .tour-row-card-cells{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;}
 .tour-row-cell{display:flex;flex-direction:column;gap:4px;flex:1;min-width:90px;}
-.tour-row-cell.unmapped{opacity:0.55;}
-.tour-row-cell-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+.tour-row-cell.unmapped{opacity:0.85;}
+.tour-row-cell-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--text);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
 .tour-row-cell-value{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;width:100%;box-sizing:border-box;}
 .tour-row-cell-value:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,229,160,0.2);}
-.tour-row-cell-value:disabled{background:var(--bg);color:var(--text3);cursor:not-allowed;}
+.tour-row-cell-value:disabled{background:var(--bg);color:var(--text2);cursor:not-allowed;font-style:italic;}
 .tour-row-card-nav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;}
 .tour-row-card-nav .left{display:flex;gap:8px;}
 .tour-toggle-btn{background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.4);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;}
@@ -3327,11 +3327,13 @@ function apTourRenderLineItem() {
       const c = pdfCells[i];
       const label = c.col_name || ('Col ' + (i + 1));
       const mKey = matchedKeys[i];
-      const v = mKey != null ? row[mKey] : '';
+      // Mapped: τιμή από extracted data (editable)
+      // Unmapped: τιμή από PDF cell text (read-only, ως reference για user)
+      const v = mKey != null ? row[mKey] : (c.pdf_text || '');
       const dataKey = mKey || ('_pdf_' + i);
       const mapped = mKey ? '1' : '0';
       const cls = mKey ? 'tour-row-cell' : 'tour-row-cell unmapped';
-      const dis = mKey ? '' : 'disabled title="Δεν υπάρχει αντίστοιχο πεδίο στο template"';
+      const dis = mKey ? '' : 'disabled title="Από PDF — δεν υπάρχει στο template"';
       html += `<div class="${cls}">
         <div class="tour-row-cell-label" title="${esc(label)}">${esc(label)}</div>
         <input class="tour-row-cell-value" data-cell-key="${esc(dataKey)}" data-mapped="${mapped}" value="${v != null ? esc(v) : ''}" oninput="apTourMarkDirty()" ${dis}/>
@@ -3364,9 +3366,7 @@ function apTourRenderLineItem() {
   apTourPositionRowCard();
   apTourInitRowDrag();
   apTourDrawHighlight();
-  // Focus first mapped input
-  const firstInput = document.querySelector('#ap-tour-row-cells .tour-row-cell-value:not(:disabled)');
-  if (firstInput) firstInput.focus();
+  // (Δεν κάνουμε auto-focus/select — ο user κάνει click στο cell που θέλει να επεξεργαστεί)
 }
 
 // Positioning helper: full-width card πάνω στο PDF area

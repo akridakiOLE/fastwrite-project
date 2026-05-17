@@ -848,17 +848,19 @@ def get_line_positions(doc_id):
                     best = t
 
             headers = []
+            extracted_rows = []
             if best:
                 # Πλάτος πίνακα ως % της σελίδας (για στενότερο highlight)
                 tb = best.bbox  # (x0, top, x1, bottom)
                 left_pct  = round(tb[0] / page_w, 4)
                 right_pct = round(tb[2] / page_w, 4)
-                # Line Items Tour Sprint 1: εξάγουμε column headers
+                # Line Items Tour Sprint 1: εξάγουμε column headers + cell text
                 try:
-                    extracted_rows = best.extract()
+                    extracted_rows = best.extract() or []
                     if extracted_rows and extracted_rows[0]:
                         headers = [str(h or "").strip() for h in extracted_rows[0]]
                 except Exception:
+                    extracted_rows = []
                     headers = []
                 rows = best.rows
                 for ri, row in enumerate(rows):
@@ -866,17 +868,22 @@ def get_line_positions(doc_id):
                     if not row.cells or not row.cells[0]: continue
                     y_top = row.cells[0][1]
                     y_bot = row.cells[0][3]
-                    # Line Items Tour Sprint 1: per-cell positions για cell-level navigation
+                    # Line Items Tour: per-cell positions + PDF text content
                     cells = []
+                    row_text = extracted_rows[ri] if ri < len(extracted_rows) else []
                     for ci, cell in enumerate(row.cells):
                         if not cell: continue
                         try:
                             cx0, _cy0, cx1, _cy1 = cell[0], cell[1], cell[2], cell[3]
+                            cell_text = ""
+                            if ci < len(row_text) and row_text[ci] is not None:
+                                cell_text = str(row_text[ci]).strip()
                             cells.append({
                                 "col_idx":  ci,
                                 "col_name": headers[ci] if ci < len(headers) else f"col{ci}",
                                 "x_pct":    round(cx0 / page_w, 4),
                                 "right_pct": round(cx1 / page_w, 4),
+                                "pdf_text": cell_text,
                             })
                         except Exception:
                             continue
