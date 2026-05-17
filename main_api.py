@@ -847,24 +847,47 @@ def get_line_positions(doc_id):
                 if best is None or len(rows) > len(best.extract()):
                     best = t
 
+            headers = []
             if best:
                 # Πλάτος πίνακα ως % της σελίδας (για στενότερο highlight)
                 tb = best.bbox  # (x0, top, x1, bottom)
                 left_pct  = round(tb[0] / page_w, 4)
                 right_pct = round(tb[2] / page_w, 4)
+                # Line Items Tour Sprint 1: εξάγουμε column headers
+                try:
+                    extracted_rows = best.extract()
+                    if extracted_rows and extracted_rows[0]:
+                        headers = [str(h or "").strip() for h in extracted_rows[0]]
+                except Exception:
+                    headers = []
                 rows = best.rows
                 for ri, row in enumerate(rows):
                     if ri == 0: continue  # skip header
                     if not row.cells or not row.cells[0]: continue
                     y_top = row.cells[0][1]
                     y_bot = row.cells[0][3]
+                    # Line Items Tour Sprint 1: per-cell positions για cell-level navigation
+                    cells = []
+                    for ci, cell in enumerate(row.cells):
+                        if not cell: continue
+                        try:
+                            cx0, _cy0, cx1, _cy1 = cell[0], cell[1], cell[2], cell[3]
+                            cells.append({
+                                "col_idx":  ci,
+                                "col_name": headers[ci] if ci < len(headers) else f"col{ci}",
+                                "x_pct":    round(cx0 / page_w, 4),
+                                "right_pct": round(cx1 / page_w, 4),
+                            })
+                        except Exception:
+                            continue
                     positions.append({
                         "top_pct":    round(y_top / page_h, 4),
                         "bottom_pct": round(y_bot / page_h, 4),
                         "left_pct":   left_pct,
-                        "right_pct":  right_pct
+                        "right_pct":  right_pct,
+                        "cells":      cells,
                     })
-        return jsonify({"positions": positions, "page": page_num})
+        return jsonify({"positions": positions, "page": page_num, "headers": headers})
     except Exception as e:
         return jsonify({"positions": [], "error": str(e)})
 
