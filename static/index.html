@@ -232,6 +232,17 @@ select.form-input option{background:var(--bg2);}
 .tour-card-btn:hover:not(:disabled){border-color:var(--accent);}
 .tour-card-btn:disabled{opacity:.4;cursor:not-allowed;}
 .tour-card-btn.primary{background:var(--accent);color:#0a0c10;border-color:var(--accent);font-weight:600;}
+/* Tour Row Card (Line Items horizontal bar) */
+.tour-row-card{position:fixed;background:var(--bg2);border:2px solid var(--accent);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6);padding:12px 16px;z-index:60;user-select:none;max-width:96vw;}
+.tour-row-card.dragging{transition:none;}
+.tour-row-card-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;cursor:move;font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:.8px;}
+.tour-row-card-cells{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;}
+.tour-row-cell{display:flex;flex-direction:column;gap:3px;min-width:110px;flex-shrink:0;}
+.tour-row-cell-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.7px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tour-row-cell-value{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;width:100%;box-sizing:border-box;}
+.tour-row-cell-value:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,229,160,0.2);}
+.tour-row-card-nav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;}
+.tour-row-card-nav .left{display:flex;gap:8px;}
 .tour-toggle-btn{background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.4);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;}
 .tour-toggle-btn.active{background:var(--accent);color:#0a0c10;}
 .le-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:.5px;margin-bottom:4px;display:block;}
@@ -1223,7 +1234,22 @@ select.form-input option{background:var(--bg2);}
             <button onclick="apZoomBy(-0.2)" title="Σμίκρυνση (Ctrl + scroll down)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 10px;font-size:15px;font-weight:600;cursor:pointer;line-height:1;">−</button>
           </div>
         </div>
-        <!-- Tour Mode floating card (Sprint 2) -->
+        <!-- Tour Mode floating ROW card για line items (Sprint Line Items Tour v2) -->
+        <div id="ap-tour-row-card" class="tour-row-card" style="display:none;">
+          <div class="tour-row-card-header" id="ap-tour-row-drag">
+            <span>Γραμμή <span id="ap-tour-row-counter">1/1</span></span>
+            <button onclick="apToggleTour()" style="background:transparent;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:0 4px;" title="Έξοδος (Esc)">×</button>
+          </div>
+          <div class="tour-row-card-cells" id="ap-tour-row-cells"></div>
+          <div class="tour-row-card-nav">
+            <div class="left">
+              <button class="tour-card-btn" id="ap-tour-row-prev" onclick="apTourNavRow(-1)">↑ Προηγ.</button>
+              <button class="tour-card-btn" id="ap-tour-row-next" onclick="apTourNavRow(1)">Επόμ. ↓</button>
+            </div>
+            <button class="tour-card-btn primary" id="ap-tour-approve-btn" onclick="apTourApproveDoc()" style="display:none;">✓ Έγκριση Τιμολογίου</button>
+          </div>
+        </div>
+        <!-- Tour Mode floating card (Sprint 2 - scalars) -->
         <div id="ap-tour-card" class="tour-card" style="display:none;">
           <div class="tour-card-header" id="ap-tour-drag-handle">
             <span class="tour-card-title">Πεδίο</span>
@@ -3221,6 +3247,8 @@ function apTourExit() {
   apTourLineCell = 0;
   document.getElementById('page-approval').classList.remove('tour-mode-active');
   document.getElementById('ap-tour-card').style.display = 'none';
+  const rowCard = document.getElementById('ap-tour-row-card');
+  if (rowCard) rowCard.style.display = 'none';
   document.getElementById('ap-tour-toggle').classList.remove('active');
   const stateEl = document.getElementById('ap-tour-toggle-state');
   const dotEl = document.getElementById('ap-tour-toggle-dot');
@@ -3234,6 +3262,10 @@ function apTourRender() {
   if (!apTourActive) return;
   if (apTourMode === 'lineitem') return apTourRenderLineItem();
   if (!apTourFields.length) return;
+  // Ensure scalar card visible, row card hidden
+  document.getElementById('ap-tour-card').style.display = 'block';
+  const rowCard = document.getElementById('ap-tour-row-card');
+  if (rowCard) rowCard.style.display = 'none';
   const field = apTourFields[apTourIdx];
   const id = apDocIds[apCurrentIdx];
   const rd = apDocData[id].result_data || {};
@@ -3259,37 +3291,114 @@ function apTourRender() {
   apTourDrawHighlight();
 }
 
-// Line Items Tour: render για line item cell
+// Line Items Tour v2: horizontal bar με ΟΛΑ τα cells της γραμμής
 function apTourRenderLineItem() {
   const row = apTourLineData[apTourLineRow];
   if (!row) { apTourExit(); return; }
   const keys = Object.keys(row);
-  const cellKey = keys[apTourLineCell];
-  if (cellKey === undefined) { apTourExit(); return; }
-  const value = row[cellKey];
-  // Column label: χρησιμοποίησε header από PDF αν υπάρχει, αλλιώς humanize το key
-  let colLabel = humanizeFieldName(cellKey);
-  if (apTourLinePositions[apTourLineRow] && apTourLinePositions[apTourLineRow].cells) {
-    const cellInfo = apTourLinePositions[apTourLineRow].cells[apTourLineCell];
-    if (cellInfo && cellInfo.col_name) colLabel = cellInfo.col_name;
+  // Build cells HTML
+  let html = '';
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    const v = row[k];
+    let label = humanizeFieldName(k);
+    if (apTourLinePositions[apTourLineRow] && apTourLinePositions[apTourLineRow].cells) {
+      const cellInfo = apTourLinePositions[apTourLineRow].cells[i];
+      if (cellInfo && cellInfo.col_name) label = cellInfo.col_name;
+    }
+    const esc = (s) => String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    html += `<div class="tour-row-cell">
+      <div class="tour-row-cell-label" title="${esc(label)}">${esc(label)}</div>
+      <input class="tour-row-cell-value" data-cell-key="${esc(k)}" value="${v != null ? esc(v) : ''}" oninput="apTourMarkDirty()"/>
+    </div>`;
   }
-  document.getElementById('ap-tour-field-label').textContent = colLabel;
-  document.getElementById('ap-tour-field-name').textContent =
-    'Γραμμή ' + (apTourLineRow + 1) + ' / ' + apTourLineData.length +
-    ' · Στήλη ' + (apTourLineCell + 1) + ' / ' + keys.length;
-  document.getElementById('ap-tour-counter').textContent =
-    'L' + (apTourLineRow + 1) + '·' + (apTourLineCell + 1);
-  const valInput = document.getElementById('ap-tour-value');
-  valInput.value = value != null ? value : '';
-  valInput.focus();
-  valInput.select();
-  // Buttons
-  document.getElementById('ap-tour-prev').disabled = false;
-  const isLastCell = (apTourLineCell === keys.length - 1);
-  const isLastRow  = (apTourLineRow === apTourLineData.length - 1);
-  document.getElementById('ap-tour-next').textContent =
-    (isLastCell && isLastRow) ? '✓ Τέλος' : 'Επόμ. →';
+  document.getElementById('ap-tour-row-cells').innerHTML = html;
+  document.getElementById('ap-tour-row-counter').textContent =
+    (apTourLineRow + 1) + ' / ' + apTourLineData.length;
+  // Buttons state
+  document.getElementById('ap-tour-row-prev').disabled = (apTourLineRow === 0);
+  const isLastRow = (apTourLineRow === apTourLineData.length - 1);
+  document.getElementById('ap-tour-row-next').style.display = isLastRow ? 'none' : 'inline-block';
+  document.getElementById('ap-tour-approve-btn').style.display = isLastRow ? 'inline-block' : 'none';
+  // Show row card, hide normal card
+  document.getElementById('ap-tour-card').style.display = 'none';
+  document.getElementById('ap-tour-row-card').style.display = 'block';
+  // Position: αν δεν έχει set, βάλε το πάνω-κέντρο του pdf area
+  const card = document.getElementById('ap-tour-row-card');
+  if (!card.style.left || card.style.left === '0px') {
+    const pdfArea = document.getElementById('ap-pdf-area');
+    const rect = pdfArea.getBoundingClientRect();
+    card.style.left = Math.max(10, rect.left + (rect.width - card.offsetWidth) / 2) + 'px';
+    card.style.top = (rect.top + 20) + 'px';
+  }
+  apTourInitRowDrag();
   apTourDrawHighlight();
+  // Focus first input
+  const firstInput = document.querySelector('#ap-tour-row-cells .tour-row-cell-value');
+  if (firstInput) firstInput.focus();
+}
+
+// Commit row cells από τα inputs + sync με classic line items table
+function apTourCommitRow() {
+  const row = apTourLineData[apTourLineRow];
+  if (!row) return;
+  const inputs = document.querySelectorAll('#ap-tour-row-cells .tour-row-cell-value');
+  const tr = document.getElementById('ap-row-' + apTourLineRow);
+  inputs.forEach(inp => {
+    const k = inp.dataset.cellKey;
+    if (k === undefined) return;
+    row[k] = inp.value;
+    // sync με classic line items table cell (αν είναι rendered)
+    if (tr) {
+      const classicCell = tr.querySelector(`td[data-col="${CSS.escape(k)}"]`);
+      if (classicCell) classicCell.textContent = inp.value;
+    }
+  });
+  apMarkDirty();
+}
+
+// Έγκριση Τιμολογίου από το tour (στο τέλος της τελευταίας γραμμής)
+function apTourApproveDoc() {
+  apTourCommitRow();
+  apTourExit();
+  // Καλεί το υπάρχον approve action μέσω του classic approve bar
+  // Αν δεν υπάρχει approve flow, εμφανίζει toast
+  const approveBtn = document.querySelector('#ap-approve-bar button');
+  if (approveBtn) {
+    approveBtn.click();
+  } else {
+    toast('Το tour ολοκληρώθηκε. Πατήστε ✓✓ Έγκριση Τιμολογίου για ολοκλήρωση.', 'success');
+  }
+}
+
+// Drag handlers για το row card (μία φορά setup)
+let apTourRowDragInited = false;
+function apTourInitRowDrag() {
+  if (apTourRowDragInited) return;
+  apTourRowDragInited = true;
+  const card = document.getElementById('ap-tour-row-card');
+  const handle = document.getElementById('ap-tour-row-drag');
+  if (!card || !handle) return;
+  let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  handle.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+    dragging = true;
+    card.classList.add('dragging');
+    sx = e.clientX; sy = e.clientY;
+    const r = card.getBoundingClientRect();
+    ox = r.left; oy = r.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    card.style.left = Math.max(0, Math.min(window.innerWidth - card.offsetWidth, ox + (e.clientX - sx))) + 'px';
+    card.style.top  = Math.max(0, Math.min(window.innerHeight - card.offsetHeight, oy + (e.clientY - sy))) + 'px';
+  });
+  document.addEventListener('mouseup', function() {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove('dragging');
+  });
 }
 
 function apTourDrawHighlight() {
@@ -3302,32 +3411,18 @@ function apTourDrawHighlight() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (apTourMode === 'lineitem') {
-    // Line item: highlight row (faded) + active cell (bright)
+    // Line item v2: ολόκληρο το row highlighted (όλα τα cells μαζί)
     const pos = apTourLinePositions[apTourLineRow];
     if (!pos) return;
     const rowY = pos.top_pct * canvas.height;
     const rowH = (pos.bottom_pct - pos.top_pct) * canvas.height;
     const rowX = (pos.left_pct != null ? pos.left_pct : 0) * canvas.width;
     const rowW = ((pos.right_pct != null ? pos.right_pct : 1) - (pos.left_pct != null ? pos.left_pct : 0)) * canvas.width;
-    // row faded
-    ctx.fillStyle = 'rgba(0, 229, 160, 0.15)';
+    ctx.fillStyle   = 'rgba(0, 229, 160, 0.30)';
+    ctx.strokeStyle = 'rgba(0, 229, 160, 1.0)';
+    ctx.lineWidth   = 3;
     ctx.fillRect(rowX, rowY, rowW, rowH);
-    // active cell bright
-    const cellInfo = pos.cells && pos.cells[apTourLineCell];
-    if (cellInfo) {
-      const cx = cellInfo.x_pct * canvas.width;
-      const cw = (cellInfo.right_pct - cellInfo.x_pct) * canvas.width;
-      ctx.fillStyle   = 'rgba(0, 229, 160, 0.40)';
-      ctx.strokeStyle = 'rgba(0, 229, 160, 1.0)';
-      ctx.lineWidth   = 3;
-      ctx.fillRect(cx, rowY, cw, rowH);
-      ctx.strokeRect(cx, rowY, cw, rowH);
-    } else {
-      // fallback: highlight row
-      ctx.strokeStyle = 'rgba(0, 229, 160, 1.0)';
-      ctx.lineWidth   = 3;
-      ctx.strokeRect(rowX, rowY, rowW, rowH);
-    }
+    ctx.strokeRect(rowX, rowY, rowW, rowH);
     return;
   }
 
@@ -3348,49 +3443,13 @@ function apTourDrawHighlight() {
 
 function apTourNav(dir) {
   if (!apTourActive) return;
-  // Πρώτα αποθήκευσε την τρέχουσα τιμή
-  apTourCommitCurrent();
-
+  // Σε line item mode το apTourNav καλείται από scalars ή Enter shortcut
   if (apTourMode === 'lineitem') {
-    // Line item navigation: cell-level forward/back με row wraparound
-    const row = apTourLineData[apTourLineRow];
-    const keys = row ? Object.keys(row) : [];
-    if (dir > 0) {
-      // Επόμενο cell στην ίδια γραμμή
-      if (apTourLineCell < keys.length - 1) {
-        apTourLineCell++;
-      } else {
-        // Τέλος γραμμής → επόμενη γραμμή
-        if (apTourLineRow < apTourLineData.length - 1) {
-          apTourLineRow++;
-          apTourLineCell = 0;
-        } else {
-          apTourExit();
-          return;
-        }
-      }
-    } else {
-      // Προηγούμενο cell
-      if (apTourLineCell > 0) {
-        apTourLineCell--;
-      } else {
-        // Αρχή γραμμής → προηγούμενη γραμμή τελευταίο cell
-        if (apTourLineRow > 0) {
-          apTourLineRow--;
-          const prevRowKeys = Object.keys(apTourLineData[apTourLineRow] || {});
-          apTourLineCell = Math.max(0, prevRowKeys.length - 1);
-        } else {
-          // Πίσω στα scalars
-          apTourMode = 'scalar';
-          apTourIdx = apTourFields.length - 1;
-        }
-      }
-    }
-    apTourRender();
+    apTourNavRow(dir);
     return;
   }
-
   // Scalar mode
+  apTourCommitCurrent();
   const next = apTourIdx + dir;
   if (next < 0) return;
   if (next >= apTourFields.length) {
@@ -3410,16 +3469,28 @@ function apTourNav(dir) {
   apTourRender();
 }
 
-// ↑/↓ jump στην προηγούμενη/επόμενη γραμμή (skip cells)
+// ↑/↓ jump στην προηγούμενη/επόμενη γραμμή line items
 function apTourNavRow(dir) {
-  if (!apTourActive || apTourMode !== 'lineitem') return;
-  apTourCommitCurrent();
+  if (!apTourActive) return;
+  if (apTourMode === 'lineitem') apTourCommitRow();
+  else apTourCommitCurrent();
   const next = apTourLineRow + dir;
-  if (next < 0 || next >= apTourLineData.length) return;
+  if (next < 0) {
+    // Αρχή line items → πίσω στα scalars
+    if (apTourFields.length > 0) {
+      apTourMode = 'scalar';
+      apTourIdx = apTourFields.length - 1;
+      document.getElementById('ap-tour-row-card').style.display = 'none';
+      apTourRender();
+    }
+    return;
+  }
+  if (next >= apTourLineData.length) {
+    // Πέρα από τελευταία γραμμή → δεν κάνουμε τίποτα (ο user πρέπει να πατήσει Έγκριση)
+    return;
+  }
   apTourLineRow = next;
-  // Διατηρούμε το cell index αν είναι valid στη νέα γραμμή
-  const newKeys = Object.keys(apTourLineData[next] || {});
-  if (apTourLineCell >= newKeys.length) apTourLineCell = Math.max(0, newKeys.length - 1);
+  apTourMode = 'lineitem';
   apTourRender();
 }
 
