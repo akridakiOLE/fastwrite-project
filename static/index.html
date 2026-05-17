@@ -1264,6 +1264,7 @@ select.form-input option{background:var(--bg2);}
           <input type="text" class="tour-card-value" id="ap-tour-value" oninput="apTourMarkDirty()"/>
           <div class="tour-card-nav">
             <button class="tour-card-btn" id="ap-tour-prev" onclick="apTourNav(-1)">← Προηγ.</button>
+            <button class="tour-card-btn" id="ap-tour-skip" onclick="apTourSkipToLineItems()" title="Παράκαμψη στις γραμμές (PageDown)" style="display:none;">⏭ Γραμμές</button>
             <button class="tour-card-btn primary" onclick="apTourNav(1)" id="ap-tour-next">Επόμ. →</button>
           </div>
         </div>
@@ -3290,8 +3291,22 @@ function apTourRender() {
   const isLastScalar = (apTourIdx === totalScalars - 1);
   document.getElementById('ap-tour-next').textContent =
     isLastScalar ? (hasLineItems ? 'Γραμμές →' : '✓ Τέλος') : 'Επόμ. →';
+  // Skip button: εμφάνιση μόνο αν υπάρχουν line items ΚΑΙ δεν είμαστε ήδη στο τέλος
+  const skipBtn = document.getElementById('ap-tour-skip');
+  if (skipBtn) skipBtn.style.display = (hasLineItems && !isLastScalar) ? 'inline-block' : 'none';
   // Highlight bbox στο PNG
   apTourDrawHighlight();
+}
+
+// Παράκαμψη scalar fields → directly στα line items
+function apTourSkipToLineItems() {
+  if (!apTourActive) return;
+  apTourCommitCurrent();
+  if (!apTourLineKey || !apTourLineData.length || !apTourLinePositions.length) return;
+  apTourMode = 'lineitem';
+  apTourLineRow = 0;
+  apTourLineCell = 0;
+  apTourRender();
 }
 
 // Line Items Tour v2: horizontal bar με ΟΛΑ τα cells της γραμμής
@@ -3826,12 +3841,13 @@ function apFocusScalarField(dir) {
 // Keyboard shortcuts for approval page (Step 2: εκτεταμένη πλοήγηση + Sprint 2 Tour Mode)
 document.addEventListener('keydown', function(e) {
   if (document.getElementById('page-approval').style.display === 'none') return;
-  // Tour Mode keyboard handling (←/→/↑/↓/Enter/Esc)
+  // Tour Mode keyboard handling (←/→/↑/↓/Enter/Esc/PageDown)
   if (apTourActive) {
     if (e.key === 'ArrowLeft')  { e.preventDefault(); apTourNav(-1); return; }
     if (e.key === 'ArrowRight') { e.preventDefault(); apTourNav(1);  return; }
     if (e.key === 'ArrowDown')  { e.preventDefault(); apTourNavRow(1);  return; } // line item: next row
     if (e.key === 'ArrowUp')    { e.preventDefault(); apTourNavRow(-1); return; } // line item: prev row
+    if (e.key === 'PageDown')   { e.preventDefault(); apTourSkipToLineItems(); return; } // skip στα line items
     if (e.key === 'Enter')      { e.preventDefault(); apTourNav(1);  return; }
     if (e.key === 'Escape')     { e.preventDefault(); apTourExit();  return; }
     return;
