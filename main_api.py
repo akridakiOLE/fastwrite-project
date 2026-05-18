@@ -19,6 +19,7 @@ from schema_builder import SchemaBuilder
 from validator      import InvoiceValidator
 from exporter       import DocumentExporter
 import billing_manager
+import license_manager  # Phase 2 Desktop: signed entitlements
 import random
 import email_service
 
@@ -52,6 +53,67 @@ processor  = FileProcessor(output_dir=PROCESSED_DIR)
 schema_bld = SchemaBuilder()
 validator  = InvoiceValidator()
 exporter   = DocumentExporter(export_dir=EXPORT_DIR)
+
+# ── Phase 2 Desktop: License Manager (lazy init) ─────────────────────────
+_LICENSE_MANAGER = None
+
+def _is_desktop_mode() -> bool:
+    """True αν τρέχουμε ως desktop. Default = web."""
+    return os.environ.get("FASTWRITE_MODE", "web").lower() == "desktop"
+
+
+def _get_license_manager():
+    """Lazy singleton. Καλείται μόνο σε desktop mode."""
+    global _LICENSE_MANAGER
+    if _LICENSE_MANAGER is None:
+        pubkey = PROJECT_ROOT / "license_pubkey.pem"
+        if not pubkey.exists():
+            logger.error("[license] missing public key at %s", pubkey)
+            return None
+        try:
+            _LICENSE_MANAGER = license_manager.LicenseManager(
+                base_dir=BASE_DIR,
+                public_key_pem=pubkey.read_bytes(),
+                db=db,
+            )
+        except Exception as e:
+            logger.exception("[license] init failed: %s", e)
+            return None
+    return _LICENSE_MANAGER
+
+
+def _enforce_license_limit(*, docs: int = 0, pages: int = 0):
+    """Έλεγχος signed entitlement. Επιστρέφει Flask tuple αν blocked, None αν allowed."""
+    lm = _get_license_manager()
+    if lm is None:
+        return jsonify({
+            "error": "Δεν βρέθηκε άδεια χρήσης. Δες %APPDATA%\\FastWrite\\secrets\\license.jwt",
+            "limit_reached": True,
+            "limit_type": "license_missing",
+        }), 403
+    try:
+        ent = lm.load_entitlement(allow_trial_fallback=True)
+    except license_manager.LicenseInvalidError as e:
+        return jsonify({
+            "error": f"Άκυρη άδεια χρήσης: {e}",
+            "limit_reached": True,
+            "limit_type": "license_invalid",
+        }), 403
+    remaining = lm.remaining(ent)
+    if remaining["docs"] is not None and remaining["docs"] < docs:
+        return jsonify({
+            "error": f"Έφτασες το όριο εγγράφων ({ent.docs_per_period}) για plan '{ent.plan}'.",
+            "limit_reached": True, "limit_type": "docs",
+            "plan": ent.plan, "usage": lm.summary(ent),
+        }), 403
+    if remaining["pages"] is not None and remaining["pages"] < pages:
+        return jsonify({
+            "error": f"Έφτασες το όριο σελίδων ({ent.pages_per_period}) για plan '{ent.plan}'.",
+            "limit_reached": True, "limit_type": "pages",
+            "plan": ent.plan, "usage": lm.summary(ent),
+        }), 403
+    return None
+
 
 # ── Seed default pricing plans on startup ──
 db.seed_default_plans()
@@ -87,6 +149,8 @@ def _enforce_page_limit(user_id: int, pages: int):
     Returns a Flask (response, status) tuple if blocked, or None if allowed."""
     if pages <= 0:
         return None
+    if _is_desktop_mode():                              # Phase 2: desktop → license
+        return _enforce_license_limit(pages=pages)
     check = db.check_usage_limit(user_id, 'page_processed', pages)
     if not check.get('allowed'):
         return jsonify({
@@ -104,6 +168,8 @@ def _enforce_doc_limit(user_id: int, docs: int):
     Returns a Flask (response, status) tuple if blocked, or None if allowed."""
     if docs <= 0:
         return None
+    if _is_desktop_mode():                              # Phase 2: desktop → license
+        return _enforce_license_limit(docs=docs)
     check = db.check_usage_limit(user_id, 'doc_processed', docs)
     if not check.get('allowed'):
         return jsonify({
