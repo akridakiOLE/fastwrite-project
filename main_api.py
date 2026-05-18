@@ -115,6 +115,24 @@ def _enforce_license_limit(*, docs: int = 0, pages: int = 0):
     return None
 
 
+def _consume_license_usage(*, docs: int = 0, pages: int = 0) -> None:
+    """Phase 2 Desktop: αυξάνει τον τοπικό license counter μετά από επιτυχή
+    extraction. No-op σε web mode. Πιάνει quietly όλα τα exceptions για να
+    μην σπάσει η κύρια ροή — το enforce έχει ήδη κάνει τον σκληρό έλεγχο."""
+    if not _is_desktop_mode() or (docs == 0 and pages == 0):
+        return
+    lm = _get_license_manager()
+    if lm is None:
+        return
+    try:
+        ent = lm.load_entitlement(allow_trial_fallback=True)
+        lm.consume(ent, docs=docs, pages=pages)
+    except license_manager.LicenseLimitReachedError:
+        logger.warning("[license] limit reached during consume (was missed by enforce?)")
+    except Exception as e:
+        logger.exception("[license] consume failed: %s", e)
+
+
 # ── Seed default pricing plans on startup ──
 db.seed_default_plans()
 
@@ -1140,6 +1158,7 @@ def extract_document(doc_id):
         db.update_document_status(doc_id, status="pending_review", result_json=json.dumps(result.extracted_data))
         # ── Record page usage ──
         db.record_usage_event(uid, 'page_processed', page_count)
+        _consume_license_usage(docs=1, pages=page_count)  # Phase 2 Desktop
         return jsonify({"success": True, "doc_id": doc_id, "data": result.extracted_data, "status": "pending_review"})
     else:
         db.update_document_status(doc_id, status="Failed")
@@ -1267,6 +1286,7 @@ def batch_extract_selected():
                                           len(processed_result.pages))
                 except Exception as e:
                     logger.error("Failed to record page usage for doc %d: %s", doc_id, e)
+                _consume_license_usage(docs=1, pages=len(processed_result.pages))  # Phase 2 Desktop
                 results["extracted"] += 1
                 results["details"].append({"doc_id": doc_id, "status": final_status})
             else:
@@ -1725,6 +1745,31 @@ def auth_me():
                 "page_limit": summary["page_limit"],
             }
     return jsonify(result)
+
+
+@app.get("/api/license/summary")
+@require_auth
+def api_license_summary():
+    """Phase 2 Desktop: Επιστρέφει το license summary (plan, remaining, features).
+    Σε web mode επιστρέφει {"desktop": false} ώστε το frontend να ξέρει να
+    κρύψει το chip χωρίς να βασίζεται σε error handling."""
+    if not _is_desktop_mode():
+        return jsonify({"desktop": False})
+    lm = _get_license_manager()
+    if lm is None:
+        return jsonify({"desktop": True, "error": "license_unavailable"}), 503
+    try:
+        ent = lm.load_entitlement(allow_trial_fallback=True)
+        summary = lm.summary(ent)
+        summary["desktop"] = True
+        return jsonify(summary)
+    except license_manager.LicenseInvalidError as e:
+        return jsonify({"desktop": True, "error": "license_invalid",
+                        "detail": str(e)}), 403
+    except Exception as e:
+        logger.exception("[license] summary endpoint failed: %s", e)
+        return jsonify({"desktop": True, "error": str(e)}), 500
+
 
 @app.post("/api/auth/change-username")
 @require_auth

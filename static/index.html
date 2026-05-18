@@ -5508,8 +5508,40 @@ async function openStripePortal() {
   }
 }
 
+// ── Phase 2 Desktop: License chip ─────────────────────────────────────
+async function loadLicenseChip() {
+  try {
+    const res = await fetch('/api/license/summary', {credentials: 'include'});
+    if (!res.ok) return;
+    const data = await res.json();
+    const chip = document.getElementById('license-chip');
+    if (!chip) return;
+    if (!data.desktop) { chip.style.display = 'none'; return; }
+    if (data.error) {
+      chip.textContent = '⚠ ' + (data.error === 'license_invalid' ? 'Άκυρη άδεια' : 'License σφάλμα');
+      chip.style.borderColor = 'var(--danger)';
+      chip.style.display = 'inline-flex';
+      return;
+    }
+    const docs = data.docs || {};
+    const remaining = docs.remaining;
+    const limit = docs.limit;
+    const planLabel = data.is_trial ? 'Trial' : (data.plan || 'license');
+    const countText = (remaining == null || limit == null)
+      ? '∞ docs'
+      : `${remaining}/${limit} docs`;
+    chip.textContent = `${planLabel} · ${countText}`;
+    chip.style.borderColor = 'var(--border)';
+    chip.style.display = 'inline-flex';
+  } catch (e) {
+    console.warn('[license-chip] load failed:', e);
+  }
+}
+
 // ── Load plan info on page load ──
-(async function() { await loadUserPlanInfo(); })();
+(async function() { await loadUserPlanInfo(); await loadLicenseChip(); })();
 </script>
+<!-- Phase 2 Desktop: License chip (μόνιμο, εμφανίζεται μόνο σε desktop mode) -->
+<div id="license-chip" style="position:fixed;bottom:12px;right:12px;display:none;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:11px;color:var(--text2);font-family:'Segoe UI',system-ui,sans-serif;letter-spacing:.3px;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>
 </body>
 </html>
