@@ -1,0 +1,38 @@
+# FastWrite Desktop Phase 1 PoC dependencies
+# Install:
+#   python -m venv venv
+#   venv\Scripts\activate
+#   pip install -r requirements-desktop.txt
+
+# Native window wrapper
+pywebview>=5.0
+
+# Web framework (same as production)
+flask>=3.0
+
+# Authentication & crypto
+PyJWT>=2.8
+bcrypt>=4.0
+cryptography>=42.0
+
+# AI / Gemini SDK
+google-genai>=0.3
+
+# PDF processing
+pdfplumber>=0.10
+pypdfium2>=4.20
+pypdf>=4.0
+
+# Images
+Pillow>=10.0
+
+# Export (Excel / CSV)
+openpyxl>=3.1
+pandas>=2.0
+
+# Network / requests
+requests>=2.31
+
+# Build (Phase 4 — PyInstaller)
+# Pinned για reproducible builds. Bump μόνο όταν επιβεβαιωθεί ότι το νέο version δουλεύει.
+pyinstaller==6.11.0

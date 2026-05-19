@@ -767,9 +767,11 @@ select.form-input option{background:var(--bg2);}
               <label class="form-label" data-i18n="settings_api_provider">Παροχέας</label>
               <select class="form-input" id="key-service">
                 <option value="gemini">Gemini (Google)</option>
-                <option value="openai">OpenAI</option>
-                <option value="claude">Claude (Anthropic)</option>
-                <option value="mistral">Mistral</option>
+                <!-- Multi-provider αναβλήθηκε (Master Doc v16 §5.4). Ξεσχολίασε όταν προστεθεί
+                     υποστήριξη στο ai_extractor.py. -->
+                <!-- <option value="openai">OpenAI</option> -->
+                <!-- <option value="claude">Claude (Anthropic)</option> -->
+                <!-- <option value="mistral">Mistral</option> -->
               </select>
             </div>
             <div class="form-group">
@@ -974,7 +976,7 @@ select.form-input option{background:var(--bg2);}
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το 2FA και πώς το ενεργοποιώ;</div><div class="faq-a">Η Ταυτοποίηση 2 Βημάτων (2FA) προσθέτει ένα επιπλέον επίπεδο ασφάλειας. Χρειάζεστε μια εφαρμογή Authenticator (π.χ. Google Authenticator). Πηγαίνετε στις Ρυθμίσεις → "Ενεργοποίηση 2FA", σαρώστε το QR code, εισάγετε τον 6ψήφιο κωδικό για επαλήθευση.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι γίνεται αν χάσω πρόσβαση στο 2FA;</div><div class="faq-a">Επικοινωνήστε με την υποστήριξη. Ο διαχειριστής μπορεί να επαναφέρει (reset) το 2FA για τον λογαριασμό σας χωρίς να έχει πρόσβαση στα δεδομένα σας.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το API Key;</div><div class="faq-a">Το API Key είναι ένα κλειδί πρόσβασης στην υπηρεσία AI (π.χ. Google Gemini) που χρησιμοποιείται για την εξαγωγή δεδομένων. <strong>ΥΠΟΧΡΕΩΤΙΚΑ χρησιμοποιείτε αποκλειστικά το δικό σας κλειδί (BYOK — Bring Your Own Key).</strong> Η χρέωση γίνεται απευθείας από τον πάροχο AI στον δικό σας λογαριασμό. Η πλατφόρμα FastWrite δεν παρέχει δικό της API Key και δεν μεσολαβεί στην επεξεργασία των δεδομένων σας — διασφαλίζοντας πλήρη ιδιωτικότητα και ανεξαρτησία.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιους AI παρόχους υποστηρίζει;</div><div class="faq-a">Αυτή τη στιγμή υποστηρίζεται κυρίως το Google Gemini. Σύντομα θα υποστηρίζονται και OpenAI, Claude (Anthropic), και Mistral.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιους AI παρόχους υποστηρίζει;</div><div class="faq-a">Υποστηρίζεται το Google Gemini 2.5 Flash, το οποίο είναι βέλτιστο για εξαγωγή δεδομένων από τιμολόγια (vision + tabular + structured output).</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🔒 Ασφάλεια &amp; Ιδιωτικότητα</div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιος βλέπει τα έγγραφά μου;</div><div class="faq-a">Κανείς. Τα έγγραφά σας είναι πλήρως απομονωμένα. Ούτε ο διαχειριστής του συστήματος μπορεί να δει τα δεδομένα σας. Κάθε χρήστης βλέπει και διαχειρίζεται μόνο τα δικά του έγγραφα.</div></div>
@@ -1098,7 +1100,7 @@ select.form-input option{background:var(--bg2);}
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is 2FA and how do I enable it?</div><div class="faq-a">Two-Factor Authentication (2FA) adds an extra layer of security. You need an Authenticator app (e.g. Google Authenticator). Go to Settings → "Enable 2FA", scan the QR code, enter the 6-digit code to verify.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What if I lose access to 2FA?</div><div class="faq-a">Contact support. The administrator can reset 2FA for your account without having access to your data.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is an API Key?</div><div class="faq-a">An API Key is an access key to the AI service (e.g. Google Gemini) used for data extraction. <strong>You MUST use your own key (BYOK — Bring Your Own Key).</strong> Billing is done directly by the AI provider to your account. The FastWrite platform does not provide its own API Key and does not mediate the processing of your data — ensuring complete privacy and independence.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Which AI providers are supported?</div><div class="faq-a">Currently Google Gemini is primarily supported. OpenAI, Claude (Anthropic), and Mistral will be supported soon.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Which AI providers are supported?</div><div class="faq-a">Google Gemini 2.5 Flash is supported, which is optimal for invoice data extraction (vision + tabular + structured output).</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🔒 Security &amp; Privacy</div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Who can see my documents?</div><div class="faq-a">No one. Your documents are fully isolated. Even the system administrator cannot see your data. Each user sees and manages only their own documents.</div></div>
