@@ -17,3 +17,6 @@ build/
 dist/
 *.spec.bak
 
+# Master project doc — Google Drive only, NEVER στο git
+FastWrite_Master_Project_*
+
