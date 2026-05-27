@@ -20,6 +20,7 @@ from validator      import InvoiceValidator
 from exporter       import DocumentExporter
 import billing_manager
 import license_manager  # Phase 2 Desktop: signed entitlements
+import xero_connector  # Phase A: Xero OAuth + Bills push (desktop only)
 import random
 import email_service
 
@@ -2856,6 +2857,138 @@ def serve_ui_spa(subpath):
     if not token or not verify_token(token):
         return redirect("/ui/login")
     return send_file(str(STATIC_DIR / "index.html"))
+
+
+# ── Phase A: Xero Integration Endpoints (desktop only) ───────────────────
+#
+# 5 endpoints για το Xero OAuth flow + tenant management. Όλα με @require_auth.
+# Σε web mode επιστρέφουν 503 (το Xero είναι inherently desktop-only λόγω του
+# loopback server στο port 5556 — βλ. xero_integration_design_v1.md §2.2).
+
+_XERO_CONNECTOR = None
+_XERO_INIT_ERROR = None
+
+
+def _get_xero_connector():
+    """Lazy singleton. Returns None αν web mode ή λείπει XERO_CLIENT_ID."""
+    global _XERO_CONNECTOR, _XERO_INIT_ERROR
+    if not _is_desktop_mode():
+        _XERO_INIT_ERROR = "Xero integration διαθέσιμο μόνο σε desktop mode"
+        return None
+    if _XERO_CONNECTOR is None and _XERO_INIT_ERROR is None:
+        try:
+            _XERO_CONNECTOR = xero_connector.XeroConnector(secrets_dir=SECRETS_DIR)
+            logger.info("[xero] connector initialized (secrets=%s)", SECRETS_DIR)
+        except xero_connector.XeroConfigError as e:
+            _XERO_INIT_ERROR = str(e)
+            logger.warning("[xero] init failed: %s", e)
+            return None
+        except Exception as e:
+            _XERO_INIT_ERROR = f"Unexpected error: {e}"
+            logger.exception("[xero] unexpected init error")
+            return None
+    return _XERO_CONNECTOR
+
+
+def _xero_unavailable_response():
+    return jsonify({
+        "error": "Xero integration μη διαθέσιμο",
+        "detail": _XERO_INIT_ERROR or "Άγνωστος λόγος",
+    }), 503
+
+
+@app.post("/api/xero/connect")
+@require_auth
+def xero_connect_endpoint():
+    """Ξεκινά OAuth flow. Επιστρέφει auth_url + ανοίγει browser αυτόματα."""
+    connector = _get_xero_connector()
+    if connector is None:
+        return _xero_unavailable_response()
+    if connector.is_connected():
+        return jsonify({
+            "error": "Already connected. Use /api/xero/disconnect first.",
+            "connected": True,
+        }), 400
+    try:
+        auth_url = connector.start_oauth(open_browser=True)
+        return jsonify({"auth_url": auth_url, "status": "in_progress"}), 200
+    except Exception as e:
+        logger.exception("[xero] start_oauth failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/api/xero/status")
+@require_auth
+def xero_status_endpoint():
+    connector = _get_xero_connector()
+    if connector is None:
+        return jsonify({
+            "available": False,
+            "connected": False,
+            "detail": _XERO_INIT_ERROR,
+        }), 200
+    oauth = connector.get_oauth_status()
+    if connector.is_connected():
+        return jsonify({
+            "available": True,
+            "connected": True,
+            "tenants": connector.get_tenants(),
+            "active_tenant_id": connector.get_active_tenant_id(),
+            "oauth_status": oauth["status"],
+        }), 200
+    return jsonify({
+        "available": True,
+        "connected": False,
+        "oauth_status": oauth["status"],
+        "oauth_error": oauth["error"],
+    }), 200
+
+
+@app.get("/api/xero/tenants")
+@require_auth
+def xero_tenants_endpoint():
+    connector = _get_xero_connector()
+    if connector is None:
+        return _xero_unavailable_response()
+    try:
+        return jsonify({
+            "tenants": connector.get_tenants(),
+            "active_tenant_id": connector.get_active_tenant_id(),
+        }), 200
+    except xero_connector.XeroNotConnectedError:
+        return jsonify({"error": "Δεν είσαι συνδεδεμένος στο Xero"}), 400
+
+
+@app.put("/api/xero/tenants/active")
+@require_auth
+def xero_set_active_tenant_endpoint():
+    connector = _get_xero_connector()
+    if connector is None:
+        return _xero_unavailable_response()
+    data = request.get_json(silent=True) or {}
+    tenant_id = data.get("tenant_id")
+    if not tenant_id:
+        return jsonify({"error": "Λείπει το tenant_id στο body"}), 400
+    try:
+        connector.set_active_tenant(tenant_id)
+        return jsonify({"active_tenant_id": tenant_id}), 200
+    except xero_connector.XeroError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.post("/api/xero/disconnect")
+@require_auth
+def xero_disconnect_endpoint():
+    connector = _get_xero_connector()
+    if connector is None:
+        return _xero_unavailable_response()
+    try:
+        connector.disconnect()
+        return jsonify({"status": "disconnected"}), 200
+    except Exception as e:
+        logger.exception("[xero] disconnect failed")
+        return jsonify({"error": str(e)}), 500
+
 
 # ── App Start ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":

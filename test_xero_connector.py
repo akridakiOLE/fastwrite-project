@@ -597,29 +597,74 @@ class TestConnectFlow(XeroConnectorTestBase):
                     self.connector.connect()
 
 
-if __name__ == "__main__":
-    unittest.main()
-=300):
+
+# ── Async OAuth (start_oauth / get_oauth_status) για Flask integration ──────
+
+
+class TestAsyncOAuth(XeroConnectorTestBase):
+    """
+    Tests για το async pattern που χρησιμοποιεί το Flask endpoint.
+    start_oauth() returns auth_url αμέσως + spawns background thread.
+    """
+
+    def _wait_for_status(self, target: str, timeout_sec: float = 3.0) -> None:
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            if self.connector.get_oauth_status()["status"] == target:
+                return
+            time.sleep(0.05)
+        actual = self.connector.get_oauth_status()
+        raise AssertionError(f"Status not {target} within {timeout_sec}s. Final: {actual}")
+
+    def test_initial_status_is_idle(self):
+        status = self.connector.get_oauth_status()
+        self.assertEqual(status["status"], "idle")
+        self.assertIsNone(status["error"])
+
+    def test_start_oauth_returns_auth_url_immediately(self):
+        callback_event = threading.Event()
+
+        def slow_loopback(expected_state, timeout_sec=300):
+            callback_event.wait(timeout=2.0)
+            result = xc._CallbackResult()
+            result.error = "test_abort"
+            return result
+
+        with mock.patch.object(xc, "run_loopback_server", side_effect=slow_loopback):
+            with mock.patch.object(xc.webbrowser, "open"):
+                start = time.time()
+                auth_url = self.connector.start_oauth(open_browser=False)
+                elapsed = time.time() - start
+
+        self.assertLess(elapsed, 1.0)
+        self.assertIn(xc.XERO_AUTH_URL, auth_url)
+        self.assertEqual(self.connector.get_oauth_status()["status"], "in_progress")
+
+        callback_event.set()
+        self._wait_for_status("error", timeout_sec=3.0)
+
+    def test_start_oauth_completes_async(self):
+        self.mock_session.post.return_value = _FakeResponse(200, _make_token_response())
+        self.mock_session.get.return_value = _FakeResponse(
+            200, [{"tenantId": "t1", "tenantName": "Demo", "tenantType": "ORGANISATION"}]
+        )
+
+        def fake_loopback(expected_state, timeout_sec=300):
             result = xc._CallbackResult()
             result.code = "FAKE-CODE"
             result.state = expected_state
             return result
 
         with mock.patch.object(xc, "run_loopback_server", side_effect=fake_loopback):
-            with mock.patch.object(xc.webbrowser, "open") as mock_browser:
-                tokens = self.connector.connect()
+            with mock.patch.object(xc.webbrowser, "open"):
+                self.connector.start_oauth(open_browser=False)
 
-        mock_browser.assert_called_once()
-        auth_url = mock_browser.call_args.args[0]
-        self.assertIn(xc.XERO_AUTH_URL, auth_url)
-        self.assertIn(FAKE_CLIENT_ID, auth_url)
-
-        self.assertEqual(tokens.access_token, "access-token-v1")
-        self.assertEqual(len(tokens.tenants), 1)
-        self.assertEqual(tokens.active_tenant_id, "t1")
+        self._wait_for_status("completed", timeout_sec=3.0)
         self.assertTrue(self.connector.is_connected())
+        self.assertEqual(self.connector.get_active_tenant_id(), "t1")
+        self.assertIsNone(self.connector.get_oauth_status()["error"])
 
-    def test_connect_user_denies_raises(self):
+    def test_start_oauth_error_state(self):
         def fake_loopback(expected_state, timeout_sec=300):
             result = xc._CallbackResult()
             result.error = "access_denied"
@@ -627,8 +672,13 @@ if __name__ == "__main__":
 
         with mock.patch.object(xc, "run_loopback_server", side_effect=fake_loopback):
             with mock.patch.object(xc.webbrowser, "open"):
-                with self.assertRaises(xc.XeroOAuthError):
-                    self.connector.connect()
+                self.connector.start_oauth(open_browser=False)
+
+        self._wait_for_status("error", timeout_sec=3.0)
+        status = self.connector.get_oauth_status()
+        self.assertEqual(status["status"], "error")
+        self.assertIn("access_denied", status["error"])
+        self.assertFalse(self.connector.is_connected())
 
 
 if __name__ == "__main__":

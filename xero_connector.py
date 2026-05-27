@@ -401,6 +401,74 @@ class XeroConnector:
         }
         return f"{XERO_AUTH_URL}?{urllib.parse.urlencode(params)}"
 
+    # ── Async OAuth Flow (για Flask integration) ────────────────────────
+
+    def start_oauth(self, open_browser: bool = True) -> str:
+        """
+        Ξεκινά τον OAuth flow σε background thread και επιστρέφει αμέσως
+        το auth_url. Σχεδιασμένο για Flask endpoints που δεν πρέπει να
+        μπλοκάρουν περιμένοντας τον user.
+
+        Side effects:
+            - Spawns daemon thread που τρέχει loopback server + token exchange
+            - Αν open_browser=True, ανοίγει τον browser στο auth_url
+            - Set _oauth_status = "in_progress"
+
+        Status polling: get_oauth_status() returns
+            {status: "idle"|"in_progress"|"completed"|"error", error: str|None}
+        """
+        code_verifier, code_challenge = generate_pkce_pair()
+        state = generate_state()
+        auth_url = self.build_auth_url(code_challenge, state)
+
+        self._oauth_status = "in_progress"
+        self._oauth_error = None
+
+        def _runner() -> None:
+            try:
+                callback = run_loopback_server(state)
+                if callback.error or not callback.code:
+                    self._oauth_status = "error"
+                    self._oauth_error = callback.error or "no_code_received"
+                    return
+
+                tokens = self._exchange_code_for_tokens(callback.code, code_verifier)
+                tokens.tenants = self._fetch_tenants(tokens.access_token)
+                if tokens.tenants and not tokens.active_tenant_id:
+                    tokens.active_tenant_id = tokens.tenants[0].get("tenantId")
+
+                self._save_tokens(tokens)
+                self._oauth_status = "completed"
+                logger.info("Xero OAuth completed (async): %d tenant(s)", len(tokens.tenants))
+            except Exception as e:  # noqa: BLE001
+                logger.exception("Xero OAuth background thread failed")
+                self._oauth_status = "error"
+                self._oauth_error = str(e)
+
+        thread = threading.Thread(target=_runner, daemon=True, name="xero-oauth")
+        thread.start()
+
+        if open_browser:
+            webbrowser.open(auth_url, new=2)
+
+        return auth_url
+
+    def get_oauth_status(self) -> dict:
+        """
+        Τρέχουσα κατάσταση του async OAuth flow.
+
+        status:
+            'idle' — δεν έχει ξεκινήσει ποτέ flow
+            'in_progress' — flow τρέχει, περιμένει user
+            'completed' — επιτυχία, tokens αποθηκευμένα
+            'error' — απέτυχε (βλ. error field)
+        """
+        return {
+            "status": getattr(self, "_oauth_status", "idle"),
+            "error": getattr(self, "_oauth_error", None),
+        }
+
+    # ── Sync OAuth Flow (για CLI/tests) ─────────────────────────────────
     # ── Full OAuth Flow ─────────────────────────────────────────────────
 
     def connect(self, open_browser: bool = True) -> XeroTokens:
