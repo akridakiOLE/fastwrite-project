@@ -1523,6 +1523,32 @@ select.form-input option{background:var(--bg2);}
   </div>
 </div>
 
+
+<!-- ── Xero Push Modal (Phase B) ── -->
+<div class="modal-overlay" id="xero-push-modal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">🔗 Push to Xero (as DRAFT)</div>
+      <button class="modal-close" onclick="closeModal('xero-push-modal')">✕</button>
+    </div>
+    <div style="padding:20px;">
+      <div id="xero-push-preview" style="font-size:13px;color:var(--text2);margin-bottom:16px;background:var(--bg2);padding:12px;border-radius:8px;border:1px solid var(--border);"></div>
+      <div class="form-group">
+        <label class="form-label">Account Code (Xero Chart of Accounts)</label>
+        <select class="form-input" id="xero-push-account-select" disabled>
+          <option value="">Φόρτωση...</option>
+        </select>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">Επιλεγμένος account code εφαρμόζεται σε όλα τα line items</div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-secondary" onclick="closeModal('xero-push-modal')">Άκυρο</button>
+        <button class="btn btn-primary" id="xero-push-confirm-btn" onclick="xeroDoPush()" disabled>Push as DRAFT</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:12px;text-align:center;">Το Bill θα δημιουργηθεί σε κατάσταση <strong>DRAFT</strong> — εσύ θα το κάνεις AUTHORISE μέσα στο Xero.</div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Usage Warning Banner (inserted dynamically) ── -->
 
 <!-- ── Toast Container ── -->
@@ -1875,6 +1901,9 @@ function renderDocs(docs) {
       <td><span style="font-size:12px;color:var(--text3)">${recDate}</span></td>
       <td style="display:flex;gap:5px">
         <button class="btn btn-secondary btn-sm" onclick="viewDoc(${doc.id})" title="${t('js_view')}">👁</button>
+        ${rd._xero_invoice_id
+          ? `<a class="btn btn-secondary btn-sm" href="${rd._xero_deep_link || '#'}" target="_blank" rel="noopener" title="Open in Xero — already pushed">🔗✓</a>`
+          : (hasExtractedData ? `<button class="btn btn-secondary btn-sm" onclick="xeroOpenPushModal(${doc.id})" title="Push to Xero as DRAFT">🔗</button>` : '')}
         <button class="btn btn-danger btn-sm" onclick="deleteDoc(${doc.id})" title="${t('js_delete')}">🗑</button>
       </td>
     </tr>`;
@@ -4931,6 +4960,111 @@ async function xeroSetActiveTenant(tenantId){
   toast('Active tenant άλλαξε', 'success');
   loadXeroStatus();
 }
+
+// ── Xero Push to Bill (Phase B) ──────────────────────────────────────────────
+let _xeroPushPendingDocId = null;
+let _xeroAccountsCache = null;  // session cache για να μη κάνουμε fetch κάθε φορά
+
+async function _xeroFetchAccountsCached(){
+  if (_xeroAccountsCache) return _xeroAccountsCache;
+  const r = await api('GET','/api/xero/accounts');
+  if (r.error) { toast(`Xero accounts: ${r.error}`, 'error'); return []; }
+  _xeroAccountsCache = r.accounts || [];
+  return _xeroAccountsCache;
+}
+
+async function xeroOpenPushModal(docId){
+  // Quick connection check
+  const status = await api('GET','/api/xero/status');
+  if (!status.connected) {
+    toast('Πρέπει πρώτα να συνδεθείς στο Xero (Ρυθμίσεις)', 'error');
+    return;
+  }
+
+  // Fetch το document για preview
+  const doc = await api('GET', `/api/documents/${docId}`);
+  if (doc.error) { toast(doc.error, 'error'); return; }
+  const rd = doc.result_data || {};
+
+  const supplier = rd.supplier_name || rd.vendor_name || rd.company || '—';
+  const invNum   = rd.invoice_number || rd.invoice_no || '—';
+  const invDate  = rd.invoice_date || rd.date || '—';
+  const total    = rd.total || rd.total_amount || rd.subtotal || '—';
+  const currency = rd.currency || '';
+
+  // Build preview HTML
+  document.getElementById('xero-push-preview').innerHTML = `
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 12px;">
+      <div style="color:var(--text3)">Tenant:</div>
+      <div><strong>${(status.tenants?.find(t => t.tenantId === status.active_tenant_id)?.tenantName) || '—'}</strong></div>
+      <div style="color:var(--text3)">Supplier:</div>
+      <div><strong>${supplier}</strong></div>
+      <div style="color:var(--text3)">Invoice #:</div>
+      <div>${invNum}</div>
+      <div style="color:var(--text3)">Date:</div>
+      <div>${invDate}</div>
+      <div style="color:var(--text3)">Total:</div>
+      <div><strong>${total} ${currency}</strong></div>
+    </div>`;
+
+  // Load accounts and populate dropdown
+  const sel = document.getElementById('xero-push-account-select');
+  const btn = document.getElementById('xero-push-confirm-btn');
+  sel.disabled = true;
+  btn.disabled = true;
+  sel.innerHTML = '<option value="">Φόρτωση accounts...</option>';
+  openModal('xero-push-modal');
+  _xeroPushPendingDocId = docId;
+
+  const accounts = await _xeroFetchAccountsCached();
+  if (!accounts.length) {
+    sel.innerHTML = '<option value="">Δεν βρέθηκαν διαθέσιμοι λογαριασμοί</option>';
+    return;
+  }
+  // Sort by Code
+  accounts.sort((a,b) => (a.Code || '').localeCompare(b.Code || ''));
+  sel.innerHTML = '<option value="">— Επιλογή —</option>' + accounts.map(a =>
+    `<option value="${a.Code}">${a.Code} — ${a.Name} (${a.Type})</option>`
+  ).join('');
+  sel.disabled = false;
+  sel.onchange = () => { btn.disabled = !sel.value; };
+}
+
+async function xeroDoPush(){
+  const docId = _xeroPushPendingDocId;
+  if (!docId) { toast('Internal error: missing doc id', 'error'); return; }
+  const accountCode = document.getElementById('xero-push-account-select').value;
+  if (!accountCode) { toast('Επίλεξε account code πρώτα', 'error'); return; }
+
+  const btn = document.getElementById('xero-push-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Pushing...';
+
+  try {
+    const r = await api('POST', `/api/xero/push/${docId}`, {account_code: accountCode});
+    if (r.error) {
+      toast(`Push απέτυχε: ${r.error}`, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Push as DRAFT';
+      return;
+    }
+    closeModal('xero-push-modal');
+    btn.textContent = 'Push as DRAFT';
+    btn.disabled = false;
+    toast(`Bill δημιουργήθηκε στο Xero (DRAFT) — άνοιξε με 🔗✓`, 'success');
+    // Open in Xero σε νέα καρτέλα αυτόματα
+    if (r.deep_link) {
+      window.open(r.deep_link, '_blank', 'noopener');
+    }
+    loadDocuments();  // refresh για να φανεί το 🔗✓ badge
+  } catch (e) {
+    console.error('xeroDoPush error:', e);
+    toast('Σφάλμα δικτύου στο Push', 'error');
+    btn.disabled = false;
+    btn.textContent = 'Push as DRAFT';
+  }
+}
+
 
 // ── FAQ Functions ────────────────────────────────────────────────────────────
 function toggleFaq(el) {
