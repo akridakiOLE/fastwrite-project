@@ -287,6 +287,13 @@ select.form-input option{background:var(--bg2);}
 .af-btn{padding:4px 7px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;line-height:1;transition:all 0.15s;}
 .af-btn:hover{background:var(--bg2);border-color:var(--text3);}
 .af-btn.active{background:rgba(0,229,160,0.12);border-color:var(--accent);color:var(--accent);}
+
+/* ── Xero Integration (Phase C) ───────────────────────────────────────── */
+.xero-status-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+.xero-status-dot-green{background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,0.5);}
+.xero-status-dot-gray{background:#6b7280;}
+.xero-status-dot-amber{background:#fbbf24;box-shadow:0 0 6px rgba(251,191,36,0.4);animation:xero-pulse 1.4s ease-in-out infinite;}
+@keyframes xero-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 </style>
 <script src="/static/i18n.js"></script>
 </head>
@@ -779,6 +786,21 @@ select.form-input option{background:var(--bg2);}
               <input class="form-input" type="password" id="key-value" placeholder="Εισήγαγε το API key..." data-i18n-placeholder="settings_api_key_placeholder"/>
             </div>
             <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση κλειδιού AI — κρυπτογραφείται με Fernet encryption" onclick="saveKey()" data-i18n="settings_api_save" data-i18n-hint="settings_api_save_hint">Αποθήκευση Key</button>
+          </div>
+
+          <!-- Xero Integration (Phase C) -->
+          <div class="card">
+            <div class="card-title">🔗 Σύνδεση με Xero</div>
+            <div id="xero-status-block" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
+            <div id="xero-tenant-block" style="margin-top:12px;display:none;">
+              <label class="form-label">Active Organisation</label>
+              <select class="form-input" id="xero-tenant-select" onchange="xeroSetActiveTenant(this.value)"></select>
+            </div>
+            <div id="xero-actions" style="margin-top:16px;display:flex;gap:8px;">
+              <button class="btn btn-primary" id="xero-connect-btn" onclick="xeroConnect()" style="display:none;">Σύνδεση με Xero</button>
+              <button class="btn btn-secondary" id="xero-disconnect-btn" onclick="xeroDisconnect()" style="display:none;">Αποσύνδεση</button>
+            </div>
+            <div style="margin-top:12px;font-size:11px;color:var(--text3);">Push extracted invoices ως Bills (Phase B — επόμενο)</div>
           </div>
 
           <!-- Section 3b: UX Preferences (Sprint 3: Tour Mode toggle) -->
@@ -4498,6 +4520,7 @@ async function loadSettings() {
   ]);
   // Load 2FA status + Admin users
   load2FAStatus();
+  loadXeroStatus();
   loadAdminUsers();
   // Sprint 3: Sync Tour Mode toggle UI
   syncTourPreferenceUI();
@@ -4809,6 +4832,104 @@ async function saveKey() {
   const res = await api('POST','/api/keys/save',{service,api_key:key});
   if (res.success) { toast(t('js_key_saved'),'success'); document.getElementById('key-value').value=''; loadSettings(); }
   else toast(res.error||t('error'),'error');
+}
+
+
+// ── Xero Integration (Phase C) ──────────────────────────────────────────────
+let _xeroPollInterval = null;
+
+async function loadXeroStatus(){
+  const s = await api('GET','/api/xero/status');
+  const block         = document.getElementById('xero-status-block');
+  const tenantBlock   = document.getElementById('xero-tenant-block');
+  const tenantSelect  = document.getElementById('xero-tenant-select');
+  const connectBtn    = document.getElementById('xero-connect-btn');
+  const disconnectBtn = document.getElementById('xero-disconnect-btn');
+  if (!block) return; // settings page δεν είναι ορατή
+
+  if (!s || s.available === false) {
+    block.innerHTML = `<span class="xero-status-dot xero-status-dot-gray"></span> Μη διαθέσιμο: ${s?.detail || 'unknown'}`;
+    connectBtn.style.display = 'none';
+    disconnectBtn.style.display = 'none';
+    tenantBlock.style.display = 'none';
+    return;
+  }
+
+  if (s.connected) {
+    const tenants = s.tenants || [];
+    const active = tenants.find(t => t.tenantId === s.active_tenant_id) || tenants[0];
+    block.innerHTML = `<span class="xero-status-dot xero-status-dot-green"></span> Συνδεδεμένος στο <strong>${active?.tenantName || 'Unknown'}</strong>`;
+    if (tenants.length > 1) {
+      tenantBlock.style.display = '';
+      tenantSelect.innerHTML = tenants.map(t =>
+        `<option value="${t.tenantId}" ${t.tenantId === s.active_tenant_id ? 'selected' : ''}>${t.tenantName}</option>`
+      ).join('');
+    } else {
+      tenantBlock.style.display = 'none';
+    }
+    connectBtn.style.display = 'none';
+    disconnectBtn.style.display = '';
+  } else if (s.oauth_status === 'in_progress') {
+    block.innerHTML = `<span class="xero-status-dot xero-status-dot-amber"></span> Περιμένει consent στον browser...`;
+    connectBtn.style.display = 'none';
+    disconnectBtn.style.display = 'none';
+    tenantBlock.style.display = 'none';
+  } else {
+    const errSuffix = s.oauth_error ? ` — σφάλμα: ${s.oauth_error}` : '';
+    block.innerHTML = `<span class="xero-status-dot xero-status-dot-gray"></span> Μη συνδεδεμένος${errSuffix}`;
+    connectBtn.style.display = '';
+    disconnectBtn.style.display = 'none';
+    tenantBlock.style.display = 'none';
+  }
+}
+
+async function xeroConnect(){
+  const r = await api('POST','/api/xero/connect');
+  if (r.error) { toast(r.error, 'error'); return; }
+  toast('Ανοίγει browser για consent...', 'info');
+  await loadXeroStatus();
+
+  // Poll status κάθε 2sec για max 5 λεπτά
+  if (_xeroPollInterval) clearInterval(_xeroPollInterval);
+  const startTime = Date.now();
+  _xeroPollInterval = setInterval(async () => {
+    if (Date.now() - startTime > 300000) {
+      clearInterval(_xeroPollInterval);
+      _xeroPollInterval = null;
+      toast('OAuth timeout — δοκίμασε ξανά', 'error');
+      loadXeroStatus();
+      return;
+    }
+    const s = await api('GET','/api/xero/status');
+    if (s.connected) {
+      clearInterval(_xeroPollInterval);
+      _xeroPollInterval = null;
+      toast('Επιτυχής σύνδεση στο Xero!', 'success');
+      loadXeroStatus();
+    } else if (s.oauth_status === 'error') {
+      clearInterval(_xeroPollInterval);
+      _xeroPollInterval = null;
+      toast(`Σφάλμα Xero: ${s.oauth_error || 'unknown'}`, 'error');
+      loadXeroStatus();
+    } else {
+      loadXeroStatus();
+    }
+  }, 2000);
+}
+
+async function xeroDisconnect(){
+  if (!confirm('Σίγουρα θέλεις να αποσυνδεθείς από το Xero;')) return;
+  const r = await api('POST','/api/xero/disconnect');
+  if (r.error) { toast(r.error, 'error'); return; }
+  toast('Αποσυνδέθηκες από το Xero', 'success');
+  loadXeroStatus();
+}
+
+async function xeroSetActiveTenant(tenantId){
+  const r = await api('PUT','/api/xero/tenants/active', {tenant_id: tenantId});
+  if (r.error) { toast(r.error, 'error'); return; }
+  toast('Active tenant άλλαξε', 'success');
+  loadXeroStatus();
 }
 
 // ── FAQ Functions ────────────────────────────────────────────────────────────
