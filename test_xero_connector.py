@@ -681,5 +681,366 @@ class TestAsyncOAuth(XeroConnectorTestBase):
         self.assertFalse(self.connector.is_connected())
 
 
+
+
+# ── Phase B: Contacts API ────────────────────────────────────────────────────
+
+
+class TestContacts(XeroConnectorTestBase):
+
+    def _seed_connection(self):
+        from datetime import datetime, timedelta, timezone
+        tokens = xc.XeroTokens(
+            access_token="seed-access",
+            refresh_token="seed-refresh",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            tenants=[{"tenantId": "tenant-uuid-1"}],
+            active_tenant_id="tenant-uuid-1",
+        )
+        self.connector._save_tokens(tokens)
+
+    def test_fetch_contacts_with_where(self):
+        self._seed_connection()
+        contacts_data = {"Contacts": [{"ContactID": "c1", "Name": "ACME Ltd"}]}
+        self.mock_session.get.return_value = _FakeResponse(200, contacts_data)
+
+        result = self.connector.fetch_contacts(where='Name="ACME Ltd"')
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["Name"], "ACME Ltd")
+
+        call = self.mock_session.get.call_args
+        self.assertEqual(call.args[0], xc.XERO_CONTACTS_URL)
+        self.assertEqual(call.kwargs["headers"]["Xero-Tenant-Id"], "tenant-uuid-1")
+        self.assertEqual(call.kwargs["params"]["where"], 'Name="ACME Ltd"')
+
+    def test_find_contact_by_name_found(self):
+        self._seed_connection()
+        self.mock_session.get.return_value = _FakeResponse(
+            200, {"Contacts": [{"ContactID": "c1", "Name": "ACME Ltd"}]}
+        )
+        c = self.connector.find_contact_by_name("ACME Ltd")
+        self.assertIsNotNone(c)
+        self.assertEqual(c["ContactID"], "c1")
+
+    def test_find_contact_by_name_not_found(self):
+        self._seed_connection()
+        self.mock_session.get.return_value = _FakeResponse(200, {"Contacts": []})
+        c = self.connector.find_contact_by_name("Nonexistent Supplier")
+        self.assertIsNone(c)
+
+    def test_find_contact_empty_name(self):
+        self._seed_connection()
+        self.assertIsNone(self.connector.find_contact_by_name(""))
+        self.assertIsNone(self.connector.find_contact_by_name("   "))
+
+    def test_create_contact_with_vat(self):
+        self._seed_connection()
+        self.mock_session.post.return_value = _FakeResponse(
+            200, {"Contacts": [{"ContactID": "new-c1", "Name": "New Supplier", "TaxNumber": "GB123"}]}
+        )
+        c = self.connector.create_contact("New Supplier", vat="GB123")
+        self.assertEqual(c["ContactID"], "new-c1")
+
+        body = self.mock_session.post.call_args.kwargs["json"]
+        self.assertEqual(body["Contacts"][0]["Name"], "New Supplier")
+        self.assertEqual(body["Contacts"][0]["TaxNumber"], "GB123")
+
+    def test_create_contact_error(self):
+        self._seed_connection()
+        self.mock_session.post.return_value = _FakeResponse(400, text="invalid name")
+        with self.assertRaises(xc.XeroTokenError):
+            self.connector.create_contact("X")
+
+    def test_ensure_contact_existing(self):
+        self._seed_connection()
+        self.mock_session.get.return_value = _FakeResponse(
+            200, {"Contacts": [{"ContactID": "exist-1", "Name": "Existing"}]}
+        )
+        c = self.connector.ensure_contact("Existing")
+        self.assertEqual(c["ContactID"], "exist-1")
+        self.mock_session.post.assert_not_called()  # Δεν κάναμε create
+
+    def test_ensure_contact_creates_when_missing(self):
+        self._seed_connection()
+        self.mock_session.get.return_value = _FakeResponse(200, {"Contacts": []})
+        self.mock_session.post.return_value = _FakeResponse(
+            200, {"Contacts": [{"ContactID": "auto-1", "Name": "Auto Created"}]}
+        )
+        c = self.connector.ensure_contact("Auto Created", vat="GB999")
+        self.assertEqual(c["ContactID"], "auto-1")
+        self.mock_session.post.assert_called_once()
+
+
+# ── Phase B: Accounts API με cache ───────────────────────────────────────────
+
+
+class TestAccounts(XeroConnectorTestBase):
+
+    def _seed_connection(self):
+        from datetime import datetime, timedelta, timezone
+        tokens = xc.XeroTokens(
+            access_token="seed-access",
+            refresh_token="seed-refresh",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            tenants=[{"tenantId": "tenant-uuid-1"}],
+            active_tenant_id="tenant-uuid-1",
+        )
+        self.connector._save_tokens(tokens)
+
+    def test_fetch_accounts_initial_call(self):
+        self._seed_connection()
+        accounts_data = {"Accounts": [
+            {"AccountID": "a1", "Code": "200", "Name": "Sales", "Type": "REVENUE"},
+            {"AccountID": "a2", "Code": "310", "Name": "Cost of Goods", "Type": "DIRECTCOSTS"},
+        ]}
+        self.mock_session.get.return_value = _FakeResponse(200, accounts_data)
+
+        result = self.connector.fetch_accounts()
+        self.assertEqual(len(result), 2)
+        self.mock_session.get.assert_called_once()
+
+        # Cache file δημιουργήθηκε
+        cache_path = self.secrets_dir / xc.ACCOUNTS_CACHE_FILENAME
+        self.assertTrue(cache_path.exists())
+
+    def test_fetch_accounts_cache_hit(self):
+        self._seed_connection()
+        # Pre-populate cache file
+        import json
+        cache_path = self.secrets_dir / xc.ACCOUNTS_CACHE_FILENAME
+        cache_path.write_text(json.dumps({
+            "tenant_id": "tenant-uuid-1",
+            "accounts": [{"AccountID": "cached-1", "Code": "999", "Name": "Cached"}],
+        }), encoding="utf-8")
+
+        result = self.connector.fetch_accounts()
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["AccountID"], "cached-1")
+        self.mock_session.get.assert_not_called()  # Cache hit — no HTTP call
+
+    def test_fetch_accounts_force_refresh(self):
+        self._seed_connection()
+        # Pre-populate cache file
+        import json
+        cache_path = self.secrets_dir / xc.ACCOUNTS_CACHE_FILENAME
+        cache_path.write_text(json.dumps({
+            "tenant_id": "tenant-uuid-1",
+            "accounts": [{"AccountID": "stale-1"}],
+        }), encoding="utf-8")
+
+        self.mock_session.get.return_value = _FakeResponse(
+            200, {"Accounts": [{"AccountID": "fresh-1", "Code": "200", "Name": "Fresh"}]}
+        )
+        result = self.connector.fetch_accounts(force_refresh=True)
+        self.assertEqual(result[0]["AccountID"], "fresh-1")
+        self.mock_session.get.assert_called_once()
+
+    def test_fetch_accounts_cache_different_tenant_ignored(self):
+        """Cache από άλλο tenant δεν πρέπει να επιστραφεί."""
+        self._seed_connection()
+        import json
+        cache_path = self.secrets_dir / xc.ACCOUNTS_CACHE_FILENAME
+        cache_path.write_text(json.dumps({
+            "tenant_id": "DIFFERENT-TENANT",
+            "accounts": [{"AccountID": "wrong-tenant"}],
+        }), encoding="utf-8")
+
+        self.mock_session.get.return_value = _FakeResponse(
+            200, {"Accounts": [{"AccountID": "correct-tenant"}]}
+        )
+        result = self.connector.fetch_accounts()
+        self.assertEqual(result[0]["AccountID"], "correct-tenant")
+        self.mock_session.get.assert_called_once()
+
+
+# ── Phase B: push_bill (core feature) ────────────────────────────────────────
+
+
+class TestPushBill(XeroConnectorTestBase):
+
+    def _seed_connection(self):
+        from datetime import datetime, timedelta, timezone
+        tokens = xc.XeroTokens(
+            access_token="seed-access",
+            refresh_token="seed-refresh",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            tenants=[{"tenantId": "tenant-uuid-1"}],
+            active_tenant_id="tenant-uuid-1",
+        )
+        self.connector._save_tokens(tokens)
+
+    def _setup_happy_path_mocks(self):
+        """Mocks για: contact lookup found + bill push success."""
+        # 1ο GET = contacts lookup
+        # 2ο POST = bill push
+        self.mock_session.get.return_value = _FakeResponse(
+            200, {"Contacts": [{"ContactID": "supplier-uuid", "Name": "ACME Ltd"}]}
+        )
+        self.mock_session.post.return_value = _FakeResponse(
+            200, {"Invoices": [{
+                "InvoiceID": "inv-uuid-1",
+                "Status": "DRAFT",
+                "InvoiceNumber": "INV-001",
+                "Type": "ACCPAY",
+            }]}
+        )
+
+    def test_push_bill_happy_path(self):
+        self._seed_connection()
+        self._setup_happy_path_mocks()
+
+        result = self.connector.push_bill(
+            supplier_name="ACME Ltd",
+            invoice_number="INV-001",
+            invoice_date="2026-05-15",
+            due_date="2026-06-15",
+            currency="GBP",
+            line_items=[
+                {"description": "Services", "quantity": 1, "unit_amount": 100.0, "account_code": "310"},
+            ],
+        )
+        self.assertEqual(result["invoice_id"], "inv-uuid-1")
+        self.assertEqual(result["status"], "DRAFT")
+        self.assertIn("go.xero.com/AccountsPayable", result["deep_link"])
+        self.assertIn("inv-uuid-1", result["deep_link"])
+
+    def test_push_bill_json_payload_structure(self):
+        self._seed_connection()
+        self._setup_happy_path_mocks()
+
+        self.connector.push_bill(
+            supplier_name="ACME Ltd",
+            invoice_number="INV-001",
+            invoice_date="2026-05-15",
+            line_items=[
+                {"description": "Item 1", "quantity": 2, "unit_amount": 50.0, "account_code": "310"},
+            ],
+        )
+
+        # Inspect το POST body του /Invoices
+        push_call = self.mock_session.post.call_args
+        self.assertEqual(push_call.args[0], xc.XERO_INVOICES_URL)
+        bill = push_call.kwargs["json"]["Invoices"][0]
+        self.assertEqual(bill["Type"], "ACCPAY")
+        self.assertEqual(bill["Status"], "DRAFT")  # ΠΟΤΕ AUTHORISED auto
+        self.assertEqual(bill["Contact"]["ContactID"], "supplier-uuid")
+        self.assertEqual(bill["InvoiceNumber"], "INV-001")
+        self.assertEqual(bill["Date"], "2026-05-15")
+        self.assertEqual(len(bill["LineItems"]), 1)
+        self.assertEqual(bill["LineItems"][0]["AccountCode"], "310")
+
+    def test_push_bill_auto_creates_supplier(self):
+        self._seed_connection()
+        # GET επιστρέφει empty (supplier ΔΕΝ υπάρχει)
+        # 1ο POST = create contact
+        # 2ο POST = push bill
+        self.mock_session.get.return_value = _FakeResponse(200, {"Contacts": []})
+        self.mock_session.post.side_effect = [
+            _FakeResponse(200, {"Contacts": [{"ContactID": "new-supplier", "Name": "New Co"}]}),
+            _FakeResponse(200, {"Invoices": [{"InvoiceID": "inv-uuid-2", "Status": "DRAFT"}]}),
+        ]
+
+        result = self.connector.push_bill(
+            supplier_name="New Co",
+            supplier_vat="GB123",
+            invoice_number="INV-002",
+            invoice_date="2026-05-15",
+            line_items=[
+                {"description": "X", "quantity": 1, "unit_amount": 50.0, "account_code": "310"},
+            ],
+        )
+        self.assertEqual(result["invoice_id"], "inv-uuid-2")
+        # 2 POST calls = create contact + push bill
+        self.assertEqual(self.mock_session.post.call_count, 2)
+
+    def test_push_bill_missing_supplier_raises(self):
+        self._seed_connection()
+        with self.assertRaises(xc.XeroError):
+            self.connector.push_bill(
+                supplier_name="",
+                invoice_number="X",
+                invoice_date="2026-01-01",
+                line_items=[{"description": "x", "unit_amount": 1, "account_code": "310"}],
+            )
+
+    def test_push_bill_no_line_items_raises(self):
+        self._seed_connection()
+        with self.assertRaises(xc.XeroError):
+            self.connector.push_bill(
+                supplier_name="X",
+                invoice_number="Y",
+                invoice_date="2026-01-01",
+                line_items=[],
+            )
+
+    def test_push_bill_line_item_missing_account_code_raises(self):
+        self._seed_connection()
+        with self.assertRaises(xc.XeroError):
+            self.connector.push_bill(
+                supplier_name="X",
+                invoice_number="Y",
+                invoice_date="2026-01-01",
+                line_items=[{"description": "x", "unit_amount": 1}],  # missing account_code
+            )
+
+    def test_push_bill_optional_fields(self):
+        """due_date και currency είναι optional."""
+        self._seed_connection()
+        self._setup_happy_path_mocks()
+
+        self.connector.push_bill(
+            supplier_name="ACME Ltd",
+            invoice_number="INV-003",
+            invoice_date="2026-05-15",
+            line_items=[{"description": "x", "unit_amount": 1, "account_code": "310"}],
+        )
+        bill = self.mock_session.post.call_args.kwargs["json"]["Invoices"][0]
+        self.assertNotIn("DueDate", bill)
+        self.assertNotIn("CurrencyCode", bill)
+
+
+# ── Phase B: XeroRateLimiter ─────────────────────────────────────────────────
+
+
+class TestRateLimiter(unittest.TestCase):
+
+    def test_below_limit_no_wait(self):
+        limiter = xc.XeroRateLimiter(max_per_minute=10)
+        start = time.monotonic()
+        for _ in range(5):
+            limiter.wait_if_needed()
+        elapsed = time.monotonic() - start
+        self.assertLess(elapsed, 0.5)  # Πρέπει να είναι σχεδόν instant
+
+    def test_tracks_calls(self):
+        limiter = xc.XeroRateLimiter(max_per_minute=10)
+        for _ in range(5):
+            limiter.wait_if_needed()
+        self.assertEqual(len(limiter._calls), 5)
+
+    def test_cleanup_old_calls(self):
+        """Calls > 60s παλιά καθαρίζονται."""
+        limiter = xc.XeroRateLimiter(max_per_minute=10)
+        # Inject fake old timestamps
+        limiter._calls = [time.monotonic() - 70.0, time.monotonic() - 65.0]
+        limiter.wait_if_needed()
+        # Παλιά διαγράφηκαν, μόνο το τρέχον υπάρχει
+        self.assertEqual(len(limiter._calls), 1)
+
+    def test_at_limit_waits(self):
+        """Όταν φτάσουμε στο limit, η wait_if_needed πρέπει να blocks."""
+        limiter = xc.XeroRateLimiter(max_per_minute=3)
+        # Fill window με 3 calls που έγιναν "πριν 59 sec"
+        ago_59 = time.monotonic() - 59.0
+        limiter._calls = [ago_59, ago_59 + 0.1, ago_59 + 0.2]
+
+        start = time.monotonic()
+        limiter.wait_if_needed()
+        elapsed = time.monotonic() - start
+        # Πρέπει να περίμενε ~1 sec (μέχρι ο πρώτος call να εξέλθει από το window)
+        self.assertGreater(elapsed, 0.8)
+        self.assertLess(elapsed, 2.5)
+
+
 if __name__ == "__main__":
     unittest.main()

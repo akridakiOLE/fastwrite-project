@@ -2990,6 +2990,189 @@ def xero_disconnect_endpoint():
         return jsonify({"error": str(e)}), 500
 
 
+
+
+# ── Phase B: Xero Bills Push + Helpers ────────────────────────────────────
+
+def _extract_bill_data_from_doc(doc_result: dict) -> dict:
+    """
+    Mapping extracted document fields → Xero Bill input. Χρησιμοποιεί τις
+    υπάρχουσες συμβάσεις του FastWrite (supplier_name/vendor_name, κλπ).
+
+    Returns dict με keys που ταιριάζουν στα kwargs του push_bill().
+    """
+    supplier_name = (doc_result.get("supplier_name")
+                     or doc_result.get("vendor_name")
+                     or doc_result.get("supplier")
+                     or "").strip()
+    supplier_vat = (doc_result.get("supplier_vat")
+                    or doc_result.get("vat_number")
+                    or doc_result.get("tax_number") or "")
+    if supplier_vat:
+        supplier_vat = str(supplier_vat).strip()
+
+    invoice_number = (doc_result.get("invoice_number")
+                      or doc_result.get("invoice_no")
+                      or doc_result.get("number") or "").strip()
+
+    invoice_date = (doc_result.get("invoice_date")
+                    or doc_result.get("date") or "").strip()
+    due_date = (doc_result.get("due_date") or "").strip()
+    currency = (doc_result.get("currency") or "").strip() or None
+
+    line_items_raw = doc_result.get("line_items") or doc_result.get("items") or []
+    line_items = []
+    if isinstance(line_items_raw, list) and line_items_raw:
+        for li in line_items_raw:
+            if not isinstance(li, dict):
+                continue
+            line_items.append({
+                "description": (li.get("description") or li.get("desc") or "").strip() or "Item",
+                "quantity": float(li.get("quantity") or li.get("qty") or 1),
+                "unit_amount": float(li.get("unit_price") or li.get("unit_amount") or li.get("price") or 0),
+            })
+    else:
+        # Fallback: single line item με το συνολικό
+        total = doc_result.get("total") or doc_result.get("total_amount") or doc_result.get("subtotal") or 0
+        line_items = [{
+            "description": f"Invoice {invoice_number}" if invoice_number else "Imported invoice",
+            "quantity": 1,
+            "unit_amount": float(total),
+        }]
+
+    return {
+        "supplier_name": supplier_name,
+        "supplier_vat": supplier_vat or None,
+        "invoice_number": invoice_number,
+        "invoice_date": invoice_date,
+        "due_date": due_date or None,
+        "currency": currency,
+        "line_items": line_items,
+    }
+
+
+@app.get("/api/xero/accounts")
+@require_auth
+def xero_accounts_endpoint():
+    """Chart of Accounts (cached 24h). Used by UI για AccountCode dropdown."""
+    connector = _get_xero_connector()
+    if connector is None:
+        return _xero_unavailable_response()
+    if not connector.is_connected():
+        return jsonify({"error": "Δεν είσαι συνδεδεμένος στο Xero"}), 400
+
+    force = request.args.get("refresh", "").lower() in ("1", "true", "yes")
+    try:
+        accounts = connector.fetch_accounts(force_refresh=force)
+        # Φιλτράρω: μόνο ενεργοί λογαριασμοί που δέχονται payments
+        useful = [a for a in accounts
+                  if a.get("Status") == "ACTIVE"
+                  and a.get("Type") in ("EXPENSE", "DIRECTCOSTS", "OVERHEADS", "FIXED", "CURRLIAB")]
+        return jsonify({"accounts": useful, "total": len(accounts)}), 200
+    except xero_connector.XeroError as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/api/xero/contacts/search")
+@require_auth
+def xero_contacts_search_endpoint():
+    """Αναζήτηση contacts με exact name match (case-insensitive)."""
+    connector = _get_xero_connector()
+    if connector is None:
+        return _xero_unavailable_response()
+    if not connector.is_connected():
+        return jsonify({"error": "Δεν είσαι συνδεδεμένος στο Xero"}), 400
+
+    name = (request.args.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Λείπει query param 'name'"}), 400
+    try:
+        contact = connector.find_contact_by_name(name)
+        return jsonify({"found": contact is not None, "contact": contact}), 200
+    except xero_connector.XeroError as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/xero/push/<int:doc_id>")
+@require_auth
+def xero_push_doc_endpoint(doc_id):
+    """
+    Push a single document ως Bill στο Xero (DRAFT status).
+
+    Body (JSON):
+        {
+          "account_code": "310",   // REQUIRED — από AccountCode dropdown
+          "overrides": {           // OPTIONAL — manual edits από preview modal
+            "supplier_name": "...",
+            "invoice_number": "...",
+            ...
+          }
+        }
+    """
+    connector = _get_xero_connector()
+    if connector is None:
+        return _xero_unavailable_response()
+    if not connector.is_connected():
+        return jsonify({"error": "Δεν είσαι συνδεδεμένος στο Xero"}), 400
+
+    uid = request.current_user["user_id"]
+    doc = db.get_document(doc_id)
+    if not doc:
+        return jsonify({"error": f"Document #{doc_id} δεν βρέθηκε"}), 404
+    if doc.get("user_id") not in (None, uid):
+        return jsonify({"error": "Δεν έχεις πρόσβαση σε αυτό το document"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    account_code = (payload.get("account_code") or "").strip()
+    if not account_code:
+        return jsonify({"error": "Λείπει account_code στο body"}), 400
+
+    # Parse extracted data + apply manual overrides
+    try:
+        result_data = json.loads(doc.get("result_json") or "{}")
+    except json.JSONDecodeError:
+        return jsonify({"error": "Document result_json είναι invalid JSON"}), 500
+
+    # Αν υπάρχει ήδη pushed στο Xero, αρνιόμαστε (αποφυγή duplicate)
+    if result_data.get("_xero_invoice_id"):
+        return jsonify({
+            "error": "Document έχει ήδη pushedaρισμα στο Xero",
+            "xero_invoice_id": result_data["_xero_invoice_id"],
+        }), 409
+
+    bill_data = _extract_bill_data_from_doc(result_data)
+    overrides = payload.get("overrides") or {}
+    for k, v in overrides.items():
+        if v not in (None, "") and k in bill_data:
+            bill_data[k] = v
+
+    # Validation πριν την κλήση
+    if not bill_data.get("supplier_name"):
+        return jsonify({"error": "Λείπει supplier_name από extracted data"}), 400
+    if not bill_data.get("invoice_number"):
+        return jsonify({"error": "Λείπει invoice_number από extracted data"}), 400
+    if not bill_data.get("invoice_date"):
+        return jsonify({"error": "Λείπει invoice_date από extracted data"}), 400
+
+    # Apply account_code σε όλα τα line items (Phase B v1)
+    for li in bill_data["line_items"]:
+        li["account_code"] = account_code
+
+    try:
+        result = connector.push_bill(**bill_data)
+    except xero_connector.XeroError as e:
+        logger.exception("[xero] push_bill failed for doc %s", doc_id)
+        return jsonify({"error": str(e)}), 502  # Bad Gateway → external API error
+
+    # Save xero_invoice_id + deep_link μέσα στο result_json
+    result_data["_xero_invoice_id"] = result["invoice_id"]
+    result_data["_xero_deep_link"] = result["deep_link"]
+    result_data["_xero_pushed_at"] = datetime.utcnow().isoformat()
+    db.update_document_status(doc_id, doc.get("status") or "Εγκρίθηκε", json.dumps(result_data))
+
+    return jsonify(result), 200
+
+
 # ── App Start ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)

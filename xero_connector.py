@@ -187,6 +187,61 @@ def generate_state() -> str:
     return secrets.token_urlsafe(32)
 
 
+
+
+# ── Bills/Contacts/Accounts API endpoints (Phase B) ─────────────────────────
+
+XERO_INVOICES_URL = "https://api.xero.com/api.xro/2.0/Invoices"
+XERO_CONTACTS_URL = "https://api.xero.com/api.xro/2.0/Contacts"
+XERO_ACCOUNTS_URL = "https://api.xero.com/api.xro/2.0/Accounts"
+
+# Rate limit: Xero επιτρέπει 60 calls/min/tenant. Χρησιμοποιούμε 55 για safety margin.
+RATE_LIMIT_PER_MINUTE = 55
+ACCOUNTS_CACHE_FILENAME = "xero_accounts_cache.json"
+ACCOUNTS_CACHE_TTL_SEC = 24 * 60 * 60  # 24 ώρες
+
+
+class XeroRateLimiter:
+    """
+    Thread-safe sliding-window rate limiter για Xero API calls.
+
+    Επιτρέπει max N calls μέσα σε rolling window 60 sec. Αν φτάσει το limit,
+    η μέθοδος wait_if_needed() κάνει sleep μέχρι να ελευθερωθεί slot.
+
+    Per design doc §8.3: 55 calls/min για safety margin (Xero limit = 60).
+    """
+
+    def __init__(self, max_per_minute: int = RATE_LIMIT_PER_MINUTE):
+        self.max_per_minute = max_per_minute
+        self._calls: list[float] = []  # timestamps των πρόσφατων calls
+        self._lock = threading.Lock()
+
+    def wait_if_needed(self) -> None:
+        """Block αν χρειάζεται για να μη ξεπεραστεί το rate limit."""
+        with self._lock:
+            now = time.monotonic()
+            # Καθαρίζουμε calls > 60 sec παλιά
+            cutoff = now - 60.0
+            self._calls = [t for t in self._calls if t > cutoff]
+
+            if len(self._calls) >= self.max_per_minute:
+                # Sleep μέχρι ο παλαιότερος call να βγει από το window
+                sleep_for = self._calls[0] + 60.0 - now + 0.05  # +50ms padding
+                if sleep_for > 0:
+                    # Release lock κατά το sleep
+                    pass
+                # We release-and-reacquire pattern: sleep outside lock
+            else:
+                # Slot available — log this call
+                self._calls.append(now)
+                return
+
+        # Sleep outside the lock
+        time.sleep(sleep_for)
+        # Recursive call για επαναξιολόγηση
+        self.wait_if_needed()
+
+
 # ── Loopback HTTP Server (callback receiver) ────────────────────────────────
 
 
@@ -365,6 +420,7 @@ class XeroConnector:
 
         self._token_path = self.secrets_dir / TOKEN_FILENAME
         self._cached_tokens: Optional[XeroTokens] = None
+        self._rate_limiter = XeroRateLimiter()
 
     # ── Machine key (shared με KeyManager) ──────────────────────────────
 
@@ -658,6 +714,266 @@ class XeroConnector:
             raise XeroError(f"Άγνωστο tenant_id: {tenant_id}")
         tokens.active_tenant_id = tenant_id
         self._save_tokens(tokens)
+
+
+    # ── Contacts API (Phase B) ──────────────────────────────────────────
+
+    def fetch_contacts(self, where: Optional[str] = None) -> list[dict]:
+        """
+        GET /api.xro/2.0/Contacts με optional `where` filter.
+        Παράδειγμα where: 'Name="ACME Ltd"' ή 'TaxNumber="GB123"'.
+        """
+        access_token = self.get_valid_access_token()
+        tenant_id = self.get_active_tenant_id()
+        if not tenant_id:
+            raise XeroError("Δεν υπάρχει active tenant")
+
+        params = {"where": where} if where else None
+        self._rate_limiter.wait_if_needed()
+        try:
+            resp = self._http.get(
+                XERO_CONTACTS_URL,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Xero-Tenant-Id": tenant_id,
+                    "Accept": "application/json",
+                },
+                params=params,
+                timeout=HTTP_TIMEOUT_SEC,
+            )
+        except requests.RequestException as e:
+            raise XeroTokenError(f"Network error στο /Contacts: {e}") from e
+
+        if resp.status_code != 200:
+            raise XeroTokenError(
+                f"/Contacts απέτυχε (HTTP {resp.status_code}): {resp.text[:200]}"
+            )
+        return resp.json().get("Contacts", [])
+
+    def find_contact_by_name(self, name: str) -> Optional[dict]:
+        """Αναζήτηση contact με exact name match (case-insensitive)."""
+        if not name or not name.strip():
+            return None
+        # Escape double quotes στο where clause
+        safe_name = name.strip().replace('"', '\\"')
+        contacts = self.fetch_contacts(where=f'Name="{safe_name}"')
+        return contacts[0] if contacts else None
+
+    def create_contact(self, name: str, vat: Optional[str] = None) -> dict:
+        """
+        POST /api.xro/2.0/Contacts — δημιουργεί νέο supplier contact.
+        Απαιτεί scope `accounting.contacts` (όχι μόνο .read).
+        """
+        access_token = self.get_valid_access_token()
+        tenant_id = self.get_active_tenant_id()
+        if not tenant_id:
+            raise XeroError("Δεν υπάρχει active tenant")
+
+        body = {"Name": name.strip()}
+        if vat and vat.strip():
+            body["TaxNumber"] = vat.strip()
+
+        self._rate_limiter.wait_if_needed()
+        try:
+            resp = self._http.post(
+                XERO_CONTACTS_URL,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Xero-Tenant-Id": tenant_id,
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                json={"Contacts": [body]},
+                timeout=HTTP_TIMEOUT_SEC,
+            )
+        except requests.RequestException as e:
+            raise XeroTokenError(f"Network error στο create contact: {e}") from e
+
+        if resp.status_code not in (200, 201):
+            raise XeroTokenError(
+                f"Create contact απέτυχε (HTTP {resp.status_code}): {resp.text[:200]}"
+            )
+        contacts = resp.json().get("Contacts", [])
+        if not contacts:
+            raise XeroTokenError("Xero δεν επέστρεψε contact στο response")
+        logger.info("Δημιουργήθηκε supplier στο Xero: %s", name)
+        return contacts[0]
+
+    def ensure_contact(self, name: str, vat: Optional[str] = None) -> dict:
+        """Lookup-or-create pattern. Επιστρέφει πάντα ένα contact dict."""
+        existing = self.find_contact_by_name(name)
+        if existing:
+            return existing
+        return self.create_contact(name, vat=vat)
+
+    # ── Accounts API με 24h cache (Phase B) ─────────────────────────────
+
+    def fetch_accounts(self, force_refresh: bool = False) -> list[dict]:
+        """
+        GET /api.xro/2.0/Accounts (Chart of Accounts).
+        Cached σε disk file (xero_accounts_cache.json) με 24h TTL.
+        """
+        cache_path = self.secrets_dir / ACCOUNTS_CACHE_FILENAME
+
+        if not force_refresh and cache_path.exists():
+            try:
+                age = time.time() - cache_path.stat().st_mtime
+                if age < ACCOUNTS_CACHE_TTL_SEC:
+                    cached = json.loads(cache_path.read_text(encoding="utf-8"))
+                    if cached.get("tenant_id") == self.get_active_tenant_id():
+                        return cached.get("accounts", [])
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Accounts cache read failed (refreshing): %s", e)
+
+        access_token = self.get_valid_access_token()
+        tenant_id = self.get_active_tenant_id()
+        if not tenant_id:
+            raise XeroError("Δεν υπάρχει active tenant")
+
+        self._rate_limiter.wait_if_needed()
+        try:
+            resp = self._http.get(
+                XERO_ACCOUNTS_URL,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Xero-Tenant-Id": tenant_id,
+                    "Accept": "application/json",
+                },
+                timeout=HTTP_TIMEOUT_SEC,
+            )
+        except requests.RequestException as e:
+            raise XeroTokenError(f"Network error στο /Accounts: {e}") from e
+
+        if resp.status_code != 200:
+            raise XeroTokenError(
+                f"/Accounts απέτυχε (HTTP {resp.status_code}): {resp.text[:200]}"
+            )
+        accounts = resp.json().get("Accounts", [])
+
+        # Save στο cache
+        try:
+            cache_path.write_text(
+                json.dumps({"tenant_id": tenant_id, "accounts": accounts}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except OSError as e:
+            logger.warning("Accounts cache write failed: %s", e)
+
+        return accounts
+
+    # ── Bills Push (Phase B core) ───────────────────────────────────────
+
+    def push_bill(
+        self,
+        *,
+        supplier_name: str,
+        invoice_number: str,
+        invoice_date: str,
+        line_items: list[dict],
+        supplier_vat: Optional[str] = None,
+        due_date: Optional[str] = None,
+        currency: Optional[str] = None,
+        reference: str = "FastWrite import",
+    ) -> dict:
+        """
+        Push extracted invoice ως ACCPAY Bill στο Xero σε κατάσταση DRAFT.
+
+        ΠΟΤΕ auto-AUTHORISE — security/compliance issue (design doc §6.3).
+
+        Args:
+            supplier_name: όνομα του supplier (required, lookup/create automatic)
+            invoice_number: invoice number
+            invoice_date: YYYY-MM-DD
+            line_items: list of dicts με keys: description, quantity, unit_amount, account_code
+                        (account_code REQUIRED ανά line item)
+            supplier_vat: optional VAT number για supplier creation
+            due_date: optional YYYY-MM-DD
+            currency: ISO 4217 (e.g. "EUR", "GBP"). Default = tenant default.
+            reference: free-text reference (default "FastWrite import")
+
+        Returns:
+            {invoice_id, status, deep_link, raw_response}
+        """
+        # Validation
+        if not supplier_name or not supplier_name.strip():
+            raise XeroError("Λείπει supplier_name")
+        if not line_items:
+            raise XeroError("Bill δεν μπορεί να έχει 0 line items")
+        for i, li in enumerate(line_items):
+            for required in ("description", "unit_amount", "account_code"):
+                if required not in li or li[required] in (None, ""):
+                    raise XeroError(f"Line item {i}: λείπει '{required}'")
+
+        # Ensure contact (lookup or auto-create)
+        contact = self.ensure_contact(supplier_name, vat=supplier_vat)
+
+        # Build Bill JSON
+        bill = {
+            "Type": "ACCPAY",  # Bills στο Xero
+            "Status": "DRAFT",  # ΠΟΤΕ AUTHORISED auto
+            "Contact": {"ContactID": contact["ContactID"]},
+            "Date": invoice_date,
+            "InvoiceNumber": invoice_number,
+            "Reference": reference,
+            "LineAmountTypes": "Exclusive",  # default: amounts exclude tax
+            "LineItems": [
+                {
+                    "Description": str(li["description"])[:4000],  # Xero max 4000
+                    "Quantity": float(li.get("quantity", 1)),
+                    "UnitAmount": float(li["unit_amount"]),
+                    "AccountCode": str(li["account_code"]),
+                }
+                for li in line_items
+            ],
+        }
+        if due_date:
+            bill["DueDate"] = due_date
+        if currency:
+            bill["CurrencyCode"] = currency
+
+        # POST
+        access_token = self.get_valid_access_token()
+        tenant_id = self.get_active_tenant_id()
+        if not tenant_id:
+            raise XeroError("Δεν υπάρχει active tenant")
+
+        self._rate_limiter.wait_if_needed()
+        try:
+            resp = self._http.post(
+                XERO_INVOICES_URL,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Xero-Tenant-Id": tenant_id,
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                json={"Invoices": [bill]},
+                timeout=HTTP_TIMEOUT_SEC,
+            )
+        except requests.RequestException as e:
+            raise XeroTokenError(f"Network error στο push_bill: {e}") from e
+
+        if resp.status_code not in (200, 201):
+            raise XeroTokenError(
+                f"Push bill απέτυχε (HTTP {resp.status_code}): {resp.text[:300]}"
+            )
+
+        data = resp.json()
+        invoices = data.get("Invoices", [])
+        if not invoices:
+            raise XeroTokenError("Xero δεν επέστρεψε Invoice στο response")
+
+        inv = invoices[0]
+        invoice_id = inv.get("InvoiceID")
+        deep_link = f"https://go.xero.com/AccountsPayable/Edit.aspx?InvoiceID={invoice_id}"
+        logger.info("Push Bill OK: %s → %s (DRAFT)", invoice_number, invoice_id)
+        return {
+            "invoice_id": invoice_id,
+            "status": inv.get("Status", "DRAFT"),
+            "deep_link": deep_link,
+            "raw_response": inv,
+        }
+
 
     def disconnect(self) -> None:
         """
