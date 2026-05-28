@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Privacy Policy — FastWrite</title>
+<meta name="theme-color" content="#0a0e14" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<header><div class="container"><div class="brand">Fast<span>Write</span></div><nav><ul><li><a href="/">Home</a></li><li><a href="/legal/privacy.html">Privacy</a></li><li><a href="/legal/terms.html">Terms</a></li><li><a href="mailto:support@fastwrite.tech">Contact</a></li></ul></nav></div></header>
+<main class="legal-page">
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <div class="legal-meta">Effective Date: [to be set on publication] · Last Updated: [to be set]</div>
+    <p><strong>Effective Date:</strong> [TO BE FILLED before publication]
+<strong>Last Updated:</strong> [TO BE FILLED before publication]</p>
+<hr />
+<h2>1. Introduction</h2>
+<p>This Privacy Policy describes how <strong>FastWrite</strong> ("we", "us", or "our") collects, uses, and protects your information when you use the FastWrite desktop application and related services (the "Service").</p>
+<p>FastWrite is designed with <strong>privacy by default</strong>: your documents, extracted data, and API keys are stored locally on your computer and never transmitted to our servers. We collect the minimum information necessary to provide the Service.</p>
+<p>This Policy is written to comply with the General Data Protection Regulation (GDPR) and the UK Data Protection Act 2018, and applies to all users worldwide.</p>
+<hr />
+<h2>2. Who We Are (Data Controller)</h2>
+<p><strong>Operator:</strong> Stavros Kallenos, sole trader (Cyprus)
+<strong>Brand:</strong> FastWrite
+<strong>Country of Establishment:</strong> Republic of Cyprus
+<strong>Registered Address:</strong> [TO BE FILLED — residential or virtual office address]
+<strong>Tax Identification Code (TIC):</strong> [TO BE FILLED if required by lawyer]
+<strong>Contact Email for Privacy Matters:</strong> support@fastwrite.tech</p>
+<p>For GDPR purposes, we act as the <strong>data controller</strong> for the limited personal data we collect (see Section 3). For data you push to your own Xero account through FastWrite, <strong>you remain the data controller</strong> and FastWrite is a transient data processor.</p>
+<hr />
+<h2>3. Information We Collect</h2>
+<h3>3.1 Information You Provide Directly</h3>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Examples</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Account information</td>
+<td>Email, username, password (hashed)</td>
+<td>Account creation, authentication</td>
+</tr>
+<tr>
+<td>License information</td>
+<td>License JWT, payment metadata (for paid tiers, if applicable)</td>
+<td>License validation</td>
+</tr>
+<tr>
+<td>Support communications</td>
+<td>Emails you send to support@fastwrite.tech</td>
+<td>Responding to your inquiries</td>
+</tr>
+</tbody>
+</table>
+<h3>3.2 Information Stored Locally (NOT Transmitted to Us)</h3>
+<p>The following data is stored <strong>only on your computer</strong> under <code>%APPDATA%\FastWrite\</code> (Windows), <code>~/Library/Application Support/FastWrite/</code> (macOS), or <code>~/.local/share/FastWrite/</code> (Linux). We do <strong>not</strong> have access to this data:</p>
+<ul>
+<li>Uploaded documents (invoices, receipts, PDFs)</li>
+<li>Extracted data and templates</li>
+<li>Your AI provider API keys (e.g., Google Gemini), encrypted with a machine-specific Fernet key</li>
+<li>Your Xero OAuth tokens, encrypted with the same machine-specific key</li>
+<li>Your local SQLite database (<code>app.db</code>)</li>
+</ul>
+<h3>3.3 Information We Do NOT Collect</h3>
+<ul>
+<li>We do <strong>not</strong> collect or transmit the content of your invoices to our servers.</li>
+<li>We do <strong>not</strong> track your usage analytics (e.g., feature usage, behavior).</li>
+<li>We do <strong>not</strong> use cookies for tracking.</li>
+<li>We do <strong>not</strong> sell, rent, or share your personal data with third parties for marketing.</li>
+</ul>
+<hr />
+<h2>4. How We Use Information</h2>
+<p>We use the limited information we collect for the following purposes:</p>
+<ol>
+<li><strong>Account &amp; Authentication:</strong> Creating your account, signing you in, securing access.</li>
+<li><strong>License Validation:</strong> Verifying your entitlement to use paid features (if applicable).</li>
+<li><strong>Support:</strong> Responding to questions, troubleshooting issues, sending service announcements.</li>
+<li><strong>Legal Compliance:</strong> Complying with applicable laws and responding to lawful requests from authorities.</li>
+</ol>
+<hr />
+<h2>5. Legal Bases for Processing (GDPR Article 6)</h2>
+<p>We rely on the following legal bases:</p>
+<ul>
+<li><strong>Contract (Art. 6(1)(b)):</strong> To deliver the Service you have signed up for.</li>
+<li><strong>Legitimate Interests (Art. 6(1)(f)):</strong> To secure our Service, prevent fraud, and improve reliability.</li>
+<li><strong>Consent (Art. 6(1)(a)):</strong> Where applicable, for optional features (e.g., marketing emails — opt-in only).</li>
+<li><strong>Legal Obligation (Art. 6(1)(c)):</strong> Where required by law (e.g., tax records, court orders).</li>
+</ul>
+<hr />
+<h2>6. Third-Party Services</h2>
+<p>FastWrite enables you to integrate with the following third-party services. These integrations are <strong>initiated by you</strong> and operate under the third party's own privacy policy:</p>
+<h3>6.1 Google Gemini (AI Document Extraction)</h3>
+<ul>
+<li>You provide your <strong>own</strong> Google Gemini API key (BYOK — "Bring Your Own Key").</li>
+<li>When you process a document, its content is sent <strong>directly from your computer to Google's Gemini API</strong>, not through our servers.</li>
+<li>Google's processing of this content is governed by <a href="https://policies.google.com/privacy">Google's Privacy Policy</a> and <a href="https://policies.google.com/terms">Google AI Terms</a>.</li>
+<li>We never see your Gemini API key in plain text — it is encrypted on your computer with Fernet symmetric encryption.</li>
+</ul>
+<h3>6.2 Xero Accounting</h3>
+<ul>
+<li>If you choose to connect FastWrite to your Xero account, we use OAuth 2.0 with PKCE — meaning <strong>no client secret is ever stored in the application</strong>.</li>
+<li>Xero OAuth tokens are stored <strong>locally and encrypted</strong> on your computer.</li>
+<li>When you push a document as a Bill, the data is transmitted <strong>directly from your computer to Xero's API</strong>, not through our servers.</li>
+<li>Xero's handling of this data is governed by <a href="https://www.xero.com/about/legal/privacy/">Xero's Privacy Policy</a>.</li>
+<li>You can disconnect FastWrite from Xero at any time via Settings → Σύνδεση με Xero → Αποσύνδεση. This deletes the local token and revokes our access on Xero's side.</li>
+</ul>
+<h3>6.3 Email Service Providers</h3>
+<p>If you contact us at support@fastwrite.tech, your message is routed through Cloudflare Email Routing to a Gmail mailbox. Cloudflare's and Google's respective privacy policies apply.</p>
+<hr />
+<h2>7. Data Storage &amp; Security</h2>
+<h3>7.1 Where Data Is Stored</h3>
+<ul>
+<li><strong>Account data</strong> (the small set in Section 3.1): stored on our server hosted at Hetzner Cloud (Falkenstein, Germany — EU).</li>
+<li><strong>Everything else</strong> (Section 3.2): stored on <strong>your computer only</strong>.</li>
+</ul>
+<h3>7.2 Security Measures</h3>
+<ul>
+<li>All transmissions between FastWrite and external APIs (Xero, Gemini) use HTTPS with TLS 1.2 or higher.</li>
+<li>Server access is restricted, password-protected, and uses SSH key authentication.</li>
+<li>Local secrets (API keys, OAuth tokens) are encrypted using the <code>cryptography</code> Python library's Fernet implementation, with a machine-specific key generated on first run.</li>
+<li>Passwords are stored using bcrypt hashing.</li>
+</ul>
+<h3>7.3 Data Breach Notification</h3>
+<p>If a security incident affecting your personal data occurs, we will notify affected users within <strong>72 hours</strong> of becoming aware of the incident, as required by GDPR Art. 33.</p>
+<hr />
+<h2>8. Your Data Subject Rights (GDPR Articles 15–22)</h2>
+<p>If you are a resident of the European Economic Area (EEA), the United Kingdom, or similar jurisdictions, you have the following rights:</p>
+<table>
+<thead>
+<tr>
+<th>Right</th>
+<th>What it means</th>
+<th>How to exercise</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Access</strong> (Art. 15)</td>
+<td>Receive a copy of your personal data we hold</td>
+<td>Email support@fastwrite.tech</td>
+</tr>
+<tr>
+<td><strong>Rectification</strong> (Art. 16)</td>
+<td>Correct inaccurate or incomplete data</td>
+<td>Email or via Settings page</td>
+</tr>
+<tr>
+<td><strong>Erasure</strong> (Art. 17)</td>
+<td>Request deletion of your account and data</td>
+<td>Email support@fastwrite.tech</td>
+</tr>
+<tr>
+<td><strong>Restriction</strong> (Art. 18)</td>
+<td>Limit how we process your data</td>
+<td>Email</td>
+</tr>
+<tr>
+<td><strong>Portability</strong> (Art. 20)</td>
+<td>Receive your data in a machine-readable format</td>
+<td>Email</td>
+</tr>
+<tr>
+<td><strong>Objection</strong> (Art. 21)</td>
+<td>Object to processing based on legitimate interests</td>
+<td>Email</td>
+</tr>
+<tr>
+<td><strong>Withdraw Consent</strong></td>
+<td>Withdraw any consent you previously gave</td>
+<td>Email or in-app settings</td>
+</tr>
+</tbody>
+</table>
+<p>We will respond to all valid requests within <strong>one month</strong> (GDPR Art. 12(3)).</p>
+<p>You also have the right to lodge a complaint with a supervisory authority — for Cyprus, this is the <a href="https://www.dataprotection.gov.cy/">Office of the Commissioner for Personal Data Protection</a>.</p>
+<hr />
+<h2>9. Cookies &amp; Similar Technologies</h2>
+<p>The FastWrite desktop application does not use cookies. The FastWrite marketing website (fastwrite.tech) may use only <strong>strictly necessary</strong> cookies for session management. We do <strong>not</strong> use analytics, advertising, or tracking cookies.</p>
+<hr />
+<h2>10. International Data Transfers</h2>
+<p>The account data we hold is stored in the European Union (Germany). When you use third-party integrations (Gemini, Xero), data is transferred to those providers' infrastructure, which may be located outside the EU. We rely on the following safeguards:</p>
+<ul>
+<li><strong>Gemini:</strong> Google's Standard Contractual Clauses and self-certification under applicable frameworks.</li>
+<li><strong>Xero:</strong> Xero's published data processing terms and Standard Contractual Clauses.</li>
+</ul>
+<hr />
+<h2>11. Data Retention</h2>
+<ul>
+<li><strong>Account data:</strong> Retained while your account is active and for a reasonable period afterwards (typically 12 months) for legal compliance and support history.</li>
+<li><strong>Local data on your computer:</strong> You control retention. Uninstalling FastWrite or deleting the <code>%APPDATA%\FastWrite\</code> folder removes all local data.</li>
+<li><strong>Support emails:</strong> Retained for up to 24 months for service-quality purposes.</li>
+<li><strong>Legal/tax records:</strong> Retained for the period required by applicable law (typically 7 years in Cyprus).</li>
+</ul>
+<hr />
+<h2>12. Children's Privacy</h2>
+<p>FastWrite is a <strong>business productivity tool</strong> and is not directed at individuals under the age of 18. We do not knowingly collect personal data from children. If you believe we have collected such data, please contact us at support@fastwrite.tech and we will delete it.</p>
+<hr />
+<h2>13. Changes to This Policy</h2>
+<p>We may update this Policy from time to time. The "Last Updated" date at the top will reflect any change. For material changes, we will notify you via email or in-app announcement at least <strong>30 days</strong> before the changes take effect.</p>
+<hr />
+<h2>14. Contact</h2>
+<p>For any privacy-related question, complaint, or data subject request:</p>
+<p><strong>Email:</strong> support@fastwrite.tech
+<strong>Postal Address:</strong> [TO BE FILLED]
+<strong>Website:</strong> https://fastwrite.tech</p>
+<hr />
+<p><em>FastWrite — Privacy Policy v1.0 — [date]</em>
+<em>Reviewed by: [TO BE FILLED — Cyprus legal counsel]</em></p>
+  </div>
+</main>
+<footer><div class="container"><div class="copy">© 2026 FastWrite · Operated by Stavros Kallenos (Cyprus)</div><ul><li><a href="/legal/privacy.html">Privacy Policy</a></li><li><a href="/legal/terms.html">Terms of Service</a></li><li><a href="mailto:support@fastwrite.tech">Contact</a></li></ul></div></footer>
+</body>
+</html>

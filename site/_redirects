@@ -1,0 +1,5 @@
+# Cloudflare Pages redirects — friendlier URLs
+/privacy      /legal/privacy.html  301
+/terms        /legal/terms.html    301
+/legal/privacy  /legal/privacy.html  301
+/legal/terms    /legal/terms.html    301
