@@ -1,0 +1,13 @@
+# Cloudflare Workers (with Static Assets) config για το fastwrite.tech static site.
+#
+# Σερβίρει τον φάκελο site/ ως static assets. Δεν χρειάζεται build step ή
+# JavaScript Worker code — το Cloudflare σερβίρει αυτόματα τα HTML/CSS/JS αρχεία.
+#
+# _headers και _redirects μέσα στο site/ εφαρμόζονται αυτόματα.
+
+name = "fastwrite-tech"
+compatibility_date = "2024-11-01"
+
+[assets]
+directory = "./site"
+not_found_handling = "404-page"
