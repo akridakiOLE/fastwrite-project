@@ -5,7 +5,7 @@
 #
 # _headers και _redirects μέσα στο site/ εφαρμόζονται αυτόματα.
 
-name = "fastwrite-tech"
+name = "fastwrite-project"
 compatibility_date = "2024-11-01"
 
 [assets]
