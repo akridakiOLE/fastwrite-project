@@ -1,5 +1,9 @@
-# Cloudflare Pages redirects — friendlier URLs
-/privacy      /legal/privacy.html  301
-/terms        /legal/terms.html    301
-/legal/privacy  /legal/privacy.html  301
-/legal/terms    /legal/terms.html    301
+# Cloudflare Workers Static Assets — friendly short URLs
+#
+# ΣΗΜΕΙΩΣΗ: Cloudflare αυτόματα drops το .html (clean URLs by default).
+# Άρα /legal/privacy σερβίρει το /legal/privacy.html αυτόματα — δεν χρειάζονται
+# explicit redirects για το .html.
+#
+# Μόνο shorter aliases:
+/privacy      /legal/privacy    301
+/terms        /legal/terms      301

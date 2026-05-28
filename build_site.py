@@ -28,8 +28,8 @@ NAV_HEADER = (
     '<header><div class="container"><div class="brand">Fast<span>Write</span></div>'
     '<nav><ul>'
     '<li><a href="/">Home</a></li>'
-    '<li><a href="/legal/privacy.html">Privacy</a></li>'
-    '<li><a href="/legal/terms.html">Terms</a></li>'
+    '<li><a href="/legal/privacy">Privacy</a></li>'
+    '<li><a href="/legal/terms">Terms</a></li>'
     '<li><a href="mailto:support@fastwrite.tech">Contact</a></li>'
     '</ul></nav></div></header>'
 )
@@ -37,8 +37,8 @@ FOOTER = (
     '<footer><div class="container">'
     '<div class="copy">© 2026 FastWrite · Operated by Stavros Kallenos (Cyprus)</div>'
     '<ul>'
-    '<li><a href="/legal/privacy.html">Privacy Policy</a></li>'
-    '<li><a href="/legal/terms.html">Terms of Service</a></li>'
+    '<li><a href="/legal/privacy">Privacy Policy</a></li>'
+    '<li><a href="/legal/terms">Terms of Service</a></li>'
     '<li><a href="mailto:support@fastwrite.tech">Contact</a></li>'
     '</ul></div></footer>'
 )
