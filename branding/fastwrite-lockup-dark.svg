@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="100" viewBox="0 0 340 100" role="img" aria-label="FastWrite logo (for dark backgrounds)">
+  <rect x="10" y="10" width="80" height="80" rx="18" fill="#00E5A0"/>
+  <text x="50" y="63" text-anchor="middle" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="36" font-weight="800" fill="#06231A">FW</text>
+  <text x="108" y="65" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="44" font-weight="600"><tspan fill="#FFFFFF">fast</tspan><tspan fill="#00E5A0">write</tspan></text>
+</svg>

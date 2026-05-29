@@ -24,7 +24,7 @@ This Policy is written to comply with the General Data Protection Regulation (GD
 **Tax Identification Code (TIC):** [TO BE FILLED if required by lawyer]
 **Contact Email for Privacy Matters:** support@fastwrite.tech
 
-For GDPR purposes, we act as the **data controller** for the limited personal data we collect (see Section 3). For data you push to your own Xero account through FastWrite, **you remain the data controller** and FastWrite is a transient data processor.
+For GDPR purposes, we act as the **data controller** for the limited personal data we collect (see Section 3). For data you push to your own accounting platform (currently Xero; support for additional platforms such as QuickBooks is planned) through FastWrite, **you remain the data controller** and FastWrite is a transient data processor.
 
 ---
 
@@ -45,7 +45,7 @@ The following data is stored **only on your computer** under `%APPDATA%\FastWrit
 - Uploaded documents (invoices, receipts, PDFs)
 - Extracted data and templates
 - Your AI provider API keys (e.g., Google Gemini), encrypted with a machine-specific Fernet key
-- Your Xero OAuth tokens, encrypted with the same machine-specific key
+- Your accounting-platform OAuth tokens (e.g., Xero, and future providers such as QuickBooks), encrypted with the same machine-specific key
 - Your local SQLite database (`app.db`)
 
 ### 3.3 Information We Do NOT Collect
@@ -90,13 +90,15 @@ FastWrite enables you to integrate with the following third-party services. Thes
 - Google's processing of this content is governed by [Google's Privacy Policy](https://policies.google.com/privacy) and [Google AI Terms](https://policies.google.com/terms).
 - We never see your Gemini API key in plain text — it is encrypted on your computer with Fernet symmetric encryption.
 
-### 6.2 Xero Accounting
+### 6.2 Accounting Platform Integrations (Xero — and future providers)
 
-- If you choose to connect FastWrite to your Xero account, we use OAuth 2.0 with PKCE — meaning **no client secret is ever stored in the application**.
-- Xero OAuth tokens are stored **locally and encrypted** on your computer.
-- When you push a document as a Bill, the data is transmitted **directly from your computer to Xero's API**, not through our servers.
-- Xero's handling of this data is governed by [Xero's Privacy Policy](https://www.xero.com/about/legal/privacy/).
-- You can disconnect FastWrite from Xero at any time via Settings → Σύνδεση με Xero → Αποσύνδεση. This deletes the local token and revokes our access on Xero's side.
+FastWrite lets you connect to a third-party accounting platform. **Xero** is the currently supported provider; support for additional platforms (such as **QuickBooks**) is planned and, when released, will operate under the same principles described here.
+
+- If you choose to connect FastWrite to your accounting platform account, we use OAuth 2.0 with PKCE — meaning **no client secret is ever stored in the application**.
+- Your accounting-platform OAuth tokens are stored **locally and encrypted** on your computer.
+- When you push a document as a Bill, the data is transmitted **directly from your computer to the accounting platform's API**, not through our servers.
+- Each provider's handling of this data is governed by its own privacy policy — for example, [Xero's Privacy Policy](https://www.xero.com/about/legal/privacy/). For QuickBooks and any future provider, that provider's published privacy policy will apply.
+- You can disconnect FastWrite from a connected accounting platform at any time via the in-app Settings (e.g., Σύνδεση με Xero → Αποσύνδεση). This deletes the local token and revokes our access on the provider's side.
 
 ### 6.3 Email Service Providers
 
@@ -152,10 +154,10 @@ The FastWrite desktop application does not use cookies. The FastWrite marketing 
 
 ## 10. International Data Transfers
 
-The account data we hold is stored in the European Union (Germany). When you use third-party integrations (Gemini, Xero), data is transferred to those providers' infrastructure, which may be located outside the EU. We rely on the following safeguards:
+The account data we hold is stored in the European Union (Germany). When you use third-party integrations (e.g., Gemini, Xero, and future accounting providers such as QuickBooks), data is transferred to those providers' infrastructure, which may be located outside the EU. We rely on the following safeguards:
 
 - **Gemini:** Google's Standard Contractual Clauses and self-certification under applicable frameworks.
-- **Xero:** Xero's published data processing terms and Standard Contractual Clauses.
+- **Accounting platforms (Xero; QuickBooks and others when supported):** the relevant provider's published data processing terms and Standard Contractual Clauses.
 
 ---
 

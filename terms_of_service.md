@@ -33,7 +33,7 @@ FastWrite is an AI-assisted document extraction tool that helps you:
 - Upload invoices, receipts, and similar business documents;
 - Extract structured data using Google Gemini (or other AI providers as configured);
 - Review, validate, and export the extracted data;
-- Optionally push extracted data to your Xero accounting account as **DRAFT** Bills (ACCPAY invoices).
+- Optionally push extracted data to your connected accounting platform (currently Xero; support for additional platforms such as QuickBooks is planned) as **DRAFT** Bills (ACCPAY invoices or the equivalent).
 
 ### 3.2 What FastWrite Does NOT Do
 
@@ -82,33 +82,35 @@ To use AI extraction, you must provide your own API key for Google Gemini (or ot
 
 ---
 
-## 6. Xero Integration
+## 6. Accounting Platform Integration (Xero — and future providers)
+
+This Section applies to any accounting platform you connect through FastWrite. **Xero** is the currently supported provider; support for additional platforms (such as **QuickBooks**) is planned and, when released, will be governed by this same Section. References to "Xero" below apply equally to any other accounting platform you choose to connect.
 
 ### 6.1 Your Authorisation
 
-By connecting your Xero account, you authorise FastWrite to:
+By connecting your accounting platform account, you authorise FastWrite to:
 
-(a) Read your Xero contacts and chart of accounts (for matching and mapping);
+(a) Read your contacts and chart of accounts (for matching and mapping);
 (b) Create supplier contacts when one does not already exist for an extracted invoice;
-(c) Push **DRAFT** Bills (ACCPAY invoices) to your Xero organisation.
+(c) Push **DRAFT** Bills (ACCPAY invoices or the equivalent) to your organisation on that platform.
 
 ### 6.2 DRAFT-Only Policy
 
-**All Bills created by FastWrite are in DRAFT status.** You retain full control to review, edit, or delete each Bill in Xero before approving (authorising) it. We will never automatically approve, authorise, pay, or otherwise finalise a financial transaction on your behalf.
+**All Bills created by FastWrite are in DRAFT status.** You retain full control to review, edit, or delete each Bill in your accounting platform before approving (authorising) it. We will never automatically approve, authorise, pay, or otherwise finalise a financial transaction on your behalf.
 
-### 6.3 Disclaimer of Xero-Related Risks
+### 6.3 Disclaimer of Integration-Related Risks
 
-FastWrite is **not** affiliated with, endorsed by, or representative of Xero Limited. We are an independent third-party Xero app. You acknowledge that:
+FastWrite is **not** affiliated with, endorsed by, or representative of Xero Limited, Intuit Inc. (QuickBooks), or any other accounting platform provider. We are an independent third-party application. You acknowledge that:
 
 (a) Any errors in extracted data, mapping, or pushing are **your responsibility** to detect and correct before approving Bills;
-(b) FastWrite is **not responsible** for any financial, tax, audit, or compliance consequences arising from inaccurate data pushed to Xero;
-(c) Xero's own terms of service govern your relationship with Xero.
+(b) FastWrite is **not responsible** for any financial, tax, audit, or compliance consequences arising from inaccurate data pushed to any accounting platform;
+(c) Each accounting platform's own terms of service govern your relationship with that platform.
 
 ---
 
 ## 7. Pricing & Payment (if applicable)
 
-The Service is offered through the Xero App Marketplace at **no cost for the basic tier**. Optional **bespoke deployment and support services** are offered under separate written agreement and pricing.
+The Service is offered through the Xero App Marketplace (and, where applicable, other accounting-platform marketplaces) and/or via **direct download from fastwrite.tech**, at **no cost for the basic tier**. These Terms apply to you regardless of how you obtained the Service — whether through a marketplace listing or by direct download. Optional **bespoke deployment and support services** are offered under separate written agreement and pricing.
 
 For free-tier users: no payment is required. For bespoke clients: terms, pricing, and refunds are governed by the individual service agreement signed between us.
 
@@ -171,7 +173,7 @@ WITHOUT LIMITING THE GENERALITY OF THE FOREGOING:
 (a) WE DO **NOT** WARRANT THAT THE SERVICE WILL BE ERROR-FREE OR UNINTERRUPTED;
 (b) WE DO **NOT** WARRANT THE ACCURACY, COMPLETENESS, OR RELIABILITY OF DATA EXTRACTED BY AI;
 (c) WE DO **NOT** WARRANT THAT THE SERVICE WILL MEET YOUR SPECIFIC REQUIREMENTS;
-(d) WE DO **NOT** WARRANT THE AVAILABILITY OR BEHAVIOR OF THIRD-PARTY SERVICES (GEMINI, XERO, ETC.).
+(d) WE DO **NOT** WARRANT THE AVAILABILITY OR BEHAVIOR OF THIRD-PARTY SERVICES (GEMINI, XERO, QUICKBOOKS, OR ANY OTHER INTEGRATED PROVIDER).
 
 **You acknowledge that AI extraction may produce errors, and you are solely responsible for reviewing and validating all extracted data before relying on it for accounting, tax, or financial decisions.**
 
@@ -183,7 +185,7 @@ TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL FASTWRITE, 
 
 (a) ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES;
 (b) ANY LOSS OF PROFITS, REVENUE, DATA, USE, GOODWILL, OR BUSINESS OPPORTUNITY;
-(c) ANY DAMAGES ARISING FROM AI-EXTRACTION ERRORS, INCORRECT XERO ENTRIES, OR THIRD-PARTY SERVICE FAILURES;
+(c) ANY DAMAGES ARISING FROM AI-EXTRACTION ERRORS, INCORRECT ACCOUNTING-PLATFORM ENTRIES (E.G., XERO, QUICKBOOKS), OR THIRD-PARTY SERVICE FAILURES;
 (d) ANY AMOUNT EXCEEDING, IN AGGREGATE, **THE GREATER OF (i) €100 OR (ii) THE FEES YOU PAID TO US IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM**.
 
 Some jurisdictions do not allow the exclusion of certain warranties or limitation of liability for consequential damages. In such jurisdictions, the above limitations apply only to the maximum extent permitted by law.

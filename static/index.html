@@ -498,12 +498,12 @@ select.form-input option{background:var(--bg2);}
             <div class="form-group" style="margin-top:6px;display:none;">
               <label class="form-label" id="batch-schema-label" style="font-size:10px;">Template</label>
               <select class="form-input" id="batch-schema" style="font-size:11px;padding:5px 8px;"></select>
-              <div id="batch-schema-hint" style="font-size:9px;color:var(--text2);margin-top:3px;display:none;">
+              <div id="batch-schema-hint" style="font-size:9px;color:var(--text2);margin-top:3px;display:none;" data-i18n="upload_schema_hint">
                 ℹ Χρησιμοποιείται μόνο αν το Auto Match δεν βρει ετικέτα
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-              <button class="btn btn-primary tooltip-hint" data-hint="Ανεβάστε PDF και ξεκινήστε αυτόματη εξαγωγή δεδομένων με AI" style="flex:1;padding:12px 8px;font-size:13px;font-weight:600;" onclick="handleRegisterClick()" id="batch-btn">
+              <button class="btn btn-primary tooltip-hint" data-hint="Ανεβάστε PDF και ξεκινήστε αυτόματη εξαγωγή δεδομένων με AI" data-i18n-hint="upload_register_hint" style="flex:1;padding:12px 8px;font-size:13px;font-weight:600;" onclick="handleRegisterClick()" id="batch-btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 <span data-i18n="upload_register_btn">Καταγραφή Εγγράφων</span>
               </button>
@@ -790,30 +790,30 @@ select.form-input option{background:var(--bg2);}
 
           <!-- Xero Integration (Phase C) -->
           <div class="card">
-            <div class="card-title">🔗 Σύνδεση με Xero</div>
+            <div class="card-title" data-i18n="xero_card_title">🔗 Σύνδεση με Xero</div>
             <div id="xero-status-block" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
             <div id="xero-tenant-block" style="margin-top:12px;display:none;">
               <label class="form-label">Active Organisation</label>
               <select class="form-input" id="xero-tenant-select" onchange="xeroSetActiveTenant(this.value)"></select>
             </div>
             <div id="xero-actions" style="margin-top:16px;display:flex;gap:8px;">
-              <button class="btn btn-primary" id="xero-connect-btn" onclick="xeroConnect()" style="display:none;">Σύνδεση με Xero</button>
-              <button class="btn btn-secondary" id="xero-disconnect-btn" onclick="xeroDisconnect()" style="display:none;">Αποσύνδεση</button>
+              <button class="btn btn-primary" id="xero-connect-btn" onclick="xeroConnect()" style="display:none;" data-i18n="xero_connect_btn">Σύνδεση με Xero</button>
+              <button class="btn btn-secondary" id="xero-disconnect-btn" onclick="xeroDisconnect()" style="display:none;" data-i18n="xero_disconnect_btn">Αποσύνδεση</button>
             </div>
-            <div style="margin-top:12px;font-size:11px;color:var(--text3);">Push extracted invoices ως Bills (Phase B — επόμενο)</div>
+            <div style="margin-top:12px;font-size:11px;color:var(--text3);" data-i18n="xero_card_note">Push extracted invoices to Xero as DRAFT Bills</div>
           </div>
 
           <!-- Section 3b: UX Preferences (Sprint 3: Tour Mode toggle) -->
           <div class="card">
-            <div class="card-title">🎯 Εμφάνιση Σελίδας Έγκρισης</div>
+            <div class="card-title" data-i18n="settings_tour_card_title">🎯 Εμφάνιση Σελίδας Έγκρισης</div>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;">
               <div style="flex:1;">
-                <div style="font-size:14px;color:var(--text);font-weight:600;margin-bottom:4px;">Καθοδηγούμενη Έγκριση (Tour Mode)</div>
-                <div style="font-size:12px;color:var(--text3);">Όταν είναι ενεργό, η σελίδα Έγκρισης ανοίγει αυτόματα σε λειτουργία Tour Mode (ένα πεδίο τη φορά με highlight πάνω στο τιμολόγιο).</div>
+                <div style="font-size:14px;color:var(--text);font-weight:600;margin-bottom:4px;" data-i18n="settings_tour_label">Καθοδηγούμενη Έγκριση (Tour Mode)</div>
+                <div style="font-size:12px;color:var(--text3);" data-i18n="settings_tour_desc">Όταν είναι ενεργό, η σελίδα Έγκρισης ανοίγει αυτόματα σε λειτουργία Tour Mode (ένα πεδίο τη φορά με highlight πάνω στο τιμολόγιο).</div>
               </div>
               <label style="display:inline-flex;align-items:center;cursor:pointer;gap:8px;">
                 <input type="checkbox" id="setting-tour-default" onchange="saveTourPreference(this.checked)" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;"/>
-                <span id="setting-tour-label" style="font-size:13px;color:var(--text2);">Ανενεργό</span>
+                <span id="setting-tour-label" style="font-size:13px;color:var(--text2);" data-i18n="tour_disabled">Ανενεργό</span>
               </label>
             </div>
           </div>
@@ -1229,8 +1229,8 @@ select.form-input option{background:var(--bg2);}
         <div class="topbar-actions" style="gap:6px;">
           <!-- Document dropdown -->
           <div style="position:relative;" id="ap-docs-dd-wrap">
-            <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εμφάνιση λίστας εγγράφων προς έγκριση" onclick="apToggleDocsDD(event)" style="font-size:11px;">
-              📄 Έγγραφα <span id="ap-doc-counter" style="color:var(--accent);">1/1</span> ▼
+            <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εμφάνιση λίστας εγγράφων προς έγκριση" data-i18n-hint="ap_docs_dd_hint" onclick="apToggleDocsDD(event)" style="font-size:11px;">
+              📄 <span data-i18n="ap_docs_btn">Έγγραφα</span> <span id="ap-doc-counter" style="color:var(--accent);">1/1</span> ▼
             </button>
             <div id="ap-docs-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:320px;max-height:340px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
               <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;"><span data-i18n="ap_docs_header">ΕΓΓΡΑΦΑ ΠΡΟΣ ΕΓΚΡΙΣΗ</span></div>
@@ -1240,14 +1240,14 @@ select.form-input option{background:var(--bg2);}
           <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο προηγούμενο έγγραφο προς έγκριση" data-i18n="ap_prev" data-i18n-hint="ap_prev_hint" onclick="apPrevDoc()" id="ap-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
           <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο επόμενο έγγραφο προς έγκριση" data-i18n="ap_next" data-i18n-hint="ap_next_hint" onclick="apNextDoc()" id="ap-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
           <!-- Tour Mode toggle (Sprint 2) -->
-          <button class="tour-toggle-btn tooltip-hint" id="ap-tour-toggle" data-hint="Καθοδηγούμενη Έγκριση — δείχνει ένα πεδίο τη φορά μεγάλο πάνω στο τιμολόγιο" onclick="apToggleTour()">
+          <button class="tour-toggle-btn tooltip-hint" id="ap-tour-toggle" data-hint="Καθοδηγούμενη Έγκριση — δείχνει ένα πεδίο τη φορά μεγάλο πάνω στο τιμολόγιο" data-i18n-hint="ap_tour_toggle_hint" onclick="apToggleTour()">
             <span id="ap-tour-toggle-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#555;margin-right:6px;vertical-align:middle;"></span>Tour Mode: <span id="ap-tour-toggle-state">OFF</span>
           </button>
         </div>
       </div>
       <div style="display:flex;width:100%;height:calc(100vh - 52px);overflow:hidden;background:var(--bg);position:relative;">
         <!-- Toggle sidebar button — positioned at left edge of PDF area -->
-        <button id="ap-sidebar-toggle" onclick="apToggleSidebar()" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:all .3s ease;" title="Εμφάνιση/Απόκρυψη μενού">◀</button>
+        <button id="ap-sidebar-toggle" onclick="apToggleSidebar()" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:all .3s ease;" title="Εμφάνιση/Απόκρυψη μενού" data-i18n-title="ap_sidebar_toggle_title">◀</button>
         <!-- PDF Area (PNG + canvas highlight + page number overlay) -->
         <div id="ap-pdf-area" style="flex:1;height:100%;overflow:hidden;min-width:0;display:flex;flex-direction:column;position:relative;">
           <div id="ap-img-wrap" style="flex:1;overflow:auto;position:relative;cursor:crosshair;">
@@ -1256,40 +1256,40 @@ select.form-input option{background:var(--bg2);}
           </div>
           <!-- Zoom controls (Step 3) -->
           <div id="ap-zoom-controls" style="position:absolute;top:10px;right:10px;z-index:30;display:flex;flex-direction:column;gap:4px;background:rgba(15,15,15,0.85);border:1px solid var(--border);border-radius:8px;padding:6px;backdrop-filter:blur(6px);">
-            <button onclick="apZoomBy(0.2)" title="Μεγέθυνση (Ctrl + scroll up)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 10px;font-size:15px;font-weight:600;cursor:pointer;line-height:1;">+</button>
-            <button onclick="apZoomReset()" id="ap-zoom-label" title="Επαναφορά (διπλό κλικ)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:3px 6px;font-size:10px;cursor:pointer;line-height:1;font-family:'DM Mono',monospace;">100%</button>
-            <button onclick="apZoomBy(-0.2)" title="Σμίκρυνση (Ctrl + scroll down)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 10px;font-size:15px;font-weight:600;cursor:pointer;line-height:1;">−</button>
+            <button onclick="apZoomBy(0.2)" title="Μεγέθυνση (Ctrl + scroll up)" data-i18n-title="ap_zoom_in_title" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 10px;font-size:15px;font-weight:600;cursor:pointer;line-height:1;">+</button>
+            <button onclick="apZoomReset()" id="ap-zoom-label" title="Επαναφορά (διπλό κλικ)" data-i18n-title="ap_zoom_reset_title" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:3px 6px;font-size:10px;cursor:pointer;line-height:1;font-family:'DM Mono',monospace;">100%</button>
+            <button onclick="apZoomBy(-0.2)" title="Σμίκρυνση (Ctrl + scroll down)" data-i18n-title="ap_zoom_out_title" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 10px;font-size:15px;font-weight:600;cursor:pointer;line-height:1;">−</button>
           </div>
         </div>
         <!-- Tour Mode floating ROW card για line items (Sprint Line Items Tour v2) -->
         <div id="ap-tour-row-card" class="tour-row-card" style="display:none;">
           <div class="tour-row-card-header" id="ap-tour-row-drag">
-            <span>Γραμμή <span id="ap-tour-row-counter">1/1</span></span>
-            <button onclick="apToggleTour()" style="background:transparent;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:0 4px;" title="Έξοδος (Esc)">×</button>
+            <span><span data-i18n="ap_tour_row">Γραμμή</span> <span id="ap-tour-row-counter">1/1</span></span>
+            <button onclick="apToggleTour()" style="background:transparent;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:0 4px;" title="Έξοδος (Esc)" data-i18n-title="ap_tour_exit_title">×</button>
           </div>
           <div class="tour-row-card-cells" id="ap-tour-row-cells"></div>
           <div class="tour-row-card-nav">
             <div class="left">
-              <button class="tour-card-btn" id="ap-tour-row-prev" onclick="apTourNavRow(-1)">↑ Προηγ.</button>
-              <button class="tour-card-btn" id="ap-tour-row-next" onclick="apTourNavRow(1)">Επόμ. ↓</button>
+              <button class="tour-card-btn" id="ap-tour-row-prev" onclick="apTourNavRow(-1)" data-i18n="ap_tour_row_prev">↑ Προηγ.</button>
+              <button class="tour-card-btn" id="ap-tour-row-next" onclick="apTourNavRow(1)" data-i18n="ap_tour_row_next">Επόμ. ↓</button>
             </div>
-            <button class="tour-card-btn primary" id="ap-tour-approve-btn" onclick="apTourApproveDoc()" style="display:none;">✓ Έγκριση Τιμολογίου</button>
+            <button class="tour-card-btn primary" id="ap-tour-approve-btn" onclick="apTourApproveDoc()" style="display:none;" data-i18n="ap_tour_approve">✓ Έγκριση Τιμολογίου</button>
           </div>
         </div>
         <!-- Tour Mode floating card (Sprint 2 - scalars) -->
         <div id="ap-tour-card" class="tour-card" style="display:none;">
           <div class="tour-card-header" id="ap-tour-drag-handle">
-            <span class="tour-card-title">Πεδίο</span>
+            <span class="tour-card-title" data-i18n="ap_tour_field">Πεδίο</span>
             <span class="tour-card-counter" id="ap-tour-counter">1 / 1</span>
-            <button class="tour-card-close" onclick="apToggleTour()" title="Έξοδος (Esc)">×</button>
+            <button class="tour-card-close" onclick="apToggleTour()" title="Έξοδος (Esc)" data-i18n-title="ap_tour_exit_title">×</button>
           </div>
           <div class="tour-card-label" id="ap-tour-field-label" style="color:var(--text);font-size:18px;font-weight:600;margin-bottom:2px;">Field</div>
           <div class="tour-card-field" id="ap-tour-field-name">FIELD</div>
           <input type="text" class="tour-card-value" id="ap-tour-value" oninput="apTourMarkDirty()"/>
           <div class="tour-card-nav">
-            <button class="tour-card-btn" id="ap-tour-prev" onclick="apTourNav(-1)">← Προηγ.</button>
-            <button class="tour-card-btn" id="ap-tour-skip" onclick="apTourSkipToLineItems()" title="Παράκαμψη στις γραμμές (PageDown)" style="display:none;">⏭ Γραμμές</button>
-            <button class="tour-card-btn primary" onclick="apTourNav(1)" id="ap-tour-next">Επόμ. →</button>
+            <button class="tour-card-btn" id="ap-tour-prev" onclick="apTourNav(-1)" data-i18n="ap_tour_prev">← Προηγ.</button>
+            <button class="tour-card-btn" id="ap-tour-skip" onclick="apTourSkipToLineItems()" title="Παράκαμψη στις γραμμές (PageDown)" data-i18n-title="ap_tour_skip_title" data-i18n="ap_tour_skip" style="display:none;">⏭ Γραμμές</button>
+            <button class="tour-card-btn primary" onclick="apTourNav(1)" id="ap-tour-next" data-i18n="ap_tour_next">Επόμ. →</button>
           </div>
         </div>
         <!-- Data Panel (right side) -->
@@ -1298,7 +1298,7 @@ select.form-input option{background:var(--bg2);}
           <div style="flex-shrink:0;border-bottom:1px solid var(--border);">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);cursor:pointer;user-select:none;" onclick="apToggleScalars()">
               <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;"><span data-i18n="ap_scalar_title">Γενικά Στοιχεία</span></span>
-              <span style="font-size:10px;color:var(--accent);" id="ap-toggle-icon">▲ Απόκρυψη</span>
+              <span style="font-size:10px;color:var(--accent);" id="ap-toggle-icon" data-i18n="ap_scalar_toggle_hide">▲ Απόκρυψη</span>
             </div>
             <div id="ap-scalar-fields" style="display:flex;flex-wrap:wrap;gap:14px;padding:14px 16px;"></div>
           </div>
@@ -1536,15 +1536,15 @@ select.form-input option{background:var(--bg2);}
       <div class="form-group">
         <label class="form-label">Account Code (Xero Chart of Accounts)</label>
         <select class="form-input" id="xero-push-account-select" disabled>
-          <option value="">Φόρτωση...</option>
+          <option value="" data-i18n="xero_accounts_loading">Loading accounts...</option>
         </select>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px;">Επιλεγμένος account code εφαρμόζεται σε όλα τα line items</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;" data-i18n="xero_account_apply_note">The selected account code applies to all line items</div>
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
-        <button class="btn btn-secondary" onclick="closeModal('xero-push-modal')">Άκυρο</button>
+        <button class="btn btn-secondary" onclick="closeModal('xero-push-modal')" data-i18n="xero_cancel">Άκυρο</button>
         <button class="btn btn-primary" id="xero-push-confirm-btn" onclick="xeroDoPush()" disabled>Push as DRAFT</button>
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:12px;text-align:center;">Το Bill θα δημιουργηθεί σε κατάσταση <strong>DRAFT</strong> — εσύ θα το κάνεις AUTHORISE μέσα στο Xero.</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:12px;text-align:center;" data-i18n-html="xero_push_draft_note">The Bill is created as <strong>DRAFT</strong> — you authorise it inside Xero.</div>
     </div>
   </div>
 </div>
@@ -1671,7 +1671,7 @@ function updateDonutChart(total, completed, pending, failed) {
 function renderRecentActivity(activities) {
   const el = document.getElementById('activity-list');
   if (!activities.length) {
-    el.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:13px;padding:24px;">' + t('js_no_recent_activity') + '</div>';
+    el.innerHTML = '<div data-i18n="js_no_recent_activity" style="text-align:center;color:var(--text2);font-size:13px;padding:24px;">' + t('js_no_recent_activity') + '</div>';
     return;
   }
   const actionLabels = {
@@ -3155,7 +3155,7 @@ function saveTourPreference(enabled) {
   try { localStorage.setItem(TOUR_PREF_KEY, enabled ? '1' : '0'); }
   catch (e) { /* localStorage μπορεί να είναι disabled — ignore */ }
   const lbl = document.getElementById('setting-tour-label');
-  if (lbl) lbl.textContent = enabled ? 'Ενεργό' : 'Ανενεργό';
+  if (lbl) lbl.textContent = enabled ? t('tour_enabled') : t('tour_disabled');
 }
 
 function syncTourPreferenceUI() {
@@ -3164,7 +3164,7 @@ function syncTourPreferenceUI() {
   const enabled = loadTourPreference();
   cb.checked = enabled;
   const lbl = document.getElementById('setting-tour-label');
-  if (lbl) lbl.textContent = enabled ? 'Ενεργό' : 'Ανενεργό';
+  if (lbl) lbl.textContent = enabled ? t('tour_enabled') : t('tour_disabled');
 }
 
 // ── Tour Mode (Sprint 2) ───────────────────────────────────────────────────
@@ -3234,7 +3234,7 @@ async function apToggleTour() {
   } catch(e) { apTourBboxes = {}; }
 
   if (!Object.keys(apTourBboxes).length) {
-    toast('Δεν υπάρχουν θέσεις πεδίων για αυτό το έγγραφο. Ξαναεξαγάγετε για να δημιουργηθούν.', 'error');
+    toast(t('tour_no_positions'), 'error');
     // cleanup πιθανού preemptive class από auto-activation
     document.getElementById('page-approval').classList.remove('tour-mode-active');
     return;
@@ -3253,7 +3253,7 @@ async function apToggleTour() {
   apTourBboxes = normalizedBboxes;
   apTourFields = Object.keys(normalizedBboxes);
   if (!apTourFields.length) {
-    toast('Δεν βρέθηκαν εξαγόμενα πεδία με γνωστές θέσεις.', 'error');
+    toast(t('tour_no_known_positions'), 'error');
     document.getElementById('page-approval').classList.remove('tour-mode-active');
     return;
   }
@@ -3333,7 +3333,7 @@ function apTourRender() {
   // Counter: αν υπάρχουν line items, δείξε προοπτική συνέχειας
   const totalScalars = apTourFields.length;
   const hasLineItems = apTourLineKey && apTourLineData.length > 0;
-  const counterTxt = (apTourIdx + 1) + ' / ' + totalScalars + (hasLineItems ? ' (+ γραμμές)' : '');
+  const counterTxt = (apTourIdx + 1) + ' / ' + totalScalars + (hasLineItems ? ' ' + t('tour_plus_lineitems') : '');
   document.getElementById('ap-tour-counter').textContent = counterTxt;
   const valInput = document.getElementById('ap-tour-value');
   valInput.value = value != null ? value : '';
@@ -3343,7 +3343,7 @@ function apTourRender() {
   document.getElementById('ap-tour-prev').disabled = (apTourIdx === 0);
   const isLastScalar = (apTourIdx === totalScalars - 1);
   document.getElementById('ap-tour-next').textContent =
-    isLastScalar ? (hasLineItems ? 'Γραμμές →' : '✓ Τέλος') : 'Επόμ. →';
+    isLastScalar ? (hasLineItems ? t('tour_to_lineitems') : t('tour_done')) : t('tour_next');
   // Skip button: εμφάνιση μόνο αν υπάρχουν line items ΚΑΙ δεν είμαστε ήδη στο τέλος
   const skipBtn = document.getElementById('ap-tour-skip');
   if (skipBtn) skipBtn.style.display = (hasLineItems && !isLastScalar) ? 'inline-block' : 'none';
@@ -3417,7 +3417,7 @@ function apTourRenderLineItem() {
       const dataKey = mKey || ('_pdf_' + i);
       const mapped = mKey ? '1' : '0';
       const badge = mKey ? '' : '<span class="tour-row-cell-badge">[PDF]</span>';
-      const dis = mKey ? '' : 'disabled title="Από PDF — δεν υπάρχει στο template"';
+      const dis = mKey ? '' : 'disabled title="' + t('tour_cell_from_pdf') + '"';
       html += `<div class="tour-row-cell">
         <div class="tour-row-cell-label" title="${esc(label)}">${esc(label)}${badge}</div>
         <input class="tour-row-cell-value" data-cell-key="${esc(dataKey)}" data-mapped="${mapped}" value="${v != null ? esc(v) : ''}" oninput="apTourMarkDirty()" ${dis}/>
@@ -3499,7 +3499,7 @@ function apTourApproveDoc() {
   if (approveBtn) {
     approveBtn.click();
   } else {
-    toast('Το tour ολοκληρώθηκε. Πατήστε ✓✓ Έγκριση Τιμολογίου για ολοκλήρωση.', 'success');
+    toast(t('tour_complete_approve'), 'success');
   }
 }
 
@@ -4877,7 +4877,7 @@ async function loadXeroStatus(){
   if (!block) return; // settings page δεν είναι ορατή
 
   if (!s || s.available === false) {
-    block.innerHTML = `<span class="xero-status-dot xero-status-dot-gray"></span> Μη διαθέσιμο: ${s?.detail || 'unknown'}`;
+    block.innerHTML = `<span class="xero-status-dot xero-status-dot-gray"></span> ${t('xero_unavailable')}: ${s?.detail || 'unknown'}`;
     connectBtn.style.display = 'none';
     disconnectBtn.style.display = 'none';
     tenantBlock.style.display = 'none';
@@ -4887,7 +4887,7 @@ async function loadXeroStatus(){
   if (s.connected) {
     const tenants = s.tenants || [];
     const active = tenants.find(t => t.tenantId === s.active_tenant_id) || tenants[0];
-    block.innerHTML = `<span class="xero-status-dot xero-status-dot-green"></span> Συνδεδεμένος στο <strong>${active?.tenantName || 'Unknown'}</strong>`;
+    block.innerHTML = `<span class="xero-status-dot xero-status-dot-green"></span> ${t('xero_connected_to')} <strong>${active?.tenantName || 'Unknown'}</strong>`;
     if (tenants.length > 1) {
       tenantBlock.style.display = '';
       tenantSelect.innerHTML = tenants.map(t =>
@@ -4899,13 +4899,13 @@ async function loadXeroStatus(){
     connectBtn.style.display = 'none';
     disconnectBtn.style.display = '';
   } else if (s.oauth_status === 'in_progress') {
-    block.innerHTML = `<span class="xero-status-dot xero-status-dot-amber"></span> Περιμένει consent στον browser...`;
+    block.innerHTML = `<span class="xero-status-dot xero-status-dot-amber"></span> ${t('xero_awaiting_consent')}`;
     connectBtn.style.display = 'none';
     disconnectBtn.style.display = 'none';
     tenantBlock.style.display = 'none';
   } else {
-    const errSuffix = s.oauth_error ? ` — σφάλμα: ${s.oauth_error}` : '';
-    block.innerHTML = `<span class="xero-status-dot xero-status-dot-gray"></span> Μη συνδεδεμένος${errSuffix}`;
+    const errSuffix = s.oauth_error ? ` — ${t('xero_error')}: ${s.oauth_error}` : '';
+    block.innerHTML = `<span class="xero-status-dot xero-status-dot-gray"></span> ${t('xero_not_connected')}${errSuffix}`;
     connectBtn.style.display = '';
     disconnectBtn.style.display = 'none';
     tenantBlock.style.display = 'none';
@@ -4915,7 +4915,7 @@ async function loadXeroStatus(){
 async function xeroConnect(){
   const r = await api('POST','/api/xero/connect');
   if (r.error) { toast(r.error, 'error'); return; }
-  toast('Ανοίγει browser για consent...', 'info');
+  toast(t('xero_opening_browser'), 'info');
   await loadXeroStatus();
 
   // Poll status κάθε 2sec για max 5 λεπτά
@@ -5012,18 +5012,18 @@ async function xeroOpenPushModal(docId){
   const btn = document.getElementById('xero-push-confirm-btn');
   sel.disabled = true;
   btn.disabled = true;
-  sel.innerHTML = '<option value="">Φόρτωση accounts...</option>';
+  sel.innerHTML = '<option value="">' + t('xero_accounts_loading') + '</option>';
   openModal('xero-push-modal');
   _xeroPushPendingDocId = docId;
 
   const accounts = await _xeroFetchAccountsCached();
   if (!accounts.length) {
-    sel.innerHTML = '<option value="">Δεν βρέθηκαν διαθέσιμοι λογαριασμοί</option>';
+    sel.innerHTML = '<option value="">' + t('xero_no_accounts') + '</option>';
     return;
   }
   // Sort by Code
   accounts.sort((a,b) => (a.Code || '').localeCompare(b.Code || ''));
-  sel.innerHTML = '<option value="">— Επιλογή —</option>' + accounts.map(a =>
+  sel.innerHTML = '<option value="">' + t('xero_account_select_placeholder') + '</option>' + accounts.map(a =>
     `<option value="${a.Code}">${a.Code} — ${a.Name} (${a.Type})</option>`
   ).join('');
   sel.disabled = false;
