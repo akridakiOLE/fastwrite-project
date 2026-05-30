@@ -367,7 +367,7 @@ select.form-input option{background:var(--bg2);}
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
         <div style="display:flex;align-items:center;gap:6px;">
           <span class="status-dot"></span>
-          <span class="status-text" id="server-status">Σύνδεση...</span>
+          <span class="status-text" id="server-status" data-i18n="server_connecting">Σύνδεση...</span>
         </div>
         <button class="tooltip-hint" data-hint="Αποσύνδεση από τον λογαριασμό σας" data-i18n-hint="sidebar_logout_hint" onclick="doLogout()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 10px;font-size:11px;transition:all .15s;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'" data-i18n-title="sidebar_logout_hint" data-i18n="sidebar_logout">⏻ Έξοδος</button>
       </div>
@@ -447,7 +447,7 @@ select.form-input option{background:var(--bg2);}
           <div class="card" style="padding:20px;overflow:hidden;">
             <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;" data-i18n="activity_title">Πρόσφατη Δραστηριότητα</div>
             <div id="activity-list" style="display:flex;flex-direction:column;gap:0;">
-              <div style="text-align:center;color:var(--text2);font-size:13px;padding:24px;">Φόρτωση...</div>
+              <div style="text-align:center;color:var(--text2);font-size:13px;padding:24px;" data-i18n="loading">Φόρτωση...</div>
             </div>
           </div>
         </div>
@@ -547,7 +547,7 @@ select.form-input option{background:var(--bg2);}
             <tr id="doc-header-row" style="position:relative;">
               <th style="width:36px;vertical-align:top;">
                 <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-                  <button id="bulk-delete-btn" class="btn btn-danger btn-sm" onclick="deleteSelectedDocs()" style="display:none;padding:2px 6px;font-size:10px;white-space:nowrap;" title="Διαγραφή επιλεγμένων" data-i18n-hint="docs_delete_hint">🗑</button>
+                  <button id="bulk-delete-btn" class="btn btn-danger btn-sm" onclick="deleteSelectedDocs()" style="display:none;padding:2px 6px;font-size:10px;white-space:nowrap;" title="Διαγραφή επιλεγμένων" data-i18n-title="docs_delete_title" data-i18n-hint="docs_delete_hint">🗑</button>
                   <input type="checkbox" id="doc-select-all" onchange="toggleSelectAll(this)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"/>
                 </div>
               </th>
@@ -657,7 +657,7 @@ select.form-input option{background:var(--bg2);}
           <!-- Section 1: Λογαριασμός -->
           <div class="card">
             <div class="card-title" data-i18n="settings_account_title">👤 Λογαριασμός</div>
-            <div id="account-info" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
+            <div id="account-info" style="margin-bottom:16px;font-size:13px;color:var(--text2);" data-i18n="loading">Φόρτωση...</div>
 
             <!-- Αλλαγή Username -->
             <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
@@ -724,7 +724,7 @@ select.form-input option{background:var(--bg2);}
           <!-- Section 2: Ασφάλεια 2FA -->
           <div class="card">
             <div class="card-title" data-i18n="settings_2fa_title">🛡️ Ταυτοποίηση 2 Βημάτων (2FA)</div>
-            <div id="twofa-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
+            <div id="twofa-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);" data-i18n="loading">Φόρτωση...</div>
 
             <!-- 2FA Disabled State: Show enable button -->
             <div id="twofa-off" style="display:none;">
@@ -769,7 +769,7 @@ select.form-input option{background:var(--bg2);}
           <!-- Section 3: API Keys -->
           <div class="card">
             <div class="card-title" data-i18n="settings_api_title">🔑 API Keys</div>
-            <div id="keys-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);">Φόρτωση...</div>
+            <div id="keys-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);" data-i18n="loading">Φόρτωση...</div>
             <div class="form-group">
               <label class="form-label" data-i18n="settings_api_provider">Παροχέας</label>
               <select class="form-input" id="key-service">
@@ -791,7 +791,7 @@ select.form-input option{background:var(--bg2);}
           <!-- Xero Integration (Phase C) -->
           <div class="card">
             <div class="card-title" data-i18n="xero_card_title">🔗 Σύνδεση με Xero</div>
-            <div id="xero-status-block" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
+            <div id="xero-status-block" style="font-size:13px;color:var(--text2);" data-i18n="loading">Φόρτωση...</div>
             <div id="xero-tenant-block" style="margin-top:12px;display:none;">
               <label class="form-label">Active Organisation</label>
               <select class="form-input" id="xero-tenant-select" onchange="xeroSetActiveTenant(this.value)"></select>
@@ -821,7 +821,7 @@ select.form-input option{background:var(--bg2);}
           <!-- Section 3: Πληροφορίες Συστήματος -->
           <div class="card">
             <div class="card-title" data-i18n="settings_system_title">⚙️ Πληροφορίες Συστήματος</div>
-            <div id="system-info" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
+            <div id="system-info" style="font-size:13px;color:var(--text2);" data-i18n="loading">Φόρτωση...</div>
           </div>
 
           <!-- Section 4: Διαχείριση Χρηστών (Admin only) -->
@@ -873,7 +873,7 @@ select.form-input option{background:var(--bg2);}
               </div>
             </div>
 
-            <div id="admin-users-count" style="font-size:13px;color:var(--text2);margin-bottom:12px;">Φόρτωση...</div>
+            <div id="admin-users-count" style="font-size:13px;color:var(--text2);margin-bottom:12px;" data-i18n="loading">Φόρτωση...</div>
             <div style="margin-bottom:12px;">
               <input class="form-input" type="text" id="admin-users-search" placeholder="Αναζήτηση χρήστη (username ή email)..." data-i18n-placeholder="settings_users_search" oninput="filterAdminUsers()" style="margin-bottom:0;"/>
             </div>
@@ -1150,8 +1150,8 @@ select.form-input option{background:var(--bg2);}
         <div class="topbar-actions" style="gap:6px;">
           <!-- Dropdown 1: Επιλεγμένα Έγγραφα -->
           <div style="position:relative;" id="le-docs-dd-wrap">
-            <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εμφάνιση λίστας επιλεγμένων εγγράφων για επεξεργασία" onclick="leToggleDocsDD(event)" style="font-size:11px;">
-              📄 Έγγραφα <span id="le-doc-counter" style="color:var(--accent);">1/1</span> ▼
+            <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εμφάνιση λίστας επιλεγμένων εγγράφων για επεξεργασία" data-i18n-hint="le_docs_dd_hint" onclick="leToggleDocsDD(event)" style="font-size:11px;">
+              <span data-i18n="le_docs_btn">📄 Έγγραφα</span> <span id="le-doc-counter" style="color:var(--accent);">1/1</span> ▼
             </button>
             <div id="le-docs-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:300px;max-height:320px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
               <div style="padding:4px 8px;font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;"><span data-i18n="le_docs_header">ΕΠΙΛΕΓΜΕΝΑ ΕΓΓΡΑΦΑ</span></div>
@@ -1160,7 +1160,7 @@ select.form-input option{background:var(--bg2);}
           </div>
           <!-- Dropdown 2: Υφιστάμενες Ετικέτες -->
           <div style="position:relative;" id="le-labels-dd-wrap">
-            <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εμφάνιση υφιστάμενων ετικετών — επιλέξτε ή διαγράψτε" onclick="leToggleLabelsDD(event)" style="font-size:11px;">
+            <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Εμφάνιση υφιστάμενων ετικετών — επιλέξτε ή διαγράψτε" data-i18n-hint="le_labels_dd_hint" data-i18n="le_labels_btn" onclick="leToggleLabelsDD(event)" style="font-size:11px;">
               🏷 Ετικέτες ▼
             </button>
             <div id="le-labels-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:280px;max-height:320px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:120;padding:6px;" onclick="event.stopPropagation()">
@@ -1176,7 +1176,7 @@ select.form-input option{background:var(--bg2);}
       </div>
       <div class="label-editor-container" style="position:relative;">
         <!-- Toggle sidebar button -->
-        <button id="le-sidebar-toggle" onclick="leToggleSidebar()" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:all .3s ease;" title="Εμφάνιση/Απόκρυψη μενού">◀</button>
+        <button id="le-sidebar-toggle" onclick="leToggleSidebar()" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:all .3s ease;" title="Εμφάνιση/Απόκρυψη μενού" data-i18n-title="le_sidebar_toggle_title">◀</button>
         <!-- PDF Area (full width when panel collapsed) -->
         <div class="le-pdf-area">
           <iframe id="le-doc-pdf" src="" style="width:100%;height:100%;border:none;background:#fff;"></iframe>
@@ -1186,32 +1186,32 @@ select.form-input option{background:var(--bg2);}
           <div class="label-editor-panel-header">
             <span class="title">🏷 <span data-i18n="le_new_label">Νέα Ετικέτα</span></span>
             <div style="display:flex;gap:6px;align-items:center;">
-              <button class="btn btn-sm tooltip-hint" data-hint="Προσθήκη πίνακα γραμμών (line items) στην ετικέτα — για τιμολόγια με πολλές γραμμές" style="padding:4px 10px;font-size:11px;font-weight:600;background:rgba(255,179,0,0.15);color:var(--warn);border:1px solid rgba(255,179,0,0.4);" onclick="leToggleLineItems()" id="le-lineitems-toggle">+ Array Line Items</button>
-              <button class="btn btn-sm" style="padding:4px 8px;font-size:13px;color:var(--text2);background:none;border:1px solid var(--border);" onclick="leTogglePanel()" title="Κρύψε πίνακα">✕</button>
+              <button class="btn btn-sm tooltip-hint" data-hint="Προσθήκη πίνακα γραμμών (line items) στην ετικέτα — για τιμολόγια με πολλές γραμμές" data-i18n-hint="le_lineitems_hint" style="padding:4px 10px;font-size:11px;font-weight:600;background:rgba(255,179,0,0.15);color:var(--warn);border:1px solid rgba(255,179,0,0.4);" onclick="leToggleLineItems()" id="le-lineitems-toggle">+ Array Line Items</button>
+              <button class="btn btn-sm" style="padding:4px 8px;font-size:13px;color:var(--text2);background:none;border:1px solid var(--border);" onclick="leTogglePanel()" title="Κρύψε πίνακα" data-i18n-title="le_hide_panel_title">✕</button>
             </div>
           </div>
           <div class="label-editor-panel-body" id="le-panel-body">
             <div id="le-form-view">
-              <label class="le-label">Όνομα Ετικέτας</label>
-              <input class="le-input" id="le-label-name" placeholder="π.χ. invoice_dei, cosmote_receipt..."/>
-              <label class="le-label">🏢 Προμηθευτής / Πωλητής</label>
-              <input class="le-input" id="le-supplier" placeholder="π.χ. cosmote, ote, κοσμοτε — πολλαπλές με κόμμα"/>
-              <label class="le-label">Πεδία (χωρισμένα με κόμμα)</label>
-              <input class="le-input" id="le-fields" placeholder="π.χ. invoice_number, invoice_date, vendor_name, total_amount"/>
+              <label class="le-label" data-i18n="le_label_name">Όνομα Ετικέτας</label>
+              <input class="le-input" id="le-label-name" placeholder="π.χ. invoice_dei, cosmote_receipt..." data-i18n-placeholder="le_name_placeholder"/>
+              <label class="le-label" data-i18n="le_supplier">🏢 Προμηθευτής / Πωλητής</label>
+              <input class="le-input" id="le-supplier" placeholder="π.χ. cosmote, ote, κοσμοτε — πολλαπλές με κόμμα" data-i18n-placeholder="le_supplier_placeholder"/>
+              <label class="le-label" data-i18n="le_fields">Πεδία (χωρισμένα με κόμμα)</label>
+              <input class="le-input" id="le-fields" placeholder="π.χ. invoice_number, invoice_date, vendor_name, total_amount" data-i18n-placeholder="le_fields_placeholder"/>
               <div id="le-lineitems-row" style="display:none;">
-                <label class="le-label" style="color:var(--warn);font-weight:500;">📋 Στήλες Line Items (χωρισμένα με κόμμα)</label>
-                <input class="le-input" id="le-lineitems-fields" placeholder="π.χ. Description, Quantity, Unit Price, Total" style="border-color:rgba(255,179,0,0.3);"/>
+                <label class="le-label" style="color:var(--warn);font-weight:500;" data-i18n="le_lineitems_cols">📋 Στήλες Line Items (χωρισμένα με κόμμα)</label>
+                <input class="le-input" id="le-lineitems-fields" placeholder="π.χ. Description, Quantity, Unit Price, Total" data-i18n-placeholder="le_lineitems_placeholder" style="border-color:rgba(255,179,0,0.3);"/>
               </div>
               <div style="display:flex;gap:8px;margin-top:12px;">
-                <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Προβολή δομής ετικέτας πριν την αποθήκευση" onclick="lePreview()" style="flex:1;">Προεπισκόπηση</button>
+                <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Προβολή δομής ετικέτας πριν την αποθήκευση" data-i18n-hint="le_preview_hint" data-i18n="le_preview_btn" onclick="lePreview()" style="flex:1;">Προεπισκόπηση</button>
               </div>
             </div>
             <div id="le-preview-view" style="display:none;">
-              <div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:8px;">Προεπισκόπηση Ετικέτας</div>
+              <div style="font-size:13px;color:var(--accent);font-weight:600;margin-bottom:8px;" data-i18n="le_preview_title">Προεπισκόπηση Ετικέτας</div>
               <div id="le-preview-content"></div>
               <div style="display:flex;gap:8px;margin-top:12px;">
-                <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη φόρμα για αλλαγές" onclick="leBackToForm()" style="flex:1;">← Πίσω</button>
-                <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση ετικέτας — θα είναι διαθέσιμη για αυτόματη αντιστοίχιση" onclick="leSaveLabel()" style="flex:1;">💾 Αποθήκευση</button>
+                <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επιστροφή στη φόρμα για αλλαγές" data-i18n-hint="le_back_form_hint" onclick="leBackToForm()" style="flex:1;">← Πίσω</button>
+                <button class="btn btn-primary btn-sm tooltip-hint" data-hint="Αποθήκευση ετικέτας — θα είναι διαθέσιμη για αυτόματη αντιστοίχιση" data-i18n-hint="le_save_hint" data-i18n="le_save_btn" onclick="leSaveLabel()" style="flex:1;">💾 Αποθήκευση</button>
               </div>
             </div>
           </div>
@@ -1340,7 +1340,7 @@ select.form-input option{background:var(--bg2);}
           <div>
             <div class="card" style="margin-bottom:16px;">
               <div class="card-title">📄 <span data-i18n="tb_doc_info">Πληροφορίες Εγγράφου</span></div>
-              <div id="tb-doc-info" style="font-size:13px;color:var(--text2);">Φόρτωση...</div>
+              <div id="tb-doc-info" style="font-size:13px;color:var(--text2);" data-i18n="loading">Φόρτωση...</div>
             </div>
 
             <div class="card" id="tb-results-card" style="display:none;">
@@ -1357,26 +1357,26 @@ select.form-input option{background:var(--bg2);}
                 <label class="form-label">Template</label>
                 <select class="form-input" id="tb-schema"></select>
               </div>
-              <button class="btn btn-primary tooltip-hint" data-hint="Εκτέλεση AI εξαγωγής δεδομένων με το επιλεγμένο template" style="width:100%" id="tb-extract-btn" onclick="doTemplateBuilderExtract()">
+              <button class="btn btn-primary tooltip-hint" data-hint="Εκτέλεση AI εξαγωγής δεδομένων με το επιλεγμένο template" data-i18n-hint="tb_extract_hint" style="width:100%" id="tb-extract-btn" onclick="doTemplateBuilderExtract()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Εξαγωγή Δεδομένων
+                <span data-i18n="tb_extract_btn">Εξαγωγή Δεδομένων</span>
               </button>
               <div id="tb-extract-result" style="margin-top:16px;display:none;"></div>
             </div>
 
             <div class="card">
-              <div class="card-title">+ Δημιουργία Νέου Template</div>
+              <div class="card-title" data-i18n="tb_new_tmpl_title">+ Δημιουργία Νέου Template</div>
               <div class="form-group">
-                <label class="form-label">Ετικέτα</label>
-                <input class="form-input" id="tb-new-tmpl-name" placeholder="π.χ. invoice, receipt..."/>
+                <label class="form-label" data-i18n="tb_label">Ετικέτα</label>
+                <input class="form-input" id="tb-new-tmpl-name" placeholder="π.χ. invoice, receipt..." data-i18n-placeholder="tb_name_placeholder"/>
               </div>
               <div class="form-group">
-                <label class="form-label">🏢 Προμηθευτής Πωλητής</label>
-                <input class="form-input" id="tb-new-supplier-pattern" placeholder="π.χ. cosmote, ote — πολλαπλές με κόμμα"/>
+                <label class="form-label" data-i18n="tb_supplier">🏢 Προμηθευτής Πωλητής</label>
+                <input class="form-input" id="tb-new-supplier-pattern" placeholder="π.χ. cosmote, ote — πολλαπλές με κόμμα" data-i18n-placeholder="tb_supplier_placeholder"/>
               </div>
               <div id="tb-new-fields"></div>
-              <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Προσθήκη νέου πεδίου εξαγωγής στο template" onclick="tbAddField()" style="margin-bottom:16px;">+ Προσθήκη Πεδίου</button>
-              <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση template — θα χρησιμοποιηθεί για μελλοντικές εξαγωγές" style="width:100%" onclick="tbSaveTemplate()">Αποθήκευση Template</button>
+              <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Προσθήκη νέου πεδίου εξαγωγής στο template" data-i18n-hint="tb_addfield_hint" data-i18n="tb_addfield_btn" onclick="tbAddField()" style="margin-bottom:16px;">+ Προσθήκη Πεδίου</button>
+              <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση template — θα χρησιμοποιηθεί για μελλοντικές εξαγωγές" data-i18n-hint="tb_save_hint" data-i18n="tb_save_btn" style="width:100%" onclick="tbSaveTemplate()">Αποθήκευση Template</button>
             </div>
           </div>
 
@@ -1461,7 +1461,7 @@ select.form-input option{background:var(--bg2);}
 <div class="modal-overlay" id="doc-modal">
   <div class="modal" style="width:95vw;max-width:1200px;">
     <div class="modal-header">
-      <div class="modal-title" id="doc-modal-title">Λεπτομέρειες Εγγράφου</div>
+      <div class="modal-title" id="doc-modal-title" data-i18n="doc_modal_title">Λεπτομέρειες Εγγράφου</div>
       <button class="modal-close" onclick="closeModal('doc-modal')">✕</button>
     </div>
     <div id="doc-modal-body"></div>
@@ -1472,25 +1472,25 @@ select.form-input option{background:var(--bg2);}
 <div class="modal-overlay" id="tmpl-modal">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Νέα Ετικέτα</div>
+      <div class="modal-title" data-i18n="tmpl_modal_title">Νέα Ετικέτα</div>
       <button class="modal-close" onclick="closeModal('tmpl-modal')">✕</button>
     </div>
     <!-- hidden: κρατά το αρχικό όνομα κατά την επεξεργασία -->
     <input type="hidden" id="tmpl-original-name" value=""/>
     <div class="form-group">
-      <label class="form-label">Ετικέτα</label>
-      <input class="form-input" id="tmpl-name" placeholder="π.χ. invoice_dei, cosmote_receipt..."/>
+      <label class="form-label" data-i18n="tmpl_label">Ετικέτα</label>
+      <input class="form-input" id="tmpl-name" placeholder="π.χ. invoice_dei, cosmote_receipt..." data-i18n-placeholder="tmpl_name_placeholder"/>
     </div>
     <div class="form-group">
-      <label class="form-label">🏢 Προμηθευτής Πωλητής <span style="color:var(--text3);font-size:11px;font-weight:400">(λέξεις-κλειδιά προμηθευτή, π.χ. ΔΕΗ, DEI, δεη)</span></label>
-      <input class="form-input" id="tmpl-supplier-pattern" placeholder="π.χ. cosmote, ote, κοσμοτε — πολλαπλές με κόμμα"/>
+      <label class="form-label" data-i18n="tmpl_supplier">🏢 Προμηθευτής Πωλητής <span style="color:var(--text3);font-size:11px;font-weight:400">(λέξεις-κλειδιά προμηθευτή, π.χ. ΔΕΗ, DEI, δεη)</span></label>
+      <input class="form-input" id="tmpl-supplier-pattern" placeholder="π.χ. cosmote, ote, κοσμοτε — πολλαπλές με κόμμα" data-i18n-placeholder="tmpl_supplier_placeholder"/>
     </div>
     <div id="tmpl-fields"></div>
     <div style="display:flex;gap:8px;margin-bottom:16px;">
-      <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Προσθήκη νέου πεδίου εξαγωγής στην ετικέτα" onclick="addField()">+ Προσθήκη Πεδίου</button>
-      <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επικόλληση ετικέτας από clipboard" id="tmpl-paste-btn" onclick="pasteTemplateFromClipboard()" style="display:none;">📋 Επικόλληση</button>
+      <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Προσθήκη νέου πεδίου εξαγωγής στην ετικέτα" data-i18n-hint="tmpl_addfield_hint" data-i18n="tmpl_addfield_btn" onclick="addField()">+ Προσθήκη Πεδίου</button>
+      <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Επικόλληση ετικέτας από clipboard" data-i18n-hint="tmpl_paste_hint" data-i18n="tmpl_paste_btn" id="tmpl-paste-btn" onclick="pasteTemplateFromClipboard()" style="display:none;">📋 Επικόλληση</button>
     </div>
-    <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση ετικέτας — θα είναι διαθέσιμη για αυτόματη αντιστοίχιση εγγράφων" id="tmpl-save-btn" style="width:100%" onclick="saveTemplate()">Αποθήκευση Template</button>
+    <button class="btn btn-primary tooltip-hint" data-hint="Αποθήκευση ετικέτας — θα είναι διαθέσιμη για αυτόματη αντιστοίχιση εγγράφων" data-i18n-hint="tmpl_save_hint" data-i18n="tmpl_save_btn" id="tmpl-save-btn" style="width:100%" onclick="saveTemplate()">Αποθήκευση Template</button>
   </div>
 </div>
 
@@ -1498,7 +1498,7 @@ select.form-input option{background:var(--bg2);}
 <div class="modal-overlay" id="precheck-modal">
   <div class="modal" style="max-width:500px;">
     <div class="modal-header">
-      <div class="modal-title" id="precheck-modal-title">Ανάλυση Αρχείου</div>
+      <div class="modal-title" id="precheck-modal-title" data-i18n="precheck_modal_title">Ανάλυση Αρχείου</div>
       <button class="modal-close" onclick="closeModal('precheck-modal')">✕</button>
     </div>
     <div id="precheck-modal-body" style="padding:16px;"></div>
@@ -4925,7 +4925,7 @@ async function xeroConnect(){
     if (Date.now() - startTime > 300000) {
       clearInterval(_xeroPollInterval);
       _xeroPollInterval = null;
-      toast('OAuth timeout — δοκίμασε ξανά', 'error');
+      toast(t('xero_oauth_timeout'), 'error');
       loadXeroStatus();
       return;
     }
@@ -4933,12 +4933,12 @@ async function xeroConnect(){
     if (s.connected) {
       clearInterval(_xeroPollInterval);
       _xeroPollInterval = null;
-      toast('Επιτυχής σύνδεση στο Xero!', 'success');
+      toast(t('xero_connect_success'), 'success');
       loadXeroStatus();
     } else if (s.oauth_status === 'error') {
       clearInterval(_xeroPollInterval);
       _xeroPollInterval = null;
-      toast(`Σφάλμα Xero: ${s.oauth_error || 'unknown'}`, 'error');
+      toast(t('xero_error_toast') + ': ' + (s.oauth_error || 'unknown'), 'error');
       loadXeroStatus();
     } else {
       loadXeroStatus();
@@ -4947,17 +4947,17 @@ async function xeroConnect(){
 }
 
 async function xeroDisconnect(){
-  if (!confirm('Σίγουρα θέλεις να αποσυνδεθείς από το Xero;')) return;
+  if (!confirm(t('xero_disconnect_confirm'))) return;
   const r = await api('POST','/api/xero/disconnect');
   if (r.error) { toast(r.error, 'error'); return; }
-  toast('Αποσυνδέθηκες από το Xero', 'success');
+  toast(t('xero_disconnected'), 'success');
   loadXeroStatus();
 }
 
 async function xeroSetActiveTenant(tenantId){
   const r = await api('PUT','/api/xero/tenants/active', {tenant_id: tenantId});
   if (r.error) { toast(r.error, 'error'); return; }
-  toast('Active tenant άλλαξε', 'success');
+  toast(t('xero_tenant_changed'), 'success');
   loadXeroStatus();
 }
 
@@ -4977,7 +4977,7 @@ async function xeroOpenPushModal(docId){
   // Quick connection check
   const status = await api('GET','/api/xero/status');
   if (!status.connected) {
-    toast('Πρέπει πρώτα να συνδεθείς στο Xero (Ρυθμίσεις)', 'error');
+    toast(t('xero_connect_first'), 'error');
     return;
   }
 
@@ -5034,7 +5034,7 @@ async function xeroDoPush(){
   const docId = _xeroPushPendingDocId;
   if (!docId) { toast('Internal error: missing doc id', 'error'); return; }
   const accountCode = document.getElementById('xero-push-account-select').value;
-  if (!accountCode) { toast('Επίλεξε account code πρώτα', 'error'); return; }
+  if (!accountCode) { toast(t('xero_select_account'), 'error'); return; }
 
   const btn = document.getElementById('xero-push-confirm-btn');
   btn.disabled = true;
@@ -5043,7 +5043,7 @@ async function xeroDoPush(){
   try {
     const r = await api('POST', `/api/xero/push/${docId}`, {account_code: accountCode});
     if (r.error) {
-      toast(`Push απέτυχε: ${r.error}`, 'error');
+      toast(t('xero_push_failed') + ': ' + r.error, 'error');
       btn.disabled = false;
       btn.textContent = 'Push as DRAFT';
       return;
@@ -5051,7 +5051,7 @@ async function xeroDoPush(){
     closeModal('xero-push-modal');
     btn.textContent = 'Push as DRAFT';
     btn.disabled = false;
-    toast(`Bill δημιουργήθηκε στο Xero (DRAFT) — άνοιξε με 🔗✓`, 'success');
+    toast(t('xero_push_success'), 'success');
     // Open in Xero σε νέα καρτέλα αυτόματα
     if (r.deep_link) {
       window.open(r.deep_link, '_blank', 'noopener');
@@ -5059,7 +5059,7 @@ async function xeroDoPush(){
     loadDocuments();  // refresh για να φανεί το 🔗✓ badge
   } catch (e) {
     console.error('xeroDoPush error:', e);
-    toast('Σφάλμα δικτύου στο Push', 'error');
+    toast(t('xero_push_network_error'), 'error');
     btn.disabled = false;
     btn.textContent = 'Push as DRAFT';
   }
@@ -5775,7 +5775,7 @@ async function loadLicenseChip() {
     if (!chip) return;
     if (!data.desktop) { chip.style.display = 'none'; return; }
     if (data.error) {
-      chip.textContent = '⚠ ' + (data.error === 'license_invalid' ? 'Άκυρη άδεια' : 'License σφάλμα');
+      chip.textContent = '⚠ ' + (data.error === 'license_invalid' ? t('license_invalid') : t('license_error_label'));
       chip.style.borderColor = 'var(--danger)';
       chip.style.display = 'inline-flex';
       return;
