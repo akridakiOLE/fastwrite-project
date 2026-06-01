@@ -20,3 +20,7 @@ dist/
 # Master project doc — Google Drive only, NEVER στο git
 FastWrite_Master_Project_*
 
+
+# Demo video binaries — host on YouTube/Vimeo, never commit
+*.mp4
+*.mov
