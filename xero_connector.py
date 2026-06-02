@@ -79,6 +79,12 @@ DEFAULT_SCOPES = [
     "accounting.settings.read",
 ]
 
+# Xero PKCE app Client ID — baked-in fallback για distributed builds (.exe).
+# PKCE client ID = ΟΧΙ secret (δεν συνοδεύεται από client_secret), ασφαλές να
+# ενσωματωθεί στον κώδικα/GitHub. Override με env var XERO_CLIENT_ID ή explicit
+# constructor arg (για dev/testing). Ίδια PKCE app σε dev + production (v22).
+EMBEDDED_CLIENT_ID = "5E581BE2C6A9446EBFD0B494DF49463C"
+
 MACHINE_KEY_FILENAME = ".machine.key"
 TOKEN_FILENAME = "xero_token.enc"
 
@@ -407,7 +413,11 @@ class XeroConnector:
         self.secrets_dir = Path(secrets_dir)
         self.secrets_dir.mkdir(parents=True, exist_ok=True)
 
-        resolved_client_id = client_id or os.environ.get("XERO_CLIENT_ID", "").strip()
+        resolved_client_id = (
+            client_id
+            or os.environ.get("XERO_CLIENT_ID", "").strip()
+            or EMBEDDED_CLIENT_ID
+        )
         if not resolved_client_id:
             raise XeroConfigError(
                 "Λείπει το XERO_CLIENT_ID. Όρισέ το ως env var ή πέρασέ το στον constructor."

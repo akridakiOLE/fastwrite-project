@@ -172,10 +172,19 @@ class TestConfig(unittest.TestCase):
 
     def test_missing_client_id_raises(self):
         with tempfile.TemporaryDirectory() as tmp:
-            # Καθαρίζουμε το env var για να δοκιμάσουμε missing case
+            # Καθαρίζουμε env var ΚΑΙ embedded fallback για το missing case
             with mock.patch.dict(os.environ, {}, clear=True):
-                with self.assertRaises(xc.XeroConfigError):
-                    xc.XeroConnector(secrets_dir=Path(tmp))
+                with mock.patch.object(xc, "EMBEDDED_CLIENT_ID", ""):
+                    with self.assertRaises(xc.XeroConfigError):
+                        xc.XeroConnector(secrets_dir=Path(tmp))
+
+    def test_embedded_client_id_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # Χωρίς env var ή explicit arg → πέφτει στο embedded fallback
+            with mock.patch.dict(os.environ, {}, clear=True):
+                connector = xc.XeroConnector(secrets_dir=Path(tmp))
+                self.assertEqual(connector.client_id, xc.EMBEDDED_CLIENT_ID)
+                self.assertTrue(connector.client_id)
 
     def test_env_var_client_id_picked_up(self):
         with tempfile.TemporaryDirectory() as tmp:
