@@ -1927,6 +1927,13 @@ function fmtVal(key, val) {
   return val;
 }
 
+// Variant για editable approval fields: null/empty/"null" → "" (όχι "—"),
+// ώστε το save (apCollectData) να μην αποθηκεύει junk. Ποσά → 2 δεκαδικά.
+function fmtValEdit(key, val) {
+  const r = fmtVal(key, val);
+  return r === '—' ? '' : r;
+}
+
 async function viewDoc(id) {
   const doc = await api('GET',`/api/documents/${id}`);
   const rd  = doc.result_data || {};
@@ -2992,7 +2999,7 @@ async function apLoadDoc(idx) {
     } else {
       scalarHtml += `<div style="display:flex;flex-direction:column;gap:5px;min-width:170px;flex:1;">
         <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:.9px;text-transform:uppercase;">${k}</div>
-        <input class="le-input ap-field-input" data-key="${k}" value="${v != null ? v : ''}" oninput="apMarkDirty()" style="margin:0;padding:9px 12px;font-size:14px;"/>
+        <input class="le-input ap-field-input" data-key="${k}" value="${fmtValEdit(k, v)}" oninput="apMarkDirty()" style="margin:0;padding:9px 12px;font-size:14px;"/>
       </div>`;
     }
   }
@@ -3035,7 +3042,7 @@ function apRenderTable(key, rows) {
   ).join('');
   document.getElementById('ap-li-tbody').innerHTML = rows.map((row, ri) =>
     `<tr id="ap-row-${ri}" onclick="apSelectRow(${ri})" style="cursor:pointer;transition:background .1s;border-bottom:1px solid var(--border);">` +
-    cols.map(c => `<td contenteditable="true" data-key="${key}" data-col="${c}" data-ri="${ri}" oninput="apMarkDirty()" style="padding:9px 10px;color:var(--text2);min-width:50px;">${row[c] != null ? row[c] : ''}</td>`).join('') +
+    cols.map(c => `<td contenteditable="true" data-key="${key}" data-col="${c}" data-ri="${ri}" oninput="apMarkDirty()" style="padding:9px 10px;color:var(--text2);min-width:50px;">${fmtValEdit(c, row[c])}</td>`).join('') +
     '</tr>'
   ).join('');
 }
@@ -3353,7 +3360,7 @@ function apTourRender() {
   const counterTxt = (apTourIdx + 1) + ' / ' + totalScalars + (hasLineItems ? ' ' + t('tour_plus_lineitems') : '');
   document.getElementById('ap-tour-counter').textContent = counterTxt;
   const valInput = document.getElementById('ap-tour-value');
-  valInput.value = value != null ? value : '';
+  valInput.value = fmtValEdit(field, value);
   valInput.focus();
   valInput.select();
   // Buttons enable/disable
