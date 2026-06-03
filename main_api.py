@@ -870,12 +870,109 @@ def serve_filtered_pdf():
         logging.error("filtered-pdf error: %s", e)
         return jsonify({"error": str(e)}), 500
 
+def _compute_text_field_bboxes(pdf_path, page_num, scalars):
+    """Tour Mode: ακριβείς θέσεις scalar πεδίων μέσω pdfplumber text-search.
+
+    Για κάθε field ψάχνει την εξαγμένη ΤΙΜΗ μέσα στις λέξεις του PDF και
+    επιστρέφει το ακριβές bbox. Πολύ ακριβέστερο από τις AI-εκτιμώμενες
+    συντεταγμένες. Επιστρέφει {field: {x,y,w,h,page}} normalized 0-1
+    (top-origin) μόνο για όσα βρεθούν με σιγουριά. Soft-fail → {}."""
+    import re as _re
+    out = {}
+    try:
+        import pdfplumber
+    except Exception:
+        return out
+    if (not pdf_path or not str(pdf_path).lower().endswith(".pdf")
+            or not Path(pdf_path).exists()):
+        return out
+
+    def _norm(s):
+        return _re.sub(r"[^a-z0-9]", "", str(s).lower())
+
+    def _num(s):
+        m = _re.sub(r"[^\d.,-]", "", str(s))
+        if not m:
+            return None
+        if "," in m and "." in m:
+            m = m.replace(",", "")          # κόμμα = χιλιάδες
+        else:
+            m = m.replace(",", ".")          # κόμμα = δεκαδικά
+        try:
+            return float(m)
+        except Exception:
+            return None
+
+    try:
+        with pdfplumber.open(str(pdf_path)) as pdf:
+            if page_num < 1 or page_num > len(pdf.pages):
+                return out
+            page = pdf.pages[page_num - 1]
+            pw, ph = page.width, page.height
+            if not pw or not ph:
+                return out
+            words = page.extract_words() or []
+            norms = [_norm(w.get("text", "")) for w in words]
+            n = len(words)
+
+            def _union(i, j):
+                xs0 = min(words[k]["x0"] for k in range(i, j + 1))
+                xs1 = max(words[k]["x1"] for k in range(i, j + 1))
+                t0 = min(words[k]["top"] for k in range(i, j + 1))
+                b1 = max(words[k]["bottom"] for k in range(i, j + 1))
+                if xs1 <= xs0 or b1 <= t0:
+                    return None
+                return {
+                    "x": round(xs0 / pw, 4),
+                    "y": round(t0 / ph, 4),
+                    "w": round((xs1 - xs0) / pw, 4),
+                    "h": round((b1 - t0) / ph, 4),
+                    "page": page_num,
+                }
+
+            for field, value in scalars.items():
+                target = _norm(value)
+                if not target:
+                    continue
+                found = None
+                # 1) Text: contiguous window of words whose concat == target
+                for i in range(n):
+                    if not norms[i]:
+                        continue
+                    concat = ""
+                    for j in range(i, min(i + 10, n)):
+                        concat += norms[j]
+                        if concat == target:
+                            found = _union(i, j)
+                            break
+                        if len(concat) > len(target):
+                            break
+                    if found:
+                        break
+                # 2) Numeric: μοναδικό word που ταιριάζει αριθμητικά
+                if not found:
+                    tnum = _num(value)
+                    if tnum is not None:
+                        hits = []
+                        for wi, w in enumerate(words):
+                            wn = _num(w.get("text", ""))
+                            if wn is not None and abs(wn - tnum) < 0.005:
+                                hits.append(wi)
+                        if len(hits) == 1:
+                            found = _union(hits[0], hits[0])
+                if found:
+                    out[field] = found
+    except Exception:
+        return out
+    return out
+
+
 @app.get("/api/documents/<int:doc_id>/field-positions")
 @require_auth
 def get_field_positions(doc_id):
-    """Tour Mode (Sprint 1.3): Επιστρέφει bounding boxes ανά πεδίο.
-    Format: { "FIELD_NAME": {x, y, w, h, page}, ... }
-    Όλα normalized 0-1. Αν δεν υπάρχουν bbox (παλιό doc), επιστρέφει {}."""
+    """Tour Mode: bounding boxes ανά scalar πεδίο.
+    Format: { "FIELD_NAME": {x, y, w, h, page}, ... } normalized 0-1.
+    Προτεραιότητα: ακριβές pdfplumber text-search· fallback στα AI _bboxes."""
     uid = request.current_user["user_id"]
     doc = db.get_document(doc_id)
     if not doc:
@@ -888,7 +985,27 @@ def get_field_positions(doc_id):
         rd = json.loads(raw) if isinstance(raw, str) else raw
     except Exception:
         rd = {}
-    bboxes = rd.get("_bboxes", {}) if isinstance(rd, dict) else {}
+    if not isinstance(rd, dict):
+        rd = {}
+    # Base: AI-estimated bboxes (fallback για ό,τι δεν βρει το text-search)
+    bboxes = dict(rd.get("_bboxes", {}) or {})
+    # Override με ακριβείς text-search θέσεις όπου βρεθούν
+    try:
+        import re as _re
+        scalars = {k: v for k, v in rd.items()
+                   if not isinstance(v, (list, dict))
+                   and v not in (None, "", "null")
+                   and not str(k).startswith("_")}
+        original = doc.get("original_filename") or doc.get("filename") or ""
+        pdf_path = UPLOAD_DIR / original
+        fp = doc.get("file_path", "") or ""
+        m = _re.search(r"page_(\d+)", fp)
+        page_num = int(m.group(1)) if m else 1
+        precise = _compute_text_field_bboxes(pdf_path, page_num, scalars)
+        for k, v in precise.items():
+            bboxes[k] = v  # text-search υπερισχύει του AI bbox
+    except Exception as e:
+        logger.warning("[field-positions] text-search failed (soft): %s", e)
     return jsonify({"bboxes": bboxes})
 
 
