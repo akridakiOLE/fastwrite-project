@@ -2994,6 +2994,52 @@ def xero_disconnect_endpoint():
 
 # ── Phase B: Xero Bills Push + Helpers ────────────────────────────────────
 
+# B3: πιθανά ονόματα πεδίου για κωδικό προμηθευτή/προϊόντος σε extracted
+# line items. Το default schema ΔΕΝ έχει κανένα· custom schemas μπορεί να
+# προσθέσουν οποιοδήποτε από αυτά.
+_LINE_ITEM_CODE_KEYS = (
+    "code", "item_code", "product_code", "sku",
+    "item_no", "product_no", "item_number", "product_number", "ref",
+)
+
+
+def _compose_line_item_description(li: dict) -> str:
+    """
+    Χτίζει το Xero line Description από τα extracted data (B3).
+
+    Ο κωδικός προμηθευτή (π.χ. "201", "P001") ΔΕΝ μπαίνει στο Xero ItemCode:
+    το ItemCode δείχνει στο ΔΙΚΟ σου inventory (Products & Services) και ένας
+    άγνωστος κωδικός → InvalidItemCode (απορρίπτει όλο το push). Αντ' αυτού
+    προτάσσεται στο Description ως "CODE — Description", ώστε να είναι ορατός
+    χωρίς να μολύνει/σπάει τον κατάλογο προϊόντων.
+    """
+    desc = (li.get("description") or li.get("desc") or "").strip() or "Item"
+    # Normalized key lookup: τα template field names γίνονται keys ως έχουν
+    # (π.χ. "Item Code", "SKU"), οπότε κάνουμε lowercase + spaces/dashes→underscore.
+    norm = {}
+    for k, v in li.items():
+        nk = str(k).strip().lower().replace(" ", "_").replace("-", "_")
+        norm.setdefault(nk, v)
+    code = ""
+    for key in _LINE_ITEM_CODE_KEYS:
+        val = norm.get(key)
+        # Το AI εκπέμπει το literal string "null"/"none"/"n/a" για κενά πεδία.
+        if val is not None and str(val).strip().lower() not in ("", "null", "none", "n/a"):
+            code = str(val).strip()
+            break
+    if code:
+        # Απόφυγε διπλό prefix αν το AI έβαλε ήδη τον κωδικό στην αρχή.
+        already = (
+            desc == code
+            or desc.startswith(f"{code} ")
+            or desc.startswith(f"{code}—")
+            or desc.startswith(f"{code} —")
+        )
+        if not already:
+            return f"{code} — {desc}"
+    return desc
+
+
 def _extract_bill_data_from_doc(doc_result: dict) -> dict:
     """
     Mapping extracted document fields → Xero Bill input. Χρησιμοποιεί τις
@@ -3027,7 +3073,7 @@ def _extract_bill_data_from_doc(doc_result: dict) -> dict:
             if not isinstance(li, dict):
                 continue
             line_items.append({
-                "description": (li.get("description") or li.get("desc") or "").strip() or "Item",
+                "description": _compose_line_item_description(li),
                 "quantity": float(li.get("quantity") or li.get("qty") or 1),
                 "unit_amount": float(li.get("unit_price") or li.get("unit_amount") or li.get("price") or 0),
             })
