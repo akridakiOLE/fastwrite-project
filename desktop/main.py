@@ -41,13 +41,74 @@ def setup_app_data_dir() -> Path:
         base = Path.home() / ".local" / "share" / "FastWrite"
 
     base.mkdir(parents=True, exist_ok=True)
-    for sub in ("data", "secrets", "uploads", "processed", "exports"):
+    for sub in ("data", "secrets", "uploads", "processed", "exports", "logs"):
         (base / sub).mkdir(exist_ok=True)
     return base
 
 
 APP_DATA = setup_app_data_dir()
 log.info("App data folder: %s", APP_DATA)
+
+
+def _setup_file_logging(base: Path) -> None:
+    """Diagnostics για το frozen .exe (windowed → stdout/stderr κρυμμένα).
+    Γράφει logs + crashes σε αρχεία ώστε να διαγιγνώσκουμε .exe-only bugs
+    (π.χ. το approve 'Failed to fetch'). No-op-safe σε κάθε αποτυχία."""
+    import faulthandler
+    import datetime as _dt
+    from logging.handlers import RotatingFileHandler
+
+    logs_dir = base / "logs"
+    logs_dir.mkdir(exist_ok=True)
+
+    # 1) Root logger → rotating file (πιάνει logging.* + werkzeug logs/tracebacks)
+    try:
+        fh = RotatingFileHandler(logs_dir / "fastwrite.log",
+                                 maxBytes=2_000_000, backupCount=3, encoding="utf-8")
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(logging.Formatter(
+            "[%(asctime)s] %(levelname)s %(name)s: %(message)s"))
+        root = logging.getLogger()
+        root.setLevel(logging.INFO)
+        root.addHandler(fh)
+    except Exception:
+        pass
+
+    # 2) Redirect stdout/stderr → αρχείο (πιάνει print() π.χ. [APPROVE] +
+    #    werkzeug tracebacks). Σε windowed .exe το sys.stdout/err είναι None.
+    try:
+        _stream = open(logs_dir / "stdio.log", "a", buffering=1, encoding="utf-8")
+        sys.stdout = _stream
+        sys.stderr = _stream
+    except Exception:
+        pass
+
+    # 3) faulthandler → hard crashes / native segfaults (πιθανό αίτιο του
+    #    "Failed to fetch": connection drop χωρίς HTTP response).
+    try:
+        _crash = open(logs_dir / "crash.log", "a", encoding="utf-8")
+        _crash.write(f"\n=== session {_dt.datetime.now().isoformat()} ===\n")
+        _crash.flush()
+        faulthandler.enable(file=_crash, all_threads=True)
+    except Exception:
+        pass
+
+    # 4) Uncaught exceptions (main thread + worker threads) → log με traceback
+    def _hook(exc_type, exc, tb):
+        logging.getLogger("uncaught").error("Uncaught exception",
+                                            exc_info=(exc_type, exc, tb))
+    sys.excepthook = _hook
+    if hasattr(threading, "excepthook"):
+        def _thook(args):
+            logging.getLogger("uncaught.thread").error(
+                "Uncaught thread exception",
+                exc_info=(args.exc_type, args.exc_value, args.exc_traceback))
+        threading.excepthook = _thook
+
+    log.info("File logging enabled → %s", logs_dir / "fastwrite.log")
+
+
+_setup_file_logging(APP_DATA)
 
 # Set env var ΠΡΙΝ να γίνει import το main_api — αλλιώς πιάνει το παλιό /app/projects default
 os.environ["FASTWRITE_BASE_DIR"] = str(APP_DATA)
