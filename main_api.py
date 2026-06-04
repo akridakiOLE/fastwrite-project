@@ -887,7 +887,7 @@ def serve_filtered_pdf():
         logging.error("filtered-pdf error: %s", e)
         return jsonify({"error": str(e)}), 500
 
-def _compute_text_field_bboxes(pdf_path, page_num, scalars):
+def _compute_text_field_bboxes(pdf_path, page_num, scalars, ai_bboxes=None):
     """Tour Mode: ακριβείς θέσεις scalar πεδίων μέσω pdfplumber text-search.
 
     Για κάθε field ψάχνει την εξαγμένη ΤΙΜΗ μέσα στις λέξεις του PDF και
@@ -947,12 +947,34 @@ def _compute_text_field_bboxes(pdf_path, page_num, scalars):
                     "page": page_num,
                 }
 
+            ai_map = ai_bboxes or {}
+
+            def _center(b):
+                return (b["x"] + b["w"] / 2.0, b["y"] + b["h"] / 2.0)
+
+            def _pick(cands, ai):
+                # cands: λίστα από bbox dicts.
+                #  - 1 candidate → ξεκάθαρο, χρησιμοποίησέ το (pixel-precise).
+                #  - πολλά + AI hint → διάλεξε το ΠΙΟ ΚΟΝΤΙΝΟ στο AI bbox:
+                #    context-awareness από το AI + ακρίβεια από το text-search.
+                #  - πολλά χωρίς AI → ambiguous → None (κράτα το AI base / κανένα).
+                cands = [c for c in cands if c]
+                if len(cands) == 1:
+                    return cands[0]
+                if len(cands) > 1 and ai:
+                    acx = ai.get("x", 0) + ai.get("w", 0) / 2.0
+                    acy = ai.get("y", 0) + ai.get("h", 0) / 2.0
+                    return min(cands, key=lambda b: (_center(b)[0] - acx) ** 2
+                                                    + (_center(b)[1] - acy) ** 2)
+                return None
+
             for field, value in scalars.items():
                 target = _norm(value)
                 if not target:
                     continue
-                found = None
-                # 1) Text: contiguous window of words whose concat == target
+                ai = ai_map.get(field)
+                # 1) Text candidates: contiguous windows whose concat == target
+                text_cands = []
                 for i in range(n):
                     if not norms[i]:
                         continue
@@ -960,23 +982,21 @@ def _compute_text_field_bboxes(pdf_path, page_num, scalars):
                     for j in range(i, min(i + 10, n)):
                         concat += norms[j]
                         if concat == target:
-                            found = _union(i, j)
+                            text_cands.append(_union(i, j))
                             break
                         if len(concat) > len(target):
                             break
-                    if found:
-                        break
-                # 2) Numeric: μοναδικό word που ταιριάζει αριθμητικά
+                found = _pick(text_cands, ai)
+                # 2) Numeric candidates: words matching numerically
                 if not found:
                     tnum = _num(value)
                     if tnum is not None:
-                        hits = []
+                        num_cands = []
                         for wi, w in enumerate(words):
                             wn = _num(w.get("text", ""))
                             if wn is not None and abs(wn - tnum) < 0.005:
-                                hits.append(wi)
-                        if len(hits) == 1:
-                            found = _union(hits[0], hits[0])
+                                num_cands.append(_union(wi, wi))
+                        found = _pick(num_cands, ai)
                 if found:
                     out[field] = found
     except Exception:
@@ -1018,7 +1038,7 @@ def get_field_positions(doc_id):
         fp = doc.get("file_path", "") or ""
         m = _re.search(r"page_(\d+)", fp)
         page_num = int(m.group(1)) if m else 1
-        precise = _compute_text_field_bboxes(pdf_path, page_num, scalars)
+        precise = _compute_text_field_bboxes(pdf_path, page_num, scalars, ai_bboxes=bboxes)
         for k, v in precise.items():
             bboxes[k] = v  # text-search υπερισχύει του AI bbox
     except Exception as e:
