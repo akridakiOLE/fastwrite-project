@@ -70,6 +70,13 @@ def _setup_file_logging(base: Path) -> None:
             "[%(asctime)s] %(levelname)s %(name)s: %(message)s"))
         root = logging.getLogger()
         root.setLevel(logging.INFO)
+        # ΚΡΙΣΙΜΟ: αφαίρεσε σπασμένους StreamHandlers με stream=None. Στο windowed
+        # .exe το sys.stderr=None, οπότε ο StreamHandler του basicConfig σκάει σε
+        # ΚΑΘΕ werkzeug request-log (κατά το send_response) → connection drop →
+        # "Failed to fetch" στο approve. Αυτό είναι η ρίζα του bug.
+        for _h in list(root.handlers):
+            if isinstance(_h, logging.StreamHandler) and getattr(_h, "stream", None) is None:
+                root.removeHandler(_h)
         root.addHandler(fh)
     except Exception:
         pass
