@@ -304,6 +304,19 @@ def _match_supplier_to_template(supplier, templates):
 
 
 def _recalc_activities_after_template_change(uid: int = None):
+    """B1 fix — safe wrapper. Το recalc είναι secondary bookkeeping (ενημέρωση
+    counts στο activity history) και ΔΕΝ πρέπει ΠΟΤΕ να σπάει το response του
+    caller (approve / template-save). Αν αποτύχει για οποιονδήποτε λόγο (π.χ.
+    DB/runtime issue στο frozen .exe), επιστρέφει [] αντί να propagάρει
+    exception → ο caller παίρνει 200 (το έγγραφο έχει ήδη εγκριθεί)."""
+    try:
+        return _recalc_impl(uid=uid)
+    except Exception as e:
+        logger.error("[_recalc] failed (non-critical, swallowed): %s", e, exc_info=True)
+        return []
+
+
+def _recalc_impl(uid: int = None):
     """Re-match suppliers in ALL activity entries against current templates.
     Handles both pre-check entries (with invoices array) and batch entries
     (with doc_ids — looks up actual documents in the database).
@@ -334,6 +347,8 @@ def _recalc_activities_after_template_change(uid: int = None):
             result_data = json.loads(rj)
         except (json.JSONDecodeError, TypeError):
             continue
+        if not isinstance(result_data, dict):
+            continue  # B1 hardening: result_json could be a list/scalar
 
         invoices = result_data.get("invoices")
         doc_ids  = result_data.get("doc_ids")
@@ -366,6 +381,8 @@ def _recalc_activities_after_template_change(uid: int = None):
                     doc_status_map[sd_supplier] = sd.get("status", "")
 
             for inv in invoices:
+                if not isinstance(inv, dict):
+                    continue  # B1 hardening: malformed invoice entry
                 supplier  = (inv.get("supplier") or "").strip()
                 new_match = _match_supplier_to_template(supplier, templates)
 
