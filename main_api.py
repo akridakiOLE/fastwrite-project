@@ -3194,6 +3194,65 @@ def _compose_line_item_description(li: dict) -> str:
     return desc
 
 
+# B2: Currency normalization (extracted value → ISO 4217 για Xero CurrencyCode).
+# Το AI/PDF μπορεί να δώσει σύμβολο ("£"), όνομα ("Pounds") ή casing ("gbp").
+# Αν στείλουμε ΜΗ-έγκυρο CurrencyCode, το Xero ΑΠΟΡΡΙΠΤΕΙ όλο το push (όπως με
+# άγνωστο ItemCode στο B3). Αν δεν αναγνωρίσουμε νόμισμα → None → το Xero
+# χρησιμοποιεί το default tenant currency (ασφαλέστερο από το να σπάσει το push).
+_CURRENCY_SYMBOLS = {
+    "R$": "BRL",  # multi-char ΠΡΩΤΑ (βλ. sorted-by-length παρακάτω)
+    "£": "GBP", "$": "USD", "€": "EUR", "¥": "JPY",
+    "₹": "INR", "₽": "RUB", "₺": "TRY", "₩": "KRW",
+    "₪": "ILS", "฿": "THB", "₫": "VND", "₱": "PHP",
+}
+_CURRENCY_NAMES = {
+    "sterling": "GBP", "pounds": "GBP", "pound": "GBP", "gbp": "GBP",
+    "dollars": "USD", "dollar": "USD", "usd": "USD",
+    "euros": "EUR", "euro": "EUR", "eur": "EUR",
+    "yen": "JPY", "jpy": "JPY",
+    "francs": "CHF", "franc": "CHF", "chf": "CHF",
+    "rupees": "INR", "rupee": "INR", "inr": "INR",
+}
+_ISO_4217 = {
+    "AED", "AUD", "BGN", "BRL", "CAD", "CHF", "CNY", "CZK", "DKK", "EUR",
+    "GBP", "HKD", "HRK", "HUF", "IDR", "ILS", "INR", "ISK", "JPY", "KRW",
+    "MXN", "MYR", "NOK", "NZD", "PHP", "PLN", "RON", "RUB", "SEK", "SGD",
+    "THB", "TRY", "USD", "VND", "ZAR",
+}
+
+
+def _normalize_currency(raw) -> "str | None":
+    """
+    Κανονικοποιεί extracted currency σε ISO 4217 (π.χ. "£"→"GBP", "gbp"→"GBP").
+    Επιστρέφει None αν κενό/«null»/μη-αναγνωρίσιμο, ώστε το push_bill να μη στείλει
+    CurrencyCode και το Xero να πέσει στο default tenant currency (όχι σπάσιμο push).
+    """
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s or s.lower() in ("null", "none", "n/a", "na", "-", "—"):
+        return None
+    up = s.upper()
+    # 1) Καθαρός 3-γράμματος ISO κωδικός (π.χ. "gbp" → "GBP")
+    if up in _ISO_4217:
+        return up
+    # 2) Σύμβολο οπουδήποτε μέσα στο string (multi-char ΠΡΩΤΑ: "R$" πριν το "$")
+    for sym in sorted(_CURRENCY_SYMBOLS, key=len, reverse=True):
+        if sym in up:
+            return _CURRENCY_SYMBOLS[sym]
+    # 3) Όνομα/λέξη νομίσματος (π.χ. "Pounds", "Euro")
+    low = s.lower()
+    for name, code in _CURRENCY_NAMES.items():
+        if name in low:
+            return code
+    # 4) Embedded 3-γράμματος κωδικός μέσα σε φράση (π.χ. "Total GBP")
+    import re as _re
+    for tok in _re.findall(r"[A-Za-z]{3}", up):
+        if tok in _ISO_4217:
+            return tok
+    return None
+
+
 def _extract_bill_data_from_doc(doc_result: dict) -> dict:
     """
     Mapping extracted document fields → Xero Bill input. Χρησιμοποιεί τις
@@ -3218,7 +3277,7 @@ def _extract_bill_data_from_doc(doc_result: dict) -> dict:
     invoice_date = (doc_result.get("invoice_date")
                     or doc_result.get("date") or "").strip()
     due_date = (doc_result.get("due_date") or "").strip()
-    currency = (doc_result.get("currency") or "").strip() or None
+    currency = _normalize_currency(doc_result.get("currency"))
 
     line_items_raw = doc_result.get("line_items") or doc_result.get("items") or []
     line_items = []
@@ -3345,6 +3404,9 @@ def xero_push_doc_endpoint(doc_id):
     for k, v in overrides.items():
         if v not in (None, "") and k in bill_data:
             bill_data[k] = v
+
+    # B2: re-normalize currency μετά τα overrides (idempotent — "GBP"→"GBP")
+    bill_data["currency"] = _normalize_currency(bill_data.get("currency"))
 
     # Validation πριν την κλήση
     if not bill_data.get("supplier_name"):

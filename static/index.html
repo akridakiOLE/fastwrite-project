@@ -3379,7 +3379,9 @@ function apTourRender() {
 function apTourSkipToLineItems() {
   if (!apTourActive) return;
   apTourCommitCurrent();
-  if (!apTourLineKey || !apTourLineData.length || !apTourLinePositions.length) return;
+  // Αρκεί να υπάρχουν line item ΔΕΔΟΜΕΝΑ· τα PDF positions είναι προαιρετικά
+  // (χωρίς positions → χωρίς highlight, αλλά οι γραμμές παραμένουν editable).
+  if (!apTourLineKey || !apTourLineData.length) return;
   apTourMode = 'lineitem';
   apTourLineRow = 0;
   apTourLineCell = 0;
@@ -3613,8 +3615,9 @@ function apTourNav(dir) {
   const next = apTourIdx + dir;
   if (next < 0) return;
   if (next >= apTourFields.length) {
-    // Τέλος scalars: αν υπάρχουν line items, μετάβαση εκεί
-    if (apTourLineKey && apTourLineData.length > 0 && apTourLinePositions.length > 0) {
+    // Τέλος scalars: αν υπάρχουν line item ΔΕΔΟΜΕΝΑ, μετάβαση εκεί
+    // (positions προαιρετικά — βλ. apTourSkipToLineItems· χωρίς positions → χωρίς highlight)
+    if (apTourLineKey && apTourLineData.length > 0) {
       apTourMode = 'lineitem';
       apTourLineRow = 0;
       apTourLineCell = 0;

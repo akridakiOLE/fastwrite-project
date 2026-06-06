@@ -195,6 +195,41 @@ class TestExport(unittest.TestCase):
         self.assertGreater(len(r.data), 0)
 
 
+class TestCurrencyNormalization(unittest.TestCase):
+    """B2: extracted currency → ISO 4217 για Xero CurrencyCode."""
+    def test_plain_iso_code_uppercased(self):
+        self.assertEqual(main_api._normalize_currency("gbp"), "GBP")
+        self.assertEqual(main_api._normalize_currency("GBP"), "GBP")
+        self.assertEqual(main_api._normalize_currency(" usd "), "USD")
+    def test_symbols(self):
+        self.assertEqual(main_api._normalize_currency("£"), "GBP")
+        self.assertEqual(main_api._normalize_currency("$"), "USD")
+        self.assertEqual(main_api._normalize_currency("€"), "EUR")
+        self.assertEqual(main_api._normalize_currency("R$"), "BRL")
+    def test_symbol_with_amount(self):
+        self.assertEqual(main_api._normalize_currency("£100.00"), "GBP")
+    def test_names(self):
+        self.assertEqual(main_api._normalize_currency("Pounds"), "GBP")
+        self.assertEqual(main_api._normalize_currency("Euro"), "EUR")
+        self.assertEqual(main_api._normalize_currency("US Dollars"), "USD")
+    def test_embedded_code(self):
+        self.assertEqual(main_api._normalize_currency("Total GBP"), "GBP")
+    def test_empty_and_null(self):
+        for v in (None, "", "  ", "null", "none", "n/a", "—"):
+            self.assertIsNone(main_api._normalize_currency(v))
+    def test_unrecognized_returns_none(self):
+        # Μη-αναγνωρίσιμο → None → Xero default (ΟΧΙ σπάσιμο push)
+        self.assertIsNone(main_api._normalize_currency("XYZ"))
+        self.assertIsNone(main_api._normalize_currency("bitcoins"))
+    def test_extract_bill_data_normalizes(self):
+        out = main_api._extract_bill_data_from_doc({
+            "supplier_name": "ACME", "invoice_number": "INV-1",
+            "invoice_date": "2026-05-15", "currency": "£",
+            "line_items": [{"description": "x", "unit_price": 10}],
+        })
+        self.assertEqual(out["currency"], "GBP")
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("MODULE 8 - Unit Tests: Flask API Server")
@@ -203,7 +238,8 @@ if __name__ == "__main__":
     loader = unittest.TestLoader()
     suite  = unittest.TestSuite()
     for cls in [TestRoot,TestKeys,TestTemplates,TestUpload,
-                TestDocuments,TestSearchStats,TestExport]:
+                TestDocuments,TestSearchStats,TestExport,
+                TestCurrencyNormalization]:
         suite.addTests(loader.loadTestsFromTestCase(cls))
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
