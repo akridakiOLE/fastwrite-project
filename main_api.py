@@ -575,7 +575,7 @@ def upload_pre_check():
         from batch_processor import SUPPLIER_DETECT_PROMPT
         api_key = key_mgr.get_key("gemini")
         if not api_key:
-            return jsonify({"error": "Gemini API key δεν βρέθηκε."}), 500
+            return jsonify({"error": "Δεν έχει οριστεί κλειδί Gemini API. Ρυθμίσεις → API Keys για να το καταχωρίσεις.", "error_code": "gemini_key_missing"}), 400
 
         # Μετατροπή σε εικόνα
         processed = processor.process(dest)
@@ -1292,7 +1292,7 @@ def extract_document(doc_id):
 
     api_key = key_mgr.get_key("gemini")
     if not api_key:
-        return jsonify({"success": False, "error": "Gemini key δεν βρέθηκε"}), 400
+        return jsonify({"success": False, "error": "Δεν έχει οριστεί κλειδί Gemini API. Ρυθμίσεις → API Keys για να το καταχωρίσεις.", "error_code": "gemini_key_missing"}), 400
 
     file_path     = Path(doc["file_path"])
     processed     = processor.process(file_path)
@@ -1336,7 +1336,7 @@ def batch_extract_selected():
 
     api_key = key_mgr.get_key("gemini")
     if not api_key:
-        return jsonify({"error": "Gemini API key δεν βρέθηκε."}), 500
+        return jsonify({"error": "Δεν έχει οριστεί κλειδί Gemini API. Ρυθμίσεις → API Keys για να το καταχωρίσεις.", "error_code": "gemini_key_missing"}), 400
 
     from ai_extractor import AIExtractor
 
@@ -1499,7 +1499,7 @@ def batch_pre_check():
         from ai_extractor import AIExtractor
         api_key = key_mgr.get_key("gemini")
         if not api_key:
-            return jsonify({"error": "Gemini API key δεν βρέθηκε."}), 500
+            return jsonify({"error": "Δεν έχει οριστεί κλειδί Gemini API. Ρυθμίσεις → API Keys για να το καταχωρίσεις.", "error_code": "gemini_key_missing"}), 400
 
         extractor = AIExtractor(api_key=api_key)
         seg_schema = {
@@ -3422,6 +3422,14 @@ def xero_push_doc_endpoint(doc_id):
 
     try:
         result = connector.push_bill(**bill_data)
+    except xero_connector.XeroValidationError as e:
+        # Κακά δεδομένα (π.χ. invalid AccountCode/CurrencyCode) → ο χρήστης διορθώνει,
+        # ΟΧΙ reconnect. Επιστρέφουμε το μήνυμα του Xero ως 422.
+        logger.warning("[xero] push_bill validation error for doc %s: %s", doc_id, e)
+        return jsonify({"error": str(e), "error_code": "xero_validation"}), 422
+    except xero_connector.XeroRateLimitError as e:
+        logger.warning("[xero] push_bill rate-limited for doc %s", doc_id)
+        return jsonify({"error": str(e), "error_code": "xero_rate_limit"}), 429
     except xero_connector.XeroError as e:
         logger.exception("[xero] push_bill failed for doc %s", doc_id)
         return jsonify({"error": str(e)}), 502  # Bad Gateway → external API error

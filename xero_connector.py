@@ -68,13 +68,16 @@ REDIRECT_PATH = "/xero/callback"
 REDIRECT_URI = f"http://localhost:{LOOPBACK_PORT}{REDIRECT_PATH}"
 
 # Granular scopes (Xero apps δημιουργημένα μετά 2 Μαρτίου 2026)
+# Certification checkpoint «Scopes» = ζήτα ΜΟΝΟ ό,τι χρησιμοποιείς:
+#   - offline_access            → refresh token (απαραίτητο)
+#   - accounting.invoices       → push ACCPAY bills
+#   - accounting.contacts       → lookup/create suppliers (write περιλαμβάνει read)
+#   - accounting.settings.read  → chart of accounts + tax rates + org currency
+# Αφαιρέθηκαν: openid/email/profile (το id_token δεν καταναλώνεται πουθενά) και
+# το περιττό accounting.contacts.read (καλύπτεται από το accounting.contacts).
 DEFAULT_SCOPES = [
     "offline_access",
-    "openid",
-    "email",
-    "profile",
     "accounting.invoices",
-    "accounting.contacts.read",
     "accounting.contacts",
     "accounting.settings.read",
 ]
@@ -119,6 +122,20 @@ class XeroTokenError(XeroError):
 
 class XeroNotConnectedError(XeroError):
     """Δεν υπάρχει αποθηκευμένο token — χρειάζεται OAuth flow."""
+
+
+class XeroValidationError(XeroError):
+    """400/422 από το Xero — κακά/μη έγκυρα ΔΕΔΟΜΕΝΑ (π.χ. invalid AccountCode,
+    CurrencyCode μη ενεργό στο org). Ο χρήστης πρέπει να ΔΙΟΡΘΩΣΕΙ τα δεδομένα,
+    ΟΧΙ να ξανασυνδεθεί. (Certification checkpoint: Error handling / Data integrity.)"""
+
+
+class XeroRateLimitError(XeroError):
+    """429 — υπέρβαση Xero rate limit. Δοκίμασε ξανά αργότερα (Retry-After)."""
+
+    def __init__(self, message: str, retry_after: Optional[str] = None):
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 # ── Data Classes ────────────────────────────────────────────────────────────
@@ -754,10 +771,7 @@ class XeroConnector:
         except requests.RequestException as e:
             raise XeroTokenError(f"Network error στο /Contacts: {e}") from e
 
-        if resp.status_code != 200:
-            raise XeroTokenError(
-                f"/Contacts απέτυχε (HTTP {resp.status_code}): {resp.text[:200]}"
-            )
+        self._raise_for_xero_status(resp, "/Contacts")
         return resp.json().get("Contacts", [])
 
     def find_contact_by_name(self, name: str) -> Optional[dict]:
@@ -799,10 +813,7 @@ class XeroConnector:
         except requests.RequestException as e:
             raise XeroTokenError(f"Network error στο create contact: {e}") from e
 
-        if resp.status_code not in (200, 201):
-            raise XeroTokenError(
-                f"Create contact απέτυχε (HTTP {resp.status_code}): {resp.text[:200]}"
-            )
+        self._raise_for_xero_status(resp, "Create contact")
         contacts = resp.json().get("Contacts", [])
         if not contacts:
             raise XeroTokenError("Xero δεν επέστρεψε contact στο response")
@@ -854,10 +865,7 @@ class XeroConnector:
         except requests.RequestException as e:
             raise XeroTokenError(f"Network error στο /Accounts: {e}") from e
 
-        if resp.status_code != 200:
-            raise XeroTokenError(
-                f"/Accounts απέτυχε (HTTP {resp.status_code}): {resp.text[:200]}"
-            )
+        self._raise_for_xero_status(resp, "/Accounts")
         accounts = resp.json().get("Accounts", [])
 
         # Save στο cache
@@ -870,6 +878,51 @@ class XeroConnector:
             logger.warning("Accounts cache write failed: %s", e)
 
         return accounts
+
+    # ── HTTP error classification (certification: Error handling) ────────
+    @staticmethod
+    def _extract_xero_error_message(resp) -> str:
+        """Καθαρό μήνυμα σφάλματος από το Xero response (ValidationErrors/Message)."""
+        try:
+            data = resp.json()
+        except Exception:
+            return (resp.text or "")[:300]
+        msgs = []
+        for el in (data.get("Elements") or []):
+            for ve in (el.get("ValidationErrors") or []):
+                m = ve.get("Message")
+                if m:
+                    msgs.append(str(m))
+        if msgs:
+            return "; ".join(msgs)
+        return str(data.get("Message") or data.get("Detail") or (resp.text or "")[:300])
+
+    def _raise_for_xero_status(self, resp, context: str, ok=(200, 201)) -> None:
+        """Μεταφράζει HTTP status σε ΣΩΣΤΟ exception type (αντί για «πάντα token error»):
+        401/403 → XeroTokenError (re-auth) · 400/422 → XeroValidationError (διόρθωση
+        δεδομένων) · 429 → XeroRateLimitError · 5xx → XeroError (transient)."""
+        if resp.status_code in ok:
+            return
+        code = resp.status_code
+        msg = self._extract_xero_error_message(resp)
+        if code in (401, 403):
+            raise XeroTokenError(
+                f"{context}: μη εξουσιοδοτημένη πρόσβαση (HTTP {code}). Χρειάζεται re-connect στο Xero. {msg}"
+            )
+        if code in (400, 422):
+            raise XeroValidationError(
+                f"{context}: το Xero απέρριψε τα δεδομένα (HTTP {code}). {msg}"
+            )
+        if code == 429:
+            raise XeroRateLimitError(
+                f"{context}: υπέρβαση ορίου Xero (HTTP 429). Δοκίμασε ξανά σε λίγο.",
+                retry_after=resp.headers.get("Retry-After"),
+            )
+        if code >= 500:
+            raise XeroError(
+                f"{context}: προσωρινό σφάλμα Xero (HTTP {code}). Δοκίμασε ξανά. {msg}"
+            )
+        raise XeroError(f"{context} απέτυχε (HTTP {code}): {msg}")
 
     # ── Bills Push (Phase B core) ───────────────────────────────────────
 
@@ -963,10 +1016,7 @@ class XeroConnector:
         except requests.RequestException as e:
             raise XeroTokenError(f"Network error στο push_bill: {e}") from e
 
-        if resp.status_code not in (200, 201):
-            raise XeroTokenError(
-                f"Push bill απέτυχε (HTTP {resp.status_code}): {resp.text[:300]}"
-            )
+        self._raise_for_xero_status(resp, "Push bill")
 
         data = resp.json()
         invoices = data.get("Invoices", [])

@@ -26,9 +26,26 @@ main_api.exporter = DocumentExporter(export_dir=main_api.EXPORT_DIR)
 client = main_api.app.test_client()
 main_api.app.config["TESTING"] = True
 
+# Τα protected endpoints χρειάζονται έγκυρο fw_token cookie (require_auth).
+# Στήνουμε authenticated session για όλο το test client (user_id=1, admin).
+from auth_manager import create_token
+_TEST_TOKEN = create_token(1, "tester", "admin")
+try:
+    client.set_cookie("fw_token", _TEST_TOKEN)               # Werkzeug >= 2.3
+except TypeError:
+    client.set_cookie("localhost", "fw_token", _TEST_TOKEN)  # παλαιότερο Werkzeug
+
+# Παρακάμπτουμε το subscription/usage gate — το billing δοκιμάζεται ξεχωριστά,
+# εδώ ελέγχουμε μόνο τα API endpoints. (Αλλιώς ο test χρήστης δεν έχει συνδρομή → 403.)
+main_api.db.check_usage_limit = lambda *a, **k: {"allowed": True}
+main_api.db.record_usage_event = lambda *a, **k: None  # no-op: FK σε users δεν χρειάζεται εδώ
+
 def make_pdf_bytes():
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.pagesizes import A4
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+    except ImportError:
+        raise unittest.SkipTest("reportlab δεν είναι εγκατεστημένο (pip install reportlab)")
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     c.drawString(72, 700, "Test Invoice"); c.showPage(); c.save()
@@ -43,12 +60,11 @@ def upload_pdf(name="test.pdf"):
 
 
 class TestRoot(unittest.TestCase):
-    def test_root_200(self):
-        r = client.get("/"); self.assertEqual(r.status_code, 200)
-    def test_root_app_name(self):
-        self.assertIn("FastWrite", client.get("/").get_json()["app"])
-    def test_root_domain(self):
-        self.assertIn("fastwrite.duckdns.org", client.get("/").get_json()["domain"])
+    def test_root_redirects_to_ui(self):
+        # Το «/» πλέον κάνει redirect στο /ui (το παλιό JSON info endpoint αφαιρέθηκε).
+        r = client.get("/")
+        self.assertIn(r.status_code, (301, 302))
+        self.assertIn("/ui", r.headers.get("Location", ""))
     def test_health_200(self):
         r = client.get("/health"); self.assertEqual(r.status_code, 200)
     def test_health_has_status(self):
@@ -178,7 +194,12 @@ class TestSearchStats(unittest.TestCase):
 
 class TestExport(unittest.TestCase):
     def setUp(self):
-        upload_pdf("exp_test.pdf")
+        doc_id = upload_pdf("exp_test.pdf")
+        # Το export επιστρέφει ΜΟΝΟ έγγραφα με extracted data (result_json),
+        # αλλιώς 404. Βάζουμε ένα ολοκληρωμένο doc για τη δοκιμή.
+        main_api.db.update_document_status(
+            doc_id, "Εγκρίθηκε",
+            json.dumps({"invoice_number": "INV-EXP", "total": "100.00"}))
     def test_export_csv_200(self):
         r = client.post("/api/export/csv", json={})
         self.assertEqual(r.status_code, 200)
