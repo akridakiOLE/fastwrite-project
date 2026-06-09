@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- PRIVATE BETA: keep this page out of search engines -->
+<meta name="robots" content="noindex, nofollow">
+<title>FastWrite — Private Beta</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel-2:#1c2530;
+    --border:#2a3441; --text:#e6edf3; --muted:#9aa7b4;
+    --accent:#3b82f6; --accent-hover:#2563eb; --accent-soft:#10243f;
+    --ok:#3fb950; --radius:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:840px;margin:0 auto;padding:0 20px}
+  .badge{display:inline-block;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--accent);background:var(--accent-soft);border:1px solid var(--border);
+    padding:4px 12px;border-radius:999px;margin-bottom:18px}
+
+  /* Hero */
+  header{padding:64px 0 40px;text-align:center;border-bottom:1px solid var(--border)}
+  .logo{font-size:2.6rem;font-weight:800;letter-spacing:-.02em}
+  .logo span{color:var(--accent)}
+  .tagline{color:var(--muted);font-size:1.15rem;margin:14px auto 0;max-width:560px}
+  .cta{margin-top:30px}
+  .btn{display:inline-block;background:var(--accent);color:#fff;font-weight:600;
+    font-size:1.05rem;padding:14px 30px;border-radius:var(--radius);transition:.15s}
+  .btn:hover{background:var(--accent-hover);text-decoration:none}
+  .req{margin-top:14px;color:var(--muted);font-size:.85rem}
+
+  /* Language toggle within stacked layout */
+  section{padding:48px 0;border-bottom:1px solid var(--border)}
+  h2{font-size:1.5rem;margin-bottom:6px}
+  .lang-label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+    display:block;margin-bottom:18px}
+  .lead{color:var(--muted);max-width:640px;margin-bottom:8px}
+
+  .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:24px}
+  .feature{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+  .feature h3{font-size:1rem;margin-bottom:6px}
+  .feature p{color:var(--muted);font-size:.9rem}
+
+  /* Steps */
+  .steps{counter-reset:step;margin-top:22px;display:flex;flex-direction:column;gap:16px}
+  .step{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px 22px;position:relative;padding-left:64px}
+  .step::before{counter-increment:step;content:counter(step);
+    position:absolute;left:20px;top:20px;width:28px;height:28px;border-radius:50%;
+    background:var(--accent);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:.9rem}
+  .step h3{font-size:1.05rem;margin-bottom:8px}
+  .step ol{margin:8px 0 0 18px;color:var(--muted)}
+  .step li{margin-bottom:4px}
+  .note{background:var(--accent-soft);border:1px solid var(--border);border-radius:10px;
+    padding:12px 14px;margin-top:12px;font-size:.88rem;color:var(--text)}
+  .note b{color:var(--accent)}
+
+  footer{padding:36px 0;text-align:center;color:var(--muted);font-size:.85rem}
+  .divider-lang{text-align:center;padding:30px 0 0}
+  .divider-lang span{color:var(--muted);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase}
+  @media(max-width:560px){.logo{font-size:2rem}.wrap{padding:0 16px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="badge">Private Beta · Invitation Only</span>
+    <div class="logo">Fast<span>Write</span></div>
+    <p class="tagline">AI Invoice &amp; Bill Extraction for Xero — turn documents into Xero entries in seconds.</p>
+    <div class="cta">
+      <a class="btn" href="/download" id="downloadBtn">⬇ Download FastWrite for Windows</a>
+      <div class="req">Windows · requires a Xero account &amp; a Google Gemini API key</div>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== ENGLISH ===================== -->
+<section>
+  <div class="wrap">
+    <span class="lang-label">🇬🇧 English</span>
+    <h2>What FastWrite does</h2>
+    <p class="lead">Upload an invoice or bill, FastWrite extracts the data with AI, you review it, then push it straight into Xero. Your documents and API keys stay encrypted on your own computer.</p>
+    <div class="features">
+      <div class="feature"><h3>AI extraction</h3><p>Reads invoices &amp; bills and pulls out the fields automatically.</p></div>
+      <div class="feature"><h3>Direct to Xero</h3><p>Secure OAuth connection — push reviewed entries with one click.</p></div>
+      <div class="feature"><h3>Private by design</h3><p>Data &amp; keys stay encrypted locally. We don't store your invoices.</p></div>
+    </div>
+
+    <h2 style="margin-top:40px">First-time setup — 3 steps</h2>
+    <div class="steps">
+      <div class="step">
+        <h3>Create your FastWrite account</h3>
+        <ol>
+          <li>On first launch, click <b>Register</b> on the login screen.</li>
+          <li>Pick a username &amp; password — the account is stored only on your computer.</li>
+        </ol>
+        <div class="note">You get a <b>free trial of 100 documents</b> — no license key needed.</div>
+      </div>
+      <div class="step">
+        <h3>Add your Gemini API key (BYOK)</h3>
+        <ol>
+          <li>Go to <a href="https://aistudio.google.com" target="_blank" rel="noopener">Google AI Studio</a> and sign in.</li>
+          <li>Click <b>Get API key → Create API key</b> and copy it.</li>
+          <li>In FastWrite open <b>Settings</b>, paste the key into the <b>Gemini API key</b> field, and Save.</li>
+        </ol>
+        <div class="note">You bring your own key (BYOK) and pay Google directly for AI usage. The key is stored <b>encrypted on your computer</b>.</div>
+      </div>
+      <div class="step">
+        <h3>Connect your Xero account</h3>
+        <ol>
+          <li>You need an existing Xero account. No account? Create a free account / trial / demo company at <a href="https://www.xero.com" target="_blank" rel="noopener">xero.com</a> first.</li>
+          <li>In FastWrite <b>Settings</b>, click <b>Connect to Xero</b>.</li>
+          <li>Log in on Xero and choose the <b>organisation</b> to connect.</li>
+          <li>Review and <b>authorize</b> the requested permissions.</li>
+          <li>You're returned to FastWrite, now connected. Disconnect anytime from Settings.</li>
+        </ol>
+        <div class="note"><b>Connect to Xero</b> uses secure OAuth 2.0. It does <b>not</b> create a Xero account — it links FastWrite to <i>your</i> existing organisation. No secret keys are stored in the app.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== ΕΛΛΗΝΙΚΑ ===================== -->
+<section>
+  <div class="wrap">
+    <span class="lang-label">🇬🇷 Ελληνικά</span>
+    <h2>Τι κάνει το FastWrite</h2>
+    <p class="lead">Ανεβάζεις ένα τιμολόγιο, το FastWrite εξάγει τα δεδομένα με AI, τα ελέγχεις και τα κάνεις push απευθείας στο Xero. Τα έγγραφα και τα API keys σου μένουν κρυπτογραφημένα στον δικό σου υπολογιστή.</p>
+    <div class="features">
+      <div class="feature"><h3>Εξαγωγή με AI</h3><p>Διαβάζει τιμολόγια και εξάγει αυτόματα τα πεδία.</p></div>
+      <div class="feature"><h3>Απευθείας στο Xero</h3><p>Ασφαλής σύνδεση OAuth — push με ένα κλικ.</p></div>
+      <div class="feature"><h3>Ιδιωτικό εξ ορισμού</h3><p>Δεδομένα &amp; keys κρυπτογραφημένα τοπικά. Δεν αποθηκεύουμε τα τιμολόγιά σου.</p></div>
+    </div>
+
+    <h2 style="margin-top:40px">Πρώτη ρύθμιση — 3 βήματα</h2>
+    <div class="steps">
+      <div class="step">
+        <h3>Φτιάξε λογαριασμό FastWrite</h3>
+        <ol>
+          <li>Στο πρώτο άνοιγμα, πάτα <b>Εγγραφή</b> στην οθόνη login.</li>
+          <li>Διάλεξε username &amp; password — ο λογαριασμός μένει μόνο στον υπολογιστή σου.</li>
+        </ol>
+        <div class="note">Παίρνεις <b>δωρεάν trial 100 εγγράφων</b> — χωρίς κλειδί άδειας.</div>
+      </div>
+      <div class="step">
+        <h3>Βάλε το δικό σου Gemini API key (BYOK)</h3>
+        <ol>
+          <li>Πήγαινε στο <a href="https://aistudio.google.com" target="_blank" rel="noopener">Google AI Studio</a> και κάνε login.</li>
+          <li>Πάτα <b>Get API key → Create API key</b> και αντίγραψέ το.</li>
+          <li>Στο FastWrite άνοιξε τις <b>Ρυθμίσεις</b>, επικόλλησε το key στο πεδίο <b>Gemini API key</b> και Αποθήκευση.</li>
+        </ol>
+        <div class="note">Φέρνεις το δικό σου key (BYOK) και πληρώνεις εσύ τη Google για τη χρήση του AI. Το key αποθηκεύεται <b>κρυπτογραφημένο στον υπολογιστή σου</b>.</div>
+      </div>
+      <div class="step">
+        <h3>Σύνδεσε τον λογαριασμό σου στο Xero</h3>
+        <ol>
+          <li>Χρειάζεσαι υπάρχοντα λογαριασμό Xero. Δεν έχεις; Φτιάξε δωρεάν λογαριασμό / trial / demo company στο <a href="https://www.xero.com" target="_blank" rel="noopener">xero.com</a> πρώτα.</li>
+          <li>Στις <b>Ρυθμίσεις</b> του FastWrite, πάτα <b>Connect to Xero</b>.</li>
+          <li>Κάνε login στο Xero και διάλεξε το <b>organisation</b> που θες να συνδέσεις.</li>
+          <li>Έλεγξε και <b>εξουσιοδότησε</b> τα δικαιώματα που ζητούνται.</li>
+          <li>Επιστρέφεις στο FastWrite, πλέον συνδεδεμένος. Disconnect όποτε θες από τις Ρυθμίσεις.</li>
+        </ol>
+        <div class="note">Το <b>Connect to Xero</b> χρησιμοποιεί ασφαλές OAuth 2.0. <b>Δεν</b> δημιουργεί λογαριασμό Xero — συνδέει το FastWrite με το <i>δικό σου</i> υπάρχον organisation. Κανένα μυστικό κλειδί δεν αποθηκεύεται στην εφαρμογή.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    FastWrite · <a href="https://fastwrite.tech" target="_blank" rel="noopener">fastwrite.tech</a> · Windows-only (v1)<br>
+    Private beta — please don't share this link publicly.
+  </div>
+</footer>
+
+<script>
+  // The download is served by the Worker at /download (logs the visit to D1 and
+  // redirects to the GitHub release). We forward the ?ref= of the page so each
+  // tester's download is attributed. Send each tester a link like:
+  //   https://beta.fastwrite.tech/?ref=office-name
+  (function(){
+    var ref = new URLSearchParams(window.location.search).get('ref') || '';
+    var url = '/download' + (ref ? '?ref=' + encodeURIComponent(ref) : '');
+    document.getElementById('downloadBtn').setAttribute('href', url);
+  })();
+</script>
+
+</body>
+</html>

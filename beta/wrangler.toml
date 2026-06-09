@@ -1,0 +1,41 @@
+# FastWrite — Private Beta Worker (SEPARATE from the production fastwrite.tech).
+#
+# This deploys a standalone Worker that serves the beta landing page (./public)
+# and a /download route backed by a private R2 bucket + D1 download log.
+#
+# It does NOT touch the production "fastwrite-project" Worker that serves
+# fastwrite.tech. Different name, different bindings, different subdomain.
+#
+# Deploy from THIS folder:  cd beta && npx wrangler deploy
+# Full step-by-step:        see beta/DEPLOY.md
+
+name = "fastwrite-beta"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+# Keep the *.workers.dev URL for quick testing before the custom domain is wired.
+workers_dev = true
+
+# Static assets = the landing page in ./public. The Worker (main) runs first and
+# handles /download; anything else falls through to ASSETS.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# Installer hosting: GitHub Releases (public asset). No R2 needed.
+# The Worker (src/worker.js) redirects /download to the GitHub release URL.
+
+# D1 database for the download funnel.
+# Create it with:  npx wrangler d1 create fastwrite-beta-downloads
+# then paste the printed database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "fastwrite-beta-downloads"
+database_id = "153089e9-11bd-4051-b0bd-a62438fec07e"
+
+# Custom domain. Requires fastwrite.tech to be on this Cloudflare account (it is).
+# This maps https://beta.fastwrite.tech to this Worker. Wrangler creates the DNS
+# record automatically on first deploy.
+[[routes]]
+pattern = "beta.fastwrite.tech"
+custom_domain = true

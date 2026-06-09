@@ -24,3 +24,9 @@ FastWrite_Master_Project_*
 # Demo video binaries — host on YouTube/Vimeo, never commit
 *.mp4
 *.mov
+
+# Beta installer zip — host on GitHub Releases, never commit (~80MB)
+FastWrite-Windows.zip
+
+# Wrangler local cache — contains account info, NEVER commit (repo is public)
+.wrangler/
