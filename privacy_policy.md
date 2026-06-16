@@ -1,7 +1,7 @@
 # FastWrite — Privacy Policy
 
-**Effective Date:** [TO BE FILLED before publication]
-**Last Updated:** [TO BE FILLED before publication]
+**Effective Date:** 11 June 2026
+**Last Updated:** 11 June 2026
 
 ---
 
@@ -17,14 +17,15 @@ This Policy is written to comply with the General Data Protection Regulation (GD
 
 ## 2. Who We Are (Data Controller)
 
-**Operator:** Stavros Kallenos, sole trader (Cyprus)
+**Operator:** Stavros Kallenos, operating as an individual (natural person) in Cyprus
 **Brand:** FastWrite
 **Country of Establishment:** Republic of Cyprus
-**Registered Address:** [TO BE FILLED — residential or virtual office address]
-**Tax Identification Code (TIC):** [TO BE FILLED if required by lawyer]
+**Registered Address:** Derveneion 2B, 1055 Nicosia, Cyprus
 **Contact Email for Privacy Matters:** support@fastwrite.tech
 
 For GDPR purposes, we act as the **data controller** for the limited personal data we collect (see Section 3). For data you push to your own accounting platform (currently Xero; support for additional platforms such as QuickBooks is planned) through FastWrite, **you remain the data controller** and FastWrite is a transient data processor.
+
+Because FastWrite performs **no server-side processing of your invoices, extracted data, or financial information** — all such processing happens locally on your device under your own AI provider key (BYOK) — no separate Data Processing Agreement (DPA) is required for that content.
 
 ---
 
@@ -40,7 +41,7 @@ For GDPR purposes, we act as the **data controller** for the limited personal da
 
 ### 3.2 Information Stored Locally (NOT Transmitted to Us)
 
-The following data is stored **only on your computer** under `%APPDATA%\FastWrite\` (Windows), `~/Library/Application Support/FastWrite/` (macOS), or `~/.local/share/FastWrite/` (Linux). We do **not** have access to this data:
+The following data is stored **only on your computer** under `%APPDATA%\FastWrite\`. FastWrite is currently distributed as a **Windows desktop application**. We do **not** have access to this data:
 
 - Uploaded documents (invoices, receipts, PDFs)
 - Extracted data and templates
@@ -98,7 +99,7 @@ FastWrite lets you connect to a third-party accounting platform. **Xero** is the
 - Your accounting-platform OAuth tokens are stored **locally and encrypted** on your computer.
 - When you push a document as a Bill, the data is transmitted **directly from your computer to the accounting platform's API**, not through our servers.
 - Each provider's handling of this data is governed by its own privacy policy — for example, [Xero's Privacy Policy](https://www.xero.com/about/legal/privacy/). For QuickBooks and any future provider, that provider's published privacy policy will apply.
-- You can disconnect FastWrite from a connected accounting platform at any time via the in-app Settings (e.g., Σύνδεση με Xero → Αποσύνδεση). This deletes the local token and revokes our access on the provider's side.
+- You can disconnect FastWrite from a connected accounting platform at any time via the in-app Settings (e.g., Connect to Xero → Disconnect). This deletes the local token and revokes our access on the provider's side.
 
 ### 6.3 Email Service Providers
 
@@ -110,7 +111,7 @@ If you contact us at support@fastwrite.tech, your message is routed through Clou
 
 ### 7.1 Where Data Is Stored
 
-- **Account data** (the small set in Section 3.1): stored on our server hosted at Hetzner Cloud (Falkenstein, Germany — EU).
+- **Account data** (the small set in Section 3.1): stored on our server hosted at Hetzner Cloud (Helsinki, Finland — EU).
 - **Everything else** (Section 3.2): stored on **your computer only**.
 
 ### 7.2 Security Measures
@@ -154,7 +155,7 @@ The FastWrite desktop application does not use cookies. The FastWrite marketing 
 
 ## 10. International Data Transfers
 
-The account data we hold is stored in the European Union (Germany). When you use third-party integrations (e.g., Gemini, Xero, and future accounting providers such as QuickBooks), data is transferred to those providers' infrastructure, which may be located outside the EU. We rely on the following safeguards:
+The account data we hold is stored in the European Union (Finland). When you use third-party integrations (e.g., Gemini, Xero, and future accounting providers such as QuickBooks), data is transferred to those providers' infrastructure, which may be located outside the EU. We rely on the following safeguards:
 
 - **Gemini:** Google's Standard Contractual Clauses and self-certification under applicable frameworks.
 - **Accounting platforms (Xero; QuickBooks and others when supported):** the relevant provider's published data processing terms and Standard Contractual Clauses.
@@ -187,10 +188,9 @@ We may update this Policy from time to time. The "Last Updated" date at the top 
 For any privacy-related question, complaint, or data subject request:
 
 **Email:** support@fastwrite.tech
-**Postal Address:** [TO BE FILLED]
+**Postal Address:** Derveneion 2B, 1055 Nicosia, Cyprus
 **Website:** https://fastwrite.tech
 
 ---
 
-*FastWrite — Privacy Policy v1.0 — [date]*
-*Reviewed by: [TO BE FILLED — Cyprus legal counsel]*
+*FastWrite — Privacy Policy v1.0 — 11 June 2026*

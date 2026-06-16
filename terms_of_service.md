@@ -1,13 +1,13 @@
 # FastWrite — Terms of Service
 
-**Effective Date:** [TO BE FILLED before publication]
-**Last Updated:** [TO BE FILLED before publication]
+**Effective Date:** 11 June 2026
+**Last Updated:** 11 June 2026
 
 ---
 
 ## 1. Acceptance of Terms
 
-These Terms of Service ("Terms") form a binding agreement between you ("you", "your", "User") and **Stavros Kallenos, sole trader operating as "FastWrite"** ("FastWrite", "we", "us", "our"), regarding your use of the FastWrite desktop application and related services (the "Service").
+These Terms of Service ("Terms") form a binding agreement between you ("you", "your", "User") and **Stavros Kallenos, an individual (natural person) in Cyprus operating as "FastWrite"** ("FastWrite", "we", "us", "our"), regarding your use of the FastWrite desktop application and related services (the "Service").
 
 By installing, signing in to, or using the Service, you agree to be bound by these Terms. If you do not agree, you must not use the Service.
 
@@ -186,7 +186,7 @@ TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL FASTWRITE, 
 (a) ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES;
 (b) ANY LOSS OF PROFITS, REVENUE, DATA, USE, GOODWILL, OR BUSINESS OPPORTUNITY;
 (c) ANY DAMAGES ARISING FROM AI-EXTRACTION ERRORS, INCORRECT ACCOUNTING-PLATFORM ENTRIES (E.G., XERO, QUICKBOOKS), OR THIRD-PARTY SERVICE FAILURES;
-(d) ANY AMOUNT EXCEEDING, IN AGGREGATE, **THE GREATER OF (i) €100 OR (ii) THE FEES YOU PAID TO US IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM**.
+(d) ANY AMOUNT EXCEEDING, IN AGGREGATE, **THE LESSER OF (i) €100 OR (ii) THE FEES YOU PAID TO US IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM**.
 
 Some jurisdictions do not allow the exclusion of certain warranties or limitation of liability for consequential damages. In such jurisdictions, the above limitations apply only to the maximum extent permitted by law.
 
@@ -248,10 +248,9 @@ For questions or notices regarding these Terms:
 **Operator:** Stavros Kallenos
 **Brand:** FastWrite
 **Email:** support@fastwrite.tech
-**Postal Address:** [TO BE FILLED]
+**Postal Address:** Derveneion 2B, 1055 Nicosia, Cyprus
 **Website:** https://fastwrite.tech
 
 ---
 
-*FastWrite — Terms of Service v1.0 — [date]*
-*Reviewed by: [TO BE FILLED — Cyprus legal counsel]*
+*FastWrite — Terms of Service v1.0 — 11 June 2026*

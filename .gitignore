@@ -30,3 +30,6 @@ FastWrite-Windows.zip
 
 # Wrangler local cache — contains account info, NEVER commit (repo is public)
 .wrangler/
+
+# Benchmark artifacts (200-invoice PDF + preview PNGs) — local only, never commit
+benchmark/

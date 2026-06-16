@@ -91,13 +91,13 @@ def main() -> None:
         Path("privacy_policy.md"),
         LEGAL_DIR / "privacy.html",
         "Privacy Policy",
-        "Effective Date: [to be set on publication] · Last Updated: [to be set]",
+        "Effective Date: 11 June 2026 · Last Updated: 11 June 2026",
     )
     render(
         Path("terms_of_service.md"),
         LEGAL_DIR / "terms.html",
         "Terms of Service",
-        "Effective Date: [to be set on publication] · Last Updated: [to be set]",
+        "Effective Date: 11 June 2026 · Last Updated: 11 June 2026",
     )
     print("Done. Files ready στο site/ — commit + push για auto-deploy μέσω Cloudflare Pages.")
 
