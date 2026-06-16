@@ -1473,7 +1473,8 @@ def batch_extract_selected():
 from batch_processor import BatchProcessor
 
 batch_proc = BatchProcessor(db=db, key_mgr=key_mgr,
-                             processor=processor, schema_bld=schema_bld)
+                             processor=processor, schema_bld=schema_bld,
+                             license_consumer=_consume_license_usage)
 
 @app.post("/api/batch/pre-check")
 @require_auth

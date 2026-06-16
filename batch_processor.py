@@ -144,13 +144,17 @@ class BatchJobStatus:
 
 class BatchProcessor:
     def __init__(self, db, key_mgr, processor, schema_bld,
-                 batch_size=BATCH_SIZE, max_workers=MAX_WORKERS):
+                 batch_size=BATCH_SIZE, max_workers=MAX_WORKERS,
+                 license_consumer=None):
         self.db          = db
         self.key_mgr     = key_mgr
         self.processor   = processor
         self.schema_bld  = schema_bld
         self.batch_size  = batch_size
         self.max_workers = max_workers
+        # B5: optional callback to consume LICENSE usage after a successful
+        # extraction (injected from main_api to avoid a circular import).
+        self.license_consumer = license_consumer
         self._jobs       = {}
         self._jobs_lock  = threading.Lock()
         self._current_user_id = None
@@ -533,6 +537,10 @@ class BatchProcessor:
                     except Exception as e:
                         logger.error("Failed to record usage for doc %d: %s",
                                      doc_id, e)
+                    # ── B5: consume LICENSE usage (was missing in the batch path
+                    # → billing leak). Mirrors the single extract-selected path. ──
+                    if self.license_consumer:
+                        self.license_consumer(docs=1, pages=len(segment.pages))
                     return {"success": True, "doc_id": doc_id,
                             "matched_template": used_schema_name}
                 else:
