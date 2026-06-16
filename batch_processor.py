@@ -236,24 +236,38 @@ class BatchProcessor:
             "required": ["pages"],
         }
 
-        extractor   = AIExtractor(api_key=api_key)
         page_labels = {}
 
-        for batch_start in range(0, len(pages), self.batch_size):
+        # ── B6: Parallelize segmentation (was serial: ~20 Gemini calls for 200
+        # pages). Each page-batch runs in its own worker; page ranges are disjoint
+        # so results are merged serially in the main thread (no race conditions).
+        def _segment_batch(batch_start):
             batch_pages = pages[batch_start: batch_start + self.batch_size]
+            extractor = AIExtractor(api_key=api_key)
             result = extractor.extract(image_paths=batch_pages, schema=seg_schema,
                                        extra_instructions=SEGMENTATION_PROMPT)
+            local_labels = {}
+            local_error = None
             if result.is_ok():
                 for item in result.extracted_data.get("pages", []):
                     local_page  = item.get("page", 0)
                     global_page = batch_start + local_page
-                    page_labels[global_page] = item.get("new_doc", False)
+                    local_labels[global_page] = item.get("new_doc", False)
             else:
-                job.errors.append(
+                local_error = (
                     f"Segmentation batch {batch_start} απέτυχε: {result.error_message}. "
                     f"Κάθε σελίδα θεωρείται ξεχωριστό τιμολόγιο.")
                 for i in range(len(batch_pages)):
-                    page_labels[batch_start + i + 1] = True
+                    local_labels[batch_start + i + 1] = True
+            return local_labels, local_error
+
+        batch_starts = list(range(0, len(pages), self.batch_size))
+        with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
+            # pool.map preserves order; merge is serial in the main thread
+            for local_labels, local_error in pool.map(_segment_batch, batch_starts):
+                page_labels.update(local_labels)
+                if local_error:
+                    job.errors.append(local_error)
 
         page_labels[1] = True
 
