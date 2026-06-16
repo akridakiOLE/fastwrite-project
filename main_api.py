@@ -1388,70 +1388,83 @@ def batch_extract_selected():
 
     results = pre_results
 
-    for doc_id, doc, template, _n_pages in eligible_docs:
-        sname = (doc.get("schema_name") or "").strip()
+    # ── B7: Parallel extraction (heavy I/O in worker threads) + serial DB writes
+    # (main thread → no SQLite race conditions). bbox/Tour skipped in batch:
+    # highlights are computed on-demand via /field-positions (pdfplumber, local).
+    import concurrent.futures
+    BATCH_EXTRACT_WORKERS = 4  # bounded for Gemini rate limits (matches registration)
+
+    def _extract_worker(item):
+        """Worker thread: process + Gemini extract ONLY. No DB writes here."""
+        w_doc_id, w_doc, w_template, _w_n = item
+        w_sname = (w_doc.get("schema_name") or "").strip()
         try:
-            schema = schema_bld.build_from_list(template["fields"])
+            schema = schema_bld.build_from_list(w_template["fields"])
             schema.pop("additionalProperties", None)
 
-            file_path = Path(doc["file_path"])
+            file_path = Path(w_doc["file_path"])
             processed_result = processor.process(file_path)
             if not processed_result.is_ok():
-                results["failed"] += 1
-                results["details"].append({"doc_id": doc_id, "status": "process_error"})
-                continue
+                return {"doc_id": w_doc_id, "outcome": "process_error"}
 
             extractor = AIExtractor(api_key=api_key)
             result = extractor.extract(image_paths=processed_result.pages, schema=schema)
+            if not result.is_ok():
+                return {"doc_id": w_doc_id, "outcome": "extraction_failed"}
 
-            if result.is_ok():
-                extracted = result.extracted_data
-                # _confidence_pct υπολογίζεται αυτόματα από ai_extractor (logprobs)
-                # Preserve supplier info
-                rd = {}
-                try:
-                    rd = json.loads(doc.get("result_json") or "{}")
-                except:
-                    pass
-                if rd.get("_matched_supplier"):
-                    extracted.setdefault("_matched_supplier", rd["_matched_supplier"])
-                extracted.setdefault("_matched_template", sname)
-
-                # ── Tour Mode (Sprint 1.3): bbox extraction (soft fail) ──
-                try:
-                    bboxes = extractor.extract_bboxes(
-                        image_paths=processed_result.pages,
-                        extracted_values=extracted
-                    )
-                    if bboxes:
-                        extracted["_bboxes"] = bboxes
-                        logger.info("[extract-selected] doc %d BBOXES: %d fields",
-                                    doc_id, len(bboxes))
-                except Exception as e:
-                    logger.warning("[extract-selected] doc %d bbox failed (soft): %s",
-                                   doc_id, e)
-
-                # Μετά extraction: πάντα Εκκρεμεί (pending) — ο χρήστης εγκρίνει χειροκίνητα
-                final_status = "pending"
-                db.update_document_status(doc_id, status=final_status,
-                                          result_json=json.dumps(extracted))
-                # ── Record usage: pages actually sent to AI ──
-                try:
-                    db.record_usage_event(uid, 'page_processed',
-                                          len(processed_result.pages))
-                except Exception as e:
-                    logger.error("Failed to record page usage for doc %d: %s", doc_id, e)
-                _consume_license_usage(docs=1, pages=len(processed_result.pages))  # Phase 2 Desktop
-                results["extracted"] += 1
-                results["details"].append({"doc_id": doc_id, "status": final_status})
-            else:
-                db.update_document_status(doc_id, status="Failed")
-                results["failed"] += 1
-                results["details"].append({"doc_id": doc_id, "status": "extraction_failed"})
+            extracted = result.extracted_data
+            # _confidence_pct υπολογίζεται αυτόματα από ai_extractor (logprobs)
+            # Preserve supplier info
+            rd = {}
+            try:
+                rd = json.loads(w_doc.get("result_json") or "{}")
+            except:
+                pass
+            if rd.get("_matched_supplier"):
+                extracted.setdefault("_matched_supplier", rd["_matched_supplier"])
+            extracted.setdefault("_matched_template", w_sname)
+            # B7: skip extract_bboxes (Gemini call #2) in batch — Tour highlights
+            # are computed on-demand via /field-positions (pdfplumber text-search).
+            return {"doc_id": w_doc_id, "outcome": "ok",
+                    "extracted": extracted, "pages": len(processed_result.pages)}
         except Exception as e:
-            logger.error("extract-selected doc %d error: %s", doc_id, e)
+            return {"doc_id": w_doc_id, "outcome": "error", "error": str(e)}
+
+    worker_results = []
+    if eligible_docs:
+        with concurrent.futures.ThreadPoolExecutor(
+                max_workers=BATCH_EXTRACT_WORKERS) as pool:
+            # pool.map preserves input order → results stay in eligible_docs order
+            worker_results = list(pool.map(_extract_worker, eligible_docs))
+
+    # ── Serial DB-write phase (main thread only → no race conditions) ──
+    for r in worker_results:
+        doc_id = r["doc_id"]
+        outcome = r["outcome"]
+        if outcome == "ok":
+            # Μετά extraction: πάντα Εκκρεμεί (pending) — ο χρήστης εγκρίνει χειροκίνητα
+            db.update_document_status(doc_id, status="pending",
+                                      result_json=json.dumps(r["extracted"]))
+            # ── Record usage: pages actually sent to AI ──
+            try:
+                db.record_usage_event(uid, 'page_processed', r["pages"])
+            except Exception as e:
+                logger.error("Failed to record page usage for doc %d: %s", doc_id, e)
+            _consume_license_usage(docs=1, pages=r["pages"])  # Phase 2 Desktop
+            results["extracted"] += 1
+            results["details"].append({"doc_id": doc_id, "status": "pending"})
+        elif outcome == "extraction_failed":
+            db.update_document_status(doc_id, status="Failed")
             results["failed"] += 1
-            results["details"].append({"doc_id": doc_id, "status": "error", "error": str(e)})
+            results["details"].append({"doc_id": doc_id, "status": "extraction_failed"})
+        elif outcome == "process_error":
+            results["failed"] += 1
+            results["details"].append({"doc_id": doc_id, "status": "process_error"})
+        else:  # "error"
+            logger.error("extract-selected doc %d error: %s", doc_id, r.get("error"))
+            results["failed"] += 1
+            results["details"].append({"doc_id": doc_id, "status": "error",
+                                       "error": r.get("error")})
 
     return jsonify({"success": True, **results})
 
