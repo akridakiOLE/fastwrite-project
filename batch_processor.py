@@ -5,6 +5,7 @@ Pass 1 → AI Segmentation (εντοπισμός ορίων τιμολογίων
 Pass 2 → Parallel Extraction (ThreadPoolExecutor, workers=4)
 """
 
+import os
 import json
 import time
 import uuid
@@ -13,6 +14,7 @@ import threading
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from perf_config import get_max_workers
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -50,7 +52,9 @@ def _calc_confidence(extracted: dict, schema: dict) -> float:
     return round((filled / total) * 100, 1) if total > 0 else 0.0
 
 BATCH_SIZE            = 10
-MAX_WORKERS           = 4
+# Default worker count (fallback). The ACTIVE count is read at runtime via
+# perf_config.get_max_workers() in _run_job, so it applies without a rebuild.
+MAX_WORKERS           = 8
 MAX_PAGES_PER_INVOICE = 10
 
 def _smart_filename(extracted_data, original_filename):
@@ -187,6 +191,9 @@ class BatchProcessor:
         self._current_user_id = user_id
         job = self._get_job(job_id)
         job.status = "running"
+        # Apply the runtime-configured worker count (turbo) for this job.
+        self.max_workers = get_max_workers()
+        logger.info("[batch] job %s using %d workers", job_id, self.max_workers)
         try:
             processed = self.processor.process(pdf_path)
             if not processed.is_ok():

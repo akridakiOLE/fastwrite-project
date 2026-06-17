@@ -14,6 +14,7 @@ from flask import Flask, jsonify, request, send_file, make_response, redirect
 from db_manager     import DatabaseManager
 from auth_manager   import create_token, verify_token, hash_password, check_password, require_auth, require_admin, COOKIE_NAME
 from key_manager    import KeyManager
+from perf_config    import get_max_workers
 from file_processor import FileProcessor
 from schema_builder import SchemaBuilder
 from validator      import InvoiceValidator
@@ -1392,7 +1393,8 @@ def batch_extract_selected():
     # (main thread → no SQLite race conditions). bbox/Tour skipped in batch:
     # highlights are computed on-demand via /field-positions (pdfplumber, local).
     import concurrent.futures
-    BATCH_EXTRACT_WORKERS = 4  # bounded for Gemini rate limits (matches registration)
+    BATCH_EXTRACT_WORKERS = get_max_workers()  # runtime-configurable (turbo)
+    logger.info("[extract-selected] using %d workers", BATCH_EXTRACT_WORKERS)
 
     def _extract_worker(item):
         """Worker thread: process + Gemini extract ONLY. No DB writes here."""
