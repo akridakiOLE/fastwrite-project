@@ -196,15 +196,17 @@ class TestAIExtractorAPIErrors(unittest.TestCase):
         # Να ΜΗΝ έχει γίνει retry (1 μόνο κλήση)
         self.assertEqual(mock_call.call_count, 1)
 
+    @patch("ai_extractor.time.sleep")   # mock sleep για ταχύτητα
     @patch("ai_extractor.AIExtractor._call_api",
            side_effect=Exception("quota exceeded 429"))
-    def test_quota_exceeded_returns_correct_status(self, mock_call):
-        """Quota exceeded → status QUOTA_EXCEEDED."""
+    def test_quota_exceeded_returns_correct_status(self, mock_call, mock_sleep):
+        """B8: 429/quota is retried (transient rate-limit) → status QUOTA_EXCEEDED."""
         result = self.extractor.extract([self.img_path], self.schema)
 
         self.assertFalse(result.is_ok())
         self.assertEqual(result.status, ExtractionStatus.QUOTA_EXCEEDED)
-        self.assertEqual(mock_call.call_count, 1)
+        # B8: 429/quota now retries up to max_retries (max_retries=2 → 2 κλήσεις)
+        self.assertEqual(mock_call.call_count, 2)
 
     @patch("ai_extractor.time.sleep")   # mock sleep για ταχύτητα
     @patch("ai_extractor.AIExtractor._call_api",

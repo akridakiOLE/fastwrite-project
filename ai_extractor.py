@@ -120,6 +120,7 @@ class AIExtractor:
                                     skip_confidence=skip_confidence)
 
         last_error = ""
+        last_rate_limited = False
         for attempt in range(1, self.max_retries + 1):
             try:
                 api_result = self._call_api(image_paths, prompt, schema,
@@ -133,17 +134,31 @@ class AIExtractor:
                 last_error = str(e)
                 err_lower  = last_error.lower()
 
+                # Permanent auth errors — do not retry
                 if any(k in err_lower for k in
                        ["api_key", "invalid key", "permission", "401", "403"]):
                     return self._error(result, f"Άκυρο API Key: {last_error}",
                                        ExtractionStatus.INVALID_KEY, start_time)
-                if "quota" in err_lower or "429" in err_lower:
-                    return self._error(result, f"Quota υπερβάθηκε: {last_error}",
-                                       ExtractionStatus.QUOTA_EXCEEDED, start_time)
+
+                # B8: 429 / quota / rate-limit are usually TRANSIENT (per-minute
+                # RPM, especially under parallel batch) → retry with backoff
+                # instead of failing immediately; give up only after max_retries.
+                last_rate_limited = ("quota" in err_lower or "429" in err_lower
+                                     or "resource_exhausted" in err_lower
+                                     or "rate limit" in err_lower)
 
                 if attempt < self.max_retries:
-                    time.sleep(RETRY_DELAY * attempt)
+                    backoff = RETRY_DELAY * attempt
+                    if last_rate_limited:
+                        # wait longer so the per-minute RPM window can free up
+                        backoff = max(backoff, RETRY_DELAY * 3)
+                    time.sleep(backoff)
 
+        # Retries exhausted
+        if last_rate_limited:
+            return self._error(result,
+                f"Quota υπερβάθηκε μετά από {self.max_retries} προσπάθειες: {last_error}",
+                ExtractionStatus.QUOTA_EXCEEDED, start_time)
         status = (ExtractionStatus.TIMEOUT
                   if "timeout" in last_error.lower()
                   else ExtractionStatus.NETWORK_ERROR)
