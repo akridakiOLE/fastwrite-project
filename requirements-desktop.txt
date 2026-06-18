@@ -15,8 +15,8 @@ PyJWT>=2.8
 bcrypt>=4.0
 cryptography>=42.0
 
-# AI / Gemini SDK
-google-genai>=0.3
+# AI / Gemini SDK — 2.8.0+ required for new "AQ." auth keys (x-goog-api-key header)
+google-genai>=2.8.0
 
 # PDF processing
 pdfplumber>=0.10
