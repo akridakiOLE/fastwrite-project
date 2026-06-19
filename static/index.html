@@ -551,7 +551,7 @@ select.form-input option{background:var(--bg2);}
                   <input type="checkbox" id="doc-select-all" onchange="toggleSelectAll(this)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"/>
                 </div>
               </th>
-              <th style="width:44px;color:#fff;vertical-align:top;">#</th>
+              <th style="width:58px;color:#fff;vertical-align:top;white-space:nowrap;">#</th>
               <th style="color:#fff;vertical-align:top;min-width:120px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-file')"><span data-i18n="docs_th_file">ΑΡΧΕΙΟ</span> <span class="cf-arrow">▼</span></div>
                 <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-file" style="display:none;">
@@ -595,6 +595,7 @@ select.form-input option{background:var(--bg2);}
                     <option value="" data-i18n="docs_filter_all">ΟΛΑ</option>
                     <option value="pending" data-i18n="docs_filter_pending">Εκκρεμεί</option>
                     <option value="approved" data-i18n="docs_filter_approved">Εγκρίθηκε</option>
+                    <option value="Failed" data-i18n="docs_filter_failed">Απέτυχε</option>
                   </select>
                 </div>
               </th>
@@ -617,7 +618,7 @@ select.form-input option{background:var(--bg2);}
                   <input type="date" id="cff-date-to" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);"/>
                 </div>
               </th>
-              <th style="width:80px"></th>
+              <th style="width:120px;min-width:120px;"></th>
             </tr>
             </thead>
             <tbody id="docs-table"></tbody>
@@ -1888,7 +1889,7 @@ function renderDocs(docs) {
 
     return `<tr data-id="${doc.id}">
       <td><input type="checkbox" class="doc-checkbox" value="${doc.id}" onchange="updateSelection()" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"/></td>
-      <td><span style="font-family:'DM Mono',monospace;color:var(--text3);font-size:11px">#${doc.id}</span></td>
+      <td style="white-space:nowrap"><span style="font-family:'DM Mono',monospace;color:var(--text3);font-size:11px">#${doc.id}</span></td>
       <td style="max-width:180px;" title="${smartName ? smartName : filename}">
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;font-size:13px">${filename}</span>
         ${smartName ? `<span style="font-size:10px;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${smartName}</span>` : ''}

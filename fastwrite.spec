@@ -93,6 +93,7 @@ hiddenimports += [
 # Project's own modules — τα κάνουμε explicit για ασφάλεια
 hiddenimports += [
     "main_api",
+    "perf_config",
     "db_manager",
     "auth_manager",
     "key_manager",

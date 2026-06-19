@@ -56,6 +56,9 @@ BATCH_SIZE            = 10
 # perf_config.get_max_workers() in _run_job, so it applies without a rebuild.
 MAX_WORKERS           = 8
 MAX_PAGES_PER_INVOICE = 10
+# B7: bbox (Tour-mode field locations) is a SECOND AI call per doc — it ~doubled
+# batch time. Skip it in bulk; bboxes can be computed on-demand when a doc is opened.
+SKIP_BBOX_IN_BATCH    = True
 
 def _smart_filename(extracted_data, original_filename):
     """Δημιουργεί έξυπνο filename: 'vendor — invoice_no' ή fallback."""
@@ -74,30 +77,25 @@ def _smart_filename(extracted_data, original_filename):
         return f"Invoice {safe(inv_no)}"
     return None  # fallback: κρατά το υπάρχον filename
 
-# Prompt για segmentation (ορισμός ορίων τιμολογίων)
+# Prompt για segmentation (ορισμός ορίων τιμολογίων + supplier ανά σελίδα).
+# Ο supplier ενσωματώθηκε ΕΔΩ (fold-into-segmentation) ώστε να ΜΗΝ χρειάζεται
+# ξεχωριστή AI κλήση ανά τιμολόγιο για auto-match (ταχύτητα + λιγότερα failures).
 SEGMENTATION_PROMPT = """You are analyzing pages from a PDF that contains one or more invoices/documents.
-Your task: identify which page starts a NEW invoice/document.
+For EACH page do TWO things:
+1. Decide whether it STARTS a new invoice/document (new_doc).
+2. Extract the SUPPLIER / VENDOR / ISSUER name printed on that page — the company that ISSUED the invoice (the seller), NOT the recipient/buyer. Look at the company name at the top, letterhead/logo, or 'From:' section. For a continuation page, repeat the same supplier as its invoice. If no supplier is visible, use "UNKNOWN".
 
-Rules:
+Rules for new_doc:
 - Page 1 is ALWAYS the start of a new document (new_doc: true)
 - new_doc: true = this page starts a NEW invoice (different supplier, invoice number, or document header)
 - new_doc: false = this page is a CONTINUATION of the previous invoice (e.g. page 2 of a multi-page invoice)
 
-Key signals that indicate a NEW invoice:
-- Different company/supplier name at the top
-- New invoice number
-- New document header (e.g. "Invoice", "Sales Invoice", "Tax Invoice")
-- Completely different layout/format
-
-Key signals that indicate CONTINUATION:
-- "Page 2 of 2" or similar
-- Same invoice number
-- Continuation of a table from previous page
-- Payment terms / signature section of the same invoice
+Key signals for a NEW invoice: different company/supplier at the top, new invoice number, new document header ("Invoice", "Tax Invoice"), completely different layout.
+Key signals for CONTINUATION: "Page 2 of 2", same invoice number, table continued from previous page, payment/signature section of the same invoice.
 
 Return ONLY valid JSON. The "page" field must be the 1-based index of the page within this batch.
-Example for 4 pages where page 1-2 are one invoice, page 3 and 4 are separate invoices:
-{"pages": [{"page":1,"new_doc":true},{"page":2,"new_doc":false},{"page":3,"new_doc":true},{"page":4,"new_doc":true}]}"""
+Example (4 pages; pages 1-2 = one invoice from Acme, page 3 = Beta Ltd, page 4 = Gamma Co):
+{"pages":[{"page":1,"new_doc":true,"supplier_name":"Acme Ltd"},{"page":2,"new_doc":false,"supplier_name":"Acme Ltd"},{"page":3,"new_doc":true,"supplier_name":"Beta Ltd"},{"page":4,"new_doc":true,"supplier_name":"Gamma Co"}]}"""
 
 # Prompt για εξαγωγή ονόματος προμηθευτή (Auto Template Matching)
 # ΣΗΜΕΙΩΣΗ: Χρησιμοποιείται με skip_confidence=True στο extract()
@@ -112,6 +110,7 @@ Return the company name as-is from the document. If the document is not an invoi
 class InvoiceSegment:
     pages      : list = None
     page_nums  : list = None
+    supplier   : str  = None   # supplier of the segment's first page (from segmentation pass)
     def __post_init__(self):
         if self.pages is None: self.pages = []
         if self.page_nums is None: self.page_nums = []
@@ -191,11 +190,26 @@ class BatchProcessor:
         self._current_user_id = user_id
         job = self._get_job(job_id)
         job.status = "running"
+        # B6: small non-zero progress immediately so the bar shows life during the
+        # render phase (a single blocking call with no sub-steps to report).
+        job.progress_pct = 2.0
+        self._update_job(job)
         # Apply the runtime-configured worker count (turbo) for this job.
         self.max_workers = get_max_workers()
         logger.info("[batch] job %s using %d workers", job_id, self.max_workers)
+        # B6: progress bands sized ~proportionally to each phase's duration so the
+        # bar moves evenly (not frozen during render then rushing at the end).
+        # Registration is render+segmentation heavy (its "extraction" is just DB
+        # writes); a full batch is extraction (AI) heavy.
+        if registration_only:
+            render_end, seg_end = 40.0, 97.0
+        else:
+            render_end, seg_end = 15.0, 30.0
         try:
-            processed = self.processor.process(pdf_path)
+            processed = self.processor.process(
+                pdf_path,
+                progress_cb=lambda done, tot: self._set_progress(
+                    job, 2 + (done / max(tot, 1)) * (render_end - 2)))
             if not processed.is_ok():
                 self._fail_job(job, f"FileProcessor error: {processed.error_message}")
                 return
@@ -203,7 +217,7 @@ class BatchProcessor:
             job.total_pages = len(all_pages)
             self._update_job(job)
 
-            segments = self._segment(all_pages, job)
+            segments = self._segment(all_pages, job, render_end, seg_end)
             if segments is None:
                 return
 
@@ -213,7 +227,8 @@ class BatchProcessor:
             self._extract_parallel(segments, schema_name, original_filename, job,
                                    auto_match=auto_match,
                                    skip_completed=skip_completed,
-                                   registration_only=registration_only)
+                                   registration_only=registration_only,
+                                   prog_start=seg_end)
 
             job.status       = "completed"
             job.completed_at = datetime.utcnow().isoformat()
@@ -222,7 +237,13 @@ class BatchProcessor:
         except Exception as e:
             self._fail_job(job, f"Unexpected error: {e}")
 
-    def _segment(self, pages, job):
+    def _set_progress(self, job, pct):
+        """Set job.progress_pct (clamped 0-100) and publish. Used as the render
+        progress callback and for phase transitions (B6)."""
+        job.progress_pct = round(max(0.0, min(pct, 100.0)), 1)
+        self._update_job(job)
+
+    def _segment(self, pages, job, prog_start=5.0, prog_end=50.0):
         from ai_extractor import AIExtractor
         api_key = self.key_mgr.get_key("gemini")
         if not api_key:
@@ -237,9 +258,11 @@ class BatchProcessor:
                     "items": {
                         "type": "object",
                         "properties": {
-                            "page":    {"type": "integer"},
-                            "new_doc": {"type": "boolean"},
+                            "page":          {"type": "integer"},
+                            "new_doc":       {"type": "boolean"},
+                            "supplier_name": {"type": "string"},
                         },
+                        # supplier_name optional: a miss falls back to per-doc detection
                         "required": ["page", "new_doc"],
                     }
                 }
@@ -247,7 +270,8 @@ class BatchProcessor:
             "required": ["pages"],
         }
 
-        page_labels = {}
+        page_labels    = {}
+        page_suppliers = {}   # global_page → supplier name (folded in from segmentation)
 
         # ── B6: Parallelize segmentation (was serial: ~20 Gemini calls for 200
         # pages). Each page-batch runs in its own worker; page ranges are disjoint
@@ -257,28 +281,43 @@ class BatchProcessor:
             extractor = AIExtractor(api_key=api_key)
             result = extractor.extract(image_paths=batch_pages, schema=seg_schema,
                                        extra_instructions=SEGMENTATION_PROMPT)
-            local_labels = {}
+            local_labels    = {}
+            local_suppliers = {}
             local_error = None
             if result.is_ok():
                 for item in result.extracted_data.get("pages", []):
                     local_page  = item.get("page", 0)
                     global_page = batch_start + local_page
                     local_labels[global_page] = item.get("new_doc", False)
+                    sup = (item.get("supplier_name") or "").strip()
+                    if sup:
+                        local_suppliers[global_page] = sup
             else:
                 local_error = (
                     f"Segmentation batch {batch_start} απέτυχε: {result.error_message}. "
                     f"Κάθε σελίδα θεωρείται ξεχωριστό τιμολόγιο.")
                 for i in range(len(batch_pages)):
                     local_labels[batch_start + i + 1] = True
-            return local_labels, local_error
+            return local_labels, local_suppliers, local_error
 
         batch_starts = list(range(0, len(pages), self.batch_size))
+        total_batches = len(batch_starts) or 1
+        done_batches = 0
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
-            # pool.map preserves order; merge is serial in the main thread
-            for local_labels, local_error in pool.map(_segment_batch, batch_starts):
+            # Merge is order-independent (dicts keyed by global page number), so we
+            # consume as_completed to drive LIVE progress. B6: segmentation occupies
+            # the first ~50% of the bar so it MOVES during this phase (was 'dead'
+            # until extraction started ~60s in).
+            futs = [pool.submit(_segment_batch, bs) for bs in batch_starts]
+            for fut in as_completed(futs):
+                local_labels, local_suppliers, local_error = fut.result()
                 page_labels.update(local_labels)
+                page_suppliers.update(local_suppliers)
                 if local_error:
                     job.errors.append(local_error)
+                done_batches += 1
+                job.progress_pct = round(prog_start + (done_batches / total_batches) * (prog_end - prog_start), 1)
+                self._update_job(job)
 
         page_labels[1] = True
 
@@ -288,33 +327,28 @@ class BatchProcessor:
             page_num = i + 1
             is_new   = page_labels.get(page_num, True)
             if is_new or current_seg is None:
-                current_seg = InvoiceSegment()
+                current_seg = InvoiceSegment(supplier=page_suppliers.get(page_num))
                 segments.append(current_seg)
             if len(current_seg.pages) >= MAX_PAGES_PER_INVOICE:
-                current_seg = InvoiceSegment()
+                current_seg = InvoiceSegment(supplier=page_suppliers.get(page_num))
                 segments.append(current_seg)
             current_seg.pages.append(page_path)
             current_seg.page_nums.append(page_num)
         return segments
 
-    def _match_template(self, extractor, segment_pages, default_schema_name, job):
-        """
-        Auto Template Matching:
-        1. Ρωτά το Gemini ποιος είναι ο προμηθευτής (από την 1η σελίδα του segment)
-        2. Ψάχνει στη λίστα templates για supplier_pattern που να ταιριάζει
-        3. Fallback: επιστρέφει το default_schema_name
+    def _detect_supplier(self, extractor, segment_pages):
+        """FALLBACK supplier detection via a dedicated AI call.
+
+        Used ONLY when the segmentation pass did not capture a supplier for this
+        segment (normally the supplier is folded into segmentation, so this rarely
+        runs). Returns the detected name, or 'unknown'.
         """
         try:
             supplier_schema = {
                 "type": "object",
-                "properties": {
-                    "supplier_name": {"type": "string"}
-                },
+                "properties": {"supplier_name": {"type": "string"}},
                 "required": ["supplier_name"]
             }
-            # Χρησιμοποιούμε μόνο την 1η σελίδα για ταχύτητα
-            # skip_confidence=True: ΔΕΝ προσθέτουμε _confidence_pct
-            # στο schema/prompt — μπερδεύει τη supplier detection.
             result = extractor.extract(
                 image_paths=segment_pages[:1],
                 schema=supplier_schema,
@@ -322,42 +356,43 @@ class BatchProcessor:
                 skip_confidence=True
             )
             if not result.is_ok():
-                print(f"[_match_template] Gemini FAILED: {result.error_message}", flush=True)
-                return default_schema_name, "unknown", False
-
+                print(f"[_detect_supplier] Gemini FAILED: {result.error_message}", flush=True)
+                return "unknown"
             detected = (result.extracted_data.get("supplier_name") or "").strip()
-            print(f"[_match_template] Gemini raw supplier_name='{detected}'", flush=True)
             if not detected or detected.upper() == "UNKNOWN":
-                return default_schema_name, "unknown", False
-
-            # Fuzzy match: ψάχνουμε templates με supplier_pattern
-            templates = self.db.list_templates(user_id=self._current_user_id)
-            detected_lower = detected.lower()
-            best_match = None
-            for tmpl in templates:
-                pattern = (tmpl.get("supplier_pattern") or "").strip().lower()
-                if not pattern:
-                    continue
-                # Κάθε pattern μπορεί να έχει πολλές λέξεις-κλειδιά χωρισμένες με κόμμα
-                keywords = [k.strip() for k in pattern.split(",") if k.strip()]
-                for kw in keywords:
-                    if kw and kw in detected_lower:
-                        best_match = tmpl["name"]
-                        break
-                if best_match:
-                    break
-
-            if best_match:
-                return best_match, detected, True   # True = real match
-            return default_schema_name, detected, False  # False = fallback
-
+                return "unknown"
+            return detected
         except Exception as e:
-            job.errors.append(f"Template matching error: {e}. Χρήση default.")
+            print(f"[_detect_supplier] error: {e}", flush=True)
+            return "unknown"
+
+    @staticmethod
+    def _match_supplier(detected, templates, default_schema_name):
+        """PURE in-memory match: detected supplier → template by supplier_pattern.
+
+        No AI call, no DB read — `templates` is pre-fetched ONCE by the caller.
+        (Previously this read db.list_templates() per-doc on the shared SQLite
+        connection, which raced with concurrent writes → intermittent empty
+        results → false 'no template match' → missing labels. B10 Cause 2.)
+
+        Returns (matched_name, detected, is_real_match).
+        """
+        if not detected or detected == "unknown":
             return default_schema_name, "unknown", False
+        detected_lower = detected.lower()
+        for tmpl in (templates or []):
+            pattern = (tmpl.get("supplier_pattern") or "").strip().lower()
+            if not pattern:
+                continue
+            # pattern = comma-separated keywords; substring match against detected
+            for kw in [k.strip() for k in pattern.split(",") if k.strip()]:
+                if kw and kw in detected_lower:
+                    return tmpl["name"], detected, True   # real match
+        return default_schema_name, detected, False       # fallback
 
     def _extract_parallel(self, segments, schema_name, original_filename, job,
                           auto_match=False, skip_completed=False,
-                          registration_only=False):
+                          registration_only=False, prog_start=50.0):
         from ai_extractor import AIExtractor
         api_key  = self.key_mgr.get_key("gemini")
 
@@ -375,6 +410,13 @@ class BatchProcessor:
         else:
             default_schema = None
 
+        # Pre-fetch templates ONCE for auto-match. Was: db.list_templates() called
+        # per-doc inside _match_template → ~N concurrent reads on the shared SQLite
+        # connection racing with writes → intermittent empty results → false
+        # 'no template match' → missing labels (B10 Cause 2). One read, shared.
+        templates_cache = (self.db.list_templates(user_id=self._current_user_id)
+                           if auto_match else [])
+
         def extract_one(idx, segment, doc_id):
             try:
                 extractor = AIExtractor(api_key=api_key)
@@ -382,16 +424,32 @@ class BatchProcessor:
                 used_schema_name  = None
                 seg_schema        = None
 
-                # ── ΒΗΜΑ 1: Template Matching (ανίχνευση προμηθευτή + ετικέτα) ──
+                # ── ΒΗΜΑ 1: Template Matching (ετικέτα από supplier του segmentation) ──
                 if auto_match:
-                    matched_name, detected_supplier, is_real_match = self._match_template(
-                        extractor, segment.pages, schema_name, job)
+                    # Supplier comes folded-in from the segmentation pass (no extra
+                    # per-doc AI call). Fall back to a dedicated detection call ONLY
+                    # if segmentation didn't capture a usable supplier for this segment.
+                    seg_sup = (segment.supplier or "").strip()
+                    if not seg_sup or seg_sup.upper() == "UNKNOWN":
+                        detected_supplier = self._detect_supplier(extractor, segment.pages)
+                    else:
+                        detected_supplier = seg_sup
+                    # Pure in-memory match against the pre-fetched template list.
+                    matched_name, detected_supplier, is_real_match = self._match_supplier(
+                        detected_supplier, templates_cache, schema_name)
                     print(f"[extract_one] doc_id={doc_id}, auto_match=True, "
                           f"is_real_match={is_real_match}, matched_name={matched_name}, "
-                          f"detected_supplier={detected_supplier}, "
+                          f"detected_supplier={detected_supplier}, src={'seg' if seg_sup else 'fallback'}, "
                           f"registration_only={registration_only}", flush=True)
                     if is_real_match:
-                        tmpl = self.db.get_template(matched_name, user_id=self._current_user_id)
+                        # Use the PRE-FETCHED templates (no per-doc DB read). The
+                        # previous self.db.get_template() here ran on the shared
+                        # SQLite connection inside 16 threads → cursor corruption
+                        # ('bad parameter or other API misuse') / bad reads → docs
+                        # marked Failed. B10 residual. matched_name came from this
+                        # same cache, so it is guaranteed present.
+                        tmpl = next((t for t in templates_cache
+                                     if t.get("name") == matched_name), None)
                         if tmpl:
                             seg_schema = self.schema_bld.build_from_list(tmpl["fields"])
                             seg_schema.pop("additionalProperties", None)
@@ -403,8 +461,7 @@ class BatchProcessor:
                                 result_json=json.dumps({"_skipped": True,
                                     "_reason": "Template δεν βρέθηκε στη βάση",
                                     "_matched_supplier": detected_supplier or "unknown"}))
-                            self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
-                            self.db.conn.commit()
+                            self.db.set_document_schema(doc_id, None)
                             return {"success": True, "doc_id": doc_id,
                                     "matched_template": None, "skipped": True}
                     else:
@@ -414,8 +471,7 @@ class BatchProcessor:
                             result_json=json.dumps({"_skipped": True,
                                 "_reason": "Δεν βρέθηκε template για αυτό το τιμολόγιο",
                                 "_matched_supplier": detected_supplier or "unknown"}))
-                        self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
-                        self.db.conn.commit()
+                        self.db.set_document_schema(doc_id, None)
                         # ── Record usage: doc + pages ακόμα και για no_template ──
                         # Ο χρήστης κατανάλωσε Gemini API call + pages, οπότε
                         # πρέπει να μετρηθούν για το subscription enforcement.
@@ -437,8 +493,7 @@ class BatchProcessor:
                             result_json=json.dumps({"_skipped": True,
                                 "_reason": "Δεν υπάρχει ετικέτα",
                                 "_matched_supplier": "unknown"}))
-                        self.db.conn.execute("UPDATE documents SET schema_name=NULL WHERE id=?", (doc_id,))
-                        self.db.conn.commit()
+                        self.db.set_document_schema(doc_id, None)
                         # ── Record usage: doc + pages ακόμα και χωρίς ετικέτα ──
                         try:
                             self.db.record_usage_event(
@@ -465,10 +520,7 @@ class BatchProcessor:
                     # (κατά registration, initial_schema=None, οπότε πρέπει να ενημερωθεί)
                     if used_schema_name:
                         try:
-                            self.db.conn.execute(
-                                "UPDATE documents SET schema_name=? WHERE id=?",
-                                (used_schema_name, doc_id))
-                            self.db.conn.commit()
+                            self.db.set_document_schema(doc_id, used_schema_name)
                             print(f"[extract_one] doc_id={doc_id} schema_name SET to '{used_schema_name}'", flush=True)
                         except Exception as e:
                             print(f"[extract_one] doc_id={doc_id} FAILED to set schema_name: {e}", flush=True)
@@ -499,20 +551,22 @@ class BatchProcessor:
                         extracted.setdefault("_matched_template", used_schema_name)
                     conf_pct = extracted.get("_confidence_pct", 0)
                     print(f"[extract_one] doc_id={doc_id} EXTRACTED. confidence={conf_pct}%", flush=True)
-                    # ── Tour Mode (Sprint 1.3): bbox extraction για scalar fields ──
-                    # Δεν χαλάει το extraction αν αποτύχει — soft fail
-                    try:
-                        bboxes = extractor.extract_bboxes(
-                            image_paths=segment.pages,
-                            extracted_values=extracted
-                        )
-                        if bboxes:
-                            extracted["_bboxes"] = bboxes
-                            print(f"[extract_one] doc_id={doc_id} BBOXES extracted: "
-                                  f"{len(bboxes)} fields", flush=True)
-                    except Exception as e:
-                        print(f"[extract_one] doc_id={doc_id} bbox extraction failed (soft): {e}",
-                              flush=True)
+                    # ── Tour Mode bbox extraction — SKIPPED in batch (B7): it was a
+                    # SECOND AI call per doc (~doubled batch time). Not needed for
+                    # bulk; compute on-demand when a doc is opened. ──
+                    if not SKIP_BBOX_IN_BATCH:
+                        try:
+                            bboxes = extractor.extract_bboxes(
+                                image_paths=segment.pages,
+                                extracted_values=extracted
+                            )
+                            if bboxes:
+                                extracted["_bboxes"] = bboxes
+                                print(f"[extract_one] doc_id={doc_id} BBOXES extracted: "
+                                      f"{len(bboxes)} fields", flush=True)
+                        except Exception as e:
+                            print(f"[extract_one] doc_id={doc_id} bbox extraction failed (soft): {e}",
+                                  flush=True)
                     self.db.update_document_status(
                         doc_id, status=final_status,
                         result_json=json.dumps(extracted))
@@ -520,18 +574,12 @@ class BatchProcessor:
                     try:
                         smart = _smart_filename(extracted, original_filename)
                         if smart:
-                            self.db.conn.execute(
-                                "UPDATE documents SET filename=? WHERE id=?",
-                                (smart, doc_id))
-                            self.db.conn.commit()
+                            self.db.set_document_filename(doc_id, smart)
                     except Exception:
                         pass
                     if used_schema_name != schema_name:
                         try:
-                            self.db.conn.execute(
-                                "UPDATE documents SET schema_name=? WHERE id=?",
-                                (used_schema_name, doc_id))
-                            self.db.conn.commit()
+                            self.db.set_document_schema(doc_id, used_schema_name)
                         except Exception:
                             pass
                     # ── Record usage: 1 doc + N pages for this extracted segment ──
@@ -551,11 +599,20 @@ class BatchProcessor:
                     return {"success": True, "doc_id": doc_id,
                             "matched_template": used_schema_name}
                 else:
+                    print(f"[extract_one] doc_id={doc_id} extraction FAILED: {result.error_message}", flush=True)
                     self.db.update_document_status(doc_id, status="Failed")
                     return {"success": False, "doc_id": doc_id,
                             "error": result.error_message}
             except Exception as e:
-                self.db.update_document_status(doc_id, status="Failed")
+                # Visibility for residual failures (B10): print the real cause so
+                # the diagnostics log shows WHY a doc was marked Failed.
+                import traceback
+                print(f"[extract_one] doc_id={doc_id} FAILED (exception): {e}", flush=True)
+                traceback.print_exc()
+                try:
+                    self.db.update_document_status(doc_id, status="Failed")
+                except Exception as e2:
+                    print(f"[extract_one] doc_id={doc_id} also failed to mark Failed: {e2}", flush=True)
                 return {"success": False, "doc_id": doc_id, "error": str(e)}
 
         # ── Pre-register: καταχώρηση ΠΡΙΝ το parallel extraction ──────────
@@ -695,7 +752,7 @@ class BatchProcessor:
 
         # Ενημέρωση progress — skipped μετράνε ως ολοκληρωμένα στο progress
         total = job.total_invoices or 1
-        job.progress_pct = round((job.processed + job.failed + job.skipped) / total * 100, 1)
+        job.progress_pct = round(prog_start + (job.processed + job.failed + job.skipped) / total * (100 - prog_start), 1)
         self._update_job(job)
         logger.info("[batch] Pre-extraction: total=%d, skipped=%d, to_extract=%d",
                     job.total_invoices, job.skipped, len(doc_id_map))
@@ -723,7 +780,7 @@ class BatchProcessor:
                     if "doc_id" in res:
                         job.doc_ids.append(res["doc_id"])
                 total = job.total_invoices or 1
-                job.progress_pct = round((job.processed + job.failed + job.skipped + job.no_template) / total * 100, 1)
+                job.progress_pct = round(prog_start + (job.processed + job.failed + job.skipped + job.no_template) / total * (100 - prog_start), 1)
                 self._update_job(job)
 
     def _get_job(self, job_id):

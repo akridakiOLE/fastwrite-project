@@ -83,10 +83,13 @@ class FileProcessor:
 
     # ── Public ───────────────────────────────────────────────────────────────
 
-    def process(self, file_path: str | Path) -> ProcessedFile:
+    def process(self, file_path: str | Path, progress_cb=None) -> ProcessedFile:
         """
         Επεξεργασία αρχείου. Επιστρέφει ProcessedFile με λίστα εικόνων.
         :param file_path: Διαδρομή στο αρχείο εισόδου
+        :param progress_cb: optional callable(done_pages, total_pages) for live
+            render progress (lets the batch job move the progress bar during the
+            render phase instead of sitting frozen). B6.
         """
         path = Path(file_path)
         result = ProcessedFile(
@@ -107,7 +110,7 @@ class FileProcessor:
         # ── Δρομολόγηση ──────────────────────────────────────────────────────
         try:
             if suffix == ".pdf":
-                return self._process_pdf(path, result)
+                return self._process_pdf(path, result, progress_cb)
             else:
                 return self._process_image(path, result)
         except Exception as e:
@@ -119,7 +122,7 @@ class FileProcessor:
 
     # ── PDF Processing ───────────────────────────────────────────────────────
 
-    def _process_pdf(self, path: Path, result: ProcessedFile) -> ProcessedFile:
+    def _process_pdf(self, path: Path, result: ProcessedFile, progress_cb=None) -> ProcessedFile:
         """Μετατροπή PDF → PNG εικόνες ανά σελίδα (via pypdfium2)."""
         if not PYPDFIUM2_AVAILABLE:
             return self._error(result,
@@ -132,8 +135,9 @@ class FileProcessor:
         doc = pdfium.PdfDocument(str(path))
         try:
             scale = self.dpi / 72.0   # 72 DPI είναι το default του PDF
+            total = len(doc)
 
-            for page_num in range(len(doc)):
+            for page_num in range(total):
                 page   = doc[page_num]
                 bitmap = page.render(scale=scale, rotation=0)
                 pil_img = bitmap.to_pil()
@@ -141,6 +145,11 @@ class FileProcessor:
                 out_file = job_dir / f"page_{page_num + 1:04d}.png"
                 pil_img.save(str(out_file), format="PNG")
                 result.pages.append(out_file)
+                if progress_cb:
+                    try:
+                        progress_cb(page_num + 1, total)
+                    except Exception:
+                        pass
         finally:
             doc.close()
 

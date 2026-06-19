@@ -40,7 +40,7 @@ if exist "dist" rmdir /s /q dist
 
 echo.
 echo [4/5] py_compile sanity check on critical modules...
-python -m py_compile main_api.py desktop\main.py license_manager.py
+python -m py_compile main_api.py desktop\main.py license_manager.py perf_config.py file_processor.py ai_extractor.py batch_processor.py db_manager.py
 if errorlevel 1 (
     echo ERROR: py_compile failed. Fix syntax errors before building.
     exit /b 1

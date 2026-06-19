@@ -49,6 +49,10 @@ class DatabaseManager:
         self.conn.row_factory = sqlite3.Row  # Return rows as dict-like objects
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.conn.execute("PRAGMA foreign_keys=ON;")
+        # Defense-in-depth for concurrent batch writes: wait (don't raise) if the
+        # write lock is briefly held by another thread. Writes are ALSO serialized
+        # via self._write_lock; busy_timeout covers the WAL checkpoint window.
+        self.conn.execute("PRAGMA busy_timeout=5000;")
 
     def _create_tables(self):
         """Create all required tables if they don't exist."""
@@ -292,6 +296,29 @@ class DatabaseManager:
 
     # ─── DOCUMENTS ────────────────────────────────────────────────────────────
 
+    def _exec_write(self, sql: str, params=()):
+        """Execute a write + commit under the write lock, retrying briefly on a
+        transient 'database is locked' (batch threads share one connection).
+
+        Serializes writes (no interleaved commits) AND survives the rare case
+        where the WAL checkpoint / busy window still raises OperationalError —
+        which previously surfaced as a handful of docs marked 'Failed' (B10).
+        Returns the cursor; re-raises after the retries are exhausted.
+        """
+        import time
+        attempts = 5
+        for i in range(attempts):
+            try:
+                with self._write_lock:
+                    cur = self.conn.execute(sql, params)
+                    self.conn.commit()
+                    return cur
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and i < attempts - 1:
+                    time.sleep(0.1 * (i + 1))
+                    continue
+                raise
+
     def insert_document(self, filename: str, file_path: str = None,
                          schema_name: str = None,
                          original_filename: str = None,
@@ -299,13 +326,12 @@ class DatabaseManager:
         """Insert a new document record. Returns the new row id."""
         now = datetime.utcnow().isoformat()
         orig = original_filename or filename  # fallback: ίδιο με filename
-        cursor = self.conn.execute(
+        cursor = self._exec_write(
             """INSERT INTO documents
                (filename, original_filename, file_path, status, created_at, updated_at, schema_name, user_id)
                VALUES (?, ?, ?, 'Pending', ?, ?, ?, ?)""",
             (filename, orig, file_path, now, now, schema_name, user_id)
         )
-        self.conn.commit()
         return cursor.lastrowid
 
     def get_document(self, doc_id: int) -> Optional[Dict[str, Any]]:
@@ -319,12 +345,29 @@ class DatabaseManager:
                                 result_json: str = None):
         """Update the status (and optionally result) of a document."""
         now = datetime.utcnow().isoformat()
-        self.conn.execute(
+        self._exec_write(
             """UPDATE documents SET status=?, result_json=?, updated_at=?
                WHERE id=?""",
             (status, result_json, now, doc_id)
         )
-        self.conn.commit()
+
+    def set_document_schema(self, doc_id: int, schema_name: str = None):
+        """Set (or clear) a document's schema_name. Serialized + retry via _exec_write.
+
+        Replaces raw self.db.conn.execute(...) writes that batch_processor used
+        to do directly across worker threads (which bypassed the write lock).
+        """
+        self._exec_write(
+            "UPDATE documents SET schema_name=? WHERE id=?",
+            (schema_name, doc_id)
+        )
+
+    def set_document_filename(self, doc_id: int, filename: str):
+        """Update a document's display filename. Serialized + retry via _exec_write."""
+        self._exec_write(
+            "UPDATE documents SET filename=? WHERE id=?",
+            (filename, doc_id)
+        )
 
     def delete_document(self, doc_id: int):
         """Delete a document record by ID."""
@@ -411,14 +454,18 @@ class DatabaseManager:
 
     def get_template(self, name: str, user_id: int = None) -> Optional[Dict]:
         """Fetch a template by name, optionally scoped to user."""
-        if user_id is not None:
-            row = self.conn.execute(
-                "SELECT * FROM templates WHERE name=? AND user_id=?", (name, user_id)
-            ).fetchone()
-        else:
-            row = self.conn.execute(
-                "SELECT * FROM templates WHERE name=?", (name,)
-            ).fetchone()
+        # Serialize on the shared connection (reads too): a bare concurrent read
+        # from batch threads corrupted the cursor ('bad parameter or other API
+        # misuse'). The lock makes every access to self.conn single-at-a-time.
+        with self._write_lock:
+            if user_id is not None:
+                row = self.conn.execute(
+                    "SELECT * FROM templates WHERE name=? AND user_id=?", (name, user_id)
+                ).fetchone()
+            else:
+                row = self.conn.execute(
+                    "SELECT * FROM templates WHERE name=?", (name,)
+                ).fetchone()
         if row:
             d = dict(row)
             d["fields"] = json.loads(d["fields_json"])
@@ -429,14 +476,15 @@ class DatabaseManager:
 
     def list_templates(self, user_id: int = None) -> List[Dict]:
         """Return templates, optionally filtered by user_id."""
-        if user_id is not None:
-            rows = self.conn.execute(
-                "SELECT * FROM templates WHERE user_id=? ORDER BY name", (user_id,)
-            ).fetchall()
-        else:
-            rows = self.conn.execute(
-                "SELECT * FROM templates ORDER BY name"
-            ).fetchall()
+        with self._write_lock:
+            if user_id is not None:
+                rows = self.conn.execute(
+                    "SELECT * FROM templates WHERE user_id=? ORDER BY name", (user_id,)
+                ).fetchall()
+            else:
+                rows = self.conn.execute(
+                    "SELECT * FROM templates ORDER BY name"
+                ).fetchall()
         result = []
         for r in rows:
             d = dict(r)

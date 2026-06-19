@@ -29,8 +29,9 @@
 **Step 2 — Add your Gemini API key (BYOK)**
 1. Go to **Google AI Studio**: https://aistudio.google.com
 2. Sign in with a Google account and click **Get API key → Create API key**.
-3. **Copy** the key.
-4. In FastWrite, open **Settings** and paste it into the **Gemini API key** field, then **Save**.
+3. **(Recommended) Restrict the key to Gemini only:** open the key in **Google Cloud Console → Credentials → your API key → API restrictions**, choose **Restrict key**, tick **Generative Language API**, and **Save**. This limits the key to FastWrite's use, so it can't be misused if leaked.
+4. **Copy** the key.
+5. In FastWrite, open **Settings** and paste it into the **Gemini API key** field, then **Save**.
 
 > You bring your own key (BYOK). You pay Google directly for AI usage. The key is stored **encrypted on your computer** — it never leaves your machine to us.
 
@@ -73,8 +74,9 @@ Upload an invoice or bill → FastWrite extracts the data with AI → review →
 **Βήμα 2 — Βάλε το δικό σου Gemini API key (BYOK)**
 1. Πήγαινε στο **Google AI Studio**: https://aistudio.google.com
 2. Κάνε login με λογαριασμό Google και πάτα **Get API key → Create API key**.
-3. **Αντίγραψε** το key.
-4. Στο FastWrite, άνοιξε τις **Ρυθμίσεις**, επικόλλησέ το στο πεδίο **Gemini API key** και πάτα **Αποθήκευση**.
+3. **(Συνιστάται) Περιόρισε το key μόνο στο Gemini:** άνοιξε το key στο **Google Cloud Console → Credentials → το API key σου → API restrictions**, διάλεξε **Restrict key**, τσέκαρε το **Generative Language API** και **Save**. Έτσι το key δουλεύει μόνο για το FastWrite — δεν μπορεί να χρησιμοποιηθεί αλλού αν διαρρεύσει.
+4. **Αντίγραψε** το key.
+5. Στο FastWrite, άνοιξε τις **Ρυθμίσεις**, επικόλλησέ το στο πεδίο **Gemini API key** και πάτα **Αποθήκευση**.
 
 > Φέρνεις το δικό σου key (BYOK). Πληρώνεις εσύ τη Google για τη χρήση του AI. Το key αποθηκεύεται **κρυπτογραφημένο στον υπολογιστή σου** — δεν φεύγει ποτέ προς εμάς.
 
