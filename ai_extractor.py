@@ -24,10 +24,23 @@ class ExtractionStatus(str, Enum):
     TIMEOUT        = "timeout"
     QUOTA_EXCEEDED = "quota_exceeded"
 
-GEMINI_MODEL    = "gemini-2.5-flash"   # Latest stable model
+GEMINI_MODEL    = "gemini-2.5-flash"   # Fallback default if perf_config unavailable
 MAX_RETRIES     = 3
 RETRY_DELAY     = 2.0
 REQUEST_TIMEOUT = 60
+
+
+def _resolve_model() -> str:
+    """Runtime-configurable model (perf_config), with a static fallback.
+
+    Lets the app switch flash <-> flash-lite via perf_settings.json with no
+    rebuild. Explicit model= passed to AIExtractor always wins (e.g. diag tools).
+    """
+    try:
+        from perf_config import get_model
+        return get_model(GEMINI_MODEL)
+    except Exception:
+        return GEMINI_MODEL
 
 SYSTEM_PROMPT = """You are an expert data extraction specialist.
 Analyze the document image and extract ONLY the requested fields.
@@ -73,12 +86,13 @@ class AIExtractor:
     Εξαγωγή δεδομένων μέσω Google Gemini API (νέο google.genai SDK).
     """
 
-    def __init__(self, api_key: str, model: str = GEMINI_MODEL,
+    def __init__(self, api_key: str, model: str = None,
                  max_retries: int = MAX_RETRIES):
         if not api_key or not api_key.strip():
             raise ValueError("Το API key δεν μπορεί να είναι κενό.")
         self.api_key     = api_key.strip()
-        self.model       = model
+        # Explicit model wins; otherwise resolve from runtime config (perf_config).
+        self.model       = (model or "").strip() or _resolve_model()
         self.max_retries = max_retries
         self._client     = None
 
