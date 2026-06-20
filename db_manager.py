@@ -418,29 +418,30 @@ class DatabaseManager:
                        require_review: bool = False,
                        supplier_pattern: str = None,
                        user_id: int = None) -> int:
-        """Save (insert or replace) an extraction template."""
+        """Save (insert or replace) an extraction template. Thread-safe."""
         now = datetime.utcnow().isoformat()
-        # Check if template exists for this user
-        existing = None
-        if user_id is not None:
-            existing = self.conn.execute(
-                "SELECT id FROM templates WHERE name=? AND user_id=?", (name, user_id)
-            ).fetchone()
-        else:
-            existing = self.conn.execute(
-                "SELECT id FROM templates WHERE name=?", (name,)
-            ).fetchone()
-        if existing:
-            self.conn.execute(
-                """UPDATE templates SET fields_json=?, require_review=?,
-                   supplier_pattern=?, updated_at=? WHERE id=?""",
-                (json.dumps(fields), int(require_review),
-                 supplier_pattern.strip() if supplier_pattern else None,
-                 now, existing["id"])
-            )
-            self.conn.commit()
-            return existing["id"]
-        else:
+        # Serialize on the shared connection (auto-label creation runs from
+        # parallel registration threads). check-then-insert under one lock also
+        # makes get-or-create atomic (no duplicate labels for the same supplier).
+        with self._write_lock:
+            if user_id is not None:
+                existing = self.conn.execute(
+                    "SELECT id FROM templates WHERE name=? AND user_id=?", (name, user_id)
+                ).fetchone()
+            else:
+                existing = self.conn.execute(
+                    "SELECT id FROM templates WHERE name=?", (name,)
+                ).fetchone()
+            if existing:
+                self.conn.execute(
+                    """UPDATE templates SET fields_json=?, require_review=?,
+                       supplier_pattern=?, updated_at=? WHERE id=?""",
+                    (json.dumps(fields), int(require_review),
+                     supplier_pattern.strip() if supplier_pattern else None,
+                     now, existing["id"])
+                )
+                self.conn.commit()
+                return existing["id"]
             cursor = self.conn.execute(
                 """INSERT INTO templates (name, fields_json, require_review,
                    supplier_pattern, created_at, updated_at, user_id)

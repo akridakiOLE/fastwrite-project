@@ -1432,12 +1432,93 @@ def batch_extract_selected():
         except Exception as e:
             return {"doc_id": w_doc_id, "outcome": "error", "error": str(e)}
 
+    # ── Multi-invoice fast path (FLAG-GATED, OFF by default: multi_invoice_n=1) ──
+    # Groups same-template SINGLE-PAGE docs into N-per-call extractions to cut the
+    # number of (rate-limited) AI calls. SAFETY: a chunk's result is accepted only
+    # on a clean 1:1 map — count==N, image_index a permutation of 1..N, distinct
+    # invoice_numbers; otherwise the WHOLE chunk falls back to the single path.
+    # Never assigns extracted data to a doc by guess.
+    try:
+        from perf_config import get_multi_invoice_n
+        multi_n = get_multi_invoice_n()
+    except Exception:
+        multi_n = 1
+
+    def _extract_multi_chunk(chunk):
+        template = chunk[0][2]
+        schema = schema_bld.build_from_list(template["fields"])
+        schema.pop("additionalProperties", None)
+        images = []
+        for (cdid, cdoc, ctmpl, cn) in chunk:
+            pr = processor.process(Path(cdoc["file_path"]))
+            if not pr.is_ok():
+                return {"fallback": chunk}
+            images.append(pr.pages[0])
+        extractor = AIExtractor(api_key=api_key)
+        ok, invoices, err = extractor.extract_multi(images, schema)
+        n = len(chunk)
+        valid = ok and isinstance(invoices, list) and len(invoices) == n
+        if valid:
+            imgidx = [int(inv.get("image_index", -1)) for inv in invoices]
+            nums = [str(inv.get("invoice_number", "")).strip() for inv in invoices]
+            if sorted(imgidx) != list(range(1, n + 1)):
+                valid = False
+            elif any(not x for x in nums) or len(set(nums)) != n:
+                valid = False
+        if not valid:
+            logger.info("[multi] extract-selected chunk n=%d → single fallback (ok=%s, err=%s)",
+                        n, ok, err)
+            return {"fallback": chunk}
+        by_imgidx = {int(inv.get("image_index")): inv for inv in invoices}
+        out = []
+        for pos, (cdid, cdoc, ctmpl, cn) in enumerate(chunk, start=1):
+            inv = dict(by_imgidx[pos])
+            inv.pop("image_index", None)
+            rd = {}
+            try:
+                rd = json.loads(cdoc.get("result_json") or "{}")
+            except Exception:
+                pass
+            if rd.get("_matched_supplier"):
+                inv.setdefault("_matched_supplier", rd["_matched_supplier"])
+            inv.setdefault("_matched_template", (cdoc.get("schema_name") or "").strip())
+            out.append({"doc_id": cdid, "outcome": "ok", "extracted": inv, "pages": 1})
+        return {"results": out}
+
     worker_results = []
-    if eligible_docs:
+    remaining = eligible_docs
+
+    if multi_n > 1 and eligible_docs:
+        groups = {}
+        leftover = []
+        for item in eligible_docs:
+            _did, _d, _t, _n = item
+            if _n == 1:
+                groups.setdefault((_d.get("schema_name") or "").strip(), []).append(item)
+            else:
+                leftover.append(item)            # multi-page → single path
+        chunks = []
+        for _sname, items in groups.items():
+            for c in range(0, len(items), multi_n):
+                ch = items[c:c + multi_n]
+                if len(ch) >= 2:
+                    chunks.append(ch)
+                else:
+                    leftover.extend(ch)          # singleton → single path
+        if chunks:
+            logger.info("[multi] extract-selected N=%d: %d chunk(s)", multi_n, len(chunks))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=BATCH_EXTRACT_WORKERS) as mpool:
+                for r in mpool.map(_extract_multi_chunk, chunks):
+                    if "results" in r:
+                        worker_results.extend(r["results"])
+                    else:
+                        leftover.extend(r["fallback"])
+        remaining = leftover
+
+    if remaining:
         with concurrent.futures.ThreadPoolExecutor(
                 max_workers=BATCH_EXTRACT_WORKERS) as pool:
-            # pool.map preserves input order → results stay in eligible_docs order
-            worker_results = list(pool.map(_extract_worker, eligible_docs))
+            worker_results.extend(list(pool.map(_extract_worker, remaining)))
 
     # ── Serial DB-write phase (main thread only → no race conditions) ──
     for r in worker_results:

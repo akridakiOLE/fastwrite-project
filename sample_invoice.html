@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sample Invoice — FastWrite demo</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a2330; margin: 0; padding: 40px; background:#fff; }
+  .sheet { max-width: 820px; margin: 0 auto; }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; }
+  h1 { font-size: 40px; letter-spacing: 1px; color:#1f3b66; margin:0 0 18px; }
+  .sup-name { font-weight:700; font-size:16px; }
+  .muted { color:#3a4658; font-size:13px; line-height:1.5; }
+  .meta { text-align:right; font-size:13px; line-height:1.7; }
+  .meta b { color:#1f3b66; }
+  .billto { margin:26px 0 18px; font-size:13px; line-height:1.5; }
+  .billto .lbl { font-weight:700; color:#1f3b66; margin-bottom:3px; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:12.5px; }
+  thead th { background:#1f3b66; color:#fff; text-align:left; padding:9px 8px; font-weight:600; }
+  thead th.num { text-align:right; }
+  tbody td { border:1px solid #d3dae5; padding:8px; }
+  tbody td.num { text-align:right; }
+  tbody tr:nth-child(even){ background:#f6f8fb; }
+  .totals { margin-top:16px; width:300px; margin-left:auto; font-size:13px; }
+  .totals div { display:flex; justify-content:space-between; padding:5px 0; }
+  .totals .grand { border-top:2px solid #1f3b66; font-weight:700; font-size:16px; color:#1f3b66; padding-top:8px; }
+  .foot { margin-top:30px; font-size:11px; color:#7a8699; border-top:1px solid #e2e8f0; padding-top:10px; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="top">
+    <div>
+      <div class="sup-name">Brightside Office Supplies Ltd</div>
+      <div class="muted">
+        14 Camden High Street<br>
+        London NW1 7JR, United Kingdom<br>
+        VAT: GB 234 5678 90<br>
+        accounts@brightside-supplies.co.uk &nbsp;·&nbsp; +44 20 7946 0123
+      </div>
+    </div>
+    <div>
+      <h1>INVOICE</h1>
+      <div class="meta">
+        <b>Invoice No:</b> INV-2026-0042<br>
+        <b>Invoice Date:</b> 12 Mar 2026<br>
+        <b>Due Date:</b> 11 Apr 2026<br>
+        <b>Currency:</b> GBP (£)
+      </div>
+    </div>
+  </div>
+
+  <div class="billto">
+    <div class="lbl">BILL TO</div>
+    Maple &amp; Co Accountants Ltd<br>
+    8 Kingsway, Manchester M2 4WU, United Kingdom<br>
+    VAT: GB 998 7654 32
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Item Code</th>
+        <th>Description</th>
+        <th>Pack Size</th>
+        <th class="num">Qty</th>
+        <th class="num">Unit Price</th>
+        <th class="num">VAT %</th>
+        <th class="num">Net</th>
+        <th class="num">VAT</th>
+        <th class="num">Line Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>P001</td><td>A4 Premium Copier Paper</td><td>box of 5 reams</td>
+        <td class="num">10</td><td class="num">£18.50</td><td class="num">20%</td>
+        <td class="num">£185.00</td><td class="num">£37.00</td><td class="num">£222.00</td>
+      </tr>
+      <tr>
+        <td>P014</td><td>Black Ballpoint Pens</td><td>pack of 50</td>
+        <td class="num">6</td><td class="num">£7.25</td><td class="num">20%</td>
+        <td class="num">£43.50</td><td class="num">£8.70</td><td class="num">£52.20</td>
+      </tr>
+      <tr>
+        <td>P027</td><td>Heavy-duty Stapler, metal</td><td>single unit</td>
+        <td class="num">3</td><td class="num">£12.40</td><td class="num">20%</td>
+        <td class="num">£37.20</td><td class="num">£7.44</td><td class="num">£44.64</td>
+      </tr>
+      <tr>
+        <td>P033</td><td>Desk Organiser, oak finish</td><td>single unit</td>
+        <td class="num">2</td><td class="num">£24.99</td><td class="num">20%</td>
+        <td class="num">£49.98</td><td class="num">£10.00</td><td class="num">£59.98</td>
+      </tr>
+      <tr>
+        <td>P048</td><td>Sticky Notes 76x76mm</td><td>pack of 12</td>
+        <td class="num">8</td><td class="num">£9.15</td><td class="num">20%</td>
+        <td class="num">£73.20</td><td class="num">£14.64</td><td class="num">£87.84</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div><span>Subtotal (excl. VAT)</span><span>£388.88</span></div>
+    <div><span>VAT (20%)</span><span>£77.78</span></div>
+    <div class="grand"><span>TOTAL</span><span>£466.66</span></div>
+  </div>
+
+  <div class="foot">
+    Payment due within 30 days. Bank: Brightside Ltd · Sort 20-00-00 · Acc 12345678 · Ref INV-2026-0042
+  </div>
+</div>
+</body>
+</html>

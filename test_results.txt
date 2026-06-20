@@ -1,0 +1,180 @@
+C:\Users\User\fastwrite-project\ai_extractor.py:293: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.extracted_at    = datetime.utcnow().isoformat()
+...C:\Users\User\fastwrite-project\ai_extractor.py:144: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  api_result.extracted_at    = datetime.utcnow().isoformat()
+........................EC:\Users\User\fastwrite-project\db_manager.py:300: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+..C:\Users\User\fastwrite-project\db_manager.py:321: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+......C:\Users\User\fastwrite-project\db_manager.py:355: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+....C:\Users\User\fastwrite-project\db_manager.py:379: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+.....C:\Users\User\fastwrite-project\exporter.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+..C:\Users\User\fastwrite-project\exporter.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+.C:\Users\User\fastwrite-project\exporter.py:465: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+C:\Users\User\fastwrite-project\exporter.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+.C:\Users\User\fastwrite-project\exporter.py:465: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+C:\Users\User\fastwrite-project\exporter.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+.C:\Users\User\fastwrite-project\exporter.py:465: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+C:\Users\User\fastwrite-project\exporter.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+.C:\Users\User\fastwrite-project\exporter.py:465: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+C:\Users\User\fastwrite-project\exporter.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+.C:\Users\User\fastwrite-project\exporter.py:465: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+C:\Users\User\fastwrite-project\exporter.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+.C:\Users\User\fastwrite-project\exporter.py:465: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+C:\Users\User\fastwrite-project\exporter.py:391: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+..................C:\Users\User\fastwrite-project\exporter.py:273: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+...C:\Users\User\fastwrite-project\exporter.py:273: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+.C:\Users\User\fastwrite-project\exporter.py:465: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+..C:\Users\User\fastwrite-project\exporter.py:465: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+C:\Users\User\fastwrite-project\exporter.py:273: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+.C:\Users\User\fastwrite-project\file_processor.py:161: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts      = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
+C:\Users\User\fastwrite-project\file_processor.py:129: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.processed_at = datetime.utcnow().isoformat()
+.C:\Users\User\fastwrite-project\file_processor.py:170: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.processed_at  = datetime.utcnow().isoformat()
+...C:\Users\User\fastwrite-project\file_processor.py:154: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.processed_at = datetime.utcnow().isoformat()
+......................F...F............................C:\Users\User\fastwrite-project\db_manager.py:300: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+......C:\Users\User\fastwrite-project\db_manager.py:321: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+C:\Users\User\fastwrite-project\exporter.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+C:\Users\User\AppData\Local\Programs\Python\Python313\Lib\unittest\case.py:606: ResourceWarning: unclosed file <_io.BufferedReader name='C:\\Users\\User\\AppData\\Local\\Temp\\tmppnmd8ib2\\exports\\export_20260618_111601.csv'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\User\fastwrite-project\db_manager.py:300: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+C:\Users\User\fastwrite-project\db_manager.py:321: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+C:\Users\User\fastwrite-project\exporter.py:465: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+C:\Users\User\fastwrite-project\exporter.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+C:\Users\User\AppData\Local\Programs\Python\Python313\Lib\unittest\case.py:606: ResourceWarning: unclosed file <_io.BufferedReader name='C:\\Users\\User\\AppData\\Local\\Temp\\tmppnmd8ib2\\exports\\export_20260618_111601.csv'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.C:\Users\User\fastwrite-project\db_manager.py:300: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+C:\Users\User\fastwrite-project\db_manager.py:321: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+C:\Users\User\fastwrite-project\exporter.py:465: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+C:\Users\User\fastwrite-project\exporter.py:273: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.exported_at  = datetime.utcnow().isoformat()
+C:\Users\User\AppData\Local\Programs\Python\Python313\Lib\unittest\case.py:606: ResourceWarning: unclosed file <_io.BufferedReader name='C:\\Users\\User\\AppData\\Local\\Temp\\tmppnmd8ib2\\exports\\export_20260618_111601.xlsx'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+..................C:\Users\User\fastwrite-project\db_manager.py:379: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow().isoformat()
+2026-06-18 14:16:01,876 [main_api] INFO: [_recalc] START — 1 templates, 0 activities
+2026-06-18 14:16:01,877 [main_api] INFO: [_recalc] DONE — updated 0 activities: []
+...2026-06-18 14:16:01,884 [main_api] INFO: [_recalc] START — 1 templates, 0 activities
+2026-06-18 14:16:01,884 [main_api] INFO: [_recalc] DONE — updated 0 activities: []
+.2026-06-18 14:16:01,887 [main_api] INFO: [_recalc] START — 1 templates, 0 activities
+2026-06-18 14:16:01,888 [main_api] INFO: [_recalc] DONE — updated 0 activities: []
+.................................C:\Users\User\fastwrite-project\validator.py:363: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.validated_at = datetime.utcnow().isoformat()
+...C:\Users\User\fastwrite-project\validator.py:107: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result.validated_at = datetime.utcnow().isoformat()
+...............................2026-06-18 14:16:02,066 [xero_connector] INFO: Xero OAuth completed (async): 1 tenant(s)
+........2026-06-18 14:16:02,230 [xero_connector] INFO: Starting Xero OAuth flow (loopback http://localhost:5556/xero/callback)
+2026-06-18 14:16:02,233 [xero_connector] INFO: Xero connected: 1 tenant(s)
+.2026-06-18 14:16:02,241 [xero_connector] INFO: Starting Xero OAuth flow (loopback http://localhost:5556/xero/callback)
+.E2026-06-18 14:16:02,266 [xero_connector] INFO: \u0394\u03b7\u03bc\u03b9\u03bf\u03c5\u03c1\u03b3\u03ae\u03b8\u03b7\u03ba\u03b5 supplier \u03c3\u03c4\u03bf Xero: New Supplier
+.2026-06-18 14:16:02,276 [xero_connector] INFO: \u0394\u03b7\u03bc\u03b9\u03bf\u03c5\u03c1\u03b3\u03ae\u03b8\u03b7\u03ba\u03b5 supplier \u03c3\u03c4\u03bf Xero: Auto Created
+................2026-06-18 14:18:02,086 [xero_connector] INFO: Xero disconnected, local token \u03b4\u03b9\u03b1\u03b3\u03c1\u03ac\u03c6\u03b7\u03ba\u03b5
+.2026-06-18 14:18:02,097 [xero_connector] WARNING: Xero token revoke \u03b1\u03c0\u03ad\u03c4\u03c5\u03c7\u03b5 (\u03bc\u03b7 \u03ba\u03c1\u03af\u03c3\u03b9\u03bc\u03bf): no route
+2026-06-18 14:18:02,098 [xero_connector] INFO: Xero disconnected, local token \u03b4\u03b9\u03b1\u03b3\u03c1\u03ac\u03c6\u03b7\u03ba\u03b5
+..2026-06-18 14:18:02,124 [xero_connector] INFO: Access token expired — refreshing
+......2026-06-18 14:18:02,203 [xero_connector] INFO: \u0394\u03b7\u03bc\u03b9\u03bf\u03c5\u03c1\u03b3\u03ae\u03b8\u03b7\u03ba\u03b5 supplier \u03c3\u03c4\u03bf Xero: New Co
+2026-06-18 14:18:02,203 [xero_connector] INFO: Push Bill OK: INV-002 \u2192 inv-uuid-2 (DRAFT)
+.2026-06-18 14:18:02,216 [xero_connector] INFO: Push Bill OK: INV-001 \u2192 inv-uuid-1 (DRAFT)
+.2026-06-18 14:18:02,227 [xero_connector] INFO: Push Bill OK: INV-001 \u2192 inv-uuid-1 (DRAFT)
+....2026-06-18 14:18:02,265 [xero_connector] INFO: Push Bill OK: INV-003 \u2192 inv-uuid-1 (DRAFT)
+....................
+======================================================================
+ERROR: test_aq (unittest.loader._FailedTest.test_aq)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_aq
+Traceback (most recent call last):
+  File "C:\Users\User\AppData\Local\Programs\Python\Python313\Lib\unittest\loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "C:\Users\User\AppData\Local\Programs\Python\Python313\Lib\unittest\loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "C:\Users\User\fastwrite-project\test_aq.py", line 20, in <module>
+    raise SystemExit(1)
+SystemExit: 1
+
+
+======================================================================
+ERROR: test_create_contact_error (test_xero_connector.TestContacts.test_create_contact_error)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\User\fastwrite-project\test_xero_connector.py", line 761, in test_create_contact_error
+    self.connector.create_contact("X")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\User\fastwrite-project\xero_connector.py", line 816, in create_contact
+    self._raise_for_xero_status(resp, "Create contact")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\User\fastwrite-project\xero_connector.py", line 913, in _raise_for_xero_status
+    raise XeroValidationError(
+        f"{context}: \u03c4\u03bf Xero \u03b1\u03c0\u03ad\u03c1\u03c1\u03b9\u03c8\u03b5 \u03c4\u03b1 \u03b4\u03b5\u03b4\u03bf\u03bc\u03ad\u03bd\u03b1 (HTTP {code}). {msg}"
+    )
+xero_connector.XeroValidationError: Create contact: \u03c4\u03bf Xero \u03b1\u03c0\u03ad\u03c1\u03c1\u03b9\u03c8\u03b5 \u03c4\u03b1 \u03b4\u03b5\u03b4\u03bf\u03bc\u03ad\u03bd\u03b1 (HTTP 400). invalid name
+
+======================================================================
+FAIL: test_machine_key_file_permissions (test_key_manager.TestKeyManagerStorage.test_machine_key_file_permissions)
+\u03a4\u03bf machine key \u03b1\u03c1\u03c7\u03b5\u03af\u03bf \u03c0\u03c1\u03ad\u03c0\u03b5\u03b9 \u03bd\u03b1 \u03ad\u03c7\u03b5\u03b9 permissions 600.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\User\fastwrite-project\test_key_manager.py", line 91, in test_machine_key_file_permissions
+    self.assertEqual(mode, "600", f"\u039b\u03ac\u03b8\u03bf\u03c2 permissions: {mode} (\u03b1\u03bd\u03b1\u03bc\u03ad\u03bd\u03b5\u03c4\u03b1\u03b9 600)")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '666' != '600'
+- 666
++ 600
+ : \u039b\u03ac\u03b8\u03bf\u03c2 permissions: 666 (\u03b1\u03bd\u03b1\u03bc\u03ad\u03bd\u03b5\u03c4\u03b1\u03b9 600)
+
+======================================================================
+FAIL: test_stored_file_permissions (test_key_manager.TestKeyManagerStorage.test_stored_file_permissions)
+\u03a4\u03bf \u03b1\u03c1\u03c7\u03b5\u03af\u03bf keys \u03c0\u03c1\u03ad\u03c0\u03b5\u03b9 \u03bd\u03b1 \u03ad\u03c7\u03b5\u03b9 permissions 600.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\User\fastwrite-project\test_key_manager.py", line 84, in test_stored_file_permissions
+    self.assertEqual(mode, "600", f"\u039b\u03ac\u03b8\u03bf\u03c2 permissions: {mode} (\u03b1\u03bd\u03b1\u03bc\u03ad\u03bd\u03b5\u03c4\u03b1\u03b9 600)")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '666' != '600'
+- 666
++ 600
+ : \u039b\u03ac\u03b8\u03bf\u03c2 permissions: 666 (\u03b1\u03bd\u03b1\u03bc\u03ad\u03bd\u03b5\u03c4\u03b1\u03b9 600)
+
+----------------------------------------------------------------------
+Ran 297 tests in 126.490s
+
+FAILED (failures=2, errors=2)
+<sys>:0: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000024B0E39CB80>
+<sys>:0: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000024B0E09E5C0>

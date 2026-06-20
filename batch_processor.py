@@ -56,9 +56,36 @@ BATCH_SIZE            = 10
 # perf_config.get_max_workers() in _run_job, so it applies without a rebuild.
 MAX_WORKERS           = 8
 MAX_PAGES_PER_INVOICE = 10
-# B7: bbox (Tour-mode field locations) is a SECOND AI call per doc — it ~doubled
-# batch time. Skip it in bulk; bboxes can be computed on-demand when a doc is opened.
+# B7: bbox (Tour-mode field locations) is a SECOND AI call per doc → it doubled
+# batch time. Skipped in bulk; Tour-mode now computes bboxes ON-DEMAND when a
+# single doc is opened for review (see /api/document/<id>/bboxes). Keeps batch
+# fast AND keeps the highlight available (best-effort) for whatever doc is viewed.
 SKIP_BBOX_IN_BATCH    = True
+
+# Default field set for AUTO-CREATED labels. When registration detects a supplier
+# that has no existing label, the system creates one with all standard fields
+# (zero manual setup). Fields not present on a given invoice simply extract null.
+DEFAULT_LABEL_FIELDS = [
+    {"name": "invoice_number", "type": "string"},
+    {"name": "invoice_date",   "type": "date"},
+    {"name": "vendor_name",    "type": "string"},
+    {"name": "vendor_afm",     "type": "string"},
+    {"name": "buyer_name",     "type": "string"},
+    {"name": "buyer_afm",      "type": "string"},
+    {"name": "net_amount",     "type": "number"},
+    {"name": "vat_rate",       "type": "number"},
+    {"name": "vat_amount",     "type": "number"},
+    {"name": "total_amount",   "type": "number"},
+    {"name": "line_items", "type": "array", "items": [
+        {"name": "item_code",   "type": "string"},
+        {"name": "description", "type": "string"},
+        {"name": "pack_size",   "type": "string"},
+        {"name": "quantity",    "type": "number"},
+        {"name": "unit_price",  "type": "number"},
+        {"name": "total",       "type": "number"},
+    ]},
+]
+
 
 def _smart_filename(extracted_data, original_filename):
     """Δημιουργεί έξυπνο filename: 'vendor — invoice_no' ή fallback."""
@@ -303,11 +330,28 @@ class BatchProcessor:
         batch_starts = list(range(0, len(pages), self.batch_size))
         total_batches = len(batch_starts) or 1
         done_batches = 0
+
+        # B6 smoothing: the parallel segmentation calls return in a burst, so the
+        # bar would freeze ~15-20s then jump. A daemon "creeper" nudges it forward
+        # during that wait (up to ~70% of the segmentation band). Real completions
+        # use max() so the bar never moves backwards.
+        _seg_done = [False]
+        def _creeper():
+            cap = prog_start + 0.70 * (prog_end - prog_start)
+            while not _seg_done[0]:
+                time.sleep(0.7)
+                if _seg_done[0]:
+                    break
+                if job.progress_pct < cap:
+                    job.progress_pct = round(min(job.progress_pct + 0.8, cap), 1)
+                    self._update_job(job)
+        _creep_t = threading.Thread(target=_creeper, daemon=True)
+        _creep_t.start()
+
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
             # Merge is order-independent (dicts keyed by global page number), so we
-            # consume as_completed to drive LIVE progress. B6: segmentation occupies
-            # the first ~50% of the bar so it MOVES during this phase (was 'dead'
-            # until extraction started ~60s in).
+            # consume as_completed to drive LIVE progress. Segmentation fills the
+            # render_end..seg_end band.
             futs = [pool.submit(_segment_batch, bs) for bs in batch_starts]
             for fut in as_completed(futs):
                 local_labels, local_suppliers, local_error = fut.result()
@@ -316,8 +360,10 @@ class BatchProcessor:
                 if local_error:
                     job.errors.append(local_error)
                 done_batches += 1
-                job.progress_pct = round(prog_start + (done_batches / total_batches) * (prog_end - prog_start), 1)
+                real = round(prog_start + (done_batches / total_batches) * (prog_end - prog_start), 1)
+                job.progress_pct = max(job.progress_pct, real)
                 self._update_job(job)
+        _seg_done[0] = True
 
         page_labels[1] = True
 
@@ -417,6 +463,29 @@ class BatchProcessor:
         templates_cache = (self.db.list_templates(user_id=self._current_user_id)
                            if auto_match else [])
 
+        # Auto-label (get-or-create): when a detected supplier has NO label, create
+        # one with the default fields → zero manual setup for the user. Serialized
+        # so N invoices of the same NEW supplier produce ONE label (not duplicates),
+        # and re-checks under the lock first. Never touches existing labels.
+        _label_lock = threading.Lock()
+        def _get_or_create_label(detected):
+            with _label_lock:
+                name, _det, is_real = self._match_supplier(detected, templates_cache, schema_name)
+                if is_real:
+                    return name
+                try:
+                    self.db.save_template(detected, DEFAULT_LABEL_FIELDS,
+                                          supplier_pattern=detected,
+                                          user_id=self._current_user_id)
+                    templates_cache.append({"name": detected,
+                                            "supplier_pattern": detected,
+                                            "fields": DEFAULT_LABEL_FIELDS})
+                    print(f"[auto-label] created label for supplier '{detected}'", flush=True)
+                    return detected
+                except Exception as e:
+                    print(f"[auto-label] failed for '{detected}': {e}", flush=True)
+                    return None
+
         def extract_one(idx, segment, doc_id):
             try:
                 extractor = AIExtractor(api_key=api_key)
@@ -437,6 +506,11 @@ class BatchProcessor:
                     # Pure in-memory match against the pre-fetched template list.
                     matched_name, detected_supplier, is_real_match = self._match_supplier(
                         detected_supplier, templates_cache, schema_name)
+                    # AUTO-LABEL: no existing label for this supplier → create one.
+                    if not is_real_match and detected_supplier and detected_supplier != "unknown":
+                        auto = _get_or_create_label(detected_supplier)
+                        if auto:
+                            matched_name, is_real_match = auto, True
                     print(f"[extract_one] doc_id={doc_id}, auto_match=True, "
                           f"is_real_match={is_real_match}, matched_name={matched_name}, "
                           f"detected_supplier={detected_supplier}, src={'seg' if seg_sup else 'fallback'}, "
@@ -757,13 +831,135 @@ class BatchProcessor:
         logger.info("[batch] Pre-extraction: total=%d, skipped=%d, to_extract=%d",
                     job.total_invoices, job.skipped, len(doc_id_map))
 
+        # ── Multi-invoice extraction pre-pass (batch speed lever, FLAG-GATED) ──
+        # Groups same-template SINGLE-PAGE invoices into one AI call (N per call).
+        # OFF by default (perf_settings.json multi_invoice_n=1). CORRECTNESS RULE:
+        # a chunk's result is accepted only if it maps 1:1 — count==N, image_index
+        # is a permutation of 1..N, and invoice_numbers are all distinct; otherwise
+        # the WHOLE chunk falls back to the proven single-doc path. Never assigns
+        # extracted data to an invoice by guess.
+        def _persist_extracted(doc_id, extracted, used_schema_name, detected_supplier, n_pages):
+            if detected_supplier and detected_supplier != "unknown":
+                extracted.setdefault("_matched_supplier", detected_supplier)
+                extracted.setdefault("_matched_template", used_schema_name)
+            self.db.update_document_status(doc_id, status="pending",
+                                           result_json=json.dumps(extracted))
+            try:
+                smart = _smart_filename(extracted, original_filename)
+                if smart:
+                    self.db.set_document_filename(doc_id, smart)
+            except Exception:
+                pass
+            if used_schema_name != schema_name:
+                try:
+                    self.db.set_document_schema(doc_id, used_schema_name)
+                except Exception:
+                    pass
+            try:
+                self.db.record_usage_event(self._current_user_id, 'doc_processed', 1)
+                self.db.record_usage_event(self._current_user_id, 'page_processed', n_pages)
+            except Exception as e:
+                logger.error("Failed to record usage for doc %d: %s", doc_id, e)
+            if self.license_consumer:
+                self.license_consumer(docs=1, pages=n_pages)
+
+        def _process_multi_chunk(chunk, used_schema_name, schema_obj):
+            # chunk: list of (idx, doc_id, segment, detected_supplier)
+            images = [it[2].pages[0] for it in chunk]
+            extractor = AIExtractor(api_key=api_key)
+            ok, invoices, err = extractor.extract_multi(images, schema_obj)
+            n = len(chunk)
+            valid = ok and isinstance(invoices, list) and len(invoices) == n
+            if valid:
+                imgidx = [int(inv.get("image_index", -1)) for inv in invoices]
+                nums = [str(inv.get("invoice_number", "")).strip() for inv in invoices]
+                if sorted(imgidx) != list(range(1, n + 1)):
+                    valid = False                       # missing/duplicate image_index
+                elif any(not x for x in nums) or len(set(nums)) != n:
+                    valid = False                       # blank or duplicate invoice_number
+            if not valid:
+                print(f"[multi] chunk ({used_schema_name}, n={n}) → single fallback "
+                      f"(ok={ok}, err={err})", flush=True)
+                return {"fallback": [it[0] for it in chunk]}
+            by_imgidx = {int(inv.get("image_index")): inv for inv in invoices}
+            done = []
+            for pos, (idx, doc_id, segment, detected) in enumerate(chunk, start=1):
+                inv = dict(by_imgidx[pos])
+                inv.pop("image_index", None)
+                _persist_extracted(doc_id, inv, used_schema_name, detected, len(segment.pages))
+                done.append((idx, doc_id))
+            return {"done": done}
+
+        def run_multi_prepass():
+            multi_done = set()
+            try:
+                from perf_config import get_multi_invoice_n
+                multi_n = get_multi_invoice_n()
+            except Exception:
+                multi_n = 1
+            if multi_n <= 1 or registration_only:
+                return multi_done
+            groups = {}
+            for idx, doc_id in doc_id_map.items():
+                segment = segments[idx]
+                if len(segment.pages) != 1:
+                    continue                            # multi-page → single path
+                if auto_match:
+                    detected = (segment.supplier or "").strip()
+                    if not detected or detected.upper() == "UNKNOWN":
+                        continue
+                    matched_name, detected, is_real = self._match_supplier(
+                        detected, templates_cache, schema_name)
+                    if not is_real:
+                        continue                        # no_template → single path
+                    tmpl = next((t for t in templates_cache if t.get("name") == matched_name), None)
+                    if not tmpl:
+                        continue
+                    schema_obj = self.schema_bld.build_from_list(tmpl["fields"])
+                    schema_obj.pop("additionalProperties", None)
+                    used = matched_name
+                else:
+                    if not default_schema or not default_template:
+                        continue
+                    schema_obj = default_schema
+                    used = schema_name
+                    detected = None
+                groups.setdefault(used, {"schema": schema_obj, "items": []})
+                groups[used]["items"].append((idx, doc_id, segment, detected))
+            chunks = []
+            for used, g in groups.items():
+                items = g["items"]
+                for c in range(0, len(items), multi_n):
+                    chunk = items[c:c + multi_n]
+                    if len(chunk) >= 2:                 # singletons → single path (no benefit)
+                        chunks.append((chunk, used, g["schema"]))
+            if not chunks:
+                return multi_done
+            logger.info("[multi] N=%d: %d chunk(s) across %d template group(s)",
+                        multi_n, len(chunks), len(groups))
+            with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
+                futs = {pool.submit(_process_multi_chunk, ch, used, sch): True
+                        for (ch, used, sch) in chunks}
+                for fut in as_completed(futs):
+                    r = fut.result()
+                    for idx, doc_id in r.get("done", []):
+                        multi_done.add(idx)
+                        job.processed += 1
+                        job.doc_ids.append(doc_id)
+                    total = job.total_invoices or 1
+                    job.progress_pct = round(prog_start + (job.processed + job.failed + job.skipped + job.no_template) / total * (100 - prog_start), 1)
+                    self._update_job(job)
+            return multi_done
+
         # Αν δεν υπάρχουν segments για extraction, τελειώνουμε
         if not doc_id_map:
             return
 
+        multi_done = run_multi_prepass()   # handles same-template single-page docs (if enabled)
+
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {executor.submit(extract_one, idx, segments[idx], doc_id_map[idx]): idx
-                       for idx in doc_id_map}
+                       for idx in doc_id_map if idx not in multi_done}
             for future in as_completed(futures):
                 res = future.result()
                 if res["success"]:

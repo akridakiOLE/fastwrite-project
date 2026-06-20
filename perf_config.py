@@ -87,3 +87,25 @@ def get_dpi(default: int = DEFAULT_DPI) -> int:
     except Exception as e:
         logger.warning("[perf] failed to read dpi (using %d): %s", default, e)
     return default
+
+
+# Multi-invoice-per-call (batch extraction speed lever). 1 = OFF (one invoice
+# per AI call — the proven default). N>1 groups up to N same-template single-page
+# invoices into ONE call. Default OFF until validated end-to-end on real data.
+DEFAULT_MULTI_INVOICE_N = 1
+_MAX_MULTI_INVOICE_N = 50   # output budget now scales with N (extract_multi), so
+                           # larger batches are viable; experiment 10/20/30.
+
+
+def get_multi_invoice_n(default: int = DEFAULT_MULTI_INVOICE_N) -> int:
+    """Active multi-invoice batch size for extraction (perf_settings.json
+    {"multi_invoice_n": N}). 1 disables it. Read fresh; clamped 1..10."""
+    try:
+        p = _settings_path()
+        if p.exists():
+            cfg = json.loads(p.read_text(encoding="utf-8"))
+            n = int(cfg.get("multi_invoice_n", default))
+            return max(1, min(n, _MAX_MULTI_INVOICE_N))
+    except Exception as e:
+        logger.warning("[perf] failed to read multi_invoice_n (using %d): %s", default, e)
+    return default

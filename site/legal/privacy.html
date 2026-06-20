@@ -12,9 +12,9 @@
 <main class="legal-page">
   <div class="container">
     <h1>Privacy Policy</h1>
-    <div class="legal-meta">Effective Date: [to be set on publication] · Last Updated: [to be set]</div>
-    <p><strong>Effective Date:</strong> [TO BE FILLED before publication]
-<strong>Last Updated:</strong> [TO BE FILLED before publication]</p>
+    <div class="legal-meta">Effective Date: 11 June 2026 · Last Updated: 11 June 2026</div>
+    <p><strong>Effective Date:</strong> 11 June 2026
+<strong>Last Updated:</strong> 11 June 2026</p>
 <hr />
 <h2>1. Introduction</h2>
 <p>This Privacy Policy describes how <strong>FastWrite</strong> ("we", "us", or "our") collects, uses, and protects your information when you use the FastWrite desktop application and related services (the "Service").</p>
@@ -22,13 +22,13 @@
 <p>This Policy is written to comply with the General Data Protection Regulation (GDPR) and the UK Data Protection Act 2018, and applies to all users worldwide.</p>
 <hr />
 <h2>2. Who We Are (Data Controller)</h2>
-<p><strong>Operator:</strong> Stavros Kallenos, sole trader (Cyprus)
+<p><strong>Operator:</strong> Stavros Kallenos, operating as an individual (natural person) in Cyprus
 <strong>Brand:</strong> FastWrite
 <strong>Country of Establishment:</strong> Republic of Cyprus
-<strong>Registered Address:</strong> [TO BE FILLED — residential or virtual office address]
-<strong>Tax Identification Code (TIC):</strong> [TO BE FILLED if required by lawyer]
+<strong>Registered Address:</strong> Derveneion 2B, 1055 Nicosia, Cyprus
 <strong>Contact Email for Privacy Matters:</strong> support@fastwrite.tech</p>
-<p>For GDPR purposes, we act as the <strong>data controller</strong> for the limited personal data we collect (see Section 3). For data you push to your own Xero account through FastWrite, <strong>you remain the data controller</strong> and FastWrite is a transient data processor.</p>
+<p>For GDPR purposes, we act as the <strong>data controller</strong> for the limited personal data we collect (see Section 3). For data you push to your own accounting platform (currently Xero; support for additional platforms such as QuickBooks is planned) through FastWrite, <strong>you remain the data controller</strong> and FastWrite is a transient data processor.</p>
+<p>Because FastWrite performs <strong>no server-side processing of your invoices, extracted data, or financial information</strong> — all such processing happens locally on your device under your own AI provider key (BYOK) — no separate Data Processing Agreement (DPA) is required for that content.</p>
 <hr />
 <h2>3. Information We Collect</h2>
 <h3>3.1 Information You Provide Directly</h3>
@@ -59,12 +59,12 @@
 </tbody>
 </table>
 <h3>3.2 Information Stored Locally (NOT Transmitted to Us)</h3>
-<p>The following data is stored <strong>only on your computer</strong> under <code>%APPDATA%\FastWrite\</code> (Windows), <code>~/Library/Application Support/FastWrite/</code> (macOS), or <code>~/.local/share/FastWrite/</code> (Linux). We do <strong>not</strong> have access to this data:</p>
+<p>The following data is stored <strong>only on your computer</strong> under <code>%APPDATA%\FastWrite\</code>. FastWrite is currently distributed as a <strong>Windows desktop application</strong>. We do <strong>not</strong> have access to this data:</p>
 <ul>
 <li>Uploaded documents (invoices, receipts, PDFs)</li>
 <li>Extracted data and templates</li>
 <li>Your AI provider API keys (e.g., Google Gemini), encrypted with a machine-specific Fernet key</li>
-<li>Your Xero OAuth tokens, encrypted with the same machine-specific key</li>
+<li>Your accounting-platform OAuth tokens (e.g., Xero, and future providers such as QuickBooks), encrypted with the same machine-specific key</li>
 <li>Your local SQLite database (<code>app.db</code>)</li>
 </ul>
 <h3>3.3 Information We Do NOT Collect</h3>
@@ -102,13 +102,14 @@
 <li>Google's processing of this content is governed by <a href="https://policies.google.com/privacy">Google's Privacy Policy</a> and <a href="https://policies.google.com/terms">Google AI Terms</a>.</li>
 <li>We never see your Gemini API key in plain text — it is encrypted on your computer with Fernet symmetric encryption.</li>
 </ul>
-<h3>6.2 Xero Accounting</h3>
+<h3>6.2 Accounting Platform Integrations (Xero — and future providers)</h3>
+<p>FastWrite lets you connect to a third-party accounting platform. <strong>Xero</strong> is the currently supported provider; support for additional platforms (such as <strong>QuickBooks</strong>) is planned and, when released, will operate under the same principles described here.</p>
 <ul>
-<li>If you choose to connect FastWrite to your Xero account, we use OAuth 2.0 with PKCE — meaning <strong>no client secret is ever stored in the application</strong>.</li>
-<li>Xero OAuth tokens are stored <strong>locally and encrypted</strong> on your computer.</li>
-<li>When you push a document as a Bill, the data is transmitted <strong>directly from your computer to Xero's API</strong>, not through our servers.</li>
-<li>Xero's handling of this data is governed by <a href="https://www.xero.com/about/legal/privacy/">Xero's Privacy Policy</a>.</li>
-<li>You can disconnect FastWrite from Xero at any time via Settings → Σύνδεση με Xero → Αποσύνδεση. This deletes the local token and revokes our access on Xero's side.</li>
+<li>If you choose to connect FastWrite to your accounting platform account, we use OAuth 2.0 with PKCE — meaning <strong>no client secret is ever stored in the application</strong>.</li>
+<li>Your accounting-platform OAuth tokens are stored <strong>locally and encrypted</strong> on your computer.</li>
+<li>When you push a document as a Bill, the data is transmitted <strong>directly from your computer to the accounting platform's API</strong>, not through our servers.</li>
+<li>Each provider's handling of this data is governed by its own privacy policy — for example, <a href="https://www.xero.com/about/legal/privacy/">Xero's Privacy Policy</a>. For QuickBooks and any future provider, that provider's published privacy policy will apply.</li>
+<li>You can disconnect FastWrite from a connected accounting platform at any time via the in-app Settings (e.g., Connect to Xero → Disconnect). This deletes the local token and revokes our access on the provider's side.</li>
 </ul>
 <h3>6.3 Email Service Providers</h3>
 <p>If you contact us at support@fastwrite.tech, your message is routed through Cloudflare Email Routing to a Gmail mailbox. Cloudflare's and Google's respective privacy policies apply.</p>
@@ -184,10 +185,10 @@
 <p>The FastWrite desktop application does not use cookies. The FastWrite marketing website (fastwrite.tech) may use only <strong>strictly necessary</strong> cookies for session management. We do <strong>not</strong> use analytics, advertising, or tracking cookies.</p>
 <hr />
 <h2>10. International Data Transfers</h2>
-<p>The account data we hold is stored in the European Union (Finland). When you use third-party integrations (Gemini, Xero), data is transferred to those providers' infrastructure, which may be located outside the EU. We rely on the following safeguards:</p>
+<p>The account data we hold is stored in the European Union (Finland). When you use third-party integrations (e.g., Gemini, Xero, and future accounting providers such as QuickBooks), data is transferred to those providers' infrastructure, which may be located outside the EU. We rely on the following safeguards:</p>
 <ul>
 <li><strong>Gemini:</strong> Google's Standard Contractual Clauses and self-certification under applicable frameworks.</li>
-<li><strong>Xero:</strong> Xero's published data processing terms and Standard Contractual Clauses.</li>
+<li><strong>Accounting platforms (Xero; QuickBooks and others when supported):</strong> the relevant provider's published data processing terms and Standard Contractual Clauses.</li>
 </ul>
 <hr />
 <h2>11. Data Retention</h2>
@@ -207,11 +208,10 @@
 <h2>14. Contact</h2>
 <p>For any privacy-related question, complaint, or data subject request:</p>
 <p><strong>Email:</strong> support@fastwrite.tech
-<strong>Postal Address:</strong> [TO BE FILLED]
+<strong>Postal Address:</strong> Derveneion 2B, 1055 Nicosia, Cyprus
 <strong>Website:</strong> https://fastwrite.tech</p>
 <hr />
-<p><em>FastWrite — Privacy Policy v1.0 — [date]</em>
-<em>Reviewed by: [TO BE FILLED — Cyprus legal counsel]</em></p>
+<p><em>FastWrite — Privacy Policy v1.0 — 11 June 2026</em></p>
   </div>
 </main>
 <footer><div class="container"><div class="copy">© 2026 FastWrite · Operated by Stavros Kallenos (Cyprus)</div><ul><li><a href="/legal/privacy">Privacy Policy</a></li><li><a href="/legal/terms">Terms of Service</a></li><li><a href="mailto:support@fastwrite.tech">Contact</a></li></ul></div></footer>

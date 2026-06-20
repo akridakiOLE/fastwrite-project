@@ -23,6 +23,12 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+/* Visible, on-brand scrollbars (was a thin near-invisible bar) */
+*{scrollbar-width:thin;scrollbar-color:var(--accent) var(--bg2);}
+::-webkit-scrollbar{width:14px;height:14px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--accent);border-radius:7px;border:3px solid var(--bg2);}
+::-webkit-scrollbar-thumb:hover{filter:brightness(1.15);}
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar{width:6px;}
@@ -1241,16 +1247,16 @@ select.form-input option{background:var(--bg2);}
           <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο προηγούμενο έγγραφο προς έγκριση" data-i18n="ap_prev" data-i18n-hint="ap_prev_hint" onclick="apPrevDoc()" id="ap-prev-btn" disabled style="font-size:11px;">← Προηγ.</button>
           <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Μετάβαση στο επόμενο έγγραφο προς έγκριση" data-i18n="ap_next" data-i18n-hint="ap_next_hint" onclick="apNextDoc()" id="ap-next-btn" disabled style="font-size:11px;">Επόμ. →</button>
           <!-- Tour Mode toggle (Sprint 2) -->
-          <button class="tour-toggle-btn tooltip-hint" id="ap-tour-toggle" data-hint="Καθοδηγούμενη Έγκριση — δείχνει ένα πεδίο τη φορά μεγάλο πάνω στο τιμολόγιο" data-i18n-hint="ap_tour_toggle_hint" onclick="apToggleTour()">
+          <button class="tour-toggle-btn tooltip-hint" id="ap-tour-toggle" data-hint="Καθοδηγούμενη Έγκριση — δείχνει ένα πεδίο τη φορά μεγάλο πάνω στο τιμολόγιο" data-i18n-hint="ap_tour_toggle_hint" onclick="apToggleTour()" style="display:none;">
             <span id="ap-tour-toggle-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#555;margin-right:6px;vertical-align:middle;"></span>Tour Mode: <span id="ap-tour-toggle-state">OFF</span>
           </button>
         </div>
       </div>
-      <div style="display:flex;width:100%;height:calc(100vh - 52px);overflow:hidden;background:var(--bg);position:relative;">
+      <div style="display:flex;flex-direction:column;width:100%;height:calc(100vh - 52px);overflow:hidden;background:var(--bg);position:relative;">
         <!-- Toggle sidebar button — positioned at left edge of PDF area -->
-        <button id="ap-sidebar-toggle" onclick="apToggleSidebar()" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:all .3s ease;" title="Εμφάνιση/Απόκρυψη μενού" data-i18n-title="ap_sidebar_toggle_title">◀</button>
+        <button id="ap-sidebar-toggle" onclick="apToggleSidebar()" style="display:none;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;background:var(--bg3);border:1px solid var(--border);border-radius:0 6px 6px 0;color:var(--text2);cursor:pointer;padding:8px 4px;font-size:14px;transition:all .3s ease;" title="Εμφάνιση/Απόκρυψη μενού" data-i18n-title="ap_sidebar_toggle_title">◀</button>
         <!-- PDF Area (PNG + canvas highlight + page number overlay) -->
-        <div id="ap-pdf-area" style="flex:1;height:100%;overflow:hidden;min-width:0;display:flex;flex-direction:column;position:relative;">
+        <div id="ap-pdf-area" style="flex:1;min-height:0;overflow:hidden;min-width:0;display:flex;flex-direction:column;position:relative;">
           <div id="ap-img-wrap" style="flex:1;overflow:auto;position:relative;cursor:crosshair;">
             <img id="ap-doc-img" src="" style="display:block;width:100%;user-select:none;" onload="apOnImgLoad()"/>
             <canvas id="ap-hl-canvas" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
@@ -1294,7 +1300,7 @@ select.form-input option{background:var(--bg2);}
           </div>
         </div>
         <!-- Data Panel (right side) -->
-        <div id="ap-panel" style="width:440px;min-width:440px;height:100%;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .3s ease,min-width .3s ease;">
+        <div id="ap-panel" style="width:100%;height:44vh;min-height:220px;background:var(--bg2);border-top:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;">
           <!-- Scalar fields -->
           <div style="flex-shrink:0;border-bottom:1px solid var(--border);">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);cursor:pointer;user-select:none;" onclick="apToggleScalars()">
@@ -2900,12 +2906,9 @@ function openApprovalFromDocs() {
 
   apCurrentIdx = 0;
   apRenderDocsList();
-  apLoadDoc(0).then(() => {
-    // Αν preference=ON, ενεργοποίησε το Tour αφού φορτώσει το PNG
-    if (tourPref && !apTourActive) {
-      setTimeout(() => apToggleTour(), 100); // μικρό delay για canvas init
-    }
-  });
+  apLoadDoc(0);
+  // Tour Mode (bbox highlight) retired — review is now the clean horizontal
+  // side-by-side (PDF top, data table bottom). No auto-open.
 }
 
 function closeApprovalPage() {
@@ -3726,6 +3729,14 @@ window.addEventListener('resize', function() {
 });
 
 function apDrawHighlight(ri) {
+  // bbox highlight RETIRED — unreliable across invoice formats (it could not
+  // isolate rows on tables without gridlines → a "pie" over the whole invoice).
+  // Review is now the clean side-by-side (PDF + full-width data table); the row
+  // is highlighted in the TABLE, not on the PDF. Keep the canvas clear.
+  const _c = document.getElementById('ap-hl-canvas');
+  if (_c && _c.getContext) _c.getContext('2d').clearRect(0, 0, _c.width, _c.height);
+  return;
+  // ── legacy drawing below intentionally disabled ──
   const img = document.getElementById('ap-doc-img');
   const canvas = document.getElementById('ap-hl-canvas');
   if (!img.complete || canvas.width === 0) return;
@@ -3791,17 +3802,15 @@ function apToggleSidebar() {
     sidebar.style.display = '';
     layout.style.gridTemplateColumns = '220px 1fr';
     toggle.textContent = '◀';
-    // Restore panel to default width
-    panel.style.width = '440px';
-    panel.style.minWidth = '440px';
   } else {
     sidebar.style.display = 'none';
     layout.style.gridTemplateColumns = '1fr';
     toggle.textContent = '▶';
-    // Expand panel to use the extra space
-    panel.style.width = '580px';
-    panel.style.minWidth = '580px';
   }
+  // Panel is the FULL-WIDTH bottom of the vertical split now (was a fixed-width
+  // right column in the old layout) — keep it full width regardless of sidebar.
+  panel.style.width = '100%';
+  panel.style.minWidth = '0';
   // Resize canvas after layout change
   setTimeout(() => {
     const img = document.getElementById('ap-doc-img');

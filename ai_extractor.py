@@ -293,6 +293,96 @@ class AIExtractor:
         result.extracted_at    = datetime.utcnow().isoformat()
         return result
 
+    # ── Multi-invoice extraction (batch speed lever) ─────────────────────────
+    def extract_multi(self, image_paths: List[Path], item_schema: Dict[str, Any],
+                      extra_instructions: str = ""):
+        """Extract N invoices (one per image) in a SINGLE call.
+
+        `item_schema` is the per-invoice object schema (template fields). Returns
+        (ok: bool, invoices: list|None, error: str). Each returned invoice carries
+        `invoice_number` (self-identifying) + `image_index` (1-based). The CALLER
+        must map results to documents by invoice_number and fall back to single
+        extraction on ANY mismatch — never trust array position (correctness rule).
+        """
+        if not image_paths:
+            return False, None, "no images"
+
+        clean_item = copy.deepcopy(item_schema)
+        def _ds(o):
+            if isinstance(o, dict):
+                o.pop("additionalProperties", None); o.pop("$schema", None)
+                for v in list(o.values()): _ds(v)
+            elif isinstance(o, list):
+                for i in o: _ds(i)
+        _ds(clean_item)
+        props = dict(clean_item.get("properties", {}))
+        props["image_index"] = {"type": "integer",
+                                "description": "1-based index of the image this invoice came from"}
+        props["_confidence_pct"] = {"type": "number",
+                                    "description": "Overall confidence 0-100 for THIS invoice's extraction "
+                                                   "(100 = all fields clearly readable)"}
+        multi_schema = {
+            "type": "object",
+            "properties": {"invoices": {"type": "array",
+                                        "items": {"type": "object", "properties": props}}},
+            "required": ["invoices"],
+        }
+        n = len(image_paths)
+        prompt = (
+            f"You are given {n} SEPARATE invoices, one per image, in order "
+            f"(IMAGE 1 .. IMAGE {n}).\n"
+            f"Return a JSON object with an 'invoices' array of EXACTLY {n} elements.\n"
+            f"- Element k corresponds to IMAGE k; set image_index = k (1-based).\n"
+            f"- Each element MUST include invoice_number EXACTLY as printed "
+            f"(it uniquely identifies that invoice).\n"
+            f"- Do NOT merge, skip, or invent invoices. One element per image.\n"
+            f"- Monetary amounts are numbers; dates YYYY-MM-DD; missing fields null.\n"
+            f"- For each invoice set _confidence_pct: overall 0-100 confidence in that "
+            f"invoice's extraction (high if all text is clear).\n"
+            f"- Return ONLY the JSON object."
+        )
+        if extra_instructions:
+            prompt += f"\n{extra_instructions}\n"
+
+        last_error = ""
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                from google import genai
+                from google.genai import types
+                client = self._get_client()
+                parts = []
+                for i, img in enumerate(image_paths, start=1):
+                    data = Path(img).read_bytes()
+                    suffix = Path(img).suffix.lower().lstrip(".")
+                    mime = f"image/{'jpeg' if suffix == 'jpg' else suffix}"
+                    parts.append(f"=== IMAGE {i} ===")
+                    parts.append(types.Part.from_bytes(data=data, mime_type=mime))
+                parts.append(prompt)
+                # Output budget scales with N so large batches don't truncate.
+                # Gemini 2.5 Flash supports up to ~65k output tokens; 8192 (the
+                # single-call default) capped multi-invoice to only a few invoices.
+                config = types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    response_mime_type="application/json",
+                    response_schema=multi_schema,
+                    temperature=0.0,
+                    max_output_tokens=min(65000, 4096 + n * 1500),
+                )
+                resp = client.models.generate_content(
+                    model=self.model, contents=parts, config=config)
+                raw = resp.text.strip() if resp.text else ""
+                data = json.loads(raw)   # truncation → JSONDecodeError → retry → fallback
+                return True, data.get("invoices", []), ""
+            except Exception as e:
+                last_error = str(e)
+                if any(k in last_error.lower()
+                       for k in ["api_key", "invalid key", "permission", "401", "403"]):
+                    return False, None, f"invalid key: {last_error}"
+                if attempt < self.max_retries:
+                    time.sleep(RETRY_DELAY * attempt)
+                    continue
+        return False, None, last_error or "exhausted"
+
     # ── Tour Mode: Bounding box extraction (Sprint 1.1) ──────────────────────
     def extract_bboxes(self, image_paths: List[Path],
                        extracted_values: Dict[str, Any]) -> Dict[str, Any]:

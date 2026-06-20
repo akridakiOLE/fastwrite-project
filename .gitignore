@@ -33,3 +33,21 @@ FastWrite-Windows.zip
 
 # Benchmark artifacts (200-invoice PDF + preview PNGs) — local only, never commit
 benchmark/
+
+# Plaintext API keys for tests — NEVER commit (security)
+new_keys.txt
+aq_key.txt
+
+# Temporary diagnostic/utility scripts — local only, not for commit
+diag_*.py
+benchmark_report_*.json
+*_report_*.json
+diag_rate.py
+diag_multikey.py
+diag_model.py
+diag_lite.py
+whichkey.py
+add_key.py
+del_extra_keys.py
+testkeys.py
+test_aq.py
