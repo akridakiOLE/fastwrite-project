@@ -229,8 +229,18 @@ class SchemaBuilder:
             if sf_type not in TYPE_MAP:
                 sf_type = "string"  # fallback
 
-            item_properties[sf_name] = dict(TYPE_MAP[sf_type])
-            item_required.append(sf_name)
+            prop = dict(TYPE_MAP[sf_type])
+            if sf.get("description"):
+                prop["description"] = str(sf["description"])
+
+            if sf.get("nullable", False):
+                # Optional column: allow null and keep it OUT of `required`, so the
+                # model can legitimately return null when the invoice has no such
+                # column (e.g. VAT-per-line, pack_size) without breaking the schema.
+                item_properties[sf_name] = {"anyOf": [prop, {"type": "null"}]}
+            else:
+                item_properties[sf_name] = prop
+                item_required.append(sf_name)
 
         return {
             "type": "array",

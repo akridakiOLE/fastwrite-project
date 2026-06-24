@@ -12,7 +12,8 @@ sys.path.insert(0, "/app/projects")
 
 from validator import (
     InvoiceValidator, GenericValidator, ValidationResult,
-    STATUS_VALIDATED, STATUS_REVIEW, TOLERANCE
+    STATUS_VALIDATED, STATUS_REVIEW, TOLERANCE,
+    reconciliation_fraction,
 )
 
 
@@ -320,6 +321,53 @@ class TestGenericValidator(unittest.TestCase):
         self.assertFalse(result.is_valid)
 
 
+class TestReconciliationConfidence(unittest.TestCase):
+    """reconciliation_fraction: catches numeric misreads (not just blanks)."""
+
+    def _clean(self):
+        # net 310, vat 19% = 58.90, total 368.90; line totals sum to 310.
+        return {
+            "net_amount": 310.00, "vat_rate": 19.0,
+            "vat_amount": 58.90, "total_amount": 368.90,
+            "line_items": [
+                {"description": "A", "quantity": 12, "unit_price": 3.45, "total": 41.40},
+                {"description": "B", "quantity": 8,  "unit_price": 1.20, "total": 9.60},
+                {"description": "C", "quantity": 20, "unit_price": 0.85, "total": 17.00},
+                {"description": "D", "quantity": 5,  "unit_price": 7.90, "total": 39.50},
+                {"description": "E", "quantity": 1,  "unit_price": 129.00, "total": 129.00},
+                {"description": "F", "quantity": 3,  "unit_price": 24.50, "total": 73.50},
+            ],
+        }
+
+    def test_clean_invoice_full_reconciliation(self):
+        self.assertEqual(reconciliation_fraction(self._clean()), 1.0)
+
+    def test_numeric_misread_breaks_reconciliation(self):
+        # 129.00 -> 12.00: breaks line-sum, net+vat=total AND one row.
+        d = self._clean()
+        d["line_items"][4]["total"] = 12.00
+        d["line_items"][4]["unit_price"] = 12.00
+        frac = reconciliation_fraction(d)
+        self.assertIsNotNone(frac)
+        self.assertLess(frac, 1.0)
+
+    def test_total_misread_drops_score(self):
+        d = self._clean()
+        d["total_amount"] = 999.99
+        self.assertLess(reconciliation_fraction(d), 1.0)
+
+    def test_no_numeric_fields_returns_none(self):
+        self.assertIsNone(reconciliation_fraction(
+            {"supplier": "ACME", "invoice_number": "INV-1"}))
+
+    def test_string_numbers_are_parsed(self):
+        d = {"net_amount": "310,00", "vat_amount": "58,90", "total_amount": "368,90"}
+        self.assertEqual(reconciliation_fraction(d), 1.0)
+
+    def test_non_dict_returns_none(self):
+        self.assertIsNone(reconciliation_fraction(None))
+        self.assertIsNone(reconciliation_fraction([1, 2, 3]))
+
 if __name__ == "__main__":
     print("=" * 60)
     print("MODULE 6 - Unit Tests: Validation Engine")
@@ -334,6 +382,7 @@ if __name__ == "__main__":
     suite.addTests(loader.loadTestsFromTestCase(TestInvoiceValidatorFormatErrors))
     suite.addTests(loader.loadTestsFromTestCase(TestInvoiceValidatorPresence))
     suite.addTests(loader.loadTestsFromTestCase(TestGenericValidator))
+    suite.addTests(loader.loadTestsFromTestCase(TestReconciliationConfidence))
 
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)

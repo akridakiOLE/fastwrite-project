@@ -49,5 +49,5 @@ diag_lite.py
 whichkey.py
 add_key.py
 del_extra_keys.py
-testkeys.py
-test_aq.py
+testkey
+diag_sample_*

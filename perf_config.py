@@ -89,6 +89,27 @@ def get_dpi(default: int = DEFAULT_DPI) -> int:
     return default
 
 
+def get_extraction_model(default: str = None) -> str:
+    """Model for BATCH EXTRACTION only (extract-selected). Lets you run a faster
+    model (e.g. flash-lite) for bulk field extraction while keeping the accurate
+    model ('model') for SEGMENTATION/registration — flash-lite is less accurate at
+    detecting invoice boundaries. perf_settings.json {"extraction_model": "..."};
+    falls back to the main model if unset."""
+    base = default or get_model()
+    try:
+        p = _settings_path()
+        if p.exists():
+            cfg = json.loads(p.read_text(encoding="utf-8"))
+            m = str(cfg.get("extraction_model", "")).strip()
+            if m in _ALLOWED_MODELS:
+                return m
+            if m:
+                logger.warning("[perf] extraction_model %r not in allow-list; using %s", m, base)
+    except Exception as e:
+        logger.warning("[perf] failed to read extraction_model (using %s): %s", base, e)
+    return base
+
+
 # Multi-invoice-per-call (batch extraction speed lever). 1 = OFF (one invoice
 # per AI call — the proven default). N>1 groups up to N same-template single-page
 # invoices into ONE call. Default OFF until validated end-to-end on real data.

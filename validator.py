@@ -348,6 +348,145 @@ class InvoiceValidator:
         return count
 
 
+# -- Reconciliation-based confidence (model-independent correctness signal) ----
+# Catches NUMERIC misreads that completeness misses: if the model reads a number
+# wrong, the invoice arithmetic stops reconciling. Returns a fraction 0.0-1.0
+# (how many consistency checks passed) or None when NO check applies (the caller
+# then falls back to completeness).
+
+_REC_TOL = Decimal("0.02")
+
+_TOTAL_HINTS   = ("total_amount", "grand_total", "amount_due", "payable",
+                  "συνολ", "πληρωτε", "τελικ")
+_NET_HINTS     = ("net_amount", "subtotal", "sub_total", "net", "καθαρ", "μερικ")
+_VATAMT_HINTS  = ("vat_amount", "tax_amount", "φπα", "vat", "tax")
+_VATRATE_HINTS = ("vat_rate", "tax_rate", "rate")
+_QTY_HINTS     = ("quantity", "qty", "ποσοτ", "τεμ")
+_UNITP_HINTS   = ("unit_price", "unitprice", "price", "unit", "τιμη")
+_LINET_HINTS   = ("line_total", "linetotal", "total", "amount", "συνολ", "αξια")
+
+
+def _rec_num(v):
+    """Lenient numeric parse: float/int or numeric string (1.234,56 / 1,234.56)."""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        s = re.sub(r"[^\d,.\-]", "", v.strip())
+        if not s:
+            return None
+        if "," in s and "." in s:
+            s = (s.replace(".", "").replace(",", ".")
+                 if s.rfind(",") > s.rfind(".") else s.replace(",", ""))
+        elif "," in s:
+            s = s.replace(",", ".")
+        try:
+            return float(s)
+        except ValueError:
+            return None
+    return None
+
+
+def _pick_key(keys, hints, exclude=()):
+    """First key matching a hint with no excluded token. Exact canonical names
+    (containing '_') are tried first for precision."""
+    low = {k: k.lower() for k in keys}
+    for h in hints:
+        if "_" in h:
+            for k, lk in low.items():
+                if lk == h and not any(x in lk for x in exclude):
+                    return k
+    for h in hints:
+        for k, lk in low.items():
+            if h in lk and not any(x in lk for x in exclude):
+                return k
+    return None
+
+
+def _close(a, b, tol=_REC_TOL):
+    return abs(Decimal(str(a)) - Decimal(str(b))) <= tol
+
+
+def reconciliation_fraction(extracted, template=None):
+    """Fraction 0.0-1.0 of arithmetic consistency checks that passed; None if no
+    check applies."""
+    if not isinstance(extracted, dict):
+        return None
+    keys = [k for k in extracted.keys() if not k.startswith("_")]
+
+    k_total = _pick_key(keys, _TOTAL_HINTS, exclude=("line", "sub", "net", "vat", "unit"))
+    k_net   = _pick_key(keys, _NET_HINTS,   exclude=("vat", "tax"))
+    k_vat   = _pick_key(keys, _VATAMT_HINTS, exclude=("rate", "%", "total", "net"))
+    k_rate  = _pick_key(keys, _VATRATE_HINTS)
+
+    net   = _rec_num(extracted.get(k_net))   if k_net   else None
+    vat   = _rec_num(extracted.get(k_vat))   if k_vat   else None
+    total = _rec_num(extracted.get(k_total)) if k_total else None
+    rate  = _rec_num(extracted.get(k_rate))  if k_rate  else None
+
+    rows = None
+    for k in keys:
+        v = extracted.get(k)
+        if isinstance(v, list) and v and all(isinstance(r, dict) for r in v):
+            rows = v
+            break
+
+    checks = []   # each element: float in [0,1]
+
+    # A: net + vat = total
+    if net is not None and vat is not None and total is not None:
+        checks.append(1.0 if _close(net + vat, total) else 0.0)
+
+    # B: net x rate% = vat
+    if net is not None and rate is not None and vat is not None:
+        exp = Decimal(str(net)) * Decimal(str(rate)) / Decimal("100")
+        tol = max(_REC_TOL, exp * Decimal("0.01"))
+        checks.append(1.0 if abs(exp - Decimal(str(vat))) <= tol else 0.0)
+
+    if rows:
+        rk = list(rows[0].keys())
+        c_qty  = _pick_key(rk, _QTY_HINTS)
+        c_unit = _pick_key(rk, _UNITP_HINTS, exclude=("total",))
+        c_ltot = _pick_key(rk, _LINET_HINTS, exclude=("unit", "vat", "rate"))
+
+        # C: sum(line totals) = net
+        if c_ltot and net is not None:
+            s, ok = Decimal("0"), True
+            for r in rows:
+                lv = _rec_num(r.get(c_ltot))
+                if lv is None:
+                    ok = False
+                    break
+                s += Decimal(str(lv))
+            if ok:
+                tol = max(_REC_TOL, Decimal(str(net)) * Decimal("0.01"))
+                checks.append(1.0 if abs(s - Decimal(str(net))) <= tol else 0.0)
+
+        # D: per-row qty x unit = line total (fraction of rows)
+        if c_qty and c_unit and c_ltot:
+            passed = applicable = 0
+            for r in rows:
+                q  = _rec_num(r.get(c_qty))
+                u  = _rec_num(r.get(c_unit))
+                lt = _rec_num(r.get(c_ltot))
+                if q is None or u is None or lt is None:
+                    continue
+                applicable += 1
+                exp = Decimal(str(q)) * Decimal(str(u))
+                tol = max(_REC_TOL, exp * Decimal("0.01"))
+                if abs(exp - Decimal(str(lt))) <= tol:
+                    passed += 1
+            if applicable:
+                checks.append(passed / applicable)
+
+    if not checks:
+        return None
+    return sum(checks) / len(checks)
+
+
+
+
 # ── Γενικός Validator (για μη-τιμολόγια) ─────────────────────────────────────
 
 class GenericValidator:

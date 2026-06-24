@@ -8,6 +8,7 @@ import sys
 import io
 import base64
 import logging
+import threading
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file, make_response, redirect
@@ -1320,6 +1321,110 @@ def extract_document(doc_id):
         db.update_document_status(doc_id, status="Failed")
         return jsonify({"success": False, "error": result.error_message}), 500
 
+# ── Batch-extraction live progress (perceived-speed bar) ──────────────────────
+# The Batch runs in PARALLEL under the hood; we just publish how many docs are
+# done so the frontend can show a bar with groups "falling" rapidly instead of a
+# blank spinner. Keyed by user_id; polled via GET /api/batch/progress.
+_batch_progress = {}
+_batch_progress_lock = threading.Lock()
+
+def _set_batch_progress(uid, done, total, status, render=None):
+    # 34-10: `render` = how many pages have been RASTERISED (the first ~30s where
+    # there are no AI calls yet). Reported separately so the bar can move with REAL
+    # signal during rendering instead of the frontend guessing. If render is not
+    # passed, the existing value is preserved (so the final "done" set doesn't wipe it).
+    with _batch_progress_lock:
+        cur = _batch_progress.get(uid, {})
+        _batch_progress[uid] = {"done": done, "total": total, "status": status,
+                                "render": (render if render is not None else cur.get("render", 0))}
+
+def _inc_batch_progress(uid, delta):
+    with _batch_progress_lock:
+        if uid in _batch_progress:
+            _batch_progress[uid]["done"] += delta
+
+def _inc_render_progress(uid, delta):
+    with _batch_progress_lock:
+        if uid in _batch_progress:
+            _batch_progress[uid]["render"] = _batch_progress[uid].get("render", 0) + delta
+
+@app.get("/api/batch/progress")
+@require_auth
+def batch_progress():
+    uid = request.current_user["user_id"]
+    with _batch_progress_lock:
+        return jsonify(_batch_progress.get(uid, {"done": 0, "total": 0, "status": "idle", "render": 0}))
+
+
+def _completeness_confidence(extracted, template):
+    """Confidence from field COMPLETENESS (model-independent). Replaces the AI
+    self-assessment, which flash-lite over-reports as a flat 100%. Averages how
+    many fields + line-item cells were actually filled → a meaningful, honest
+    signal that varies with messy/incomplete invoices."""
+    try:
+        fields = (template or {}).get("fields", []) or []
+    except Exception:
+        return None
+    def _filled(v):
+        return v is not None and not (isinstance(v, str) and not v.strip())
+    pts = []
+    for f in fields:
+        name = f.get("name")
+        if not name or name.startswith("_"):
+            continue
+        # Optional (nullable) fields are NOT scored: a column that legitimately
+        # does not apply to this invoice (e.g. per-line VAT, pack_size) must not
+        # drag confidence down. Only mandatory fields drive completeness.
+        if f.get("nullable", False):
+            continue
+        if f.get("type") == "array":
+            cols = [c.get("name") for c in (f.get("items") or [])
+                    if c.get("name") and not c.get("nullable", False)]
+            rows = extracted.get(name)
+            if isinstance(rows, list) and rows and cols:
+                tot = filled = 0
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    for cn in cols:
+                        tot += 1
+                        if _filled(row.get(cn)):
+                            filled += 1
+                pts.append((filled / tot) if tot else 0.0)
+            else:
+                pts.append(1.0 if rows else 0.0)
+        else:
+            pts.append(1.0 if _filled(extracted.get(name)) else 0.0)
+    return round(100 * sum(pts) / len(pts), 1) if pts else None
+
+
+def _blended_confidence(extracted, template):
+    """Confidence = το πιο ΣΥΝΤΗΡΗΤΙΚΟ από τα διαθέσιμα σήματα:
+      (α) self-assessment του μοντέλου (_confidence_pct) — αυτό ποικίλλει ανά
+          τιμολόγιο στο flash (η «παλιά» συμπεριφορά),
+      (β) completeness — πιάνει κενά πεδία,
+      (γ) reconciliation — πιάνει αριθμητικά λάθη (net+ΦΠΑ=total κ.λπ.).
+    Παίρνουμε το min(): ΚΑΘΕ αδυναμία ρίχνει το ποσοστό. Σε τέλεια & σίγουρη
+    εξαγωγή το αποτέλεσμα είναι υψηλό (που είναι το σωστό)."""
+    cands = []
+    ai = extracted.get("_confidence_pct")
+    if isinstance(ai, (int, float)) and not isinstance(ai, bool):
+        cands.append(max(0.0, min(100.0, float(ai))))
+    comp = _completeness_confidence(extracted, template)
+    if comp is not None:
+        cands.append(comp)
+    try:
+        from validator import reconciliation_fraction
+        rec = reconciliation_fraction(extracted, template)
+    except Exception:
+        rec = None
+    if rec is not None:
+        cands.append(round(100 * (0.4 + 0.6 * rec), 1))
+    if not cands:
+        return None
+    return round(min(cands), 1)
+
+
 @app.post("/api/batch/extract-selected")
 @require_auth
 def batch_extract_selected():
@@ -1340,6 +1445,10 @@ def batch_extract_selected():
         return jsonify({"error": "Δεν έχει οριστεί κλειδί Gemini API. Ρυθμίσεις → API Keys για να το καταχωρίσεις.", "error_code": "gemini_key_missing"}), 400
 
     from ai_extractor import AIExtractor
+    from perf_config import get_extraction_model
+    # Model for BULK extraction only — lets us run flash-lite here for speed while
+    # segmentation/registration keep the accurate model. Falls back to main model.
+    extraction_model = get_extraction_model()
 
     # ── Subscription enforcement: pre-count pages for docs that WILL actually
     # be extracted (exclude already-completed / no-label / wrong-user docs).
@@ -1408,8 +1517,9 @@ def batch_extract_selected():
             processed_result = processor.process(file_path)
             if not processed_result.is_ok():
                 return {"doc_id": w_doc_id, "outcome": "process_error"}
+            _inc_render_progress(uid, 1)   # 34-10: page rasterised → bar moves during render
 
-            extractor = AIExtractor(api_key=api_key)
+            extractor = AIExtractor(api_key=api_key, model=extraction_model)
             result = extractor.extract(image_paths=processed_result.pages, schema=schema)
             if not result.is_ok():
                 return {"doc_id": w_doc_id, "outcome": "extraction_failed"}
@@ -1425,6 +1535,11 @@ def batch_extract_selected():
             if rd.get("_matched_supplier"):
                 extracted.setdefault("_matched_supplier", rd["_matched_supplier"])
             extracted.setdefault("_matched_template", w_sname)
+            # Honest confidence: completeness + arithmetic reconciliation
+            # (catches numeric misreads, not just blanks). Model-independent.
+            _c = _blended_confidence(extracted, w_template)
+            if _c is not None:
+                extracted["_confidence_pct"] = _c
             # B7: skip extract_bboxes (Gemini call #2) in batch — Tour highlights
             # are computed on-demand via /field-positions (pdfplumber text-search).
             return {"doc_id": w_doc_id, "outcome": "ok",
@@ -1454,7 +1569,8 @@ def batch_extract_selected():
             if not pr.is_ok():
                 return {"fallback": chunk}
             images.append(pr.pages[0])
-        extractor = AIExtractor(api_key=api_key)
+            _inc_render_progress(uid, 1)   # 34-10: page rasterised → bar moves during render
+        extractor = AIExtractor(api_key=api_key, model=extraction_model)
         ok, invoices, err = extractor.extract_multi(images, schema)
         n = len(chunk)
         valid = ok and isinstance(invoices, list) and len(invoices) == n
@@ -1482,23 +1598,44 @@ def batch_extract_selected():
             if rd.get("_matched_supplier"):
                 inv.setdefault("_matched_supplier", rd["_matched_supplier"])
             inv.setdefault("_matched_template", (cdoc.get("schema_name") or "").strip())
+            _c = _blended_confidence(inv, ctmpl)   # completeness + reconciliation
+            if _c is not None:
+                inv["_confidence_pct"] = _c
             out.append({"doc_id": cdid, "outcome": "ok", "extracted": inv, "pages": 1})
         return {"results": out}
 
+    _set_batch_progress(uid, 0, len(eligible_docs), "running", render=0)
     worker_results = []
     remaining = eligible_docs
 
     if multi_n > 1 and eligible_docs:
+        # Group by SCHEMA STRUCTURE, not by label name. All auto-labels share the
+        # same fields (DEFAULT_LABEL_FIELDS), so invoices from DIFFERENT suppliers
+        # can be batched together — the REAL-WORLD case is one buyer / many
+        # suppliers (unique labels). Grouping by label name gave groups of 1 and
+        # killed multi-invoice. Same structure → same extraction schema → safe to
+        # batch; each doc still keeps its own label/supplier, and a chunk that
+        # fails the 1:1 validation falls back to the single path.
+        def _schema_fingerprint(tmpl):
+            fields = (tmpl or {}).get("fields", []) or []
+            def _norm(f):
+                if f.get("type") == "array":
+                    cols = tuple(sorted((c.get("name"), c.get("type"))
+                                        for c in (f.get("items") or [])))
+                    return (f.get("name"), "array", cols)
+                return (f.get("name"), f.get("type"))
+            return tuple(sorted(_norm(f) for f in fields))
+
         groups = {}
         leftover = []
         for item in eligible_docs:
             _did, _d, _t, _n = item
             if _n == 1:
-                groups.setdefault((_d.get("schema_name") or "").strip(), []).append(item)
+                groups.setdefault(_schema_fingerprint(_t), []).append(item)
             else:
                 leftover.append(item)            # multi-page → single path
         chunks = []
-        for _sname, items in groups.items():
+        for _fp, items in groups.items():
             for c in range(0, len(items), multi_n):
                 ch = items[c:c + multi_n]
                 if len(ch) >= 2:
@@ -1508,17 +1645,26 @@ def batch_extract_selected():
         if chunks:
             logger.info("[multi] extract-selected N=%d: %d chunk(s)", multi_n, len(chunks))
             with concurrent.futures.ThreadPoolExecutor(max_workers=BATCH_EXTRACT_WORKERS) as mpool:
-                for r in mpool.map(_extract_multi_chunk, chunks):
+                for ch, r in zip(chunks, mpool.map(_extract_multi_chunk, chunks)):
                     if "results" in r:
                         worker_results.extend(r["results"])
+                        _inc_batch_progress(uid, len(ch))      # group "falls" → bar moves
                     else:
-                        leftover.extend(r["fallback"])
+                        leftover.extend(r["fallback"])         # → counted in single phase
         remaining = leftover
 
     if remaining:
         with concurrent.futures.ThreadPoolExecutor(
                 max_workers=BATCH_EXTRACT_WORKERS) as pool:
-            worker_results.extend(list(pool.map(_extract_worker, remaining)))
+            for r in pool.map(_extract_worker, remaining):
+                worker_results.append(r)
+                _inc_batch_progress(uid, 1)
+
+    # 34-10 DIAG: if the bar sticks at 99, this line tells us the extraction
+    # phase FINISHED (so the hang is below, in the serial DB-write phase). If it
+    # NEVER prints, a worker/Gemini call is still hung above.
+    logger.info("[extract-selected] extraction phase DONE: %d worker results → "
+                "starting serial DB-write phase", len(worker_results))
 
     # ── Serial DB-write phase (main thread only → no race conditions) ──
     for r in worker_results:
@@ -1549,6 +1695,11 @@ def batch_extract_selected():
             results["details"].append({"doc_id": doc_id, "status": "error",
                                        "error": r.get("error")})
 
+    # 34-10 DIAG: if this prints but the bar still never reaches 100, the hang is
+    # in the HTTP response delivery, not the backend work.
+    logger.info("[extract-selected] serial DB-write phase COMPLETE: extracted=%d "
+                "failed=%d → returning response", results["extracted"], results["failed"])
+    _set_batch_progress(uid, len(eligible_docs), len(eligible_docs), "done")
     return jsonify({"success": True, **results})
 
 

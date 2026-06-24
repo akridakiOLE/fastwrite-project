@@ -101,12 +101,24 @@ class AIExtractor:
         if self._client is None:
             try:
                 from google import genai
-                self._client = genai.Client(api_key=self.api_key)
             except ImportError:
                 raise ImportError(
                     "Η βιβλιοθήκη google-genai δεν είναι εγκατεστημένη. "
                     "Εκτέλεσε: pip install google-genai"
                 )
+            # 34-10: bound EVERY request with REQUEST_TIMEOUT so a single stalled
+            # call can't hang the whole batch forever (in-order pool.map froze the
+            # progress bar at 99/100). HttpOptions.timeout is in MILLISECONDS.
+            # Defensive: if this SDK build rejects http_options, fall back to a
+            # plain client so extraction keeps working (without the timeout guard).
+            try:
+                from google.genai import types
+                self._client = genai.Client(
+                    api_key=self.api_key,
+                    http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT * 1000),
+                )
+            except Exception:
+                self._client = genai.Client(api_key=self.api_key)
         return self._client
 
     def extract(self, image_paths: List[Path],
@@ -160,11 +172,19 @@ class AIExtractor:
                 last_rate_limited = ("quota" in err_lower or "429" in err_lower
                                      or "resource_exhausted" in err_lower
                                      or "rate limit" in err_lower)
+                # 503/overloaded/5xx = TRANSIENT server capacity (the flash-lite
+                # "reliability tax"). These were exhausting retries and marking docs
+                # Failed. Treat them like rate-limits → longer backoff so a brief
+                # outage clears before we give up.
+                last_transient = (last_rate_limited
+                                  or "503" in err_lower or "unavailable" in err_lower
+                                  or "overloaded" in err_lower or "500" in err_lower
+                                  or "502" in err_lower or "504" in err_lower)
 
                 if attempt < self.max_retries:
                     backoff = RETRY_DELAY * attempt
-                    if last_rate_limited:
-                        # wait longer so the per-minute RPM window can free up
+                    if last_transient:
+                        # wait longer so the RPM window / server capacity frees up
                         backoff = max(backoff, RETRY_DELAY * 3)
                     time.sleep(backoff)
 

@@ -17,8 +17,8 @@
   --warn:      #ffb300;
   --danger:    #ff4444;
   --text:      #e8eaf0;
-  --text2:     #7c8299;
-  --text3:     #3d4259;
+  --text2:     #aeb6cc;
+  --text3:     #7d86a1;
   --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -122,7 +122,16 @@ tbody td:first-child{color:var(--text);}
 .col-filter-head:hover .cf-arrow{color:var(--accent);}
 .cf-arrow{font-size:8px;color:var(--text3);transition:color .15s;}
 .col-filter-dropdown{position:absolute;top:100%;left:0;min-width:160px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.5);cursor:default;}
+.cf-checks{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;}
+.cf-checks label{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text);padding:3px 4px;cursor:pointer;white-space:nowrap;border-radius:4px;font-weight:400;}
+.cf-checks label:hover{background:var(--bg3);}
+.cf-checks input{width:13px;height:13px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto;}
+.cf-checks .cf-empty{font-size:10px;color:var(--text3);padding:4px;}
 thead th{padding:10px 10px 8px !important;}
+/* P1.2: απόκρυψη ένδειξης πλάνου/usage (νέο μοντέλο — όχι πλάνα) */
+#sidebar-plan-info{display:none !important;}
+/* P1.3: ευανάγνωστο placeholder στα search/inputs */
+.form-input::placeholder{color:#9aa2bb;opacity:1;}
 
 /* ── Upload Zone ── */
 .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:48px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2);}
@@ -134,6 +143,11 @@ thead th{padding:10px 10px 8px !important;}
 
 /* ── Progress ── */
 .progress-bar{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:8px;}
+/* 34-10: INDETERMINATE batch bar — a segment sweeps continuously across the track,
+   decoupled from the count. Starts on the first signal, runs until completion, and
+   can never "freeze" because it does not represent a percentage. On done the JS
+   sets animation:none + width:100% for a solid full bar. */
+@keyframes bxIndeterminate { 0% { left:-40%; width:40%; } 50% { left:25%; width:55%; } 100% { left:100%; width:40%; } }
 .progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .5s ease;}
 .progress-fill.active{
   background: repeating-linear-gradient(
@@ -336,7 +350,7 @@ select.form-input option{background:var(--bg2);}
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
         <span data-i18n="sidebar_settings">Ρυθμίσεις</span>
       </button>
-      <button class="nav-item" onclick="showPage('billing')">
+      <button class="nav-item" onclick="showPage('billing')" style="display:none">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
         <span data-i18n="sidebar_billing">Billing</span>
       </button>
@@ -543,8 +557,18 @@ select.form-input option{background:var(--bg2);}
       </div>
       <!-- Search bar full width -->
       <div style="padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;gap:8px;align-items:center;">
-        <input class="form-input" style="flex:1;padding:8px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);" placeholder="🔍 Αναζήτηση σε όλα τα πεδία..." data-i18n-placeholder="docs_search_placeholder" id="doc-search" oninput="filterDocs()"/>
+        <input class="form-input" style="flex:1;padding:9px 14px;font-size:13px;background:var(--bg2);border:1px solid var(--accent);border-radius:8px;color:var(--text);box-shadow:0 0 0 1px rgba(0,229,160,0.15);" placeholder="🔍 Αναζήτηση σε όλα τα πεδία..." data-i18n-placeholder="docs_search_placeholder" id="doc-search" oninput="filterDocs()"/>
         <button class="btn btn-secondary btn-sm tooltip-hint" data-hint="Καθαρίστε όλα τα φίλτρα αναζήτησης και εμφανίστε όλα τα έγγραφα" data-i18n="docs_clear_filters" data-i18n-hint="docs_clear_filters_hint" onclick="clearDocFilters()" style="white-space:nowrap;padding:8px 14px;">✕ Καθαρισμός Φίλτρων</button>
+      </div>
+      <!-- Last N selector + σύνολο επιλεγμένων (σημείο 2) -->
+      <div style="padding:6px 16px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;gap:12px;align-items:center;">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="font-size:12px;color:var(--text2);" data-i18n="docs_last_n_label">Τελευταία</span>
+          <input type="number" id="last-n-input" min="1" placeholder="100" style="width:72px;padding:5px 8px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);" onkeydown="if(event.key==='Enter'){event.preventDefault();selectLastN();}"/>
+          <button class="btn btn-secondary btn-sm" onclick="selectLastN()" data-i18n="docs_last_n_btn" style="padding:5px 12px;">Επιλογή</button>
+        </div>
+        <span id="doc-filtered-count" style="font-size:12px;color:var(--text2);"></span>
+        <span id="doc-selected-count2" style="font-size:14px;font-weight:700;color:#fff;margin-left:auto;"></span>
       </div>
       <div class="content" style="padding:0;">
         <div class="table-wrap">
@@ -561,25 +585,19 @@ select.form-input option{background:var(--bg2);}
               <th style="color:#fff;vertical-align:top;min-width:120px;position:relative;">
                 <div class="col-filter-head" onclick="toggleColFilter(event,'cf-file')"><span data-i18n="docs_th_file">ΑΡΧΕΙΟ</span> <span class="cf-arrow">▼</span></div>
                 <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-file" style="display:none;">
-                  <select id="cff-file" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-                    <option value="" data-i18n="docs_filter_all">ΟΛΑ</option>
-                  </select>
-                </div>
-              </th>
-              <th style="color:#fff;vertical-align:top;min-width:100px;position:relative;">
-                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-label')"><span data-i18n="docs_th_labels">ΕΤΙΚΕΤΕΣ</span> <span class="cf-arrow">▼</span></div>
-                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-label" style="display:none;">
-                  <select id="cff-label" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-                    <option value="" data-i18n="docs_filter_all">ΟΛΑ</option>
-                  </select>
+                  <div id="cff-file" class="cf-checks" onchange="filterDocs()"></div>
                 </div>
               </th>
               <th style="color:#fff;vertical-align:top;min-width:110px;position:relative;">
-                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-supplier')"><span data-i18n="docs_th_supplier"><div>ΠΡΟΜΗΘΕΥΤΗΣ</div><div>ΠΩΛΗΤΗΣ</div></span> <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-buyer')"><span data-i18n="docs_th_buyer">Όνομα Αγοραστή</span> <span class="cf-arrow">▼</span></div>
+                <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-buyer" style="display:none;">
+                  <div id="cff-buyer" class="cf-checks" onchange="filterDocs()"></div>
+                </div>
+              </th>
+              <th style="color:#fff;vertical-align:top;min-width:110px;position:relative;">
+                <div class="col-filter-head" onclick="toggleColFilter(event,'cf-supplier')"><span data-i18n="docs_th_supplier">Όνομα Προμηθευτή</span> <span class="cf-arrow">▼</span></div>
                 <div class="col-filter-dropdown" onclick="event.stopPropagation()" id="cf-supplier" style="display:none;">
-                  <select id="cff-supplier" onchange="filterDocs()" style="width:100%;padding:4px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-                    <option value="" data-i18n="docs_filter_all">ΟΛΑ</option>
-                  </select>
+                  <div id="cff-supplier" class="cf-checks" onchange="filterDocs()"></div>
                 </div>
               </th>
               <th style="color:#fff;vertical-align:top;min-width:80px;position:relative;">
@@ -631,6 +649,11 @@ select.form-input option{background:var(--bg2);}
           </table>
         </div>
       </div>
+      <!-- P2.2 / 35-3: scroll στην αρχή/τέλος της σελίδας (πράσινα, λειτουργικά) -->
+      <div style="position:fixed;right:16px;bottom:84px;display:flex;flex-direction:column;gap:6px;z-index:50;">
+        <button onclick="docsScrollTo(false)" title="Αρχή" data-i18n-title="docs_scroll_top" style="width:34px;height:34px;border-radius:8px;border:1px solid var(--accent);background:rgba(0,229,160,0.12);color:var(--accent);cursor:pointer;font-size:15px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.4);">▲</button>
+        <button onclick="docsScrollTo(true)" title="Τέλος" data-i18n-title="docs_scroll_bottom" style="width:34px;height:34px;border-radius:8px;border:1px solid var(--accent);background:rgba(0,229,160,0.12);color:var(--accent);cursor:pointer;font-size:15px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.4);">▼</button>
+      </div>
     </div>
 
     <!-- BATCH PAGE αφαιρέθηκε — ιστορικό μεταφέρθηκε στο Upload & Extract -->
@@ -646,10 +669,12 @@ select.form-input option{background:var(--bg2);}
       </div>
       <div class="content">
         <!-- Templates Search Bar -->
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;">
-          <input type="text" id="tf-name" data-i18n-placeholder="tpl_search_name" placeholder="🔍 Ετικέτα..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
-          <input type="text" id="tf-supplier" data-i18n-placeholder="tpl_search_supplier" placeholder="🏢 Προμηθευτής Πωλητής..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;padding:10px 14px;background:var(--bg2);border:1px solid var(--accent);border-radius:10px;box-shadow:0 0 0 1px rgba(0,229,160,0.15);">
+          <input type="text" id="tf-name" data-i18n-placeholder="tpl_search_name" placeholder="🔍 Ετικέτα..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg2);border:1px solid var(--accent);border-radius:6px;color:var(--text);outline:none;"/>
+          <input type="text" id="tf-supplier" data-i18n-placeholder="tpl_search_supplier" placeholder="🏢 Προμηθευτής Πωλητής..." oninput="applyTemplateFilters()" style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg2);border:1px solid var(--accent);border-radius:6px;color:var(--text);outline:none;"/>
           <button class="af-btn tooltip-hint" data-hint="Καθαρισμός φίλτρων αναζήτησης ετικετών" data-i18n-hint="tpl_clear_hint" onclick="clearTemplateFilters()" title="Καθαρισμός">✕ <span data-i18n="tpl_clear_btn">Καθαρισμός</span></button>
+          <button id="tpl-bulk-del" class="btn btn-danger btn-sm" style="display:none;white-space:nowrap;" onclick="deleteSelectedTemplates()">🗑 <span data-i18n="tpl_del_selected">Διαγραφή επιλεγμένων</span> (<span id="tpl-sel-count">0</span>)</button>
+          <button class="btn btn-secondary btn-sm" style="white-space:nowrap;" onclick="selectAllTemplates()"><span data-i18n="tpl_select_all">Επιλογή ΟΛΩΝ</span></button>
         </div>
         <div id="templates-list"></div>
       </div>
@@ -1564,6 +1589,7 @@ select.form-input option{background:var(--bg2);}
 <script>
 const API = '';  // same origin
 let allDocs = [];
+let lastFilteredDocs = [];   // τρέχουσα φιλτραρισμένη λίστα (για Last N)
 let batchJobs = {};
 let pollIntervals = {};
 
@@ -1721,15 +1747,28 @@ function formatActivityTime(isoStr) {
 
 // ── Documents ───────────────────────────────────────────────────────────────
 async function loadDocuments() {
+  // Register-flash fix: showPage() reveals the Documents page with the PREVIOUS
+  // render still in the DOM, then this async fetch refreshes it — so a stale list
+  // (e.g. an earlier run's BUYER NAME / CONFIDENCE) flashed for a moment. Clear the
+  // table BEFORE the await so nothing stale is shown. No data is affected.
+  const _tb = document.getElementById('docs-table');
+  if (_tb) _tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:40px">…</td></tr>';
   const res = await api('GET','/api/documents');
   allDocs = res.documents || [];
+  lastFilteredDocs = [];
   populateColumnFilters(allDocs);
   renderDocs(allDocs);
 }
 
 function clearDocFilters() {
   document.getElementById('doc-search').value = '';
-  ['cff-file','cff-label','cff-supplier','cff-status','cff-batch','cff-pct'].forEach(id => {
+  // multi-select checkbox φίλτρα → uncheck
+  ['cff-file','cff-label','cff-supplier','cff-buyer'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.querySelectorAll('input:checked').forEach(c => c.checked = false);
+  });
+  // single-select dropdowns
+  ['cff-status','cff-batch','cff-pct'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1739,7 +1778,12 @@ function clearDocFilters() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  // #1: καθάρισε και το Last-N πεδίο + τις επιλογές (checkboxes)
+  const _ln = document.getElementById('last-n-input'); if (_ln) _ln.value = '';
+  const _sa = document.getElementById('doc-select-all'); if (_sa) { _sa.checked = false; _sa.indeterminate = false; }
+  lastFilteredDocs = [];
   renderDocs(allDocs);
+  updateSelection();
 }
 
 // Toggle column filter dropdown
@@ -1768,30 +1812,37 @@ function onPctCustom() {
   filterDocs();
 }
 
-// Populate dynamic filter dropdowns from data
+// HTML-escape για ασφάλεια σε attribute/text των checkboxes
+function _cfEsc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// Supplier/buyer extraction helpers (κοινά σε populate + filter)
+function _supOf(d){const rd=d.result_data||{};return rd.supplier_name||rd.vendor_name||rd.company||rd.issuer||(rd._matched_supplier&&rd._matched_supplier!=='unknown'?rd._matched_supplier:'')||'';}
+function _buyOf(d){const rd=d.result_data||{};return rd.buyer_name||rd.buyer||rd.customer_name||rd.customer||'';}
+// Render checkbox list, διατηρώντας τα ήδη τσεκαρισμένα
+function _cfChecks(containerId, values){
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const prev = new Set([...el.querySelectorAll('input:checked')].map(c=>c.value));
+  if (!values.length){ el.innerHTML = '<div class="cf-empty">—</div>'; return; }
+  el.innerHTML = values.map(v => {
+    const e = _cfEsc(v);
+    return `<label><input type="checkbox" value="${e}"${prev.has(v)?' checked':''}>${e}</label>`;
+  }).join('');
+}
+
+// Populate dynamic filter checkbox lists from data (multi-select)
 function populateColumnFilters(docs) {
-  // Files
-  const files = [...new Set(docs.map(d => d.original_filename || d.filename).filter(Boolean))].sort();
-  const fileSel = document.getElementById('cff-file');
-  if (fileSel) fileSel.innerHTML = '<option value="">' + t('js_all') + '</option>' + files.map(f => `<option value="${f}">${f}</option>`).join('');
-  // Labels (templates)
-  const labels = [...new Set(docs.map(d => d.schema_name).filter(Boolean))].sort();
-  const labelSel = document.getElementById('cff-label');
-  if (labelSel) labelSel.innerHTML = '<option value="">' + t('js_all') + '</option>' + labels.map(l => `<option value="${l}">${l}</option>`).join('');
-  // Suppliers
-  const suppliers = [...new Set(docs.map(d => {
-    const rd = d.result_data || {};
-    return rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || (rd._matched_supplier && rd._matched_supplier !== 'unknown' ? rd._matched_supplier : '') || '';
-  }).filter(Boolean))].sort();
-  const suppSel = document.getElementById('cff-supplier');
-  if (suppSel) suppSel.innerHTML = '<option value="">' + t('js_all') + '</option>' + suppliers.map(s => `<option value="${s}">${s}</option>`).join('');
+  _cfChecks('cff-file',     [...new Set(docs.map(d => d.original_filename || d.filename).filter(Boolean))].sort());
+  _cfChecks('cff-label',    [...new Set(docs.map(d => d.schema_name).filter(Boolean))].sort());
+  _cfChecks('cff-supplier', [...new Set(docs.map(_supOf).filter(Boolean))].sort());
+  _cfChecks('cff-buyer',    [...new Set(docs.map(_buyOf).filter(Boolean))].sort());
 }
 
 function filterDocs() {
   const q         = (document.getElementById('doc-search').value || '').toLowerCase().trim();
-  const fFile     = (document.getElementById('cff-file')?.value || '');
-  const fLabel    = (document.getElementById('cff-label')?.value || '');
-  const fSupplier = (document.getElementById('cff-supplier')?.value || '');
+  const fFiles    = [...document.querySelectorAll('#cff-file input:checked')].map(c=>c.value);
+  const fLabels   = [...document.querySelectorAll('#cff-label input:checked')].map(c=>c.value);
+  const fSuppliers= [...document.querySelectorAll('#cff-supplier input:checked')].map(c=>c.value);
+  const fBuyers   = [...document.querySelectorAll('#cff-buyer input:checked')].map(c=>c.value);
   const fStatus   = (document.getElementById('cff-status')?.value || '');
   const fBatch    = (document.getElementById('cff-batch')?.value || '');
   const fPct      = (document.getElementById('cff-pct')?.value || '');
@@ -1803,13 +1854,10 @@ function filterDocs() {
 
   let filtered = allDocs;
 
-  if (fFile) filtered = filtered.filter(d => (d.original_filename || d.filename) === fFile);
-  if (fLabel) filtered = filtered.filter(d => d.schema_name === fLabel);
-  if (fSupplier) filtered = filtered.filter(d => {
-    const rd = d.result_data || {};
-    const s = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || (rd._matched_supplier && rd._matched_supplier !== 'unknown' ? rd._matched_supplier : '') || '';
-    return s === fSupplier;
-  });
+  if (fFiles.length) filtered = filtered.filter(d => fFiles.includes(d.original_filename || d.filename));
+  if (fLabels.length) filtered = filtered.filter(d => fLabels.includes(d.schema_name));
+  if (fSuppliers.length) filtered = filtered.filter(d => fSuppliers.includes(_supOf(d)));
+  if (fBuyers.length) filtered = filtered.filter(d => fBuyers.includes(_buyOf(d)));
   if (fStatus) {
     if (fStatus === 'pending') {
       // Εκκρεμεί: all non-approved/completed statuses
@@ -1861,12 +1909,15 @@ function filterDocs() {
     );
   });
 
+  lastFilteredDocs = filtered;
   renderDocs(filtered);
 }
 
 function renderDocs(docs) {
   const tbody = document.getElementById('docs-table');
-  // doc-count removed from UI
+  // #2: σύνολο τιμολογίων στην τρέχουσα (φιλτραρισμένη) λίστα
+  const _fc = document.getElementById('doc-filtered-count');
+  if (_fc) _fc.textContent = (t('docs_in_list_lbl') || 'Στη λίστα') + ': ' + docs.length;
 
   if (!docs.length) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:40px">' + t('js_no_docs_found') + '</td></tr>';
@@ -1876,8 +1927,9 @@ function renderDocs(docs) {
     const rd       = doc.result_data || {};
     // Ημερομηνία καταχώρησης
     const recDate  = doc.created_at ? doc.created_at.split('T')[0] : '—';
-    // Προμηθευτής από extracted data (πολλαπλά field names), fallback σε _matched_supplier
-    const supplier = rd.supplier_name || rd.vendor_name || rd.company || rd.issuer || (rd._matched_supplier && rd._matched_supplier !== 'unknown' ? rd._matched_supplier : '') || '—';
+    // Προμηθευτής / Αγοραστής από extracted data
+    const supplier = _supOf(doc) || '—';
+    const buyer    = _buyOf(doc) || '—';
     // Αρχείο — εμφανίζουμε το πραγματικό όνομα αρχείου που ανέβασε ο χρήστης
     const filename = doc.original_filename || doc.filename || '—';
     // Smart name (vendor — invoice) για tooltip/title
@@ -1900,7 +1952,7 @@ function renderDocs(docs) {
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;font-size:13px">${filename}</span>
         ${smartName ? `<span style="font-size:10px;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${smartName}</span>` : ''}
       </td>
-      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${(doc.status === 'no_template' || !doc.schema_name) ? '—' : doc.schema_name}</span></td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${buyer}</td>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${supplier}</td>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${ocrPct}</span></td>
       <td>${badgeHtml(doc.status)}</td>
@@ -1958,7 +2010,7 @@ async function viewDoc(id) {
 
   const arraysHtml = arrayEntries.map(([k, rows]) => {
     if (!rows.length) return '';
-    const cols = Object.keys(rows[0]);
+    const cols = liVisibleCols(rows);
     const thead = cols.map(c=>`<th>${c}</th>`).join('');
     const tbody = rows.map(row =>
       `<tr>${cols.map(c=>`<td>${fmtVal(c,row[c])}</td>`).join('')}</tr>`
@@ -2045,11 +2097,28 @@ function updateSelection() {
       countEl.style.display = 'none';
     }
   }
+  // Prominent σύνολο επιλεγμένων (σημείο 2)
+  const countEl2 = document.getElementById('doc-selected-count2');
+  if (countEl2) {
+    countEl2.textContent = (t('docs_selected_lbl') || 'Επιλεγμένα') + ': ' + selected.length;
+  }
 }
 
 function toggleSelectAll(cb) {
   document.querySelectorAll('.doc-checkbox').forEach(c => c.checked = cb.checked);
   updateSelection();
+}
+
+// «Last N»: τσεκάρει τα N πιο πρόσφατα (πρώτα N rows) της ΤΡΕΧΟΥΣΑΣ φιλτραρισμένης λίστας.
+function selectLastN() {
+  const n = parseInt((document.getElementById('last-n-input').value || '').trim(), 10);
+  if (!n || n < 1) { toast(t('js_enter_valid_number'), 'error'); return; }
+  const src = (lastFilteredDocs && lastFilteredDocs.length) ? lastFilteredDocs : allDocs;
+  if (!src.length) { toast(t('js_no_docs_found'), 'error'); return; }
+  const top = src.slice(0, n);   // λίστα είναι πιο-πρόσφατα-πρώτα → top N
+  renderDocs(top);               // 34-9: κρύβει τα υπόλοιπα από την οθόνη
+  document.querySelectorAll('.doc-checkbox').forEach(cb => cb.checked = true);  // τσεκάρει όσα φαίνονται
+  updateSelection();             // 34-8: «In list» + «Επιλεγμένα» δείχνουν N
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
@@ -2293,7 +2362,7 @@ async function doSingleExtract() {
     const scalarHtml = scalarEntries.map(([k,v])=>`<div class="data-item"><div class="data-key">${k}</div><div class="data-val">${fmtVal(k,v)}</div></div>`).join('');
     const arraysHtml = arrayEntries.map(([k,rows]) => {
       if (!rows.length) return '';
-      const cols = Object.keys(rows[0]);
+      const cols = liVisibleCols(rows);
       return `<div class="line-items-label">📋 ${k}</div>
         <div class="line-items-wrap">
           <table class="line-items-table">
@@ -2760,6 +2829,26 @@ async function openBatchFromDocs() {
 
   title.textContent = t('js_batch_export_title');
 
+  // P0.2: Αν ΕΣΤΩ 1 επιλεγμένο έχει ΗΔΗ επεξεργαστεί → ΜΠΛΟΚ ολόκληρου του batch
+  if (completed.length > 0) {
+    body.innerHTML = `<div style="padding:20px;text-align:center;">
+      <div style="font-size:14px;color:var(--warn);margin-bottom:16px;font-weight:600;">${t('js_batch_blocked_msg', {n: completed.length})}</div>
+      <button class="btn btn-primary btn-sm" style="padding:8px 24px;" onclick="closeModal('precheck-modal')">${t('js_ok')}</button>
+    </div>`;
+    modal.classList.add('open');
+    return;
+  }
+
+  // #4: μέγιστο 100 τιμολόγια ανά batch
+  if (toExtract.length > 100) {
+    body.innerHTML = `<div style="padding:20px;text-align:center;">
+      <div style="font-size:14px;color:var(--warn);margin-bottom:16px;font-weight:600;">${t('js_batch_max_msg', {max: 100, n: toExtract.length})}</div>
+      <button class="btn btn-primary btn-sm" style="padding:8px 24px;" onclick="closeModal('precheck-modal')">${t('js_ok')}</button>
+    </div>`;
+    modal.classList.add('open');
+    return;
+  }
+
   if (toExtract.length === 0) {
     let reason = '';
     if (completed.length > 0 && noLabel.length === 0) reason = t('js_all_completed_msg');
@@ -2797,19 +2886,51 @@ async function executeBatchFromDocs() {
   const body  = document.getElementById('precheck-modal-body');
 
   title.textContent = t('js_export_progress');
-  body.innerHTML = `<div style="text-align:center;padding:30px;">
-    <span class="spinner" style="display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;"></span>
-    <div style="margin-top:12px;color:var(--text2);font-size:13px;">${t('js_export_progress')}</div>
+  body.innerHTML = `<div style="padding:34px 24px;text-align:center;">
+    <div style="font-size:15px;color:var(--text2);margin-bottom:18px;">${t('js_export_progress')}</div>
+    <div style="position:relative;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;">
+      <div id="bx-bar" style="position:absolute;top:0;bottom:0;left:-40%;width:40%;background:var(--accent);border-radius:5px;animation:bxIndeterminate 1.3s ease-in-out infinite;"></div>
+    </div>
   </div>`;
+
+  // Live progress. The engine completes chunks in parallel WAVES (raw count
+  // jumps 20→160). We (a) poll the real count and (b) animate a smoothed counter
+  // toward it + a gentle time-creep, so groups appear to "fall" steadily instead
+  // of a frozen bar then a snap.
+  // 34-10: INDETERMINATE bar. Per request, the MOTION is fully DECOUPLED from the
+  // count. The bar sweeps continuously (pure CSS, time-based) from the first signal
+  // to completion — it can NEVER "freeze" in a gap because it doesn't represent a
+  // percentage; it just means "working". The honest count "X / total" updates
+  // underneath from the real extracted-doc count.
+  let bxDone = false, bxTotal = ids.length, bxExtract = 0;
+  const bxPoll = setInterval(async () => {
+    if (bxDone) return;
+    try {
+      const p = await api('GET', '/api/batch/progress');
+      if (p && p.total > 0) { bxTotal = p.total; bxExtract = p.done || 0; }
+    } catch(_) {}
+  }, 500);
+  const bxAnim = setInterval(() => {
+    const cnt = document.getElementById('bx-count');
+    if (cnt) cnt.textContent = `${bxDone ? bxTotal : Math.min(bxTotal - 1, bxExtract)} / ${bxTotal}`;
+  }, 200);
 
   try {
     const res = await api('POST', '/api/batch/extract-selected', { doc_ids: ids });
+    bxDone = true; clearInterval(bxPoll); clearInterval(bxAnim);
 
     if (!res.success) {
       body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">${res.error || t('error')}</div>
         <div style="text-align:center;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="closeModal('precheck-modal')">${t('btn_close')}</button></div>`;
       return;
     }
+
+    // Η μπάρα φτάνει 200/200 πριν εμφανιστεί η σύνοψη
+    const _bxBar = document.getElementById('bx-bar');
+    const _bxCnt = document.getElementById('bx-count');
+    if (_bxBar) { _bxBar.style.animation = 'none'; _bxBar.style.left = '0'; _bxBar.style.width = '100%'; }
+    if (_bxCnt) _bxCnt.textContent = `${bxTotal} / ${bxTotal}`;
+    await new Promise(r => setTimeout(r, 400));
 
     title.textContent = t('js_batch_complete');
     const total = res.total || 0;
@@ -2836,6 +2957,7 @@ async function executeBatchFromDocs() {
     // Refresh documents table
     await loadDocuments();
   } catch(e) {
+    bxDone = true; clearInterval(bxPoll); clearInterval(bxAnim);
     body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">${t('error')}: ${e.message || e}</div>
       <div style="text-align:center;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="closeModal('precheck-modal')">${t('btn_close')}</button></div>`;
   }
@@ -3034,13 +3156,51 @@ async function apLoadDoc(idx) {
   apRenderDocsList();
 }
 
+// 35-2: Canonical accounting column order, so the extracted table mirrors a
+// typical invoice left-to-right (code → description → qty → unit price → VAT →
+// net → gross) instead of the model's arbitrary JSON key order. Columns not in
+// this list keep their original order, appended after the known ones.
+const LI_COL_ORDER = ['item_code', 'description', 'pack_size', 'quantity',
+  'unit_price', 'vat_rate', 'vat_amount', 'total', 'total_incl_vat'];
+
+// Returns the line-item columns that have at least one non-empty value across
+// all rows, in canonical order. Optional/nullable columns that do not apply to
+// this invoice (e.g. per-line VAT, pack_size) come back null on every row →
+// hidden, so the table shows only columns the document actually has.
+function liVisibleCols(rows) {
+  if (!rows || !rows.length) return [];
+  const nonEmpty = v => v !== null && v !== undefined &&
+    !(typeof v === 'string' && v.trim() === '');
+  const cols = Object.keys(rows[0]).filter(c => rows.some(r => nonEmpty(r[c])));
+  const rank = c => { const i = LI_COL_ORDER.indexOf(c); return i === -1 ? 999 : i; };
+  return cols.slice().sort((a, b) => (rank(a) - rank(b)) ||
+    (Object.keys(rows[0]).indexOf(a) - Object.keys(rows[0]).indexOf(b)));
+}
+
+// 35-3: Scroll the Documents list to top/bottom. The arrows used to target
+// `.main`, which has overflow-y:auto but no fixed height → it never becomes the
+// real scroll context (the window scrolls instead), so the buttons did nothing.
+// Find whichever ancestor actually overflows and scroll that; fall back to the
+// page scrolling element.
+function docsScrollTo(toBottom) {
+  const candidates = [
+    document.querySelector('#page-documents .table-wrap'),
+    document.querySelector('#page-documents .content'),
+    document.querySelector('.main'),
+    document.scrollingElement || document.documentElement,
+  ];
+  const el = candidates.find(c => c && c.scrollHeight > c.clientHeight + 4)
+             || (document.scrollingElement || document.documentElement);
+  el.scrollTo({ top: toBottom ? el.scrollHeight : 0, behavior: 'smooth' });
+}
+
 function apRenderTable(key, rows) {
   if (!rows.length) {
     document.querySelector('#ap-li-thead tr').innerHTML = '';
     document.getElementById('ap-li-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">' + t('js_no_rows') + '</td></tr>';
     return;
   }
-  const cols = Object.keys(rows[0]);
+  const cols = liVisibleCols(rows);
   document.querySelector('#ap-li-thead tr').innerHTML = cols.map(c =>
     `<th style="background:var(--bg3);padding:8px 10px;text-align:left;color:var(--text3);font-family:'DM Mono',monospace;font-size:10px;border-bottom:1px solid var(--border);white-space:nowrap;text-transform:uppercase;letter-spacing:.9px;">${c}</th>`
   ).join('');
@@ -4317,7 +4477,10 @@ function renderTemplatesList(templates) {
   el.innerHTML = templates.map(tmpl=>`
     <div class="card" style="margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div class="card-title" style="margin:0">${tmpl.name}</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="checkbox" class="tpl-checkbox" value="${tmpl.name}" onchange="updateTplSelection()" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto;">
+          <div class="card-title" style="margin:0">${tmpl.name}</div>
+        </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-secondary btn-sm" onclick="editTemplate('${tmpl.name}')">${t('js_edit')}</button>
           <button class="btn btn-secondary btn-sm" onclick="copyTemplateToClipboard('${tmpl.name}')" title="${t('js_copy_hint')}">${t('js_copy')}</button>
@@ -4349,6 +4512,48 @@ function clearTemplateFilters() {
   document.getElementById('tf-name').value = '';
   document.getElementById('tf-supplier').value = '';
   renderTemplatesList(allTemplatesData);
+  updateTplSelection();   // 34-12,1: επαναφορά επιλογής/μετρητή
+}
+
+// 34-12.1: multi-select + μαζική διαγραφή ετικετών
+function updateTplSelection() {
+  const sel = [...document.querySelectorAll('.tpl-checkbox:checked')];
+  const btn = document.getElementById('tpl-bulk-del');
+  const cnt = document.getElementById('tpl-sel-count');
+  if (cnt) cnt.textContent = sel.length;
+  if (btn) btn.style.display = sel.length ? 'inline-flex' : 'none';
+}
+
+// 34-12,2: «Επιλογή ΟΛΩΝ» — τσεκάρει/ξετσεκάρει όλα τα κουτάκια (toggle)
+function selectAllTemplates() {
+  const boxes = [...document.querySelectorAll('.tpl-checkbox')];
+  const allChecked = boxes.length && boxes.every(c => c.checked);
+  boxes.forEach(c => c.checked = !allChecked);
+  updateTplSelection();
+}
+
+async function _delTemplatesByName(names) {
+  let ok = 0;
+  for (const nm of names) {
+    try { const r = await api('DELETE', `/api/templates/${encodeURIComponent(nm)}`); if (!r || !r.error) ok++; }
+    catch(e) { console.error('del tpl', nm, e); }
+  }
+  toast(t('js_template_deleted') + ' (' + ok + ')', 'success');
+  await loadTemplates();
+}
+
+async function deleteSelectedTemplates() {
+  const names = [...document.querySelectorAll('.tpl-checkbox:checked')].map(c => c.value);
+  if (!names.length) return;
+  if (!confirm(t('js_delete_selected_confirm', {n: names.length}))) return;
+  await _delTemplatesByName(names);
+}
+
+async function deleteAllTemplates() {
+  const names = (allTemplatesData || []).map(x => x.name);
+  if (!names.length) { toast(t('js_no_labels_found'), 'info'); return; }
+  if (!confirm(t('tpl_del_all_confirm', {n: names.length}))) return;
+  await _delTemplatesByName(names);
 }
 
 function openTemplateModal() {
@@ -5385,7 +5590,7 @@ async function loadTemplateBuilder(docId) {
     const scalarHtml = scalarEntries.map(([k,v])=>`<div class="data-item"><div class="data-key">${k}</div><div class="data-val">${fmtVal(k,v)}</div></div>`).join('');
     const arraysHtml = arrayEntries.map(([k, rows]) => {
       if (!rows.length) return '';
-      const cols = Object.keys(rows[0]);
+      const cols = liVisibleCols(rows);
       return `<div class="line-items-label">📋 ${k}</div>
         <div class="line-items-wrap">
           <table class="line-items-table">
@@ -5645,8 +5850,9 @@ function updateSidebarPlanInfo(userData) {
   if (pct >= 90) bar.style.background = 'var(--danger)';
   else if (pct >= 70) bar.style.background = 'var(--warn)';
   else bar.style.background = 'var(--accent)';
-  // Warning banner at 80%+
-  if (pct >= 80 && docLimit > 0) showUsageWarning(docsUsed, docLimit);
+  // 35-1: Usage/upgrade banner disabled. FastWrite uses a one-time licence model
+  // (no subscription quotas), so testers must NOT see an "Upgrade for more
+  // capacity" nag. (was: if (pct >= 80 && docLimit > 0) showUsageWarning(...))
 }
 
 function showUsageWarning(used, limit) {
