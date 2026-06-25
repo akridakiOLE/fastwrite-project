@@ -929,7 +929,7 @@ select.form-input option{background:var(--bg2);}
           <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--accent);margin-bottom:16px;">📋 Περιγραφή Συστήματος</div>
 
           <div style="font-size:13px;color:var(--text);line-height:1.8;">
-            <p style="margin-bottom:14px;">Το <strong>FastWrite</strong> είναι ένα τοπικό εργαλείο αυτόματης εξαγωγής δεδομένων από έγγραφα (τιμολόγια, αποδείξεις, παραστατικά) με χρήση τεχνητής νοημοσύνης (AI). Λειτουργεί αποκλειστικά στον δικό σας υπολογιστή — τα δεδομένα σας δεν κοινοποιούνται σε κανέναν, ούτε στον διαχειριστή της πλατφόρμας.</p>
+            <p style="margin-bottom:14px;">Το <strong>FastWrite</strong> είναι ένα τοπικό εργαλείο αυτόματης εξαγωγής δεδομένων από έγγραφα (τιμολόγια, αποδείξεις, παραστατικά) με χρήση τεχνητής νοημοσύνης (AI). Λειτουργεί αποκλειστικά στον δικό σας υπολογιστή — τα δεδομένα σας δεν κοινοποιούνται σε κανέναν — ούτε σε εμάς (FastWrite).</p>
 
             <p style="margin-bottom:14px;"><strong>Τι κάνει:</strong> Ανεβάζετε ένα PDF με ένα ή πολλαπλά τιμολόγια. Το σύστημα αναγνωρίζει αυτόματα κάθε ξεχωριστό τιμολόγιο, εντοπίζει τον προμηθευτή, αντιστοιχεί την κατάλληλη ετικέτα και εξάγει τα δεδομένα που εσείς ορίσατε (αριθμός τιμολογίου, ημερομηνία, ποσά, γραμμές ειδών κ.λπ.). Τέλος, εξάγετε τα αποτελέσματα σε CSV ή Excel.</p>
 
@@ -941,7 +941,7 @@ select.form-input option{background:var(--bg2);}
                 <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">1</div>
                 <div>
                   <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Ρύθμιση API Key</div>
-                  <div style="color:var(--text2);font-size:12px;">Πηγαίνετε στις <strong>Ρυθμίσεις → API Keys</strong> και εισάγετε το δικό σας κλειδί AI (π.χ. Google Gemini). Αυτό είναι υποχρεωτικό — η πλατφόρμα δεν παρέχει δικό της κλειδί. Η χρέωση γίνεται απευθείας στον δικό σας λογαριασμό AI.</div>
+                  <div style="color:var(--text2);font-size:12px;">Πηγαίνετε στις <strong>Ρυθμίσεις → API Keys</strong> και εισάγετε το δικό σας κλειδί <strong>Google Gemini</strong>. <strong>Αυτή τη στιγμή υποστηρίζεται ΜΟΝΟ το Google Gemini.</strong> Αυτό είναι υποχρεωτικό — η πλατφόρμα δεν παρέχει δικό της κλειδί. Η χρέωση γίνεται απευθείας στον δικό σας λογαριασμό AI.</div>
                 </div>
               </div>
 
@@ -965,7 +965,7 @@ select.form-input option{background:var(--bg2);}
                 <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">4</div>
                 <div>
                   <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Εξαγωγή Δεδομένων (Batch)</div>
-                  <div style="color:var(--text2);font-size:12px;">Από τη σελίδα <strong>Έγγραφα</strong>, επιλέξτε τα έγγραφα και πατήστε <strong>"Batch"</strong>. Το σύστημα χρησιμοποιεί AI για να εξάγει τα δεδομένα βάσει της ετικέτας κάθε εγγράφου. Τα αποτελέσματα εμφανίζονται στον πίνακα εγγράφων.</div>
+                  <div style="color:var(--text2);font-size:12px;">Από τη σελίδα <strong>Έγγραφα</strong>, επιλέξτε τα έγγραφα και πατήστε <strong>"Batch"</strong> (<strong>έως 100 τιμολόγια ανά batch</strong>). Το σύστημα χρησιμοποιεί AI για να εξάγει τα δεδομένα βάσει της ετικέτας κάθε εγγράφου. Τα αποτελέσματα εμφανίζονται στον πίνακα εγγράφων.</div>
                 </div>
               </div>
 
@@ -973,7 +973,7 @@ select.form-input option{background:var(--bg2);}
                 <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">5</div>
                 <div>
                   <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Έλεγχος &amp; Έγκριση</div>
-                  <div style="color:var(--text2);font-size:12px;">Από τη σελίδα <strong>Έγγραφα</strong>, επιλέξτε τα έγγραφα και πατήστε <strong>"Έγκριση"</strong>. Βλέπετε το τιμολόγιο αριστερά και τα εξαγόμενα δεδομένα δεξιά. Διορθώστε τυχόν λάθη και πατήστε <strong>"Έγκριση Τιμολογίου"</strong>. Η highlight sync τονίζει στο έγγραφο κάθε γραμμή που περνάτε τον κέρσορα.</div>
+                  <div style="color:var(--text2);font-size:12px;">Από τη σελίδα <strong>Έγγραφα</strong>, επιλέξτε τα έγγραφα και πατήστε <strong>"Έγκριση"</strong>. Το τιμολόγιο εμφανίζεται οριζόντια στο πάνω μέρος (σε όλο το πλάτος) και ο πίνακας με τα εξαγόμενα δεδομένα από κάτω. Διορθώστε τυχόν λάθη και πατήστε <strong>"Έγκριση Τιμολογίου"</strong>. Η highlight sync τονίζει στο έγγραφο κάθε γραμμή που περνάτε τον κέρσορα.</div>
                 </div>
               </div>
 
@@ -989,7 +989,7 @@ select.form-input option{background:var(--bg2);}
 
             <div style="margin-top:20px;padding:12px 16px;background:rgba(0,102,255,0.08);border:1px solid rgba(0,102,255,0.2);border-radius:8px;">
               <div style="font-weight:600;color:var(--accent2);margin-bottom:6px;">💡 Συμβουλή</div>
-              <div style="color:var(--text2);font-size:12px;">Η σωστή σειρά είναι: <strong>Ανέβασμα → Ετικέτες → Batch → Έγκριση → Εξαγωγή</strong>. Δημιουργήστε πρώτα ετικέτες για κάθε τύπο τιμολογίου (π.χ. ΔΕΗ, COSMOTE, VODAFONE) και μετά ξεκινήστε τη μαζική εξαγωγή. Μόλις δημιουργήσετε μια ετικέτα, το σύστημα αντιστοιχεί αυτόματα τα νέα τιμολόγια του ίδιου προμηθευτή.</div>
+              <div style="color:var(--text2);font-size:12px;">Η σωστή σειρά είναι: <strong>Ανέβασμα → Ετικέτες → Batch → Έγκριση → Εξαγωγή</strong>. Δημιουργήστε πρώτα ετικέτες για κάθε τύπο τιμολογίου (π.χ. Amazon, Microsoft, DHL) και μετά ξεκινήστε τη μαζική εξαγωγή. Μόλις δημιουργήσετε μια ετικέτα, το σύστημα αντιστοιχεί αυτόματα τα νέα τιμολόγια του ίδιου προμηθευτή.</div>
             </div>
           </div>
         </div>
@@ -1016,20 +1016,21 @@ select.form-input option{background:var(--bg2);}
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς διαγράφω έγγραφα;</div><div class="faq-a">Επιλέξτε τα έγγραφα με το checkbox και πατήστε το κουμπί "Delete" που εμφανίζεται. Η διαγραφή είναι μόνιμη.</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🏷 Ετικέτες (Templates)</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι οι ετικέτες;</div><div class="faq-a">Οι ετικέτες (templates) καθορίζουν ποια πεδία θέλετε να εξάγετε από κάθε τύπο εγγράφου. Π.χ. για τιμολόγια COSMOTE μπορεί να θέλετε: Αριθμός Τιμολογίου, Ημερομηνία, Σύνολο, ΦΠΑ. Κάθε προμηθευτής μπορεί να έχει τη δική του ετικέτα.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς δημιουργώ νέα ετικέτα;</div><div class="faq-a"><strong>Τρόπος 1 (Απλός):</strong> Πηγαίνετε στα "Ετικέτες" → "+ Νέα Ετικέτα". Εισάγετε όνομα, pattern προμηθευτή (π.χ. cosmote, ote), και τα πεδία χωρισμένα με κόμμα. Για line items, πατήστε "+ Array Line Items" και εισάγετε τις στήλες.<br><br><strong>Τρόπος 2 (Συνιστώμενος):</strong> Από τη σελίδα "Έγγραφα", επιλέξτε ένα ή περισσότερα έγγραφα και πατήστε "Ετικέτες". Μεταφέρεστε σε ειδική σελίδα όπου βλέπετε το πραγματικό τιμολόγιο αριστερά και τη φόρμα ετικέτας δεξιά. Αυτός ο τρόπος είναι πιο αποτελεσματικός γιατί μπορείτε να διαπιστώσετε ακριβώς ποια πεδία υπάρχουν στο τιμολόγιο και να τα ρυθμίσετε σωστά.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το "Supplier Pattern";</div><div class="faq-a">Είναι λέξεις-κλειδιά που βοηθούν το σύστημα να αντιστοιχίσει αυτόματα ένα τιμολόγιο με την σωστή ετικέτα κατά την καταγραφή. Π.χ. αν βάλετε "cosmote, ote, κοσμοτε", κάθε τιμολόγιο που αναγνωρίζεται ως COSMOTE θα πάρει αυτή την ετικέτα αυτόματα.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πρέπει να φτιάχνω ετικέτες χειροκίνητα;</div><div class="faq-a"><strong>ΟΧΙ — δημιουργούνται ΑΥΤΟΜΑΤΑ.</strong> Κατά την «Καταγραφή Εγγράφων», το σύστημα εντοπίζει τον προμηθευτή κάθε τιμολογίου και δημιουργεί αυτόματα μία ετικέτα γι' αυτόν — <strong>μηδέν χειροκίνητο setup</strong>. Η χειροκίνητη δημιουργία/επεξεργασία ετικέτας είναι προαιρετική, μόνο αν θέλετε να προσαρμόσετε τα πεδία.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι οι ετικέτες;</div><div class="faq-a">Οι ετικέτες (templates) καθορίζουν ποια πεδία θέλετε να εξάγετε από κάθε τύπο εγγράφου. Π.χ. για τιμολόγια Amazon μπορεί να θέλετε: Αριθμός Τιμολογίου, Ημερομηνία, Σύνολο, ΦΠΑ. Κάθε προμηθευτής μπορεί να έχει τη δική του ετικέτα.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς δημιουργώ νέα ετικέτα;</div><div class="faq-a"><strong>Τρόπος 1 (Απλός):</strong> Πηγαίνετε στα "Ετικέτες" → "+ Νέα Ετικέτα". Εισάγετε όνομα, pattern προμηθευτή (π.χ. amazon, aws), και τα πεδία χωρισμένα με κόμμα. Για line items, πατήστε "+ Array Line Items" και εισάγετε τις στήλες.<br><br><strong>Τρόπος 2 (Συνιστώμενος):</strong> Από τη σελίδα "Έγγραφα", επιλέξτε ένα ή περισσότερα έγγραφα και πατήστε "Ετικέτες". Μεταφέρεστε σε ειδική σελίδα όπου βλέπετε το πραγματικό τιμολόγιο αριστερά και τη φόρμα ετικέτας δεξιά. Αυτός ο τρόπος είναι πιο αποτελεσματικός γιατί μπορείτε να διαπιστώσετε ακριβώς ποια πεδία υπάρχουν στο τιμολόγιο και να τα ρυθμίσετε σωστά.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το "Supplier Pattern";</div><div class="faq-a">Είναι λέξεις-κλειδιά που βοηθούν το σύστημα να αντιστοιχίσει αυτόματα ένα τιμολόγιο με την σωστή ετικέτα κατά την καταγραφή. Π.χ. αν βάλετε "amazon, aws", κάθε τιμολόγιο που αναγνωρίζεται ως Amazon θα πάρει αυτή την ετικέτα αυτόματα.</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">✅ Έγκριση</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς εγκρίνω έγγραφα;</div><div class="faq-a">Από τη σελίδα "Έγγραφα", επιλέξτε τα έγγραφα και πατήστε "Έγκριση". Στη σελίδα έγκρισης βλέπετε το έγγραφο (εικόνα) αριστερά και τα εξαγόμενα δεδομένα δεξιά. Μπορείτε να διορθώσετε τιμές πριν εγκρίνετε.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς εγκρίνω έγγραφα;</div><div class="faq-a">Από τη σελίδα "Έγγραφα", επιλέξτε τα έγγραφα και πατήστε "Έγκριση". Στη σελίδα έγκρισης το τιμολόγιο εμφανίζεται οριζόντια στο πάνω μέρος (σε όλο το πλάτος) και ο πίνακας με τα εξαγόμενα δεδομένα από κάτω. Μπορείτε να διορθώσετε τιμές πριν εγκρίνετε.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Μπορώ να επεξεργαστώ δεδομένα πριν εγκρίνω;</div><div class="faq-a">Ναι, στη σελίδα έγκρισης όλα τα πεδία (γενικά στοιχεία και line items) είναι επεξεργάσιμα. Κάντε τις αλλαγές σας και μετά πατήστε "Έγκριση". Οι αλλαγές αποθηκεύονται αυτόματα.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι κάνει η highlight sync;</div><div class="faq-a">Όταν περνάτε τον κέρσορα πάνω από μια γραμμή στα line items, το αντίστοιχο σημείο στο έγγραφο τονίζεται (highlight). Αυτό βοηθά να επαληθεύσετε ότι τα δεδομένα αντιστοιχούν στο σωστό σημείο του εγγράφου.</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">⚙️ Ρυθμίσεις &amp; Λογαριασμός</div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς αλλάζω τον κωδικό μου;</div><div class="faq-a">Ρυθμίσεις → Λογαριασμός → Αλλαγή Κωδικού. Εισάγετε τον τρέχοντα κωδικό, τον νέο (τουλάχιστον 6 χαρακτήρες) και επιβεβαίωση.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το 2FA και πώς το ενεργοποιώ;</div><div class="faq-a">Η Ταυτοποίηση 2 Βημάτων (2FA) προσθέτει ένα επιπλέον επίπεδο ασφάλειας. Χρειάζεστε μια εφαρμογή Authenticator (π.χ. Google Authenticator). Πηγαίνετε στις Ρυθμίσεις → "Ενεργοποίηση 2FA", σαρώστε το QR code, εισάγετε τον 6ψήφιο κωδικό για επαλήθευση.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι γίνεται αν χάσω πρόσβαση στο 2FA;</div><div class="faq-a">Επικοινωνήστε με την υποστήριξη. Ο διαχειριστής μπορεί να επαναφέρει (reset) το 2FA για τον λογαριασμό σας χωρίς να έχει πρόσβαση στα δεδομένα σας.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το API Key;</div><div class="faq-a">Το API Key είναι ένα κλειδί πρόσβασης στην υπηρεσία AI (π.χ. Google Gemini) που χρησιμοποιείται για την εξαγωγή δεδομένων. <strong>ΥΠΟΧΡΕΩΤΙΚΑ χρησιμοποιείτε αποκλειστικά το δικό σας κλειδί (BYOK — Bring Your Own Key).</strong> Η χρέωση γίνεται απευθείας από τον πάροχο AI στον δικό σας λογαριασμό. Η πλατφόρμα FastWrite δεν παρέχει δικό της API Key και δεν μεσολαβεί στην επεξεργασία των δεδομένων σας — διασφαλίζοντας πλήρη ιδιωτικότητα και ανεξαρτησία.<br><br><strong>Συνιστάται:</strong> (1) περιορίστε το key μόνο στο Gemini API (Google Cloud Console → Credentials → API restrictions → "Generative Language API") — ένα κλικ ασφάλειας· (2) ενεργοποιήστε <strong>billing (pay-as-you-go)</strong> στον λογαριασμό σας Google για καλύτερη αξιοπιστία και ταχύτητα — το free tier έχει όρια και μπορεί να αποτυγχάνει σε μεγάλα batch.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι γίνεται αν χάσω πρόσβαση στο 2FA;</div><div class="faq-a">Επικοινωνήστε μαζί μας (FastWrite) για επαναφορά (reset) του 2FA — χωρίς να έχουμε πρόσβαση στα δεδομένα σας.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι είναι το API Key;</div><div class="faq-a">Το API Key είναι ένα κλειδί πρόσβασης στην υπηρεσία AI <strong>Google Gemini</strong> που χρησιμοποιείται για την εξαγωγή δεδομένων. <strong>Αυτή τη στιγμή υποστηρίζεται ΜΟΝΟ το Google Gemini.</strong> <strong>ΥΠΟΧΡΕΩΤΙΚΑ χρησιμοποιείτε αποκλειστικά το δικό σας κλειδί (BYOK — Bring Your Own Key).</strong> Η χρέωση γίνεται απευθείας από τον πάροχο AI στον δικό σας λογαριασμό. Η πλατφόρμα FastWrite δεν παρέχει δικό της API Key και δεν μεσολαβεί στην επεξεργασία των δεδομένων σας — διασφαλίζοντας πλήρη ιδιωτικότητα και ανεξαρτησία.<br><br><strong>Συνιστάται:</strong> (1) περιορίστε το key μόνο στο Gemini API (Google Cloud Console → Credentials → API restrictions → "Generative Language API") — ένα κλικ ασφάλειας· (2) ενεργοποιήστε <strong>billing (pay-as-you-go)</strong> στον λογαριασμό σας Google για καλύτερη αξιοπιστία και ταχύτητα — το free tier έχει όρια και μπορεί να αποτυγχάνει σε μεγάλα batch.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιους AI παρόχους υποστηρίζει;</div><div class="faq-a">Υποστηρίζεται το Google Gemini 2.5 Flash, το οποίο είναι βέλτιστο για εξαγωγή δεδομένων από τιμολόγια (vision + tabular + structured output).</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🔗 Σύνδεση με Xero</div>
@@ -1040,14 +1041,14 @@ select.form-input option{background:var(--bg2);}
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πόσο κοστίζει η χρήση;</div><div class="faq-a">Το FastWrite χρησιμοποιεί το <strong>δικό σας</strong> Gemini API key (BYOK), οπότε το κόστος της AI το πληρώνετε <strong>απευθείας στην Google</strong> — ενδεικτικά <strong>~$0.002 ανά τιμολόγιο</strong> (περίπου $15–30 ανά 10.000 τιμολόγια). <strong>Καμία χρέωση ανά τιμολόγιο από εμάς και καμία συνδρομή.</strong> Για την άδεια χρήσης του FastWrite (εφάπαξ) επικοινωνήστε μαζί μας για προσφορά προσαρμοσμένη στις ανάγκες σας.</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🔒 Ασφάλεια &amp; Ιδιωτικότητα</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιος βλέπει τα έγγραφά μου;</div><div class="faq-a">Κανείς. Τα έγγραφά σας είναι πλήρως απομονωμένα. Ούτε ο διαχειριστής του συστήματος μπορεί να δει τα δεδομένα σας. Κάθε χρήστης βλέπει και διαχειρίζεται μόνο τα δικά του έγγραφα.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς αποθηκεύονται τα δεδομένα μου;</div><div class="faq-a">Όλα τα δεδομένα (έγγραφα, εξαγόμενα στοιχεία, ετικέτες) αποθηκεύονται <strong>τοπικά στον υπολογιστή σας</strong> σε ασφαλή βάση δεδομένων. Τα API keys κρυπτογραφούνται με Fernet encryption. Οι κωδικοί αποθηκεύονται ως bcrypt hashes — δεν αποθηκεύεται ποτέ ο πραγματικός κωδικός. Κανείς δεν έχει πρόσβαση στα αρχεία σας, συμπεριλαμβανομένου του διαχειριστή της πλατφόρμας.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τα έγγραφά μου στέλνονται σε τρίτους;</div><div class="faq-a"><strong>Όχι.</strong> Το σύστημα FastWrite λειτουργεί τοπικά. Κατά την εξαγωγή δεδομένων, η επικοινωνία γίνεται απευθείας μεταξύ του δικού σας υπολογιστή και του παρόχου AI (π.χ. Google Gemini) μέσω του <strong>δικού σας API Key</strong>. Η πλατφόρμα FastWrite δεν μεσολαβεί, δεν αποθηκεύει και δεν έχει πρόσβαση στο περιεχόμενο των εγγράφων σας. Κανένα δεδομένο δεν κοινοποιείται σε τρίτους.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιος βλέπει τα έγγραφά μου;</div><div class="faq-a">Κανείς. Τα δεδομένα σας είναι τοπικά στον υπολογιστή σας — ούτε εμείς (FastWrite) δεν τα βλέπουμε. Βλέπετε και διαχειρίζεστε μόνο εσείς τα έγγραφά σας.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Πώς αποθηκεύονται τα δεδομένα μου;</div><div class="faq-a">Όλα τα δεδομένα (έγγραφα, εξαγόμενα στοιχεία, ετικέτες) αποθηκεύονται <strong>τοπικά στον υπολογιστή σας</strong> σε ασφαλή βάση δεδομένων. Τα API keys κρυπτογραφούνται με Fernet encryption. Οι κωδικοί αποθηκεύονται ως bcrypt hashes — δεν αποθηκεύεται ποτέ ο πραγματικός κωδικός. Κανείς δεν έχει πρόσβαση στα αρχεία σας — ούτε εμείς (FastWrite).</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τα έγγραφά μου στέλνονται σε τρίτους;</div><div class="faq-a"><strong>Όχι.</strong> Το σύστημα FastWrite λειτουργεί τοπικά. Κατά την εξαγωγή δεδομένων, η επικοινωνία γίνεται απευθείας μεταξύ του δικού σας υπολογιστή και του παρόχου AI Google Gemini μέσω του <strong>δικού σας API Key</strong>. Η πλατφόρμα FastWrite δεν μεσολαβεί, δεν αποθηκεύει και δεν έχει πρόσβαση στο περιεχόμενο των εγγράφων σας. Κανένα δεδομένο δεν κοινοποιείται σε τρίτους.</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">❓ Γενικά</div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Τι τύπους αρχείων δέχεται;</div><div class="faq-a">PDF, PNG, JPG, JPEG, WebP. Η batch λειτουργία (πολλαπλά τιμολόγια) δέχεται μόνο PDF.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιο είναι το μέγιστο μέγεθος αρχείου;</div><div class="faq-a">20MB ανά αρχείο.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Μπορώ να διαγράψω τον λογαριασμό μου;</div><div class="faq-a">Αυτή τη στιγμή η διαγραφή λογαριασμού γίνεται μέσω επικοινωνίας με την υποστήριξη. Ο διαχειριστής μπορεί να απενεργοποιήσει τον λογαριασμό σας.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Ποιο είναι το μέγιστο μέγεθος αρχείου;</div><div class="faq-a">Έως 100 τιμολόγια ανά αρχείο (μέγιστο μέγεθος αρχείου: 20 MB).</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Μπορώ να διαγράψω τον λογαριασμό μου;</div><div class="faq-a">Τα δεδομένα σας είναι τοπικά στον υπολογιστή σας. Για διαγραφή/απενεργοποίηση λογαριασμού, επικοινωνήστε μαζί μας (FastWrite).</div></div>
 
         </div>
         </div><!-- /faq-lang-content el -->
@@ -1060,7 +1061,7 @@ select.form-input option{background:var(--bg2);}
           <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--accent);margin-bottom:16px;">📋 System Description</div>
 
           <div style="font-size:13px;color:var(--text);line-height:1.8;">
-            <p style="margin-bottom:14px;"><strong>FastWrite</strong> is a local tool for automatic data extraction from documents (invoices, receipts, vouchers) using artificial intelligence (AI). It runs exclusively on your own computer — your data is not shared with anyone, including the platform administrator.</p>
+            <p style="margin-bottom:14px;"><strong>FastWrite</strong> is a local tool for automatic data extraction from documents (invoices, receipts, vouchers) using artificial intelligence (AI). It runs exclusively on your own computer — your data is not shared with anyone — not even us (FastWrite).</p>
 
             <p style="margin-bottom:14px;"><strong>What it does:</strong> You upload a PDF with one or multiple invoices. The system automatically identifies each individual invoice, detects the supplier, matches the appropriate label, and extracts the data you defined (invoice number, date, amounts, line items, etc.). Finally, you export the results to CSV or Excel.</p>
 
@@ -1072,7 +1073,7 @@ select.form-input option{background:var(--bg2);}
                 <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">1</div>
                 <div>
                   <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Set Up API Key</div>
-                  <div style="color:var(--text2);font-size:12px;">Go to <strong>Settings → API Keys</strong> and enter your own AI key (e.g. Google Gemini). This is mandatory — the platform does not provide its own key. Billing is done directly to your AI account.</div>
+                  <div style="color:var(--text2);font-size:12px;">Go to <strong>Settings → API Keys</strong> and enter your own <strong>Google Gemini</strong> API key. <strong>Only Google Gemini is supported at this time.</strong> This is mandatory — the platform does not provide its own key. Billing is done directly to your AI account.</div>
                 </div>
               </div>
 
@@ -1096,7 +1097,7 @@ select.form-input option{background:var(--bg2);}
                 <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">4</div>
                 <div>
                   <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Data Extraction (Batch)</div>
-                  <div style="color:var(--text2);font-size:12px;">From the <strong>Documents</strong> page, select documents and click <strong>"Batch"</strong>. The system uses AI to extract data based on each document's label. Results appear in the documents table.</div>
+                  <div style="color:var(--text2);font-size:12px;">From the <strong>Documents</strong> page, select documents and click <strong>"Batch"</strong> (<strong>up to 100 invoices per batch</strong>). The system uses AI to extract data based on each document's label. Results appear in the documents table.</div>
                 </div>
               </div>
 
@@ -1104,7 +1105,7 @@ select.form-input option{background:var(--bg2);}
                 <div style="min-width:32px;height:32px;background:var(--accent);color:var(--bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">5</div>
                 <div>
                   <div style="font-weight:600;color:var(--text);margin-bottom:2px;">Review &amp; Approve</div>
-                  <div style="color:var(--text2);font-size:12px;">From the <strong>Documents</strong> page, select documents and click <strong>"Approve"</strong>. You see the document (image) on the left and extracted data on the right. Correct any errors and click <strong>"Approve Invoice"</strong>. Highlight sync highlights the corresponding area in the document as you hover over line item rows.</div>
+                  <div style="color:var(--text2);font-size:12px;">From the <strong>Documents</strong> page, select documents and click <strong>"Approve"</strong>. The invoice is shown horizontally across the top and the extracted-data table below it (full width). Correct any errors and click <strong>"Approve Invoice"</strong>. Highlight sync highlights the corresponding area in the document as you hover over line item rows.</div>
                 </div>
               </div>
 
@@ -1120,7 +1121,7 @@ select.form-input option{background:var(--bg2);}
 
             <div style="margin-top:20px;padding:12px 16px;background:rgba(0,102,255,0.08);border:1px solid rgba(0,102,255,0.2);border-radius:8px;">
               <div style="font-weight:600;color:var(--accent2);margin-bottom:6px;">💡 Tip</div>
-              <div style="color:var(--text2);font-size:12px;">The correct order is: <strong>Upload → Labels → Batch → Approve → Export</strong>. First create labels for each invoice type (e.g. DEI, COSMOTE, VODAFONE) then start bulk extraction. Once you create a label, the system automatically matches new invoices from the same supplier.</div>
+              <div style="color:var(--text2);font-size:12px;">The correct order is: <strong>Upload → Labels → Batch → Approve → Export</strong>. First create labels for each invoice type (e.g. Amazon, Microsoft, DHL) then start bulk extraction. Once you create a label, the system automatically matches new invoices from the same supplier.</div>
             </div>
           </div>
         </div>
@@ -1147,20 +1148,21 @@ select.form-input option{background:var(--bg2);}
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I delete documents?</div><div class="faq-a">Select documents with the checkbox and click the "Delete" button that appears. Deletion is permanent.</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🏷 Labels (Templates)</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What are labels?</div><div class="faq-a">Labels (templates) define which fields you want to extract from each document type. For example, for COSMOTE invoices you might want: Invoice Number, Date, Total, VAT. Each supplier can have its own label.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I create a new label?</div><div class="faq-a"><strong>Method 1 (Simple):</strong> Go to "Labels" → "+ New Label". Enter a name, supplier pattern (e.g. cosmote, ote), and fields separated by commas. For line items, click "+ Array Line Items" and enter the columns.<br><br><strong>Method 2 (Recommended):</strong> From the "Documents" page, select one or more documents and click "Labels". You are taken to a special page where you see the actual invoice on the left and the label form on the right. This method is more effective because you can see exactly which fields exist in the invoice and configure them correctly.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is "Supplier Pattern"?</div><div class="faq-a">These are keywords that help the system automatically match an invoice with the correct label during registration. For example, if you enter "cosmote, ote", any invoice recognized as COSMOTE will automatically get this label.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Do I have to create labels manually?</div><div class="faq-a"><strong>NO — they are created AUTOMATICALLY.</strong> During "Register Documents", the system detects each invoice's supplier and automatically creates a label for it — <strong>zero manual setup</strong>. Creating/editing a label manually is optional, only if you want to customise the fields.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What are labels?</div><div class="faq-a">Labels (templates) define which fields you want to extract from each document type. For example, for Amazon invoices you might want: Invoice Number, Date, Total, VAT. Each supplier can have its own label.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I create a new label?</div><div class="faq-a"><strong>Method 1 (Simple):</strong> Go to "Labels" → "+ New Label". Enter a name, supplier pattern (e.g. amazon, aws), and fields separated by commas. For line items, click "+ Array Line Items" and enter the columns.<br><br><strong>Method 2 (Recommended):</strong> From the "Documents" page, select one or more documents and click "Labels". You are taken to a special page where you see the actual invoice on the left and the label form on the right. This method is more effective because you can see exactly which fields exist in the invoice and configure them correctly.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is "Supplier Pattern"?</div><div class="faq-a">These are keywords that help the system automatically match an invoice with the correct label during registration. For example, if you enter "amazon, aws", any invoice recognized as Amazon will automatically get this label.</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">✅ Approval</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I approve documents?</div><div class="faq-a">From the "Documents" page, select documents and click "Approve". On the approval page, you see the document (image) on the left and extracted data on the right. You can correct values before approving.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I approve documents?</div><div class="faq-a">From the "Documents" page, select documents and click "Approve". On the approval page, the invoice is shown horizontally across the top and the extracted-data table below it (full width). You can correct values before approving.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Can I edit data before approving?</div><div class="faq-a">Yes, on the approval page all fields (general data and line items) are editable. Make your changes and then click "Approve". Changes are saved automatically.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What does highlight sync do?</div><div class="faq-a">When you hover over a line item row, the corresponding area in the document is highlighted. This helps verify that the data corresponds to the correct part of the document.</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">⚙️ Settings &amp; Account</div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How do I change my password?</div><div class="faq-a">Settings → Account → Change Password. Enter your current password, the new one (at least 6 characters) and confirmation.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is 2FA and how do I enable it?</div><div class="faq-a">Two-Factor Authentication (2FA) adds an extra layer of security. You need an Authenticator app (e.g. Google Authenticator). Go to Settings → "Enable 2FA", scan the QR code, enter the 6-digit code to verify.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What if I lose access to 2FA?</div><div class="faq-a">Contact support. The administrator can reset 2FA for your account without having access to your data.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is an API Key?</div><div class="faq-a">An API Key is an access key to the AI service (e.g. Google Gemini) used for data extraction. <strong>You MUST use your own key (BYOK — Bring Your Own Key).</strong> Billing is done directly by the AI provider to your account. The FastWrite platform does not provide its own API Key and does not mediate the processing of your data — ensuring complete privacy and independence.<br><br><strong>Recommended:</strong> (1) restrict the key to the Gemini API only (Google Cloud Console → Credentials → API restrictions → "Generative Language API") — a one-click security step; (2) enable <strong>billing (pay-as-you-go)</strong> on your Google account for better reliability and speed — the free tier is rate-limited and can fail on large batches.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What if I lose access to 2FA?</div><div class="faq-a">Contact us (FastWrite) to reset your 2FA — without us having access to your data.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is an API Key?</div><div class="faq-a">An API Key is an access key to the <strong>Google Gemini</strong> AI service, used for data extraction. <strong>Only Google Gemini is supported at this time.</strong> <strong>You MUST use your own key (BYOK — Bring Your Own Key).</strong> Billing is done directly by the AI provider to your account. The FastWrite platform does not provide its own API Key and does not mediate the processing of your data — ensuring complete privacy and independence.<br><br><strong>Recommended:</strong> (1) restrict the key to the Gemini API only (Google Cloud Console → Credentials → API restrictions → "Generative Language API") — a one-click security step; (2) enable <strong>billing (pay-as-you-go)</strong> on your Google account for better reliability and speed — the free tier is rate-limited and can fail on large batches.</div></div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Which AI providers are supported?</div><div class="faq-a">Google Gemini 2.5 Flash is supported, which is optimal for invoice data extraction (vision + tabular + structured output).</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🔗 Xero Integration</div>
@@ -1171,14 +1173,14 @@ select.form-input option{background:var(--bg2);}
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How much does it cost?</div><div class="faq-a">FastWrite uses <strong>your own</strong> Gemini API key (BYOK), so you pay <strong>Google directly</strong> for the AI — indicatively <strong>~$0.002 per invoice</strong> (roughly $15–30 per 10,000 invoices). <strong>No per-invoice fees from us and no subscription.</strong> For the FastWrite license (one-time), contact us for a quote tailored to your needs.</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">🔒 Security &amp; Privacy</div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Who can see my documents?</div><div class="faq-a">No one. Your documents are fully isolated. Even the system administrator cannot see your data. Each user sees and manages only their own documents.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How is my data stored?</div><div class="faq-a">All data (documents, extracted data, labels) is stored <strong>locally on your computer</strong> in a secure database. API keys are encrypted with Fernet encryption. Passwords are stored as bcrypt hashes — the actual password is never stored. No one has access to your files, including the platform administrator.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Are my documents sent to third parties?</div><div class="faq-a"><strong>No.</strong> The FastWrite system operates locally. During data extraction, communication occurs directly between your computer and the AI provider (e.g. Google Gemini) via <strong>your own API Key</strong>. The FastWrite platform does not mediate, store, or have access to the content of your documents. No data is shared with third parties.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Who can see my documents?</div><div class="faq-a">No one. Your data is local on your own computer — not even we (FastWrite) can see it. Only you see and manage your documents.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ How is my data stored?</div><div class="faq-a">All data (documents, extracted data, labels) is stored <strong>locally on your computer</strong> in a secure database. API keys are encrypted with Fernet encryption. Passwords are stored as bcrypt hashes — the actual password is never stored. No one has access to your files — not even we (FastWrite).</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Are my documents sent to third parties?</div><div class="faq-a"><strong>No.</strong> The FastWrite system operates locally. During data extraction, communication occurs directly between your computer and the AI provider Google Gemini via <strong>your own API Key</strong>. The FastWrite platform does not mediate, store, or have access to the content of your documents. No data is shared with third parties.</div></div>
 
           <div class="faq-category" style="font-size:15px;font-weight:700;color:var(--accent);margin:12px 0 4px;">❓ General</div>
           <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What file types are accepted?</div><div class="faq-a">PDF, PNG, JPG, JPEG, WebP. Batch processing (multiple invoices) accepts only PDF.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is the maximum file size?</div><div class="faq-a">20MB per file.</div></div>
-          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Can I delete my account?</div><div class="faq-a">Currently, account deletion is done by contacting support. The administrator can deactivate your account.</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ What is the maximum file size?</div><div class="faq-a">Up to 100 invoices per file (maximum file size: 20 MB).</div></div>
+          <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">▸ Can I delete my account?</div><div class="faq-a">Your data is local on your computer. To delete/deactivate your account, contact us (FastWrite).</div></div>
 
         </div>
         </div><!-- /faq-lang-content en -->
@@ -1528,7 +1530,7 @@ select.form-input option{background:var(--bg2);}
       <input class="form-input" id="tmpl-name" placeholder="π.χ. invoice_dei, cosmote_receipt..." data-i18n-placeholder="tmpl_name_placeholder"/>
     </div>
     <div class="form-group">
-      <label class="form-label" data-i18n="tmpl_supplier">🏢 Προμηθευτής Πωλητής <span style="color:var(--text3);font-size:11px;font-weight:400">(λέξεις-κλειδιά προμηθευτή, π.χ. ΔΕΗ, DEI, δεη)</span></label>
+      <label class="form-label" data-i18n="tmpl_supplier">🏢 Προμηθευτής Πωλητής <span style="color:var(--text3);font-size:11px;font-weight:400">(λέξεις-κλειδιά προμηθευτή, π.χ. amazon, aws)</span></label>
       <input class="form-input" id="tmpl-supplier-pattern" placeholder="π.χ. cosmote, ote, κοσμοτε — πολλαπλές με κόμμα" data-i18n-placeholder="tmpl_supplier_placeholder"/>
     </div>
     <div id="tmpl-fields"></div>
@@ -2832,9 +2834,15 @@ async function openBatchFromDocs() {
   // Ανάλυση επιλεγμένων εγγράφων
   const selectedDocs = allDocs.filter(d => ids.includes(d.id));
   const doneStatuses = ['Completed','pending_review','completed','approved','Approved'];
-  const completed = selectedDocs.filter(d => doneStatuses.includes(d.status));
-  const noLabel = selectedDocs.filter(d => !d.schema_name && !doneStatuses.includes(d.status));
-  const toExtract = selectedDocs.filter(d => d.schema_name && !doneStatuses.includes(d.status));
+  // 35-4: "already processed" = approved/completed OR has ANY extracted data
+  // (a 'pending' doc that has already been through Batch keeps its data). Re-running
+  // Batch on these must be blocked — re-extraction silently overwrites/changes data.
+  const _metaKeys = new Set(['_matched_supplier','_matched_template','_skipped','_reason','_confidence_pct']);
+  const isProcessed = d => doneStatuses.includes(d.status) ||
+    Object.keys(d.result_data || {}).some(k => !_metaKeys.has(k));
+  const completed = selectedDocs.filter(isProcessed);
+  const noLabel = selectedDocs.filter(d => !d.schema_name && !isProcessed(d));
+  const toExtract = selectedDocs.filter(d => d.schema_name && !isProcessed(d));
 
   // Εμφάνιση confirmation modal
   const modal = document.getElementById('precheck-modal');
@@ -4822,8 +4830,10 @@ async function loadSettings() {
       </div>`;
   }
 
-  // API Keys
-  const services = keys.configured_services||[];
+  // API Keys — show ONLY the primary key. The multi-key slots (gemini_2/3/4) are a
+  // dead experiment (v33: the ~1 call/s limit is per Google ACCOUNT, not per key, so
+  // extra keys give zero speed) and only confuse testers. Backend uses one key.
+  const services = (keys.configured_services||[]).filter(s => !/_\d+$/.test(s));
   document.getElementById('keys-status').innerHTML = services.length
     ? services.map(s=>`<span class="badge badge-green" style="margin-right:6px">✓ ${s}</span>`).join('')
     : '<span style="color:var(--text3)">' + t('js_no_saved_keys') + '</span>';
