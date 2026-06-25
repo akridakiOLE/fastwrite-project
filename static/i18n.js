@@ -81,7 +81,7 @@ const I18N = {
       upload_step3: 'Εξαγωγή Batch',
       upload_batch_title: '📦 Batch (Πολλαπλά Τιμολόγια)',
       upload_zone_title: 'PDF με πολλαπλά τιμολόγια',
-      upload_zone_sub: 'Έως 200 τιμολόγια ανά αρχείο',
+      upload_zone_sub: 'Έως 100 τιμολόγια ανά αρχείο',
       upload_register_btn: 'Καταγραφή Εγγράφων',
       upload_register_hint: 'Ανεβάστε PDF και ξεκινήστε αυτόματη εξαγωγή δεδομένων με AI',
       upload_processing: 'Επεξεργασία...',
@@ -724,7 +724,7 @@ const I18N = {
       upload_step3: 'Batch Export',
       upload_batch_title: '📦 Batch (Multiple Invoices)',
       upload_zone_title: 'PDF with multiple invoices',
-      upload_zone_sub: 'Up to 200 invoices per file',
+      upload_zone_sub: 'Up to 100 invoices per file',
       upload_register_btn: 'Register Documents',
       upload_register_hint: 'Upload PDF and start automatic AI data extraction',
       upload_processing: 'Processing...',
@@ -1456,6 +1456,9 @@ const I18N = {
 
   async init() {
     this.currentLang = this.detectLanguage();
+    // Tester phase: only EN/EL are shown & maintained — clamp anything else to EN
+    // so a foreign-browser tester never lands on a hidden/outdated language.
+    if (this.currentLang !== 'en' && this.currentLang !== 'el') this.currentLang = 'en';
     localStorage.setItem('fw_lang', this.currentLang);
     // If detected language is external, load it first
     if (!this.translations[this.currentLang]) {
@@ -1552,8 +1555,13 @@ const I18N = {
     optionsWrap.id = 'lang-options-list';
     container.appendChild(optionsWrap);
 
+    // Tester phase: show ONLY the maintained languages (English + Greek). The
+    // other languages stay defined (data untouched) — to re-enable them all,
+    // just clear VISIBLE_LANGS (empty array = show all).
+    const VISIBLE_LANGS = ['en', 'el'];
     // Sort alphabetically by native name
     const sorted = Object.entries(this.supportedLanguages)
+      .filter(([code]) => VISIBLE_LANGS.length === 0 || VISIBLE_LANGS.includes(code))
       .sort((a, b) => a[1].native.localeCompare(b[1].native));
 
     sorted.forEach(([code, info]) => {

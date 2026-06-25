@@ -32,7 +32,7 @@
   "upload_step3": "Batch Export",
   "upload_batch_title": "📦 Batch (Multiple Invoices)",
   "upload_zone_title": "PDF with multiple invoices",
-  "upload_zone_sub": "Up to 200 invoices per file",
+  "upload_zone_sub": "Up to 100 invoices per file",
   "upload_register_btn": "Register Documents",
   "upload_register_hint": "Upload PDF and start automatic AI data extraction",
   "upload_processing": "Processing...",

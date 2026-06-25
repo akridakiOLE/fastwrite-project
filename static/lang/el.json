@@ -32,7 +32,7 @@
   "upload_step3": "Εξαγωγή Batch",
   "upload_batch_title": "📦 Batch (Πολλαπλά Τιμολόγια)",
   "upload_zone_title": "PDF με πολλαπλά τιμολόγια",
-  "upload_zone_sub": "Έως 200 τιμολόγια ανά αρχείο",
+  "upload_zone_sub": "Έως 100 τιμολόγια ανά αρχείο",
   "upload_register_btn": "Καταγραφή Εγγράφων",
   "upload_register_hint": "Ανεβάστε PDF και ξεκινήστε αυτόματη εξαγωγή δεδομένων με AI",
   "upload_processing": "Επεξεργασία...",
