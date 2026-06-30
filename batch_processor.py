@@ -187,7 +187,7 @@ class BatchJobStatus:
 class BatchProcessor:
     def __init__(self, db, key_mgr, processor, schema_bld,
                  batch_size=BATCH_SIZE, max_workers=MAX_WORKERS,
-                 license_consumer=None):
+                 license_consumer=None, license_enforcer=None):
         self.db          = db
         self.key_mgr     = key_mgr
         self.processor   = processor
@@ -197,6 +197,10 @@ class BatchProcessor:
         # B5: optional callback to consume LICENSE usage after a successful
         # extraction (injected from main_api to avoid a circular import).
         self.license_consumer = license_consumer
+        # Hard gate: optional callback returning True if the license/trial has
+        # room for N more docs. Checked BEFORE extraction so the doc cap is
+        # actually enforced (the consumer only counts, it never blocks).
+        self.license_enforcer = license_enforcer
         self._jobs       = {}
         self._jobs_lock  = threading.Lock()
         self._current_user_id = None
@@ -624,6 +628,16 @@ class BatchProcessor:
                           f"supplier={detected_supplier}, template={used_schema_name}", flush=True)
                     return {"success": True, "doc_id": doc_id,
                             "matched_template": used_schema_name, "registered": True}
+
+                # ── License hard gate: block extraction if the doc allowance is
+                #    exhausted (pairs with license_consumer below). Without this
+                #    the doc cap was only counted, never enforced. ──
+                if self.license_enforcer and not self.license_enforcer(docs=1):
+                    print(f"[extract_one] doc_id={doc_id} BLOCKED: doc limit reached "
+                          f"(license/trial allowance exhausted)", flush=True)
+                    self.db.update_document_status(doc_id, status="Blocked")
+                    return {"success": False, "doc_id": doc_id,
+                            "error": "limit_reached", "limit_reached": True}
 
                 # ── ΒΗΜΑ 3: Extraction (ΜΟΝΟ αν δεν είναι registration_only) ──
                 print(f"[extract_one] doc_id={doc_id} EXTRACTING data...", flush=True)
