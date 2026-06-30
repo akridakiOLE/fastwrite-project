@@ -78,13 +78,14 @@ LEEWAY_S = 30  # ανοχή ρολογιού (clock skew)
 GRACE_PERIOD_DAYS = 7
 
 # Default trial entitlement που χρησιμοποιείται όταν δεν υπάρχει license file.
-# Επιτρέπει στον χρήστη να κάνει register + 14 μέρες δοκιμής με cap 100 docs.
+# Επιτρέπει register + δοκιμή με cap 10000 docs (lifetime — χωρίς πρακτικό
+# χρονικό όριο· το period_days είναι μεγάλο ώστε να ΜΗΝ γίνεται reset του counter).
 TRIAL_DEFAULTS = {
     "plan": "trial",
     "limits": {
-        "docs_per_period": 100,
+        "docs_per_period": 10000,
         "pages_per_period": None,
-        "period_days": 14,
+        "period_days": 3650,
         "features": ["extract", "approve", "tour"],
     },
 }
@@ -257,16 +258,18 @@ class LicenseManager:
             raise LicenseInvalidError(f"Missing/invalid claims: {e}") from e
 
     def _make_trial_entitlement(self) -> Entitlement:
-        """Δομεί ένα τοπικό trial χωρίς υπογραφή. Το jti είναι σταθερό
-        per-machine ώστε το counter να επιμένει μεταξύ restarts."""
-        now = int(self._clock())
+        """Δομεί ένα τοπικό trial χωρίς υπογραφή. Το jti ΚΑΙ το iat είναι σταθερά
+        per-machine ώστε ο doc counter να επιμένει σωστά μεταξύ restarts/requests
+        (το period_start εξαρτάται από το iat — αν το iat γλιστράει, ο counter
+        μηδενίζεται και το όριο δεν επιβάλλεται ποτέ)."""
         trial_id = self._stable_trial_id()
+        started = self._stable_trial_started()
         return Entitlement(
             jti=trial_id,
             sub="trial",
             plan=TRIAL_DEFAULTS["plan"],
-            iat=now,
-            exp=now + TRIAL_DEFAULTS["limits"]["period_days"] * 86400,
+            iat=started,
+            exp=started + TRIAL_DEFAULTS["limits"]["period_days"] * 86400,
             limits=dict(TRIAL_DEFAULTS["limits"]),
             machine_id=None,
             raw_claims={"_synthetic_trial": True},
@@ -286,6 +289,25 @@ class LicenseManager:
         except OSError:
             pass  # Windows: αγνοούμε
         return new_id
+
+    def _stable_trial_started(self) -> int:
+        """Σταθερό timestamp έναρξης trial (persisted στο secrets/.trial_started)
+        ώστε το period_start — που εξαρτάται από το iat — να μένει σταθερό και ο
+        doc counter να αθροίζεται σωστά μεταξύ restarts/requests."""
+        marker = self.base_dir / "secrets" / ".trial_started"
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        if marker.exists():
+            try:
+                return int(marker.read_text(encoding="utf-8").strip())
+            except (ValueError, OSError):
+                pass
+        started = int(self._clock())
+        marker.write_text(str(started), encoding="utf-8")
+        try:
+            os.chmod(marker, 0o600)
+        except OSError:
+            pass  # Windows: αγνοούμε
+        return started
 
     # ── Feature gating ───────────────────────────────────────────────────
     def assert_feature(self, ent: Entitlement, feature: str) -> None:

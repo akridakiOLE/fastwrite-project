@@ -136,6 +136,15 @@ def _consume_license_usage(*, docs: int = 0, pages: int = 0) -> None:
         logger.exception("[license] consume failed: %s", e)
 
 
+def _license_doc_allowed(docs: int = 1) -> bool:
+    """Hard gate for the batch path (batch_processor): returns True if the
+    desktop license/trial has room for `docs` more docs, False if exhausted.
+    Web mode is unaffected (returns True). Checked BEFORE extraction."""
+    if not _is_desktop_mode() or docs <= 0:
+        return True
+    return _enforce_license_limit(docs=docs) is None
+
+
 # ── Seed default pricing plans on startup ──
 db.seed_default_plans()
 
@@ -1496,6 +1505,18 @@ def batch_extract_selected():
                            uid, total_pages_to_process, len(eligible_docs))
             return blocked
 
+    # ── Doc-limit enforcement (Phase 2 Desktop): hard-block if extracting these
+    #    docs would exceed the license/trial doc allowance (admins exempt).
+    #    Pairs with _consume_license_usage(docs=1) per doc below — without this
+    #    pre-flight gate the doc cap was only counted, never enforced.
+    n_eligible_docs = len(eligible_docs)
+    if not is_admin and n_eligible_docs > 0:
+        blocked = _enforce_doc_limit(uid, n_eligible_docs)
+        if blocked is not None:
+            logger.warning("[batch_extract_selected] uid=%s BLOCKED: %d docs exceeds doc limit",
+                           uid, n_eligible_docs)
+            return blocked
+
     results = pre_results
 
     # ── B7: Parallel extraction (heavy I/O in worker threads) + serial DB writes
@@ -1708,7 +1729,8 @@ from batch_processor import BatchProcessor
 
 batch_proc = BatchProcessor(db=db, key_mgr=key_mgr,
                              processor=processor, schema_bld=schema_bld,
-                             license_consumer=_consume_license_usage)
+                             license_consumer=_consume_license_usage,
+                             license_enforcer=_license_doc_allowed)
 
 @app.post("/api/batch/pre-check")
 @require_auth
@@ -1887,7 +1909,9 @@ def batch_upload():
     uid = request.current_user["user_id"]
     is_admin = request.current_user.get("role") == "admin"
     # ── Feature check: batch_upload requires paid plan (admins exempt) ──
-    if not is_admin and not billing_manager.check_feature(db, uid, 'batch_upload'):
+    # Desktop mode gates via license/trial (βλ. _enforce_doc_limit), ΟΧΙ μέσω του
+    # web-SaaS plan feature — αλλιώς ο trial tester κόβεται εδώ πριν τον κόπτη.
+    if not is_admin and not _is_desktop_mode() and not billing_manager.check_feature(db, uid, 'batch_upload'):
         return jsonify({"error": "Batch upload requires a paid plan. Please upgrade.",
                         "limit_reached": True}), 403
     file_path_param = request.form.get("file_path", "").strip()

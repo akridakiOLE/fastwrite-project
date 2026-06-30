@@ -1632,6 +1632,23 @@ function toast(msg, type='info') {
   setTimeout(() => el.remove(), 3500);
 }
 
+// Localize known backend errors (mostly Greek-only) για φιλικό first-run σε EN.
+// Mapping κατά error_code όπου υπάρχει, αλλιώς κατά σταθερό string. Fallback στο
+// raw backend error. Frontend-only — καμία εξάρτηση/αλλαγή backend.
+function localizeErr(res, fallback) {
+  if (!res) return fallback || t('error');
+  if (res.error_code === 'gemini_key_missing') return t('err_gemini_key');
+  const map = {
+    'Μόνο PDF αρχεία γίνονται δεκτά.': 'err_only_pdf',
+    'Μόνο αρχεία PDF γίνονται δεκτά.': 'err_only_pdf',
+    'Δεν βρέθηκε αρχείο.': 'err_no_file',
+    'Gemini API key δεν βρέθηκε.': 'err_gemini_key',
+    'Δεν έχει οριστεί κλειδί Gemini API. Ρυθμίσεις → API Keys για να το καταχωρίσεις.': 'err_gemini_key',
+  };
+  if (res.error && map[res.error]) return t(map[res.error]);
+  return res.error || fallback || t('error');
+}
+
 // ── Navigation ──────────────────────────────────────────────────────────────
 function showPage(name, fromEvent) {
   document.querySelectorAll('.page').forEach(p => p.style.display='none');
@@ -2320,7 +2337,7 @@ async function handleRegisterClick() {
   btn.disabled = false;
   btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> ' + t('js_register_documents');
 
-  if (!res.success) { toast(res.error || t('error'), 'error'); return; }
+  if (!res.success) { toast(localizeErr(res), 'error'); return; }
   toast(t('js_registration_started'), 'success');
   lastBatchJobId = res.job_id;
   pollBatchJob(res.job_id, true);  // true = registration mode
@@ -2362,7 +2379,7 @@ async function doSingleExtract() {
   fd.append('schema_name', schema);
 
   const up = await api('POST','/api/upload',fd,true);
-  if (!up.success) { toast(up.error||'Upload failed','error'); btn.disabled=false; btn.textContent=t('js_extract_data_btn'); return; }
+  if (!up.success) { toast(localizeErr(up, 'Upload failed'),'error'); btn.disabled=false; btn.textContent=t('js_extract_data_btn'); return; }
 
   btn.innerHTML=t('js_extracting_ai');
   const ex = await api('POST',`/api/extract/${up.doc_id}`,{schema_name:schema});
@@ -2372,6 +2389,7 @@ async function doSingleExtract() {
 
   const res = document.getElementById('single-result');
   if (ex.success) {
+    loadLicenseChip();  // refresh trial counter μετά την κατανάλωση (αλλιώς stale)
     const data = ex.data || {};
     const scalarEntries = Object.entries(data).filter(([,v]) => !Array.isArray(v));
     const arrayEntries  = Object.entries(data).filter(([,v]) => Array.isArray(v));
@@ -2426,7 +2444,7 @@ async function doBatchUpload() {
   if (!pcRes || pcRes.error) {
     btn.disabled=false;
     btn.innerHTML=batchBtnDefault;
-    toast(pcRes?.error || t('js_file_analysis_error'), 'error');
+    toast(localizeErr(pcRes, t('js_file_analysis_error')), 'error');
     return;
   }
 
@@ -2444,7 +2462,7 @@ async function doBatchUpload() {
   btn.disabled=false;
   btn.innerHTML=batchBtnDefault;
 
-  if (!res.success) { toast(res.error||t('error'),'error'); return; }
+  if (!res.success) { toast(localizeErr(res),'error'); return; }
   toast(t('js_batch_started'),'success');
   lastBatchJobId = res.job_id;
   pollBatchJob(res.job_id);
@@ -2942,7 +2960,16 @@ async function executeBatchFromDocs() {
     bxDone = true; clearInterval(bxPoll); clearInterval(bxAnim);
 
     if (!res.success) {
-      body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">${res.error || t('error')}</div>
+      // Localized μήνυμα ορίου: το backend στέλνει limit_type/limit/plan, οπότε
+      // χτίζουμε το string μέσω i18n αντί να δείξουμε το hardcoded backend error.
+      let _msg = localizeErr(res);
+      if (res.limit_reached && (res.limit_type === 'docs' || res.limit_type === 'pages')) {
+        const _u = res.usage || {};
+        const _lim = res.limit_type === 'pages' ? (_u.pages && _u.pages.limit) : (_u.docs && _u.docs.limit);
+        const _plan = res.plan || _u.plan || 'trial';
+        _msg = t(res.limit_type === 'pages' ? 'js_limit_pages' : 'js_limit_docs', {limit: _lim, plan: _plan});
+      }
+      body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">${_msg}</div>
         <div style="text-align:center;margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="closeModal('precheck-modal')">${t('btn_close')}</button></div>`;
       return;
     }
@@ -2955,6 +2982,7 @@ async function executeBatchFromDocs() {
     await new Promise(r => setTimeout(r, 400));
 
     title.textContent = t('js_batch_complete');
+    loadLicenseChip();  // refresh trial counter μετά την κατανάλωση (αλλιώς δείχνει stale)
     const total = res.total || 0;
     const extracted = res.extracted || 0;
     const pct = total > 0 ? ((extracted / total) * 100).toFixed(1) : 0;
@@ -4844,7 +4872,7 @@ async function loadSettings() {
       <div class="data-item"><div class="data-key">Database</div><div class="data-val">${health.checks?.database||'—'}</div></div>
       <div class="data-item"><div class="data-key">Gemini Key</div><div class="data-val">${health.checks?.gemini_key||'—'}</div></div>
       <div class="data-item"><div class="data-key">Status</div><div class="data-val" style="color:var(--accent)">${health.status||'—'}</div></div>
-      <div class="data-item"><div class="data-key">Domain</div><div class="data-val">fastwrite.duckdns.org</div></div>
+      <div class="data-item"><div class="data-key">Domain</div><div class="data-val">fastwrite.tech</div></div>
     </div>`;
 }
 
