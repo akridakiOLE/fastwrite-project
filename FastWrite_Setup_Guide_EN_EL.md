@@ -22,7 +22,7 @@
 **Step 1 — Create your FastWrite account**
 1. On first launch you'll see a **login** screen. Click **Register**.
 2. Choose a **username** and **password** and submit.
-3. This account is stored **only on your computer** — it is not a website login. You get a **free trial of 100 documents**; no license key is needed.
+3. This account is stored **only on your computer** — it is not a website login. You get a **free trial of 10000 documents**; no license key is needed.
 
 > Each user creates their own local account on their own PC.
 
@@ -67,7 +67,7 @@ Upload an invoice or bill → FastWrite extracts the data with AI → review →
 **Βήμα 1 — Φτιάξε λογαριασμό FastWrite**
 1. Στο πρώτο άνοιγμα θα δεις οθόνη **login**. Πάτα **Εγγραφή (Register)**.
 2. Διάλεξε **username** και **password** και υπόβαλε.
-3. Ο λογαριασμός αποθηκεύεται **μόνο στον υπολογιστή σου** — δεν είναι login ιστοσελίδας. Παίρνεις **δωρεάν trial 100 εγγράφων**· δεν χρειάζεται κλειδί άδειας (license).
+3. Ο λογαριασμός αποθηκεύεται **μόνο στον υπολογιστή σου** — δεν είναι login ιστοσελίδας. Παίρνεις **δωρεάν trial 10000 εγγράφων**· δεν χρειάζεται κλειδί άδειας (license).
 
 > Ο κάθε χρήστης φτιάχνει τον δικό του τοπικό λογαριασμό στον δικό του υπολογιστή.
 
