@@ -1543,6 +1543,8 @@ def batch_extract_selected():
             extractor = AIExtractor(api_key=api_key, model=extraction_model)
             result = extractor.extract(image_paths=processed_result.pages, schema=schema)
             if not result.is_ok():
+                logger.warning("[extract-worker] doc %s extraction_failed: %s",
+                               w_doc_id, result.error_message or "unknown")
                 return {"doc_id": w_doc_id, "outcome": "extraction_failed"}
 
             extracted = result.extracted_data
@@ -1566,6 +1568,7 @@ def batch_extract_selected():
             return {"doc_id": w_doc_id, "outcome": "ok",
                     "extracted": extracted, "pages": len(processed_result.pages)}
         except Exception as e:
+            logger.warning("[extract-worker] doc %s error: %s", w_doc_id, e)
             return {"doc_id": w_doc_id, "outcome": "error", "error": str(e)}
 
     # ── Multi-invoice fast path (FLAG-GATED, OFF by default: multi_invoice_n=1) ──

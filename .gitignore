@@ -38,6 +38,9 @@ benchmark/
 new_keys.txt
 aq_key.txt
 
+# Greek invoice test set — REAL personal documents + answer key, NEVER commit (repo is public)
+greek_test/
+
 # Temporary diagnostic/utility scripts — local only, not for commit
 diag_*.py
 benchmark_report_*.json

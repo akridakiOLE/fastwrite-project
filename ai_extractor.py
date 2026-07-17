@@ -248,7 +248,7 @@ class AIExtractor:
             response_mime_type="application/json",
             response_schema=clean_schema,
             temperature=0.0,
-            max_output_tokens=8192,
+            max_output_tokens=32768,  # 2.5-flash: τα thinking tokens μετράνε στο όριο — με 8192 κοβόταν σε σύνθετα docs (WATERBOARD 12/7/2026)
         )
 
         response = client.models.generate_content(
