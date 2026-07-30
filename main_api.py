@@ -139,6 +139,60 @@ def _enforce_demo_limit(docs: int):
     return None
 
 
+def _activate_demo_key():
+    """Desktop: τραβά το demo key από τον server, το αποθηκεύει κρυπτογραφημένα
+    και γράφει τον marker με το cap. Επιστρέφει (ok: bool, cap: int, code: str).
+    ΔΕΝ πετάει ποτέ exception — ο caller αποφασίζει τι κάνει με το αποτέλεσμα."""
+    if not _is_desktop_mode():
+        return False, 0, "desktop_only"
+    if key_mgr.has_key("gemini"):
+        return False, 0, "key_exists"
+    try:
+        import requests as _requests   # lazy: υπάρχει ήδη ως dependency (xero)
+        resp = _requests.post(f"{DEMO_SERVER_URL}/api/demo-key/claim", timeout=15)
+    except Exception as e:
+        logger.warning("[demo-key] server unreachable: %s", e)
+        return False, 0, "demo_server_unreachable"
+    if resp.status_code != 200:
+        try:
+            code = resp.json().get("error_code", "demo_claim_failed")
+        except Exception:
+            code = "demo_claim_failed"
+        logger.warning("[demo-key] claim rejected: HTTP %s (%s)", resp.status_code, code)
+        return False, 0, code
+    try:
+        data = resp.json()
+    except Exception:
+        return False, 0, "demo_claim_failed"
+    api_key = (data.get("api_key") or "").strip()
+    if not api_key:
+        return False, 0, "demo_claim_failed"
+    cap = int(data.get("cap_docs") or DEMO_DEFAULT_CAP)
+    try:
+        key_mgr.save_key("gemini", api_key)
+        DEMO_MARKER_FILE.write_text(json.dumps({
+            "claimed_at": datetime.utcnow().isoformat(),
+            "docs_used": 0,
+            "cap_docs": cap,
+        }))
+    except Exception as e:
+        logger.exception("[demo-key] failed to store key/marker: %s", e)
+        return False, 0, "demo_store_failed"
+    logger.info("[demo-key] activated (cap=%s docs)", cap)
+    return True, cap, ""
+
+
+def _demo_status() -> dict:
+    """Σύνοψη demo για το UI: {active, used, cap, remaining}. Πάντα ασφαλές."""
+    meta = _load_demo_meta()
+    if not meta:
+        return {"active": False}
+    cap = int(meta.get("cap_docs", DEMO_DEFAULT_CAP))
+    used = int(meta.get("docs_used", 0))
+    return {"active": True, "used": used, "cap": cap,
+            "remaining": max(0, cap - used)}
+
+
 def _get_license_manager():
     """Lazy singleton. Καλείται μόνο σε desktop mode."""
     global _LICENSE_MANAGER
@@ -417,49 +471,29 @@ def demo_key_claim():
     return jsonify({"api_key": demo_key, "cap_docs": DEMO_DEFAULT_CAP})
 
 
+_DEMO_ERROR_STATUS = {
+    "desktop_only": 403,
+    "key_exists": 400,
+}
+
+
 @app.post("/api/keys/demo-activate")
 def demo_key_activate():
-    """Desktop-only: τραβά το demo key από τον FastWrite server, το αποθηκεύει
-    κρυπτογραφημένα (KeyManager) και γράφει τον demo marker με το cap."""
-    if not _is_desktop_mode():
-        return jsonify({"error": "Διαθέσιμο μόνο στην desktop εφαρμογή.",
-                        "error_code": "desktop_only"}), 403
-    if key_mgr.has_key("gemini"):
-        return jsonify({"error": "Υπάρχει ήδη αποθηκευμένο Gemini key.",
-                        "error_code": "key_exists"}), 400
-    try:
-        import requests as _requests   # lazy: υπάρχει ήδη ως dependency (xero)
-        resp = _requests.post(f"{DEMO_SERVER_URL}/api/demo-key/claim", timeout=15)
-    except Exception as e:
-        logger.warning("[demo-key] server unreachable: %s", e)
-        return jsonify({"error": ("Ο FastWrite server δεν είναι προσβάσιμος. "
-                                  "Δοκίμασε αργότερα ή βάλε δικό σου κλειδί."),
-                        "error_code": "demo_server_unreachable"}), 502
-    if resp.status_code != 200:
-        try:
-            payload = resp.json()
-        except Exception:
-            payload = {}
-        return jsonify({"error": payload.get("error",
-                                             "Το demo key δεν είναι διαθέσιμο αυτή τη στιγμή."),
-                        "error_code": payload.get("error_code", "demo_claim_failed")}), 502
-    data = resp.json()
-    api_key = (data.get("api_key") or "").strip()
-    if not api_key:
-        return jsonify({"error": "Λήφθηκε κενό demo key.",
-                        "error_code": "demo_claim_failed"}), 502
-    cap = int(data.get("cap_docs") or DEMO_DEFAULT_CAP)
-    key_mgr.save_key("gemini", api_key)
-    try:
-        DEMO_MARKER_FILE.write_text(json.dumps({
-            "claimed_at": datetime.utcnow().isoformat(),
-            "docs_used": 0,
-            "cap_docs": cap,
-        }))
-    except Exception:
-        logger.exception("[demo-key] failed to write marker")
-    logger.info("[demo-key] activated on desktop (cap=%s docs)", cap)
-    return jsonify({"success": True, "cap_docs": cap})
+    """Desktop-only fallback: χειροκίνητη ενεργοποίηση demo key. Κανονικά
+    η ενεργοποίηση γίνεται ΑΥΤΟΜΑΤΑ στην εγγραφή (βλ. auth_register)· αυτό
+    το endpoint καλύπτει την περίπτωση που εκείνη απέτυχε (π.χ. offline)."""
+    ok, cap, code = _activate_demo_key()
+    if ok:
+        return jsonify({"success": True, "cap_docs": cap})
+    return jsonify({"success": False, "error_code": code}), _DEMO_ERROR_STATUS.get(code, 502)
+
+
+@app.get("/api/demo-key/status")
+def demo_key_status():
+    """UI helper: κατάσταση demo (ενεργό/υπόλοιπο) + αν μπορεί να ενεργοποιηθεί."""
+    st = _demo_status()
+    st["can_activate"] = bool(_is_desktop_mode() and not key_mgr.has_key("gemini"))
+    return jsonify(st)
 
 
 # ── Templates ─────────────────────────────────────────────────────────────────
@@ -2384,6 +2418,9 @@ def api_license_summary():
         ent = lm.load_entitlement(allow_trial_fallback=True)
         summary = lm.summary(ent)
         summary["desktop"] = True
+        # Demo (R1): όσο τρέχει με ΔΙΚΟ ΜΑΣ key, το demo cap είναι το πραγματικό
+        # όριο του χρήστη — το UI δείχνει ΕΝΑ νούμερο, όχι δύο.
+        summary["demo"] = _demo_status()
         return jsonify(summary)
     except license_manager.LicenseInvalidError as e:
         return jsonify({"desktop": True, "error": "license_invalid",
@@ -2572,9 +2609,21 @@ def auth_register():
         # ── Auto-assign Free plan ──
         db.assign_free_plan(user_id)
         logger.info("Free plan assigned to new user: %s (id=%s)", username, user_id)
+        # ── Auto-ενεργοποίηση demo key (desktop, R1 activation) ──
+        # Best-effort: ο tester μπαίνει έτοιμος να δουλέψει, χωρίς κανένα setup.
+        # ΑΝ αποτύχει (offline, εξαντλημένο, υπάρχον key) η εγγραφή ΔΕΝ σπάει —
+        # απλώς το frontend δεν δείχνει το μήνυμα ενεργοποίησης.
+        demo_ok, demo_cap, demo_code = False, 0, ""
+        try:
+            demo_ok, demo_cap, demo_code = _activate_demo_key()
+        except Exception as e:
+            logger.exception("[demo-key] auto-activation crashed (ignored): %s", e)
         # Auto-login: issue JWT token
         token = create_token(user_id, username, "user")
-        resp = make_response(jsonify({"success": True, "username": username, "role": "user"}))
+        resp = make_response(jsonify({"success": True, "username": username, "role": "user",
+                                      "demo_activated": demo_ok,
+                                      "demo_cap": demo_cap,
+                                      "demo_error_code": demo_code}))
         resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="Lax", secure=False, max_age=86400, path="/")
         return resp
     except Exception as e:
@@ -3447,7 +3496,16 @@ async function doRegister(e){
     const r=await fetch('/api/auth/register',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({username:username,password:pw,email:email})});
     const d=await r.json();
-    if(r.ok&&d.success){window.location.href='/ui';}
+    if(r.ok&&d.success){
+      // Demo key (R1): αν ενεργοποιήθηκε αυτόματα, δείξε το πριν το redirect.
+      if(d.demo_activated){
+        suc.textContent='✓ Account created — '+(d.demo_cap||100)+' free documents activated. Opening FastWrite…';
+        suc.style.display='block';
+        setTimeout(function(){window.location.href='/ui';},1800);
+      } else {
+        window.location.href='/ui';
+      }
+    }
     else{err.textContent=d.error||'Registration failed';err.style.display='block';}
   }catch(ex){err.textContent='Connection error';err.style.display='block';}
   return false;

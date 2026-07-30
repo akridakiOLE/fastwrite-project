@@ -802,10 +802,12 @@ select.form-input option{background:var(--bg2);}
           <div class="card">
             <div class="card-title" data-i18n="settings_api_title">🔑 API Keys</div>
             <div id="keys-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);" data-i18n="loading">Φόρτωση...</div>
-            <!-- Demo key (R1 activation): ορατό ΜΟΝΟ σε desktop mode χωρίς αποθηκευμένο gemini key -->
+            <!-- Demo υπόλοιπο: ορατό όσο τρέχει με το κλειδί μας -->
+            <div id="demo-key-status" style="display:none;margin-bottom:16px;padding:10px 12px;border-radius:8px;background:var(--bg2);font-size:13px;color:var(--text2);"></div>
+            <!-- Demo key εφεδρεία: μόνο αν η αυτόματη ενεργοποίηση απέτυχε -->
             <div id="demo-key-block" style="display:none;margin-bottom:16px;padding:12px;border:1px dashed var(--border);border-radius:8px;">
-              <div style="font-size:13px;color:var(--text2);margin-bottom:10px;" data-i18n="demo_key_desc">Δεν έχεις ακόμα Gemini API key; Δοκίμασε το FastWrite ΑΜΕΣΩΣ με το δωρεάν demo key μας (όριο 100 έγγραφα). Μετά μπορείς να βάλεις το δικό σου κλειδί όποτε θέλεις.</div>
-              <button class="btn btn-secondary" id="demo-key-btn" onclick="activateDemoKey()" data-i18n="demo_key_btn">🎁 Δοκίμασε με demo key</button>
+              <div style="font-size:13px;color:var(--text2);margin-bottom:10px;" data-i18n="demo_key_desc">Δεν έχεις ακόμα Gemini API key; Δοκίμασε το FastWrite ΑΜΕΣΩΣ με τα δωρεάν έγγραφά σου — δεν χρειάζεται καμία ρύθμιση.</div>
+              <button class="btn btn-secondary" id="demo-key-btn" onclick="activateDemoKey()" data-i18n="demo_key_btn">🎁 Ενεργοποίηση δωρεάν εγγράφων</button>
             </div>
             <div class="form-group">
               <label class="form-label" data-i18n="settings_api_provider">Παροχέας</label>
@@ -4852,10 +4854,22 @@ async function loadSettings() {
     api('GET','/api/auth/me'),
     api('GET','/api/license/summary')
   ]);
-  // Demo key (R1 activation): πρόταση ΜΟΝΟ σε desktop mode χωρίς gemini key.
+  // Demo key (R1 activation): κανονικά ενεργοποιείται ΑΥΤΟΜΑΤΑ στην εγγραφή.
+  // Το block εμφανίζεται μόνο ως εφεδρεία, αν εκείνη απέτυχε (π.χ. offline).
   const demoBlock = document.getElementById('demo-key-block');
   if (demoBlock) {
     demoBlock.style.display = (lic && lic.desktop && !keys.gemini_ready) ? 'block' : 'none';
+  }
+  // Demo υπόλοιπο μέσα στις Ρυθμίσεις (ορατότητα και εκτός chip)
+  const demoStatus = document.getElementById('demo-key-status');
+  if (demoStatus) {
+    const d = (lic && lic.demo) || {};
+    if (d.active) {
+      demoStatus.textContent = t('demo_remaining', {remaining: d.remaining, cap: d.cap});
+      demoStatus.style.display = 'block';
+    } else {
+      demoStatus.style.display = 'none';
+    }
   }
   // Load 2FA status + Admin users
   load2FAStatus();
@@ -6104,6 +6118,15 @@ async function loadLicenseChip() {
     if (data.error) {
       chip.textContent = '⚠ ' + (data.error === 'license_invalid' ? t('license_invalid') : t('license_error_label'));
       chip.style.borderColor = 'var(--danger)';
+      chip.style.display = 'inline-flex';
+      return;
+    }
+    // Demo (R1): όσο τρέχει με το δικό ΜΑΣ key, δείχνουμε ΜΟΝΟ το demo όριο —
+    // ένα νούμερο, καμία σύγχυση. Το trial εμφανίζεται μόνο με δικό του key.
+    const demo = data.demo || {};
+    if (demo.active) {
+      chip.textContent = `${t('demo_chip_label')} · ${demo.remaining}/${demo.cap} docs`;
+      chip.style.borderColor = demo.remaining <= 10 ? 'var(--warning, #d97706)' : 'var(--border)';
       chip.style.display = 'inline-flex';
       return;
     }
