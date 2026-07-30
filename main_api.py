@@ -81,7 +81,7 @@ DEMO_DEFAULT_CAP = 100          # έγγραφα ανά tester (απόφαση S
 DEMO_CLAIM_PER_IP_24H = 3       # claims ανά IP ανά 24ωρο
 DEMO_CLAIM_GLOBAL_24H = 50      # συνολικά claims ανά 24ωρο (κόφτης runaway)
 DEMO_SERVER_URL = os.environ.get("FASTWRITE_DEMO_SERVER",
-                                 "https://fastwrite.duckdns.org")
+                                 "https://api.fastwrite.tech")
 
 
 def _load_demo_meta():
