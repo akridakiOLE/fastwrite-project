@@ -802,6 +802,11 @@ select.form-input option{background:var(--bg2);}
           <div class="card">
             <div class="card-title" data-i18n="settings_api_title">🔑 API Keys</div>
             <div id="keys-status" style="margin-bottom:16px;font-size:13px;color:var(--text2);" data-i18n="loading">Φόρτωση...</div>
+            <!-- Demo key (R1 activation): ορατό ΜΟΝΟ σε desktop mode χωρίς αποθηκευμένο gemini key -->
+            <div id="demo-key-block" style="display:none;margin-bottom:16px;padding:12px;border:1px dashed var(--border);border-radius:8px;">
+              <div style="font-size:13px;color:var(--text2);margin-bottom:10px;" data-i18n="demo_key_desc">Δεν έχεις ακόμα Gemini API key; Δοκίμασε το FastWrite ΑΜΕΣΩΣ με το δωρεάν demo key μας (όριο 100 έγγραφα). Μετά μπορείς να βάλεις το δικό σου κλειδί όποτε θέλεις.</div>
+              <button class="btn btn-secondary" id="demo-key-btn" onclick="activateDemoKey()" data-i18n="demo_key_btn">🎁 Δοκίμασε με demo key</button>
+            </div>
             <div class="form-group">
               <label class="form-label" data-i18n="settings_api_provider">Παροχέας</label>
               <select class="form-input" id="key-service">
@@ -1637,7 +1642,14 @@ function toast(msg, type='info') {
 // raw backend error. Frontend-only — καμία εξάρτηση/αλλαγή backend.
 function localizeErr(res, fallback) {
   if (!res) return fallback || t('error');
-  if (res.error_code === 'gemini_key_missing') return t('err_gemini_key');
+  const codeMap = {
+    gemini_key_missing:      'err_gemini_key',
+    demo_unavailable:        'err_demo_unavailable',
+    demo_server_unreachable: 'err_demo_server',
+    demo_rate_limited:       'err_demo_rate_limited',
+    demo_limit_reached:      'err_demo_limit',
+  };
+  if (res.error_code && codeMap[res.error_code]) return t(codeMap[res.error_code]);
   const map = {
     'Μόνο PDF αρχεία γίνονται δεκτά.': 'err_only_pdf',
     'Μόνο αρχεία PDF γίνονται δεκτά.': 'err_only_pdf',
@@ -4834,11 +4846,17 @@ async function deleteTemplate(name) {
 
 // ── Settings ─────────────────────────────────────────────────────────────────
 async function loadSettings() {
-  const [keys, health, me] = await Promise.all([
+  const [keys, health, me, lic] = await Promise.all([
     api('GET','/api/keys/status'),
     api('GET','/health'),
-    api('GET','/api/auth/me')
+    api('GET','/api/auth/me'),
+    api('GET','/api/license/summary')
   ]);
+  // Demo key (R1 activation): πρόταση ΜΟΝΟ σε desktop mode χωρίς gemini key.
+  const demoBlock = document.getElementById('demo-key-block');
+  if (demoBlock) {
+    demoBlock.style.display = (lic && lic.desktop && !keys.gemini_ready) ? 'block' : 'none';
+  }
   // Load 2FA status + Admin users
   load2FAStatus();
   loadXeroStatus();
@@ -5155,6 +5173,20 @@ async function saveKey() {
   const res = await api('POST','/api/keys/save',{service,api_key:key});
   if (res.success) { toast(t('js_key_saved'),'success'); document.getElementById('key-value').value=''; loadSettings(); }
   else toast(res.error||t('error'),'error');
+}
+
+// Demo key (R1 activation): first-run tester χωρίς δικό του Gemini key.
+async function activateDemoKey() {
+  const btn = document.getElementById('demo-key-btn');
+  if (btn) btn.disabled = true;
+  const res = await api('POST','/api/keys/demo-activate');
+  if (btn) btn.disabled = false;
+  if (res && res.success) {
+    toast(t('demo_key_ok', {cap: res.cap_docs}), 'success');
+    loadSettings();
+  } else {
+    toast(localizeErr(res), 'error');
+  }
 }
 
 

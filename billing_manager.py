@@ -6,15 +6,19 @@ Pure Python — NO embedded HTML.
 
 import json
 import logging
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-# ── Stripe secret key: same pattern as jwt_secret.key ──
-_STRIPE_SECRET_FILE = Path("/app/projects/secrets/stripe_secret.key")
-_STRIPE_WEBHOOK_FILE = Path("/app/projects/secrets/stripe_webhook.key")
+# ── Stripe secret keys: BASE_DIR-aware (ίδιο pattern με main_api.py) ──
+# Το FASTWRITE_BASE_DIR επιτρέπει σε staging/desktop να έχουν ΔΙΚΑ τους
+# secrets αντί να διαβάζουν πάντα τα production paths.
+_BASE_DIR = Path(os.environ.get("FASTWRITE_BASE_DIR", "/app/projects"))
+_STRIPE_SECRET_FILE = _BASE_DIR / "secrets" / "stripe_secret.key"
+_STRIPE_WEBHOOK_FILE = _BASE_DIR / "secrets" / "stripe_webhook.key"
 
 
 def _load_key(filepath: Path) -> Optional[str]:

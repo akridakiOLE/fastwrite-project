@@ -9,6 +9,8 @@ import io
 import base64
 import logging
 import threading
+import time
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file, make_response, redirect
@@ -65,6 +67,78 @@ def _is_desktop_mode() -> bool:
     return os.environ.get("FASTWRITE_MODE", "web").lower() == "desktop"
 
 
+# ── Demo key (R1 activation) ─────────────────────────────────────────────
+# Σχέδιο Α (Master v47 §7): ο server μοιράζει ένα capped demo Gemini key ώστε
+# ο tester να κάνει extraction ΑΜΕΣΩΣ, χωρίς Google AI Studio setup.
+# Server-side: το key ζει στο SECRETS_DIR/demo_gemini.key (BASE_DIR-aware —
+# staging/production έχουν το δικό τους). Desktop-side: μετά το claim γράφεται
+# marker με τοπικό μετρητή εγγράφων. Ο marker σβήνεται μόλις ο tester βάλει
+# δικό του key (BYOK) — τότε ισχύει μόνο το κανονικό trial.
+DEMO_KEY_FILE    = SECRETS_DIR / "demo_gemini.key"       # server: το μοιραζόμενο key
+DEMO_MARKER_FILE = SECRETS_DIR / "demo_key_meta.json"    # desktop: claimed_at/docs_used/cap
+DEMO_CLAIMS_FILE = BASE_DIR / "data" / "demo_key_claims.json"  # server: rate-limit log
+DEMO_DEFAULT_CAP = 100          # έγγραφα ανά tester (απόφαση Stavros 30/7)
+DEMO_CLAIM_PER_IP_24H = 3       # claims ανά IP ανά 24ωρο
+DEMO_CLAIM_GLOBAL_24H = 50      # συνολικά claims ανά 24ωρο (κόφτης runaway)
+DEMO_SERVER_URL = os.environ.get("FASTWRITE_DEMO_SERVER",
+                                 "https://api.fastwrite.tech")
+
+
+def _load_demo_meta():
+    """Desktop: διαβάζει τον demo marker. None αν δεν υπάρχει/δεν διαβάζεται."""
+    try:
+        if DEMO_MARKER_FILE.exists():
+            return json.loads(DEMO_MARKER_FILE.read_text())
+    except Exception:
+        logger.warning("[demo-key] unreadable marker %s", DEMO_MARKER_FILE)
+    return None
+
+
+def _clear_demo_meta() -> None:
+    """Σβήνει τον demo marker (π.χ. όταν ο tester περνά σε δικό του key)."""
+    try:
+        if DEMO_MARKER_FILE.exists():
+            DEMO_MARKER_FILE.unlink()
+    except Exception:
+        logger.exception("[demo-key] failed to clear marker")
+
+
+def _consume_demo_usage(docs: int) -> None:
+    """Desktop: best-effort αύξηση του demo μετρητή μετά από extraction."""
+    if docs <= 0:
+        return
+    meta = _load_demo_meta()
+    if not meta:
+        return
+    meta["docs_used"] = int(meta.get("docs_used", 0)) + docs
+    try:
+        DEMO_MARKER_FILE.write_text(json.dumps(meta))
+    except Exception:
+        logger.exception("[demo-key] failed to update usage")
+
+
+def _enforce_demo_limit(docs: int):
+    """Desktop: έλεγχος demo cap. Flask tuple αν blocked, None αν allowed
+    (ή αν δεν υπάρχει ενεργός demo marker)."""
+    if docs <= 0:
+        return None
+    meta = _load_demo_meta()
+    if not meta:
+        return None
+    cap = int(meta.get("cap_docs", DEMO_DEFAULT_CAP))
+    used = int(meta.get("docs_used", 0))
+    if (cap - used) < docs:
+        return jsonify({
+            "error": (f"Εξαντλήθηκε το όριο του demo key ({cap} έγγραφα). "
+                      "Βάλε το δικό σου Gemini API key στις Ρυθμίσεις → API Keys "
+                      "για να συνεχίσεις χωρίς όριο demo."),
+            "error_code": "demo_limit_reached",
+            "limit_reached": True, "limit_type": "demo_docs",
+            "demo_cap": cap, "demo_used": used,
+        }), 403
+    return None
+
+
 def _get_license_manager():
     """Lazy singleton. Καλείται μόνο σε desktop mode."""
     global _LICENSE_MANAGER
@@ -115,6 +189,11 @@ def _enforce_license_limit(*, docs: int = 0, pages: int = 0):
             "limit_reached": True, "limit_type": "pages",
             "plan": ent.plan, "usage": lm.summary(ent),
         }), 403
+    # Demo-key cap (R1 activation): αυστηρότερος από το trial, ισχύει ΜΟΝΟ
+    # όσο υπάρχει ενεργός demo marker (σβήνεται με BYOK).
+    demo_block = _enforce_demo_limit(docs)
+    if demo_block is not None:
+        return demo_block
     return None
 
 
@@ -124,6 +203,7 @@ def _consume_license_usage(*, docs: int = 0, pages: int = 0) -> None:
     μην σπάσει η κύρια ροή — το enforce έχει ήδη κάνει τον σκληρό έλεγχο."""
     if not _is_desktop_mode() or (docs == 0 and pages == 0):
         return
+    _consume_demo_usage(docs)   # demo μετρητής (no-op χωρίς ενεργό marker)
     lm = _get_license_manager()
     if lm is None:
         return
@@ -252,7 +332,11 @@ def health_check():
 def save_api_key():
     data = request.get_json(force=True)
     try:
-        key_mgr.save_key(data.get("service","gemini"), data.get("api_key",""))
+        service = data.get("service", "gemini")
+        key_mgr.save_key(service, data.get("api_key", ""))
+        if service == "gemini":
+            # Ο tester έβαλε δικό του key → το demo cap παύει να ισχύει.
+            _clear_demo_meta()
         return jsonify({"success": True, "message": "Key αποθηκεύτηκε."})
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -266,9 +350,117 @@ def get_key_status():
 def delete_api_key(service):
     try:
         key_mgr.delete_key(service)
+        if service == "gemini":
+            _clear_demo_meta()
         return jsonify({"success": True, "message": f"Key '{service}' διαγράφηκε."})
     except KeyError:
         return jsonify({"error": f"Δεν βρέθηκε key: '{service}'"}), 404
+
+
+# ── Demo key endpoints (R1 activation — Master v47 §7, Σχέδιο Α) ─────────────
+
+def _load_demo_claims() -> dict:
+    """Server: φορτώνει το claims log. Άδειο dict σε κάθε αποτυχία."""
+    try:
+        if DEMO_CLAIMS_FILE.exists():
+            return json.loads(DEMO_CLAIMS_FILE.read_text())
+    except Exception:
+        logger.warning("[demo-key] unreadable claims file")
+    return {}
+
+
+@app.post("/api/demo-key/claim")
+def demo_key_claim():
+    """Server-side: δίνει το capped demo Gemini key σε first-run tester.
+    ΧΩΡΙΣ auth (ο tester δεν έχει ακόμα λογαριασμό/κλειδί). Προστασίες:
+    (α) 404 αν δεν υπάρχει demo_gemini.key στον server, (β) rate limit ανά IP
+    και συνολικά ανά 24ωρο, (γ) το ίδιο το key έχει budget cap στη Google.
+    Οι IP αποθηκεύονται μόνο ως truncated SHA-256 hash (όχι raw)."""
+    demo_key = None
+    try:
+        if DEMO_KEY_FILE.exists():
+            demo_key = DEMO_KEY_FILE.read_text().strip()
+    except Exception:
+        demo_key = None
+    if not demo_key:
+        return jsonify({"error": "Το demo key δεν είναι διαθέσιμο.",
+                        "error_code": "demo_unavailable"}), 404
+
+    now = time.time()
+    day_ago = now - 86400
+    ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "?")
+          .split(",")[0].strip())
+    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+
+    claims = _load_demo_claims()
+    # Κλάδεμα εγγραφών >24h ώστε το αρχείο να μη μεγαλώνει απεριόριστα.
+    claims = {k: [t for t in v if t > day_ago] for k, v in claims.items()}
+    claims = {k: v for k, v in claims.items() if v}
+
+    total_24h = sum(len(v) for v in claims.values())
+    if total_24h >= DEMO_CLAIM_GLOBAL_24H:
+        logger.warning("[demo-key] global 24h claim limit reached (%s)", total_24h)
+        return jsonify({"error": "Πολλά αιτήματα demo key. Δοκίμασε αύριο.",
+                        "error_code": "demo_rate_limited"}), 429
+    if len(claims.get(ip_hash, [])) >= DEMO_CLAIM_PER_IP_24H:
+        return jsonify({"error": "Πολλά αιτήματα από αυτή τη διεύθυνση. Δοκίμασε αύριο.",
+                        "error_code": "demo_rate_limited"}), 429
+
+    claims.setdefault(ip_hash, []).append(now)
+    try:
+        DEMO_CLAIMS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        DEMO_CLAIMS_FILE.write_text(json.dumps(claims))
+    except Exception:
+        logger.exception("[demo-key] failed to persist claims")
+    logger.info("[demo-key] claim served (ip_hash=%s, total_24h=%s)",
+                ip_hash, total_24h + 1)
+    return jsonify({"api_key": demo_key, "cap_docs": DEMO_DEFAULT_CAP})
+
+
+@app.post("/api/keys/demo-activate")
+def demo_key_activate():
+    """Desktop-only: τραβά το demo key από τον FastWrite server, το αποθηκεύει
+    κρυπτογραφημένα (KeyManager) και γράφει τον demo marker με το cap."""
+    if not _is_desktop_mode():
+        return jsonify({"error": "Διαθέσιμο μόνο στην desktop εφαρμογή.",
+                        "error_code": "desktop_only"}), 403
+    if key_mgr.has_key("gemini"):
+        return jsonify({"error": "Υπάρχει ήδη αποθηκευμένο Gemini key.",
+                        "error_code": "key_exists"}), 400
+    try:
+        import requests as _requests   # lazy: υπάρχει ήδη ως dependency (xero)
+        resp = _requests.post(f"{DEMO_SERVER_URL}/api/demo-key/claim", timeout=15)
+    except Exception as e:
+        logger.warning("[demo-key] server unreachable: %s", e)
+        return jsonify({"error": ("Ο FastWrite server δεν είναι προσβάσιμος. "
+                                  "Δοκίμασε αργότερα ή βάλε δικό σου κλειδί."),
+                        "error_code": "demo_server_unreachable"}), 502
+    if resp.status_code != 200:
+        try:
+            payload = resp.json()
+        except Exception:
+            payload = {}
+        return jsonify({"error": payload.get("error",
+                                             "Το demo key δεν είναι διαθέσιμο αυτή τη στιγμή."),
+                        "error_code": payload.get("error_code", "demo_claim_failed")}), 502
+    data = resp.json()
+    api_key = (data.get("api_key") or "").strip()
+    if not api_key:
+        return jsonify({"error": "Λήφθηκε κενό demo key.",
+                        "error_code": "demo_claim_failed"}), 502
+    cap = int(data.get("cap_docs") or DEMO_DEFAULT_CAP)
+    key_mgr.save_key("gemini", api_key)
+    try:
+        DEMO_MARKER_FILE.write_text(json.dumps({
+            "claimed_at": datetime.utcnow().isoformat(),
+            "docs_used": 0,
+            "cap_docs": cap,
+        }))
+    except Exception:
+        logger.exception("[demo-key] failed to write marker")
+    logger.info("[demo-key] activated on desktop (cap=%s docs)", cap)
+    return jsonify({"success": True, "cap_docs": cap})
+
 
 # ── Templates ─────────────────────────────────────────────────────────────────
 @app.post("/api/templates")
