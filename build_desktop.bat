@@ -61,6 +61,11 @@ if errorlevel 1 (
     echo ERROR: copying samples failed.
     exit /b 1
 )
+copy /y FastWrite_Quick_Start_Guide.pdf dist\FastWrite\ >nul
+if errorlevel 1 (
+    echo ERROR: copying quick start guide failed.
+    exit /b 1
+)
 
 echo.
 echo ========================================================================
