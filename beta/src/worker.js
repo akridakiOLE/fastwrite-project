@@ -11,11 +11,11 @@
 // cannot affect production. See beta/DEPLOY.md for the deploy steps.
 // ---------------------------------------------------------------------------
 
-// The public GitHub Release asset. The release tag MUST be "beta-v2" and the
+// The public GitHub Release asset. The release tag MUST be "beta-v3" and the
 // uploaded file MUST be named "FastWrite-Windows.zip" (see DEPLOY.md).
 // To ship a new build later: upload a new asset and bump this URL's tag.
 const DOWNLOAD_URL =
-  "https://github.com/akridakiOLE/fastwrite-project/releases/download/beta-v2/FastWrite-Windows.zip";
+  "https://github.com/akridakiOLE/fastwrite-project/releases/download/beta-v3/FastWrite-Windows.zip";
 
 export default {
   async fetch(request, env, ctx) {

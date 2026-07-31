@@ -13,7 +13,7 @@ setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 echo.
-echo [1/5] Activate virtual environment...
+echo [1/6] Activate virtual environment...
 if not exist "venv\Scripts\activate.bat" (
     echo ERROR: venv\Scripts\activate.bat not found.
     echo Run: python -m venv venv ^&^& venv\Scripts\activate ^&^& pip install -r requirements-desktop.txt
@@ -22,7 +22,7 @@ if not exist "venv\Scripts\activate.bat" (
 call venv\Scripts\activate.bat
 
 echo.
-echo [2/5] Verify PyInstaller is installed...
+echo [2/6] Verify PyInstaller is installed...
 python -c "import PyInstaller; print('PyInstaller', PyInstaller.__version__)" 2>nul
 if errorlevel 1 (
     echo PyInstaller missing. Installing...
@@ -34,12 +34,12 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/5] Clean previous build artifacts...
+echo [3/6] Clean previous build artifacts...
 if exist "build" rmdir /s /q build
 if exist "dist" rmdir /s /q dist
 
 echo.
-echo [4/5] py_compile sanity check on critical modules...
+echo [4/6] py_compile sanity check on critical modules...
 python -m py_compile main_api.py desktop\main.py license_manager.py perf_config.py file_processor.py ai_extractor.py batch_processor.py db_manager.py
 if errorlevel 1 (
     echo ERROR: py_compile failed. Fix syntax errors before building.
@@ -47,10 +47,18 @@ if errorlevel 1 (
 )
 
 echo.
-echo [5/5] Run PyInstaller (this takes 2-5 minutes)...
+echo [5/6] Run PyInstaller (this takes 2-5 minutes)...
 pyinstaller fastwrite.spec --clean --noconfirm
 if errorlevel 1 (
     echo ERROR: PyInstaller build failed.
+    exit /b 1
+)
+
+echo.
+echo [6/6] Copy bundled sample invoices (Samples\ next to FastWrite.exe)...
+xcopy /y /i /q samples dist\FastWrite\Samples\
+if errorlevel 1 (
+    echo ERROR: copying samples failed.
     exit /b 1
 )
 
