@@ -2,6 +2,8 @@ venv/
 *.pyc
 __pycache__/
 *.pdf
+# Exception: synthetic sample invoices bundled in the installer — safe for public repo
+!samples/*.pdf
 data/
 exports/
 processed/
