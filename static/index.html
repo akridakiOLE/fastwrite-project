@@ -358,6 +358,10 @@ select.form-input option{background:var(--bg2);}
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 015.12 1.65c0 1.35-2.12 2.35-2.12 2.35M12 17h.01"/></svg>
         <span data-i18n="sidebar_help">Βοήθεια</span>
       </button>
+      <button class="nav-item" id="nav-feedback" onclick="openFeedbackModal()">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+        <span data-i18n="sidebar_feedback">Σχόλια & Ιδέες</span>
+      </button>
     </nav>
     <!-- Plan Badge + Usage Meter -->
     <div id="sidebar-plan-info" style="padding:8px 16px;display:none;">
@@ -917,6 +921,19 @@ select.form-input option{background:var(--bg2);}
               <input class="form-input" type="text" id="admin-users-search" placeholder="Αναζήτηση χρήστη (username ή email)..." data-i18n-placeholder="settings_users_search" oninput="filterAdminUsers()" style="margin-bottom:0;"/>
             </div>
             <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+
+          <!-- Section 5: Desktop Testers — Εγκαταστάσεις & Χρήση (Admin only) -->
+          <div class="card" id="admin-telemetry-section" style="display:none;">
+            <div class="card-title" data-i18n="admin_installs_title">Desktop Testers — Εγκαταστάσεις &amp; Χρήση</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:12px;" data-i18n="admin_installs_note">Δεδομένα από τα telemetry pings της desktop εφαρμογής (μόνο πλήθη — ποτέ περιεχόμενο εγγράφων).</div>
+            <div id="admin-installs-list" style="overflow-x:auto;" data-i18n="loading">Φόρτωση...</div>
+          </div>
+
+          <!-- Section 6: Feedback από την εφαρμογή (Admin only) -->
+          <div class="card" id="admin-feedback-section" style="display:none;">
+            <div class="card-title" data-i18n="admin_feedback_title">Feedback από την εφαρμογή</div>
+            <div id="admin-feedback-list" style="display:flex;flex-direction:column;gap:8px;" data-i18n="loading">Φόρτωση...</div>
           </div>
 
         </div>
@@ -1550,6 +1567,32 @@ select.form-input option{background:var(--bg2);}
 </div>
 
 <!-- ── Pre-Check Modal ── -->
+<!-- Feedback Modal (in-app feedback → αποστολή στον server) -->
+<div class="modal-overlay" id="feedback-modal">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title" data-i18n="fb_title">Σχόλια & Ιδέες</div>
+      <button class="modal-close" onclick="closeModal('feedback-modal')">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px;" data-i18n="fb_subtitle">Πες μου τι δουλεύει, τι όχι, τι λείπει. Κάθε μήνυμα διαβάζεται.</div>
+    <label class="form-label" data-i18n="fb_category">Κατηγορία</label>
+    <select class="form-input" id="fb-category" style="margin-bottom:12px;">
+      <option value="bug" data-i18n="fb_cat_bug">Πρόβλημα / Bug</option>
+      <option value="idea" data-i18n="fb_cat_idea">Ιδέα / Πρόταση</option>
+      <option value="other" selected data-i18n="fb_cat_other">Άλλο</option>
+    </select>
+    <label class="form-label" data-i18n="fb_message">Μήνυμα</label>
+    <textarea class="form-input" id="fb-message" rows="5" maxlength="5000" style="resize:vertical;margin-bottom:12px;width:100%;"></textarea>
+    <label class="form-label" data-i18n="fb_image">Στιγμιότυπο οθόνης (προαιρετικό, PNG/JPG έως 2MB)</label>
+    <input class="form-input" type="file" id="fb-image" accept="image/png,image/jpeg" style="margin-bottom:6px;" onchange="fbValidateImage()"/>
+    <div style="font-size:12px;color:var(--warn,#fbbf24);margin-bottom:16px;" data-i18n="fb_privacy_note">⚠ Μην επισυνάπτεις εικόνες με πραγματικά παραστατικά ή προσωπικά δεδομένα.</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeModal('feedback-modal')" data-i18n="fb_cancel">Άκυρο</button>
+      <button class="btn btn-primary" id="fb-send-btn" onclick="sendFeedback()" data-i18n="fb_send">Αποστολή</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="precheck-modal">
   <div class="modal" style="max-width:500px;">
     <div class="modal-header">
@@ -5032,9 +5075,18 @@ let adminMeId = null;
 
 async function loadAdminUsers() {
   const section = document.getElementById('admin-users-section');
+  const telSection = document.getElementById('admin-telemetry-section');
+  const fbSection  = document.getElementById('admin-feedback-section');
   const me = await api('GET', '/api/auth/me');
-  if (!me || me.role !== 'admin') { section.style.display = 'none'; return; }
+  if (!me || me.role !== 'admin') {
+    section.style.display = 'none';
+    if (telSection) telSection.style.display = 'none';
+    if (fbSection)  fbSection.style.display  = 'none';
+    return;
+  }
   section.style.display = 'block';
+  if (telSection) telSection.style.display = 'block';
+  if (fbSection)  fbSection.style.display  = 'block';
   adminMeId = me.id;
 
   const users = await api('GET', '/api/admin/users');
@@ -5049,6 +5101,149 @@ async function loadAdminUsers() {
   // Load stats
   const stats = await api('GET', '/api/admin/users/stats');
   if (stats && !stats.error) renderAdminStats(stats);
+
+  // Load desktop telemetry + feedback (best-effort, ανεξάρτητα το ένα από το άλλο)
+  loadAdminTelemetry();
+  loadAdminFeedback();
+}
+
+// ── Admin: Desktop Testers (telemetry) ──────────────────────────────────────
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtTs(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso + (iso.endsWith('Z') ? '' : 'Z')).toLocaleString('el-GR'); }
+  catch (e) { return iso; }
+}
+
+async function loadAdminTelemetry() {
+  const box = document.getElementById('admin-installs-list');
+  if (!box) return;
+  const res = await api('GET', '/api/admin/telemetry');
+  if (!res || res.error) { box.textContent = t('js_load_error'); return; }
+  const installs = res.installs || [];
+  if (installs.length === 0) {
+    box.textContent = t('admin_installs_empty');
+    return;
+  }
+  const rows = installs.map(i => `
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px 10px;">${escHtml(i.username) || '—'}</td>
+      <td style="padding:8px 10px;">${escHtml(i.email) || '—'}</td>
+      <td style="padding:8px 10px;white-space:nowrap;">${fmtTs(i.registered_at)}</td>
+      <td style="padding:8px 10px;text-align:center;">${i.docs_demo_used}${i.docs_demo_cap ? '/' + i.docs_demo_cap : ''}</td>
+      <td style="padding:8px 10px;text-align:center;">${i.docs_total}</td>
+      <td style="padding:8px 10px;white-space:nowrap;">${fmtTs(i.last_seen)}</td>
+      <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:var(--text2);">${escHtml((i.install_id || '').slice(0, 8))}</td>
+    </tr>`).join('');
+  box.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:1px solid var(--border);color:var(--text2);font-size:12px;text-align:left;">
+        <th style="padding:8px 10px;">${t('admin_col_user')}</th>
+        <th style="padding:8px 10px;">Email</th>
+        <th style="padding:8px 10px;">${t('admin_col_registered')}</th>
+        <th style="padding:8px 10px;text-align:center;">${t('admin_col_demo_docs')}</th>
+        <th style="padding:8px 10px;text-align:center;">${t('admin_col_docs_total')}</th>
+        <th style="padding:8px 10px;">${t('admin_col_last_seen')}</th>
+        <th style="padding:8px 10px;">ID</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── Admin: Feedback list ─────────────────────────────────────────────────────
+async function loadAdminFeedback() {
+  const box = document.getElementById('admin-feedback-list');
+  if (!box) return;
+  const res = await api('GET', '/api/admin/feedback');
+  if (!res || res.error) { box.textContent = t('js_load_error'); return; }
+  const items = res.feedback || [];
+  if (items.length === 0) {
+    box.textContent = t('admin_feedback_empty');
+    return;
+  }
+  const catColor = { bug: '#f87171', idea: 'var(--accent)', other: 'var(--text2)' };
+  box.innerHTML = items.map(f => `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+        <div style="font-size:12px;color:var(--text2);">
+          <span style="color:${catColor[f.category] || 'var(--text2)'};font-weight:600;text-transform:uppercase;">${escHtml(f.category)}</span>
+          &nbsp;·&nbsp;${escHtml(f.username) || '—'}${f.email ? ' &lt;' + escHtml(f.email) + '&gt;' : ''}
+          &nbsp;·&nbsp;${fmtTs(f.created_at)}
+        </div>
+        ${f.image_path ? `<a href="${API}/api/admin/feedback/${f.id}/image" target="_blank" style="font-size:12px;color:var(--accent);">${t('admin_feedback_image')}</a>` : ''}
+      </div>
+      <div style="font-size:13px;white-space:pre-wrap;">${escHtml(f.message)}</div>
+    </div>`).join('');
+}
+
+// ── In-app Feedback (tester → server) ────────────────────────────────────────
+const FB_IMG_MAXSIZE = 2 * 1024 * 1024;
+
+function openFeedbackModal() {
+  document.getElementById('fb-message').value = '';
+  document.getElementById('fb-image').value = '';
+  document.getElementById('fb-category').value = 'other';
+  openModal('feedback-modal');
+}
+
+function fbValidateImage() {
+  const input = document.getElementById('fb-image');
+  const f = input.files && input.files[0];
+  if (!f) return true;
+  if (!['image/png', 'image/jpeg'].includes(f.type)) {
+    toast(t('fb_err_image_type'), 'error');
+    input.value = '';
+    return false;
+  }
+  if (f.size > FB_IMG_MAXSIZE) {
+    toast(t('fb_err_image_size'), 'error');
+    input.value = '';
+    return false;
+  }
+  return true;
+}
+
+function fbFileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+async function sendFeedback() {
+  const btn = document.getElementById('fb-send-btn');
+  const message = document.getElementById('fb-message').value.trim();
+  if (!message) { toast(t('fb_err_message_required'), 'error'); return; }
+  if (!fbValidateImage()) return;
+
+  let image_base64 = '';
+  const f = document.getElementById('fb-image').files[0];
+  if (f) {
+    try { image_base64 = await fbFileToBase64(f); }
+    catch (e) { toast(t('fb_err_image_read'), 'error'); return; }
+  }
+
+  btn.disabled = true;
+  try {
+    const res = await api('POST', '/api/feedback/send', {
+      category: document.getElementById('fb-category').value,
+      message, image_base64,
+    });
+    if (res && res.success) {
+      closeModal('feedback-modal');
+      toast(t('fb_sent'), 'success');
+    } else {
+      toast(localizeErr(res, t('fb_err_send_failed')), 'error');
+    }
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function renderAdminStats(s) {
@@ -6147,6 +6342,16 @@ async function loadLicenseChip() {
 
 // ── Load plan info on page load ──
 (async function() { await loadUserPlanInfo(); await loadLicenseChip(); })();
+
+// ── Feedback nav: μόνο σε desktop (localhost). Στο web deploy το
+// /api/feedback/send είναι έτσι κι αλλιώς desktop-only (403). ──
+(function() {
+  const h = window.location.hostname;
+  if (h !== '127.0.0.1' && h !== 'localhost') {
+    const btn = document.getElementById('nav-feedback');
+    if (btn) btn.style.display = 'none';
+  }
+})();
 </script>
 <!-- Phase 2 Desktop: License chip (μόνιμο, εμφανίζεται μόνο σε desktop mode) -->
 <div id="license-chip" style="position:fixed;bottom:12px;right:12px;display:none;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:11px;color:var(--text2);font-family:'Segoe UI',system-ui,sans-serif;letter-spacing:.3px;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>

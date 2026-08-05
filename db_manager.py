@@ -280,6 +280,41 @@ class DatabaseManager:
                 )
             """)
 
+            # ── Installs table: desktop telemetry (server-side use) ──
+            # Γεμίζει ΜΟΝΟ στον server (web mode) από τα /api/telemetry/*
+            # pings της desktop εφαρμογής. Μετράει ΜΟΝΟ πλήθη — ποτέ
+            # περιεχόμενο εγγράφων.
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS installs (
+                    install_id     TEXT    PRIMARY KEY,
+                    username       TEXT    NOT NULL DEFAULT '',
+                    email          TEXT    NOT NULL DEFAULT '',
+                    app_version    TEXT    NOT NULL DEFAULT '',
+                    registered_at  TEXT    NOT NULL DEFAULT '',
+                    first_seen     TEXT    NOT NULL,
+                    last_seen      TEXT    NOT NULL,
+                    docs_demo_used INTEGER NOT NULL DEFAULT 0,
+                    docs_demo_cap  INTEGER NOT NULL DEFAULT 0,
+                    docs_total     INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+
+            # ── Feedback table: in-app feedback (server-side use) ──
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at  TEXT    NOT NULL,
+                    install_id  TEXT    NOT NULL DEFAULT '',
+                    username    TEXT    NOT NULL DEFAULT '',
+                    email       TEXT    NOT NULL DEFAULT '',
+                    category    TEXT    NOT NULL DEFAULT 'other',
+                    message     TEXT    NOT NULL,
+                    app_version TEXT    NOT NULL DEFAULT '',
+                    image_path  TEXT    NOT NULL DEFAULT ''
+                )
+            """)
+            self.conn.commit()
+
             # Migration: assign orphan data (user_id IS NULL) to first admin user
             try:
                 admin = self.conn.execute(
@@ -1181,6 +1216,100 @@ class DatabaseManager:
             period_end=period_end,
             status='active'
         )
+
+    # ─── TELEMETRY: INSTALLS (server-side) ───────────────────────────────────
+
+    def upsert_install_register(self, install_id: str, username: str = '',
+                                email: str = '', app_version: str = '',
+                                docs_demo_cap: int = 0) -> None:
+        """Καταγραφή εγγραφής tester από desktop telemetry ping.
+        Upsert με βάση το install_id — δεύτερο ping δεν διπλογράφει."""
+        now = datetime.utcnow().isoformat()
+        self._exec_write(
+            """INSERT INTO installs
+                   (install_id, username, email, app_version, registered_at,
+                    first_seen, last_seen, docs_demo_cap)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(install_id) DO UPDATE SET
+                   username      = excluded.username,
+                   email         = excluded.email,
+                   app_version   = excluded.app_version,
+                   registered_at = CASE WHEN installs.registered_at = ''
+                                        THEN excluded.registered_at
+                                        ELSE installs.registered_at END,
+                   docs_demo_cap = excluded.docs_demo_cap,
+                   last_seen     = excluded.last_seen""",
+            (install_id, username, email, app_version, now, now, now,
+             docs_demo_cap)
+        )
+
+    def upsert_install_usage(self, install_id: str, docs_demo_used: int = 0,
+                             docs_demo_cap: int = 0, docs_total: int = 0,
+                             app_version: str = '') -> None:
+        """Ενημέρωση μετρητών χρήσης (απόλυτες τιμές, όχι deltas)."""
+        now = datetime.utcnow().isoformat()
+        self._exec_write(
+            """INSERT INTO installs
+                   (install_id, app_version, first_seen, last_seen,
+                    docs_demo_used, docs_demo_cap, docs_total)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(install_id) DO UPDATE SET
+                   docs_demo_used = excluded.docs_demo_used,
+                   docs_demo_cap  = CASE WHEN excluded.docs_demo_cap > 0
+                                         THEN excluded.docs_demo_cap
+                                         ELSE installs.docs_demo_cap END,
+                   docs_total     = excluded.docs_total,
+                   app_version    = CASE WHEN excluded.app_version != ''
+                                         THEN excluded.app_version
+                                         ELSE installs.app_version END,
+                   last_seen      = excluded.last_seen""",
+            (install_id, app_version, now, now,
+             docs_demo_used, docs_demo_cap, docs_total)
+        )
+
+    def list_installs(self, limit: int = 500) -> List[Dict[str, Any]]:
+        """Όλες οι εγκαταστάσεις, πιο πρόσφατη δραστηριότητα πρώτη."""
+        rows = self.conn.execute(
+            "SELECT * FROM installs ORDER BY last_seen DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ─── FEEDBACK (server-side) ──────────────────────────────────────────────
+
+    def insert_feedback(self, message: str, category: str = 'other',
+                        install_id: str = '', username: str = '',
+                        email: str = '', app_version: str = '',
+                        image_path: str = '') -> int:
+        """Νέα εγγραφή feedback. Επιστρέφει το id."""
+        now = datetime.utcnow().isoformat()
+        cursor = self._exec_write(
+            """INSERT INTO feedback
+                   (created_at, install_id, username, email, category,
+                    message, app_version, image_path)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (now, install_id, username, email, category,
+             message, app_version, image_path)
+        )
+        return cursor.lastrowid
+
+    def list_feedback(self, limit: int = 200) -> List[Dict[str, Any]]:
+        """Feedback, νεότερο πρώτο."""
+        rows = self.conn.execute(
+            "SELECT * FROM feedback ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_feedback(self, feedback_id: int) -> Optional[Dict[str, Any]]:
+        """Μία εγγραφή feedback (για το admin image download)."""
+        row = self.conn.execute(
+            "SELECT * FROM feedback WHERE id = ?", (feedback_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def count_documents(self) -> int:
+        """Συνολικός αριθμός εγγράφων στη βάση (για telemetry docs_total)."""
+        row = self.conn.execute("SELECT COUNT(*) AS c FROM documents").fetchone()
+        return int(row["c"]) if row else 0
 
     # ─── UTILITIES ────────────────────────────────────────────────────────────
 

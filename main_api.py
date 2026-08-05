@@ -193,6 +193,94 @@ def _demo_status() -> dict:
             "remaining": max(0, cap - used)}
 
 
+# ── Telemetry (desktop → server): ΜΟΝΟ πλήθη, ποτέ περιεχόμενο ──────────
+# Σκοπός (απόφαση Stavros 5/8): ορατότητα εγκαταστάσεων/εγγραφών/χρήσης ανά
+# tester στον server. Στέλνονται: install_id, username, email (αν δόθηκε),
+# app version, μετρητές εγγράφων. ΠΟΤΕ δεδομένα τιμολογίων, ΠΟΤΕ κλειδιά.
+# Όλα best-effort σε background thread — η κύρια ροή ΔΕΝ σπάει ποτέ.
+FASTWRITE_APP_VERSION = "1.0.1"
+INSTALL_ID_FILE = SECRETS_DIR / "install_id.txt"
+_TELEMETRY_MIN_GAP_SEC = 60          # throttle για usage pings
+_telemetry_last_sent = 0.0
+_telemetry_lock = threading.Lock()
+
+
+def _get_install_id() -> str:
+    """Σταθερό ανώνυμο αναγνωριστικό εγκατάστασης (uuid, μία φορά).
+    Επιτρέπει διάκριση εγκαταστάσεων ακόμα κι αν δεν δόθηκε email."""
+    try:
+        if INSTALL_ID_FILE.exists():
+            val = INSTALL_ID_FILE.read_text().strip()
+            if val:
+                return val
+        import uuid as _uuid
+        val = _uuid.uuid4().hex
+        INSTALL_ID_FILE.parent.mkdir(parents=True, exist_ok=True)
+        INSTALL_ID_FILE.write_text(val)
+        return val
+    except Exception:
+        return ""
+
+
+def _telemetry_post(path: str, payload: dict) -> None:
+    """Fire-and-forget POST στον server. Σιωπηλό σε κάθε αποτυχία."""
+    def _worker():
+        try:
+            import requests as _requests
+            _requests.post(f"{DEMO_SERVER_URL}{path}", json=payload, timeout=6)
+        except Exception as e:
+            logger.debug("[telemetry] ping failed (ignored): %s", e)
+    try:
+        threading.Thread(target=_worker, daemon=True).start()
+    except Exception:
+        pass
+
+
+def _send_register_telemetry(username: str, email: str) -> None:
+    """Ping εγγραφής (desktop only, best-effort)."""
+    if not _is_desktop_mode():
+        return
+    install_id = _get_install_id()
+    if not install_id:
+        return
+    st = _demo_status()
+    _telemetry_post("/api/telemetry/register", {
+        "install_id":    install_id,
+        "username":      (username or "")[:80],
+        "email":         (email or "")[:200],
+        "app_version":   FASTWRITE_APP_VERSION,
+        "docs_demo_cap": int(st.get("cap", 0)) if st.get("active") else 0,
+    })
+
+
+def _send_usage_telemetry(force: bool = False) -> None:
+    """Ping χρήσης (desktop only, throttled, best-effort). Στέλνει
+    ΑΠΟΛΥΤΕΣ τιμές μετρητών ώστε τα χαμένα pings να μην αλλοιώνουν το σύνολο."""
+    global _telemetry_last_sent
+    if not _is_desktop_mode():
+        return
+    with _telemetry_lock:
+        now_ts = time.time()
+        if not force and (now_ts - _telemetry_last_sent) < _TELEMETRY_MIN_GAP_SEC:
+            return
+        _telemetry_last_sent = now_ts
+    install_id = _get_install_id()
+    if not install_id:
+        return
+    st = _demo_status()
+    try:
+        docs_total = db.count_documents()
+    except Exception:
+        docs_total = 0
+    _telemetry_post("/api/telemetry/usage", {
+        "install_id":     install_id,
+        "app_version":    FASTWRITE_APP_VERSION,
+        "docs_demo_used": int(st.get("used", 0)) if st.get("active") else 0,
+        "docs_demo_cap":  int(st.get("cap", 0)) if st.get("active") else 0,
+        "docs_total":     docs_total,
+    })
+
+
 def _get_license_manager():
     """Lazy singleton. Καλείται μόνο σε desktop mode."""
     global _LICENSE_MANAGER
@@ -258,6 +346,7 @@ def _consume_license_usage(*, docs: int = 0, pages: int = 0) -> None:
     if not _is_desktop_mode() or (docs == 0 and pages == 0):
         return
     _consume_demo_usage(docs)   # demo μετρητής (no-op χωρίς ενεργό marker)
+    _send_usage_telemetry()     # ping μετρητών στον server (throttled, best-effort)
     lm = _get_license_manager()
     if lm is None:
         return
@@ -494,6 +583,217 @@ def demo_key_status():
     st = _demo_status()
     st["can_activate"] = bool(_is_desktop_mode() and not key_mgr.has_key("gemini"))
     return jsonify(st)
+
+
+# ── Telemetry receivers (server/web mode) ────────────────────────────────────
+# Δέχονται τα best-effort pings της desktop εφαρμογής. Χωρίς auth (όπως το
+# demo-key/claim) — μόνο πλήθη και στοιχεία εγγραφής, ποτέ περιεχόμενο.
+_INSTALL_ID_MAXLEN = 64
+
+
+def _clean_str(value, maxlen: int) -> str:
+    """Trim + περιορισμός μήκους για εισερχόμενα telemetry πεδία."""
+    return str(value or "").strip()[:maxlen]
+
+
+def _valid_install_id(install_id: str) -> bool:
+    return bool(install_id) and len(install_id) <= _INSTALL_ID_MAXLEN and install_id.isalnum()
+
+
+@app.post("/api/telemetry/register")
+def telemetry_register():
+    """Καταγραφή εγγραφής tester (upsert ανά install_id)."""
+    data = request.get_json(silent=True) or {}
+    install_id = _clean_str(data.get("install_id"), _INSTALL_ID_MAXLEN)
+    if not _valid_install_id(install_id):
+        return jsonify({"error": "invalid install_id"}), 400
+    try:
+        db.upsert_install_register(
+            install_id=install_id,
+            username=_clean_str(data.get("username"), 80),
+            email=_clean_str(data.get("email"), 200),
+            app_version=_clean_str(data.get("app_version"), 40),
+            docs_demo_cap=max(0, int(data.get("docs_demo_cap") or 0)),
+        )
+    except Exception:
+        logger.exception("[telemetry] register upsert failed")
+        return jsonify({"error": "server error"}), 500
+    return jsonify({"success": True})
+
+
+@app.post("/api/telemetry/usage")
+def telemetry_usage():
+    """Ενημέρωση μετρητών χρήσης (απόλυτες τιμές, upsert ανά install_id)."""
+    data = request.get_json(silent=True) or {}
+    install_id = _clean_str(data.get("install_id"), _INSTALL_ID_MAXLEN)
+    if not _valid_install_id(install_id):
+        return jsonify({"error": "invalid install_id"}), 400
+    try:
+        db.upsert_install_usage(
+            install_id=install_id,
+            docs_demo_used=max(0, int(data.get("docs_demo_used") or 0)),
+            docs_demo_cap=max(0, int(data.get("docs_demo_cap") or 0)),
+            docs_total=max(0, int(data.get("docs_total") or 0)),
+            app_version=_clean_str(data.get("app_version"), 40),
+        )
+    except Exception:
+        logger.exception("[telemetry] usage upsert failed")
+        return jsonify({"error": "server error"}), 500
+    return jsonify({"success": True})
+
+
+# ── In-app Feedback ──────────────────────────────────────────────────────────
+# Desktop: POST /api/feedback/send (auth) → προωθεί στον server.
+# Server:  POST /api/feedback (χωρίς auth, rate-limited) → DB + εικόνα σε αρχείο.
+FEEDBACK_IMAGE_DIR   = BASE_DIR / "data" / "feedback_images"
+FEEDBACK_RL_FILE     = BASE_DIR / "data" / "feedback_ratelimit.json"
+FEEDBACK_PER_IP_24H  = 10
+FEEDBACK_GLOBAL_24H  = 200
+FEEDBACK_MSG_MAXLEN  = 5000
+FEEDBACK_IMG_MAXSIZE = 2 * 1024 * 1024      # 2MB αποκωδικοποιημένη εικόνα
+FEEDBACK_CATEGORIES  = {"bug", "idea", "other"}
+
+
+def _feedback_rate_limited(ip_hash: str) -> bool:
+    """True αν το IP (ή το σύνολο) ξεπέρασε το 24ωρο όριο feedback.
+    Ίδιο pattern με τα demo-key claims: json αρχείο με timestamps ανά ip_hash."""
+    now = time.time()
+    day_ago = now - 86400
+    try:
+        entries = json.loads(FEEDBACK_RL_FILE.read_text()) if FEEDBACK_RL_FILE.exists() else {}
+    except Exception:
+        entries = {}
+    entries = {k: [t for t in v if t > day_ago] for k, v in entries.items()}
+    entries = {k: v for k, v in entries.items() if v}
+    total = sum(len(v) for v in entries.values())
+    if total >= FEEDBACK_GLOBAL_24H or len(entries.get(ip_hash, [])) >= FEEDBACK_PER_IP_24H:
+        return True
+    entries.setdefault(ip_hash, []).append(now)
+    try:
+        FEEDBACK_RL_FILE.parent.mkdir(parents=True, exist_ok=True)
+        FEEDBACK_RL_FILE.write_text(json.dumps(entries))
+    except Exception:
+        logger.exception("[feedback] failed to persist rate-limit state")
+    return False
+
+
+def _decode_feedback_image(image_b64: str):
+    """Αποκωδικοποίηση + έλεγχος τύπου/μεγέθους εικόνας feedback.
+    Επιστρέφει (bytes, extension) ή (None, error_code)."""
+    try:
+        raw = base64.b64decode(image_b64, validate=True)
+    except Exception:
+        return None, "bad_image_encoding"
+    if len(raw) > FEEDBACK_IMG_MAXSIZE:
+        return None, "image_too_large"
+    if raw[:8] == b"\x89PNG\r\n\x1a\n":
+        return raw, ".png"
+    if raw[:3] == b"\xff\xd8\xff":
+        return raw, ".jpg"
+    return None, "unsupported_image_type"
+
+
+@app.post("/api/feedback")
+def feedback_receive():
+    """Server: παραλαβή feedback από desktop εγκαταστάσεις."""
+    data = request.get_json(silent=True) or {}
+    message = _clean_str(data.get("message"), FEEDBACK_MSG_MAXLEN)
+    if not message:
+        return jsonify({"error": "Το μήνυμα είναι υποχρεωτικό.",
+                        "error_code": "message_required"}), 400
+    category = _clean_str(data.get("category"), 20).lower()
+    if category not in FEEDBACK_CATEGORIES:
+        category = "other"
+
+    ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "?")
+          .split(",")[0].strip())
+    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    if _feedback_rate_limited(ip_hash):
+        return jsonify({"error": "Πολλά μηνύματα. Δοκίμασε ξανά αύριο.",
+                        "error_code": "feedback_rate_limited"}), 429
+
+    image_path = ""
+    image_b64 = data.get("image_base64") or ""
+    if image_b64:
+        if len(image_b64) > FEEDBACK_IMG_MAXSIZE * 3 // 2 + 1024:
+            return jsonify({"error": "Η εικόνα ξεπερνά τα 2MB.",
+                            "error_code": "image_too_large"}), 413
+        raw, ext_or_err = _decode_feedback_image(image_b64)
+        if raw is None:
+            status = 413 if ext_or_err == "image_too_large" else 400
+            return jsonify({"error": "Μη αποδεκτή εικόνα (PNG/JPG έως 2MB).",
+                            "error_code": ext_or_err}), status
+        try:
+            import uuid as _uuid
+            FEEDBACK_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+            fname = f"fb_{_uuid.uuid4().hex}{ext_or_err}"
+            (FEEDBACK_IMAGE_DIR / fname).write_bytes(raw)
+            image_path = fname
+        except Exception:
+            logger.exception("[feedback] failed to store image (continuing without)")
+            image_path = ""
+
+    try:
+        fb_id = db.insert_feedback(
+            message=message,
+            category=category,
+            install_id=_clean_str(data.get("install_id"), _INSTALL_ID_MAXLEN),
+            username=_clean_str(data.get("username"), 80),
+            email=_clean_str(data.get("email"), 200),
+            app_version=_clean_str(data.get("app_version"), 40),
+            image_path=image_path,
+        )
+    except Exception:
+        logger.exception("[feedback] insert failed")
+        return jsonify({"error": "server error"}), 500
+    logger.info("[feedback] received #%s (category=%s, ip_hash=%s)", fb_id, category, ip_hash)
+    return jsonify({"success": True, "id": fb_id})
+
+
+@app.post("/api/feedback/send")
+@require_auth
+def feedback_send():
+    """Desktop: παίρνει τη φόρμα από το UI, την εμπλουτίζει με στοιχεία
+    εγκατάστασης και την προωθεί στον server. Συγχρονισμένο (όχι thread) —
+    ο tester πρέπει να δει αν στάλθηκε ή όχι."""
+    if not _is_desktop_mode():
+        return jsonify({"error": "Desktop only.", "error_code": "desktop_only"}), 403
+    data = request.get_json(silent=True) or {}
+    message = _clean_str(data.get("message"), FEEDBACK_MSG_MAXLEN)
+    if not message:
+        return jsonify({"error": "Το μήνυμα είναι υποχρεωτικό.",
+                        "error_code": "message_required"}), 400
+    username = request.current_user.get("username", "")
+    email = ""
+    try:
+        u = db.get_user_by_username(username)
+        email = (u or {}).get("email", "") or ""
+    except Exception:
+        pass
+    payload = {
+        "install_id":   _get_install_id(),
+        "username":     username,
+        "email":        email,
+        "category":     _clean_str(data.get("category"), 20).lower(),
+        "message":      message,
+        "app_version":  FASTWRITE_APP_VERSION,
+        "image_base64": data.get("image_base64") or "",
+    }
+    try:
+        import requests as _requests
+        resp = _requests.post(f"{DEMO_SERVER_URL}/api/feedback",
+                              json=payload, timeout=20)
+    except Exception as e:
+        logger.warning("[feedback] server unreachable: %s", e)
+        return jsonify({"error": "Ο server δεν απαντά. Δοκίμασε ξανά αργότερα.",
+                        "error_code": "server_unreachable"}), 502
+    if resp.status_code != 200:
+        try:
+            err = resp.json()
+        except Exception:
+            err = {"error": "Αποτυχία αποστολής.", "error_code": "send_failed"}
+        return jsonify(err), resp.status_code
+    return jsonify({"success": True})
 
 
 # ── Templates ─────────────────────────────────────────────────────────────────
@@ -2618,6 +2918,11 @@ def auth_register():
             demo_ok, demo_cap, demo_code = _activate_demo_key()
         except Exception as e:
             logger.exception("[demo-key] auto-activation crashed (ignored): %s", e)
+        # ── Telemetry ping εγγραφής (desktop only, best-effort) ──
+        try:
+            _send_register_telemetry(username, email)
+        except Exception:
+            pass
         # Auto-login: issue JWT token
         token = create_token(user_id, username, "user")
         resp = make_response(jsonify({"success": True, "username": username, "role": "user",
@@ -2990,6 +3295,44 @@ def admin_usage_report():
         ORDER BY docs_used DESC
     """).fetchall()
     return jsonify([dict(r) for r in rows])
+
+
+@app.get("/api/admin/telemetry")
+@require_admin
+def admin_telemetry():
+    """Εγκαταστάσεις desktop + μετρητές χρήσης ανά tester. Admin only."""
+    try:
+        return jsonify({"installs": db.list_installs()})
+    except Exception:
+        logger.exception("[admin] telemetry list failed")
+        return jsonify({"error": "server error"}), 500
+
+
+@app.get("/api/admin/feedback")
+@require_admin
+def admin_feedback():
+    """Λίστα feedback από την desktop εφαρμογή. Admin only."""
+    try:
+        return jsonify({"feedback": db.list_feedback()})
+    except Exception:
+        logger.exception("[admin] feedback list failed")
+        return jsonify({"error": "server error"}), 500
+
+
+@app.get("/api/admin/feedback/<int:feedback_id>/image")
+@require_admin
+def admin_feedback_image(feedback_id):
+    """Η συνημμένη εικόνα ενός feedback. Admin only."""
+    fb = db.get_feedback(feedback_id)
+    if not fb or not fb.get("image_path"):
+        return jsonify({"error": "not found"}), 404
+    # Ασφάλεια: μόνο basename, πάντα μέσα στο FEEDBACK_IMAGE_DIR.
+    fname = os.path.basename(fb["image_path"])
+    fpath = FEEDBACK_IMAGE_DIR / fname
+    if not fpath.exists():
+        return jsonify({"error": "not found"}), 404
+    mime = "image/png" if fname.endswith(".png") else "image/jpeg"
+    return send_file(fpath, mimetype=mime)
 
 
 # ── Login Page ────────────────────────────────────────────────────────────────
