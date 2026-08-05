@@ -2892,7 +2892,11 @@ def auth_register():
         return jsonify({"error": "Το username πρέπει να έχει τουλάχιστον 3 χαρακτήρες"}), 400
     if len(password) < 6:
         return jsonify({"error": "Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες"}), 400
-    if email and "@" not in email:
+    # Email υποχρεωτικό (απόφαση Stavros 5/8): είναι το μόνο κανάλι επαφής
+    # με τον tester — χωρίς αυτό η εγγραφή είναι τυφλή.
+    if not email:
+        return jsonify({"error": "Απαιτείται email"}), 400
+    if "@" not in email:
         return jsonify({"error": "Μη έγκυρη μορφή email"}), 400
     # Check duplicate username
     existing = db.get_user_by_username(username)
@@ -3800,8 +3804,8 @@ button:hover{opacity:.85;}
   <form id="reg-form" onsubmit="return doRegister(event)">
     <label>Username</label>
     <input type="text" id="reg-username" placeholder="min. 3 characters" autocomplete="username" required minlength="3"/>
-    <label>Email (optional)</label>
-    <input type="email" id="reg-email" placeholder="your@email.com" autocomplete="email"/>
+    <label>Email</label>
+    <input type="email" id="reg-email" placeholder="your@email.com" autocomplete="email" required/>
     <label>Password</label>
     <div style="position:relative">
       <input type="password" id="reg-password" placeholder="min. 6 characters" autocomplete="new-password" required minlength="6" style="padding-right:40px"/>
