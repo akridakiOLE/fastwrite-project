@@ -58,3 +58,6 @@ add_key.py
 del_extra_keys.py
 testkey
 diag_sample_*
+
+# Exception: sample pack hosted on the public site (/samples)
+!site/samples/*.pdf
