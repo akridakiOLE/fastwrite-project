@@ -1,7 +1,7 @@
 # FastWrite — Privacy Policy
 
 **Effective Date:** 11 June 2026
-**Last Updated:** 11 June 2026
+**Last Updated:** 6 August 2026
 
 ---
 
@@ -52,9 +52,23 @@ The following data is stored **only on your computer** under `%APPDATA%\FastWrit
 ### 3.3 Information We Do NOT Collect
 
 - We do **not** collect or transmit the content of your invoices to our servers.
-- We do **not** track your usage analytics (e.g., feature usage, behavior).
+- We do **not** track detailed behavioural analytics (e.g., clicks, navigation, feature-by-feature behaviour). We collect only the **aggregate usage counts** described in Section 3.4.
 - We do **not** use cookies for tracking.
 - We do **not** sell, rent, or share your personal data with third parties for marketing.
+
+### 3.4 Telemetry & In-App Feedback (added August 2026)
+
+To operate the beta programme, diagnose problems, and improve the Service, the desktop application sends a small amount of **telemetry** to our server:
+
+| Data | When it is sent | What it contains |
+|---|---|---|
+| Anonymous install identifier | Generated once, on first run | A random ID (`install_id`) not derived from your hardware or personal data |
+| Registration event | When you create an account | Username, email address, timestamp |
+| Usage counts | After each extraction | Counts only: demo documents used / remaining allowance, total number of documents processed |
+
+**Telemetry never includes the content of your documents, extracted data, file names, or API keys — only counts.** Telemetry is sent on a best-effort basis: if our server is unreachable, the application continues to work normally.
+
+The application also includes an optional **"Feedback" (Σχόλια & Ιδέες)** form. If you choose to use it, we receive the category and message you write and, only if you attach one, a screenshot (PNG/JPG, up to 2 MB). The form warns you **not to include real invoices or personal data in screenshots** — please attach demo documents only. Feedback submissions are rate-limited and stored on our EU server (see Section 7.1).
 
 ---
 
@@ -65,7 +79,8 @@ We use the limited information we collect for the following purposes:
 1. **Account & Authentication:** Creating your account, signing you in, securing access.
 2. **License Validation:** Verifying your entitlement to use paid features (if applicable).
 3. **Support:** Responding to questions, troubleshooting issues, sending service announcements.
-4. **Legal Compliance:** Complying with applicable laws and responding to lawful requests from authorities.
+4. **Beta Operation & Improvement:** Understanding how many testers install and use the application (aggregate counts — Section 3.4) and reviewing feedback you choose to send us, so we can fix problems and improve the Service.
+5. **Legal Compliance:** Complying with applicable laws and responding to lawful requests from authorities.
 
 ---
 
@@ -74,7 +89,7 @@ We use the limited information we collect for the following purposes:
 We rely on the following legal bases:
 
 - **Contract (Art. 6(1)(b)):** To deliver the Service you have signed up for.
-- **Legitimate Interests (Art. 6(1)(f)):** To secure our Service, prevent fraud, and improve reliability.
+- **Legitimate Interests (Art. 6(1)(f)):** To secure our Service, prevent fraud, improve reliability, and operate the minimal usage telemetry described in Section 3.4.
 - **Consent (Art. 6(1)(a)):** Where applicable, for optional features (e.g., marketing emails — opt-in only).
 - **Legal Obligation (Art. 6(1)(c)):** Where required by law (e.g., tax records, court orders).
 
@@ -112,6 +127,7 @@ If you contact us at support@fastwrite.tech, your message is routed through Clou
 ### 7.1 Where Data Is Stored
 
 - **Account data** (the small set in Section 3.1): stored on our server hosted at Hetzner Cloud (Helsinki, Finland — EU).
+- **Telemetry and feedback data** (Section 3.4), including any screenshots you attach to feedback: stored on the same EU server.
 - **Everything else** (Section 3.2): stored on **your computer only**.
 
 ### 7.2 Security Measures
@@ -165,6 +181,7 @@ The account data we hold is stored in the European Union (Finland). When you use
 ## 11. Data Retention
 
 - **Account data:** Retained while your account is active and for a reasonable period afterwards (typically 12 months) for legal compliance and support history.
+- **Telemetry and feedback data:** Retained for the duration of the beta programme and up to 12 months afterwards. You can request earlier deletion (including of feedback screenshots) at any time via support@fastwrite.tech.
 - **Local data on your computer:** You control retention. Uninstalling FastWrite or deleting the `%APPDATA%\FastWrite\` folder removes all local data.
 - **Support emails:** Retained for up to 24 months for service-quality purposes.
 - **Legal/tax records:** Retained for the period required by applicable law (typically 7 years in Cyprus).
@@ -193,4 +210,4 @@ For any privacy-related question, complaint, or data subject request:
 
 ---
 
-*FastWrite — Privacy Policy v1.0 — 11 June 2026*
+*FastWrite — Privacy Policy v1.1 — 6 August 2026*

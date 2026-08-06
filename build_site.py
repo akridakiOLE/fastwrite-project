@@ -91,7 +91,7 @@ def main() -> None:
         Path("privacy_policy.md"),
         LEGAL_DIR / "privacy.html",
         "Privacy Policy",
-        "Effective Date: 11 June 2026 · Last Updated: 11 June 2026",
+        "Effective Date: 11 June 2026 · Last Updated: 6 August 2026",
     )
     render(
         Path("terms_of_service.md"),
