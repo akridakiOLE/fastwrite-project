@@ -40,7 +40,10 @@ export default {
       }
     }
 
-    if (path === "/gnomi/apotelesmata") {
+    // ⚠ Είναι κάτω από /api/ ΕΠΙΤΗΔΕΣ: το run_worker_first του Cloudflare
+    // πιάνει μόνο μοτίβα με αστερίσκο ("/api/*"). Με ακριβή διαδρομή
+    // ("/gnomi/apotelesmata") ο worker ΔΕΝ καλείται και η σελίδα βγάζει 404.
+    if (path === "/api/gnomi/apotelesmata") {
       // Χωρίς σωστό κλειδί η σελίδα ΔΕΝ υπάρχει. Αν δεν έχει οριστεί καθόλου
       // κλειδί στο Cloudflare, κλειδώνει τα πάντα — ασφαλής προεπιλογή.
       const k = url.searchParams.get("k") || "";
