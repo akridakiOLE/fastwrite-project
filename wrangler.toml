@@ -1,24 +1,33 @@
-# Cloudflare Workers (with Static Assets) config για το fastwrite.tech static site.
+# Cloudflare Worker config για το fastwrite.tech.
 #
-# Σερβίρει τον φάκελο site/ ως static assets. Δεν χρειάζεται build step ή
-# JavaScript Worker code — το Cloudflare σερβίρει αυτόματα τα HTML/CSS/JS αρχεία.
+# Σερβίρει τον φάκελο site/ ως static assets. Από 14/8/2026 υπάρχει ΚΑΙ κώδικας
+# (src/worker.js) που καλύπτει ΜΟΝΟ τρία endpoints του ερωτηματολογίου:
+#   GET  /gnomi              (καταγραφή άφιξης, μετά σερβίρει το static)
+#   POST /api/gnomi/e        (συμβάντα χωνιού)
+#   POST /api/gnomi/submit   (απαντήσεις)
+# Οτιδήποτε άλλο πέφτει αυτούσιο στα assets — η υπόλοιπη σελίδα δεν αλλάζει.
 #
 # _headers και _redirects μέσα στο site/ εφαρμόζονται αυτόματα.
 # Custom domains (fastwrite.tech + www.fastwrite.tech) ρυθμίζονται από το
 # Cloudflare dashboard, όχι από εδώ.
 
 # name πρέπει να ταιριάζει με αυτό που το CI παράγει αυτόματα από το repo name.
-# Διορθώθηκε από "fastwrite-tech" → "fastwrite-project" για να εξαλειφθεί το
-# warning "Failed to match Worker name" στο build log.
 name = "fastwrite-project"
+main = "src/worker.js"
 compatibility_date = "2024-11-01"
 
 # Explicit settings (εξαλείφουν warnings από το build log):
-# Κρατάμε ενεργό το .workers.dev URL ως backup για debugging/staging.
 workers_dev = true
-# Κρατάμε ενεργά τα preview URLs για feature branches (μελλοντική χρήση).
 preview_urls = true
 
 [assets]
 directory = "./site"
+binding = "ASSETS"
 not_found_handling = "404-page"
+
+# D1 — ο ΙΔΙΟΣ λογαριασμός βάσης με τον beta worker, ΞΕΧΩΡΙΣΤΟΙ πίνακες
+# (gnomi_events, gnomi_responses). Σχήμα: schema/gnomi.sql
+[[d1_databases]]
+binding = "DB"
+database_name = "fastwrite-beta-downloads"
+database_id = "153089e9-11bd-4051-b0bd-a62438fec07e"

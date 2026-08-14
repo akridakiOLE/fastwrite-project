@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Βοήθησέ με να χτίσω το σωστό εργαλείο — FastWrite</title>
+<meta name="description" content="Φτιάχνω το FastWrite. Πριν προχωρήσω στην επόμενη φάση θέλω τη γνώμη ανθρώπων που ζουν καθημερινά με παραστατικά. Παίρνει 2 λεπτά." />
+<meta name="theme-color" content="#0a0e14" />
+<meta name="robots" content="noindex" />
+<meta property="og:title" content="Βοήθησέ με να χτίσω το σωστό εργαλείο" />
+<meta property="og:description" content="Παίρνει 2 λεπτά. Καμία σωστή ή λάθος απάντηση." />
+<meta property="og:url" content="https://fastwrite.tech/gnomi" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e14; --bg2:#131820; --bg3:#1a2030; --border:#2a3140;
+  --text:#e6e8ec; --text2:#a8b0bd; --text3:#6b7385;
+  --accent:#00E5A0; --accent-dim:rgba(0,229,160,0.12); --danger:#f87171;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text)}
+body{
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  line-height:1.55;font-size:17px;-webkit-font-smoothing:antialiased;
+  min-height:100vh;display:flex;flex-direction:column;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+.wrap{width:100%;max-width:640px;margin:0 auto;padding:0 20px}
+
+header{border-bottom:1px solid var(--border);background:var(--bg2)}
+header .wrap{display:flex;align-items:center;justify-content:space-between;padding-top:14px;padding-bottom:14px}
+.brand{font-size:19px;font-weight:700;letter-spacing:.3px}
+.brand span{color:var(--accent)}
+.domain{font-size:12px;color:var(--text3)}
+
+.bar{height:3px;background:var(--bg3)}
+.bar > i{display:block;height:100%;width:0%;background:var(--accent);transition:width .28s ease}
+
+main{flex:1;padding:26px 0 40px}
+.intro h1{font-size:27px;line-height:1.25;font-weight:700;margin-bottom:14px}
+.intro p{color:var(--text2);font-size:16px;margin-bottom:14px}
+.intro .facts{display:flex;gap:18px;flex-wrap:wrap;margin:18px 0 26px;font-size:14px;color:var(--text2)}
+.intro .facts b{color:var(--accent)}
+
+.btn{
+  display:block;width:100%;padding:15px 20px;border-radius:10px;border:0;cursor:pointer;
+  font-family:inherit;font-size:17px;font-weight:600;background:var(--accent);color:#06231A;
+}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;color:var(--text2);border:1px solid var(--border);font-weight:400;font-size:15px;padding:12px}
+.btn[disabled]{opacity:.35;cursor:default}
+
+.step{display:none}
+.step.on{display:block}
+.qnum{font-size:13px;color:var(--text3);margin-bottom:8px}
+.qnum b{color:var(--text2)}
+.q{font-size:21px;line-height:1.35;font-weight:600;margin-bottom:20px}
+
+.opts{display:flex;flex-direction:column;gap:10px;margin-bottom:22px}
+.opt{
+  display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--border);
+  border-radius:10px;background:var(--bg2);cursor:pointer;font-size:16px;color:var(--text);
+  text-align:left;font-family:inherit;width:100%;
+}
+.opt:hover{border-color:var(--text3)}
+.opt.sel{border-color:var(--accent);background:var(--accent-dim)}
+.dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--text3);flex:0 0 18px}
+.opt.sel .dot{border-color:var(--accent);background:var(--accent);box-shadow:inset 0 0 0 3px var(--bg2)}
+
+.scale{display:flex;gap:8px;margin-bottom:12px}
+.scale button{
+  flex:1;padding:16px 0;border:1px solid var(--border);border-radius:10px;background:var(--bg2);
+  color:var(--text);font-size:18px;cursor:pointer;font-family:"IBM Plex Mono",monospace;font-weight:600;
+}
+.scale button.sel{border-color:var(--accent);background:var(--accent);color:#06231A}
+.scale-lab{display:flex;justify-content:space-between;font-size:13px;color:var(--text3);margin-bottom:22px}
+
+input[type=email],textarea,input[type=text]{
+  width:100%;padding:14px 16px;border-radius:10px;border:1px solid var(--border);
+  background:var(--bg2);color:var(--text);font-family:inherit;font-size:16px;
+}
+input:focus,textarea:focus{outline:0;border-color:var(--accent)}
+textarea{min-height:120px;resize:vertical}
+.hint{font-size:13px;color:var(--text3);margin-top:8px;margin-bottom:20px}
+.other-wrap{margin-top:-6px;margin-bottom:22px;display:none}
+.other-wrap.on{display:block}
+
+.nav{display:flex;gap:10px;align-items:center;margin-top:6px}
+.nav .back{flex:0 0 auto;width:auto;padding:12px 16px}
+.nav .btn:not(.back){flex:1}
+
+.done{display:none;text-align:center;padding:40px 0}
+.done.on{display:block}
+.done .tick{font-size:44px;color:var(--accent);font-weight:700;margin-bottom:14px}
+.done h2{font-size:24px;margin-bottom:12px}
+.done p{color:var(--text2);margin-bottom:10px}
+
+footer{border-top:1px solid var(--border);padding:18px 0;font-size:12px;color:var(--text3)}
+footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+footer a{color:var(--text3)}
+.err{color:var(--danger);font-size:14px;margin-bottom:12px;display:none}
+.err.on{display:block}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="brand">Fast<span>Write</span></div>
+    <div class="domain mono">fastwrite.tech</div>
+  </div>
+</header>
+<div class="bar"><i id="bar"></i></div>
+
+<main>
+<div class="wrap">
+
+  <!-- INTRO -->
+  <section class="step on" id="s0">
+    <div class="intro">
+      <h1>Βοήθησέ με να χτίσω το σωστό εργαλείο</h1>
+      <p>Φτιάχνω το FastWrite — ένα εργαλείο που βγάζει τα δεδομένα από τιμολόγια και παραστατικά χωρίς χειροκίνητη πληκτρολόγηση. Πριν προχωρήσω στην επόμενη φάση, θέλω τη γνώμη ανθρώπων που ζουν καθημερινά με παραστατικά.</p>
+      <p>Καμία σωστή ή λάθος απάντηση — και η αρνητική γνώμη με βοηθάει το ίδιο.</p>
+      <div class="facts">
+        <span><b class="mono">8</b> ερωτήσεις</span>
+        <span><b class="mono">2</b> λεπτά</span>
+        <span>χωρίς εγγραφή</span>
+      </div>
+      <button class="btn" id="go">Ξεκίνα</button>
+    </div>
+  </section>
+
+  <!-- Q1 -->
+  <section class="step" id="s1" data-q="1">
+    <div class="qnum">Ερώτηση <b class="mono">1</b> από <span class="mono">8</span></div>
+    <div class="q">Τι σε περιγράφει καλύτερα;</div>
+    <div class="opts" data-name="q1" data-other="1">
+      <button class="opt" type="button"><i class="dot"></i>Λογιστής</button>
+      <button class="opt" type="button"><i class="dot"></i>Λογιστικό γραφείο</button>
+      <button class="opt" type="button"><i class="dot"></i>Υπάλληλος λογιστηρίου</button>
+      <button class="opt" type="button"><i class="dot"></i>Ιδιοκτήτης επιχείρησης</button>
+      <button class="opt" type="button"><i class="dot"></i>Υπάλληλος που ασχολείται με παραστατικά</button>
+      <button class="opt" type="button"><i class="dot"></i>Άλλο</button>
+    </div>
+    <div class="other-wrap"><input type="text" placeholder="Γράψε τι κάνεις" maxlength="120" /></div>
+    <div class="nav"><button class="btn ghost back" type="button">Πίσω</button><button class="btn next" type="button" disabled>Επόμενη</button></div>
+  </section>
+
+  <!-- Q2 -->
+  <section class="step" id="s2" data-q="2">
+    <div class="qnum">Ερώτηση <b class="mono">2</b> από <span class="mono">8</span></div>
+    <div class="q">Περίπου πόσα παραστατικά τον μήνα;</div>
+    <div class="opts" data-name="q2">
+      <button class="opt" type="button"><i class="dot"></i><span class="mono">50</span></button>
+      <button class="opt" type="button"><i class="dot"></i><span class="mono">50 - 200</span></button>
+      <button class="opt" type="button"><i class="dot"></i><span class="mono">200 - 500</span></button>
+      <button class="opt" type="button"><i class="dot"></i><span class="mono">500 - 1000</span></button>
+      <button class="opt" type="button"><i class="dot"></i>Πάνω από <span class="mono">1.000</span></button>
+    </div>
+    <div class="nav"><button class="btn ghost back" type="button">Πίσω</button><button class="btn next" type="button" disabled>Επόμενη</button></div>
+  </section>
+
+  <!-- Q3 -->
+  <section class="step" id="s3" data-q="3">
+    <div class="qnum">Ερώτηση <b class="mono">3</b> από <span class="mono">8</span></div>
+    <div class="q">Πόσες ώρες τον μήνα υπολογίζεις ότι πάνε στη χειροκίνητη καταχώρηση παραστατικών;</div>
+    <div class="opts" data-name="q3">
+      <button class="opt" type="button"><i class="dot"></i>Λιγότερες από <span class="mono">5</span></button>
+      <button class="opt" type="button"><i class="dot"></i><span class="mono">5 - 15</span></button>
+      <button class="opt" type="button"><i class="dot"></i><span class="mono">15 - 30</span></button>
+      <button class="opt" type="button"><i class="dot"></i><span class="mono">30 - 60</span></button>
+      <button class="opt" type="button"><i class="dot"></i>Πάνω από <span class="mono">60</span></button>
+    </div>
+    <div class="nav"><button class="btn ghost back" type="button">Πίσω</button><button class="btn next" type="button" disabled>Επόμενη</button></div>
+  </section>
+
+  <!-- Q4 -->
+  <section class="step" id="s4" data-q="4">
+    <div class="qnum">Ερώτηση <b class="mono">4</b> από <span class="mono">8</span></div>
+    <div class="q">Φαντάσου ότι φωτογραφίζεις ένα τιμολόγιο με το κινητό τη στιγμή που το παραλαμβάνεις, και τα δεδομένα φτάνουν έτοιμα στο λογιστήριο — χωρίς να τα πληκτρολογήσει κανείς. Πόσο χρήσιμο θα σου ήταν;</div>
+    <div class="scale" data-name="q4">
+      <button type="button">1</button><button type="button">2</button><button type="button">3</button><button type="button">4</button><button type="button">5</button>
+    </div>
+    <div class="scale-lab"><span>καθόλου</span><span>πολύ χρήσιμο</span></div>
+    <div class="nav"><button class="btn ghost back" type="button">Πίσω</button><button class="btn next" type="button" disabled>Επόμενη</button></div>
+  </section>
+
+  <!-- Q5 -->
+  <section class="step" id="s5" data-q="5">
+    <div class="qnum">Ερώτηση <b class="mono">5</b> από <span class="mono">8</span></div>
+    <div class="q">Πόσο χρήσιμη θα σου ήταν μια ειδοποίηση όταν ένας προμηθευτής αλλάζει τιμή σε ένα προϊόν, χωρίς να σε ενημερώσει;</div>
+    <div class="scale" data-name="q5">
+      <button type="button">1</button><button type="button">2</button><button type="button">3</button><button type="button">4</button><button type="button">5</button>
+    </div>
+    <div class="scale-lab"><span>καθόλου</span><span>πολύ χρήσιμο</span></div>
+    <div class="nav"><button class="btn ghost back" type="button">Πίσω</button><button class="btn next" type="button" disabled>Επόμενη</button></div>
+  </section>
+
+  <!-- Q6 -->
+  <section class="step" id="s6" data-q="6">
+    <div class="qnum">Ερώτηση <b class="mono">6</b> από <span class="mono">8</span></div>
+    <div class="q">Πώς περνάνε σήμερα τα δεδομένα των τιμολογίων στο λογιστικό ή μηχανογραφικό σύστημα;</div>
+    <div class="opts" data-name="q6">
+      <button class="opt" type="button"><i class="dot"></i>Πληκτρολογούνται με το χέρι</button>
+      <button class="opt" type="button"><i class="dot"></i>Με εργαλείο αυτόματης ανάγνωσης (OCR/AI)</button>
+      <button class="opt" type="button"><i class="dot"></i>Μέσω myDATA / ηλεκτρονικής τιμολόγησης</button>
+      <button class="opt" type="button"><i class="dot"></i>Συνδυασμός των παραπάνω</button>
+      <button class="opt" type="button"><i class="dot"></i>Δεν ξέρω, το χειρίζεται ο λογιστής μας</button>
+    </div>
+    <div class="nav"><button class="btn ghost back" type="button">Πίσω</button><button class="btn next" type="button" disabled>Επόμενη</button></div>
+  </section>
+
+  <!-- Q7 -->
+  <section class="step" id="s7" data-q="7">
+    <div class="qnum">Ερώτηση <b class="mono">7</b> από <span class="mono">8</span> · προαιρετικό</div>
+    <div class="q">Email</div>
+    <input type="email" id="q7" placeholder="onoma@etaireia.gr" maxlength="160" inputmode="email" autocomplete="email" />
+    <div class="hint">Μόνο αν θέλεις να μάθεις τι θα βγει από αυτό. Δεν το δίνω πουθενά, δεν στέλνω newsletter.</div>
+    <div class="nav"><button class="btn ghost back" type="button">Πίσω</button><button class="btn next" type="button">Επόμενη</button></div>
+  </section>
+
+  <!-- Q8 -->
+  <section class="step" id="s8" data-q="8">
+    <div class="qnum">Ερώτηση <b class="mono">8</b> από <span class="mono">8</span> · προαιρετικό</div>
+    <div class="q">Θέλεις να μου πεις κάτι;</div>
+    <textarea id="q8" placeholder="Ό,τι θέλεις — και τα αρνητικά."></textarea>
+    <div class="hint">Η αρνητική γνώμη με βοηθάει το ίδιο.</div>
+    <div class="err" id="err">Κάτι πήγε στραβά. Δοκίμασε ξανά.</div>
+    <div class="nav"><button class="btn ghost back" type="button">Πίσω</button><button class="btn" type="button" id="send">Στείλε</button></div>
+  </section>
+
+  <!-- DONE -->
+  <section class="done" id="done">
+    <div class="tick">&#10003;</div>
+    <h2>Ευχαριστώ.</h2>
+    <p>Η γνώμη σου καταγράφηκε.</p>
+    <p>Το FastWrite το φτιάχνω μόνος μου, στην Κύπρο. Κάθε απάντηση αλλάζει τι θα χτίσω μετά.</p>
+  </section>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>&copy; 2026 FastWrite &middot; Stavros Kallenos (Cyprus)</span>
+    <span><a href="/legal/privacy">Privacy</a></span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var A = {};
+  var cur = 0;
+  var TOTAL = 8;
+  var started = false, finished = false, maxQ = 0;
+
+  var sid = (function(){
+    try{
+      var k = sessionStorage.getItem('fw_sid');
+      if(k) return k;
+      var v = Date.now().toString(36) + Math.random().toString(36).slice(2,10);
+      sessionStorage.setItem('fw_sid', v); return v;
+    }catch(e){ return Date.now().toString(36) + Math.random().toString(36).slice(2,10); }
+  })();
+
+  var src = 'direct';
+  try{
+    var p = new URLSearchParams(location.search);
+    if(p.get('fbclid')) src = 'fb';
+    else if(document.referrer && /facebook|instagram/i.test(document.referrer)) src = 'fb';
+    else if(document.referrer) src = 'ref';
+  }catch(e){}
+
+  function ev(name, q){
+    var body = JSON.stringify({sid:sid, ev:name, q:(q===undefined?null:q), src:src});
+    try{
+      if(navigator.sendBeacon){
+        navigator.sendBeacon('/api/gnomi/e', new Blob([body], {type:'application/json'}));
+        return;
+      }
+    }catch(e){}
+    try{ fetch('/api/gnomi/e', {method:'POST', body:body, headers:{'Content-Type':'application/json'}, keepalive:true}); }catch(e){}
+  }
+
+  var steps = [];
+  for(var i=0;i<=TOTAL;i++) steps.push(document.getElementById('s'+i));
+  var bar = document.getElementById('bar');
+
+  function show(n){
+    if(steps[cur]) steps[cur].classList.remove('on');
+    cur = n;
+    steps[cur].classList.add('on');
+    bar.style.width = Math.round((cur/TOTAL)*100) + '%';
+    window.scrollTo(0,0);
+    if(cur > maxQ){ maxQ = cur; ev('q', cur); }
+  }
+
+  document.getElementById('go').addEventListener('click', function(){
+    if(!started){ started = true; ev('start'); }
+    show(1);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.opts'), function(g){
+    var name = g.getAttribute('data-name');
+    var hasOther = g.getAttribute('data-other') === '1';
+    var step = g.parentNode;
+    var next = step.querySelector('.next');
+    var otherWrap = step.querySelector('.other-wrap');
+    var all = g.querySelectorAll('.opt');
+    Array.prototype.forEach.call(all, function(b, idx){
+      b.addEventListener('click', function(){
+        Array.prototype.forEach.call(all, function(x){ x.classList.remove('sel'); });
+        b.classList.add('sel');
+        A[name] = b.textContent.trim();
+        if(hasOther && idx === all.length-1){
+          if(otherWrap) otherWrap.classList.add('on');
+        } else if(otherWrap){
+          otherWrap.classList.remove('on');
+          delete A[name+'_other'];
+        }
+        next.disabled = false;
+      });
+    });
+    if(otherWrap){
+      otherWrap.querySelector('input').addEventListener('input', function(){
+        A[name+'_other'] = this.value;
+      });
+    }
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.scale'), function(g){
+    var name = g.getAttribute('data-name');
+    var step = g.parentNode;
+    var next = step.querySelector('.next');
+    var all = g.querySelectorAll('button');
+    Array.prototype.forEach.call(all, function(b, idx){
+      b.addEventListener('click', function(){
+        Array.prototype.forEach.call(all, function(x){ x.classList.remove('sel'); });
+        b.classList.add('sel');
+        A[name] = idx+1;
+        next.disabled = false;
+      });
+    });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.next'), function(b){
+    b.addEventListener('click', function(){ show(Math.min(cur+1, TOTAL)); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.back'), function(b){
+    b.addEventListener('click', function(){ show(Math.max(cur-1, 0)); });
+  });
+
+  document.getElementById('send').addEventListener('click', function(){
+    var btn = this;
+    btn.disabled = true; btn.textContent = 'Στέλνω…';
+    document.getElementById('err').classList.remove('on');
+    A.q7 = document.getElementById('q7').value.trim();
+    A.q8 = document.getElementById('q8').value.trim();
+    fetch('/api/gnomi/submit', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sid:sid, src:src, answers:A})
+    }).then(function(r){
+      if(!r.ok) throw new Error('bad');
+      finished = true;
+      steps[cur].classList.remove('on');
+      document.getElementById('done').classList.add('on');
+      bar.style.width = '100%';
+      window.scrollTo(0,0);
+    }).catch(function(){
+      document.getElementById('err').classList.add('on');
+      btn.disabled = false; btn.textContent = 'Στείλε';
+    });
+  });
+
+  var byeSent = false;
+  function bye(){
+    if(finished || byeSent || !started) return;
+    byeSent = true;
+    ev('abandon', cur);
+  }
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'hidden') bye();
+  });
+  window.addEventListener('pagehide', bye);
+
+  ev('view');
+})();
+</script>
+</body>
+</html>
