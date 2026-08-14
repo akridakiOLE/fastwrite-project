@@ -29,7 +29,7 @@ not_found_handling = "404-page"
 # απαντούν 405 σε POST και ο worker ΔΕΝ καλείται ποτέ. Με λίστα ["/gnomi"]
 # έσπασαν αμέσως και τα δύο API και η υποβολή της φόρμας γύριζε σφάλμα.
 # Τα API endpoints ΠΡΕΠΕΙ να είναι εδώ μέσα.
-run_worker_first = ["/api/*"]
+run_worker_first = ["/api/*", "/gnomi/apotelesmata", "/gnomi/apotelesmata/*"]
 
 # D1 — ο ΙΔΙΟΣ λογαριασμός βάσης με τον beta worker, ΞΕΧΩΡΙΣΤΟΙ πίνακες
 # (gnomi_events, gnomi_responses). Σχήμα: schema/gnomi.sql
