@@ -24,10 +24,12 @@ preview_urls = true
 directory = "./site"
 binding = "ASSETS"
 not_found_handling = "404-page"
-# ΧΩΡΙΣ αυτό, το Cloudflare σερβίρει το site/gnomi/index.html ΚΑΤΕΥΘΕΙΑΝ και ο
-# worker δεν τρέχει ποτέ — οπότε χάνεται η server-side καταγραφή άφιξης, που
-# είναι η ΜΟΝΗ μέτρηση ανεξάρτητη από JavaScript.
-run_worker_first = ["/gnomi", "/gnomi/*"]
+# ⚠ ΠΡΟΣΟΧΗ — ΜΑΘΗΜΑ 14/8/2026:
+# Ό,τι ΔΕΝ είναι σε αυτή τη λίστα πάει ΠΡΩΤΑ στα static assets. Τα assets
+# απαντούν 405 σε POST και ο worker ΔΕΝ καλείται ποτέ. Με λίστα ["/gnomi"]
+# έσπασαν αμέσως και τα δύο API και η υποβολή της φόρμας γύριζε σφάλμα.
+# Τα API endpoints ΠΡΕΠΕΙ να είναι εδώ μέσα.
+run_worker_first = ["/api/*"]
 
 # D1 — ο ΙΔΙΟΣ λογαριασμός βάσης με τον beta worker, ΞΕΧΩΡΙΣΤΟΙ πίνακες
 # (gnomi_events, gnomi_responses). Σχήμα: schema/gnomi.sql
