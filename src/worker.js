@@ -181,6 +181,13 @@ const Q2_BLIND = [
 ]; // «τυφλός τη στιγμή της παραλαβής»
 const Q2_SOLVED = "Ναι, το βλέπω αμέσως από το σύστημά μου";
 
+// ⚠ ΤΟ ΡΟΛΟΪ ΤΗΣ v2. Ο πίνακας gnomi_events ΔΕΝ έχει στήλη έκδοσης, οπότε
+// χωρίς αυτό το όριο το χωνί θα μετρούσε ΚΑΙ τις 78 συνεδρίες του παλιού
+// ερωτηματολογίου (8 ερωτήσεις) μαζί με τις νέες — αριθμός χωρίς νόημα.
+// Τα παλιά δεδομένα ΔΕΝ διαγράφονται· μένουν στη βάση ως σημείο αναφοράς.
+// Τελευταίο συμβάν v1: 2026-08-15T17:12:31Z.
+const SINCE = "2026-08-15T17:30:00Z";
+
 const TARGET = 20;   // δείγμα απόφασης
 const NEED_BLIND = 12;
 const NEED_HIT = 6;
@@ -188,11 +195,15 @@ const NEED_HIT = 6;
 async function dashboard(env) {
   const [ev, resp] = await Promise.all([
     env.DB.prepare(
-      "SELECT ev, q, COUNT(DISTINCT sid) AS c FROM gnomi_events GROUP BY ev, q"
-    ).all(),
+      "SELECT ev, q, COUNT(DISTINCT sid) AS c FROM gnomi_events WHERE ts >= ? GROUP BY ev, q"
+    )
+      .bind(SINCE)
+      .all(),
     env.DB.prepare(
-      "SELECT ts, src, country, v, q1, q2, q3, email, comment FROM gnomi_responses ORDER BY id DESC LIMIT 300"
-    ).all(),
+      "SELECT ts, src, country, v, q1, q2, q3, email, comment FROM gnomi_responses WHERE ts >= ? ORDER BY id DESC LIMIT 300"
+    )
+      .bind(SINCE)
+      .all(),
   ]);
 
   const E = ev.results || [];
@@ -339,7 +350,7 @@ table{width:100%;border-collapse:collapse}
 </style></head><body><div class="wrap">
 
 <h1>Αποτελέσματα — <span class="mono">/gnomi</span> <span style="color:var(--text3);font-size:15px">v${V}</span></h1>
-<div class="sub">Δικά μας δεδομένα, όχι εκτίμηση πλατφόρμας · ανανέωσε τη σελίδα για επικαιροποίηση</div>
+<div class="sub">Δικά μας δεδομένα, όχι εκτίμηση πλατφόρμας · ανανέωσε τη σελίδα για επικαιροποίηση<br>Μετράει από <span class="mono">${esc(SINCE.slice(0, 16).replace("T", " "))} UTC</span> — ό,τι προηγήθηκε ανήκει στο παλιό ερωτηματολόγιο και δεν προσμετράται</div>
 
 <div class="verdict ${vclass}">${esc(verdict)}</div>
 <table class="crit">
