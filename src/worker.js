@@ -231,10 +231,17 @@ async function dashboard(env) {
       .join("")}</table>`;
   };
 
+  // Ο χρόνος στη σελίδα ξεχωρίζει το «πάτησε κατά λάθος και έφυγε σε 2 δευτ.»
+  // από το «διάβασε και δεν πείστηκε». Δύο εντελώς διαφορετικά προβλήματα.
+  const t5 = get("t5");
+  const t15 = get("t15");
+
   const funnelRows = [
     ["Έφτασαν στη σελίδα", views, views],
-    ["Πάτησαν «Ξεκίνα»", starts, views],
-    ...steps.map((s) => [`Ερώτηση ${s.q}`, s.reached, views]),
+    ["Έμειναν 5 δευτερόλεπτα", t5, views],
+    ["Έμειναν 15 δευτερόλεπτα", t15, views],
+    ["Απάντησαν την 1η ερώτηση", starts, views],
+    ...steps.filter((s) => s.q > 1).map((s) => [`Ερώτηση ${s.q}`, s.reached, views]),
     ["ΤΕΛΕΙΩΣΑΝ", submits, views],
   ];
 

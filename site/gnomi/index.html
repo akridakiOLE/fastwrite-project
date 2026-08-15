@@ -54,6 +54,8 @@ main{flex:1;padding:26px 0 40px}
 
 .step{display:none}
 .step.on{display:block}
+.lead{font-size:15px;color:var(--text2);margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.lead b{color:var(--text)}
 .qnum{font-size:13px;color:var(--text3);margin-bottom:8px}
 .qnum b{color:var(--text2)}
 .q{font-size:21px;line-height:1.35;font-weight:600;margin-bottom:20px}
@@ -117,23 +119,9 @@ footer a{color:var(--text3)}
 <main>
 <div class="wrap">
 
-  <!-- INTRO -->
-  <section class="step on" id="s0">
-    <div class="intro">
-      <h1>Βοήθησέ με να χτίσω το σωστό εργαλείο</h1>
-      <p>Φτιάχνω το FastWrite — ένα εργαλείο που βγάζει τα δεδομένα από τιμολόγια και παραστατικά χωρίς χειροκίνητη πληκτρολόγηση. Πριν προχωρήσω στην επόμενη φάση, θέλω τη γνώμη ανθρώπων που ζουν καθημερινά με παραστατικά.</p>
-      <p>Καμία σωστή ή λάθος απάντηση — και η αρνητική γνώμη με βοηθάει το ίδιο.</p>
-      <div class="facts">
-        <span><b class="mono">8</b> ερωτήσεις</span>
-        <span><b class="mono">2</b> λεπτά</span>
-        <span>χωρίς εγγραφή</span>
-      </div>
-      <button class="btn" id="go">Ξεκίνα</button>
-    </div>
-  </section>
-
   <!-- Q1 -->
-  <section class="step" id="s1" data-q="1">
+  <section class="step on" id="s1" data-q="1">
+    <div class="lead">Φτιάχνω το <b>FastWrite</b> και θέλω τη γνώμη σου. <b class="mono">8</b> ερωτήσεις, <b class="mono">2</b> λεπτά. Καμία σωστή ή λάθος απάντηση.</div>
     <div class="qnum">Ερώτηση <b class="mono">1</b> από <span class="mono">8</span></div>
     <div class="q">Τι σε περιγράφει καλύτερα;</div>
     <div class="opts" data-name="q1" data-other="1">
@@ -145,7 +133,7 @@ footer a{color:var(--text3)}
       <button class="opt" type="button"><i class="dot"></i>Άλλο</button>
     </div>
     <div class="other-wrap"><input type="text" placeholder="Γράψε τι κάνεις" maxlength="120" /></div>
-    <div class="nav"><button class="btn ghost back" type="button">Πίσω</button><button class="btn next" type="button" disabled>Επόμενη</button></div>
+    <div class="nav"><button class="btn next" type="button" disabled>Επόμενη</button></div>
   </section>
 
   <!-- Q2 -->
@@ -252,9 +240,9 @@ footer a{color:var(--text3)}
 <script>
 (function(){
   var A = {};
-  var cur = 0;
   var TOTAL = 8;
-  var started = false, finished = false, maxQ = 0;
+  var cur = 1;                 // η ΠΡΩΤΗ οθόνη είναι η ερώτηση 1 — καμία εισαγωγή
+  var started = false, finished = false, maxQ = 1;
 
   var sid = (function(){
     try{
@@ -284,8 +272,8 @@ footer a{color:var(--text3)}
     try{ fetch('/api/gnomi/e', {method:'POST', body:body, headers:{'Content-Type':'application/json'}, keepalive:true}); }catch(e){}
   }
 
-  var steps = [];
-  for(var i=0;i<=TOTAL;i++) steps.push(document.getElementById('s'+i));
+  var steps = {};
+  for(var i=1;i<=TOTAL;i++) steps[i] = document.getElementById('s'+i);
   var bar = document.getElementById('bar');
 
   function show(n){
@@ -297,10 +285,12 @@ footer a{color:var(--text3)}
     if(cur > maxQ){ maxQ = cur; ev('q', cur); }
   }
 
-  document.getElementById('go').addEventListener('click', function(){
-    if(!started){ started = true; ev('start'); }
-    show(1);
-  });
+  // Πρώτη απάντηση = ο άνθρωπος μπήκε στη διαδικασία.
+  function markStarted(){
+    if(started) return;
+    started = true;
+    ev('start');
+  }
 
   Array.prototype.forEach.call(document.querySelectorAll('.opts'), function(g){
     var name = g.getAttribute('data-name');
@@ -311,6 +301,7 @@ footer a{color:var(--text3)}
     var all = g.querySelectorAll('.opt');
     Array.prototype.forEach.call(all, function(b, idx){
       b.addEventListener('click', function(){
+        markStarted();
         Array.prototype.forEach.call(all, function(x){ x.classList.remove('sel'); });
         b.classList.add('sel');
         A[name] = b.textContent.trim();
@@ -337,6 +328,7 @@ footer a{color:var(--text3)}
     var all = g.querySelectorAll('button');
     Array.prototype.forEach.call(all, function(b, idx){
       b.addEventListener('click', function(){
+        markStarted();
         Array.prototype.forEach.call(all, function(x){ x.classList.remove('sel'); });
         b.classList.add('sel');
         A[name] = idx+1;
@@ -349,7 +341,7 @@ footer a{color:var(--text3)}
     b.addEventListener('click', function(){ show(Math.min(cur+1, TOTAL)); });
   });
   Array.prototype.forEach.call(document.querySelectorAll('.back'), function(b){
-    b.addEventListener('click', function(){ show(Math.max(cur-1, 0)); });
+    b.addEventListener('click', function(){ show(Math.max(cur-1, 1)); });
   });
 
   document.getElementById('send').addEventListener('click', function(){
@@ -376,7 +368,7 @@ footer a{color:var(--text3)}
 
   var byeSent = false;
   function bye(){
-    if(finished || byeSent || !started) return;
+    if(finished || byeSent) return;
     byeSent = true;
     ev('abandon', cur);
   }
@@ -385,7 +377,13 @@ footer a{color:var(--text3)}
   });
   window.addEventListener('pagehide', bye);
 
+  // Χρόνος στη σελίδα — ξεχωρίζει το «πάτησε κατά λάθος» από το «διάβασε και έφυγε».
+  setTimeout(function(){ if(!byeSent) ev('t5'); }, 5000);
+  setTimeout(function(){ if(!byeSent) ev('t15'); }, 15000);
+
+  bar.style.width = Math.round((1/TOTAL)*100) + '%';
   ev('view');
+  ev('q', 1);
 })();
 </script>
 </body>
