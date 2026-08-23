@@ -20,7 +20,7 @@
 // GDPR: δεν αποθηκεύεται IP. Μόνο χώρα (Cloudflare) και user-agent.
 // ---------------------------------------------------------------------------
 
-const V = 2; // έκδοση ερωτηματολογίου
+const V = 3; // έκδοση ερωτηματολογίου
 
 export default {
   async fetch(request, env, ctx) {
@@ -163,23 +163,21 @@ async function saveResponse(env, request, b) {
 
 const QLABEL = {
   1: "Σε χρέωσε προμηθευτής ακριβότερα, χωρίς να στο πει;",
-  2: "Το βλέπεις τη στιγμή της παραλαβής;",
-  3: "Πώς θα έβρισκες τεμάχια ανά κωδικό μέσα στη χρονιά;",
-  4: "Τελευταία οθόνη (email + σχόλιο)",
+  2: "Τελευταία οθόνη (email + σχόλιο)",
 };
 
 // Οι ακριβείς ετικέτες των επιλογών — χρησιμοποιούνται για τα κριτήρια.
 // ⚠ Πρέπει να ταιριάζουν ΓΡΑΜΜΑ ΠΡΟΣ ΓΡΑΜΜΑ με το site/gnomi/index.html.
-const Q1_OUT = "Δεν παραλαμβάνω εμπόρευμα από προμηθευτές";
+const Q1_OUT = "Δεν παραλαμβάνω εμπόρευμα";
 const Q1_HIT = [
-  "Ναι, το κατάλαβα τυχαία",
-  "Ναι, γιατί το ελέγχω",
+  "Ναι, το κατάλαβα την ώρα της παραλαβής",
+  "Ναι, το κατάλαβα αργότερα",
 ]; // «του έχει συμβεί»
-const Q2_BLIND = [
-  "Όχι εκείνη τη στιγμή — θα φανεί αργότερα στα βιβλία",
-  "Όχι, δεν υπάρχει τρόπος να το ξέρω τότε",
+const Q1_BLIND = [
+  "Ναι, το κατάλαβα αργότερα",
+  "Δεν θα μπορούσα να το ξέρω",
 ]; // «τυφλός τη στιγμή της παραλαβής»
-const Q2_SOLVED = "Ναι, το βλέπω αμέσως από το σύστημά μου";
+const Q1_SOLVED = "Ναι, το κατάλαβα την ώρα της παραλαβής";
 
 // ⚠ ΤΟ ΡΟΛΟΪ ΤΗΣ ΜΕΤΡΗΣΗΣ. Ο πίνακας gnomi_events ΔΕΝ έχει στήλη έκδοσης,
 // οπότε χωρίς αυτό το όριο το χωνί θα ανακάτευε διαφορετικές περιόδους σε
@@ -196,11 +194,12 @@ const Q2_SOLVED = "Ναι, το βλέπω αμέσως από το σύστημ
 //                         Κλείσιμο περιόδου: 82 έφτασαν · 38 στα 5" ·
 //                         16 στα 15" · 2 ξεκίνησαν · 1 τελείωσε · 1 email.
 //                         15" -> απάντησε = 12,5%  (το νούμερο προς σύγκριση)
-const SINCE = "2026-08-16T12:40:00Z";
+//   2026-08-23T07:10:00Z  v2 (3 ερωτήσεις) -> v3 (1 ερώτηση, ίδια με τη
+//                         διαφήμιση CY-GR-Leads-Fasi2). Κλείσιμο περιόδου v2:
+//                         208 έφτασαν · 114 στα 5" · 41 στα 15" · 4 απάντησαν
+//                         την 1η · 1 τελείωσε · 0 email.
+const SINCE = "2026-08-23T07:10:00Z";
 
-const TARGET = 20;   // δείγμα απόφασης
-const NEED_BLIND = 12;
-const NEED_HIT = 6;
 
 async function dashboard(env) {
   const [ev, resp] = await Promise.all([
@@ -240,10 +239,10 @@ async function dashboard(env) {
   const t15 = get("t15");
 
   const steps = [];
-  for (let i = 2; i <= 4; i++) steps.push({ q: i, reached: get("q", i) });
+  for (let i = 2; i <= 2; i++) steps.push({ q: i, reached: get("q", i) });
 
   const abandons = [];
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 2; i++) {
     const c = get("abandon", i);
     if (c) abandons.push({ q: i, c });
   }
@@ -278,25 +277,11 @@ async function dashboard(env) {
   };
 
   // --- Τα κριτήρια απόφασης, υπολογισμένα ------------------------------------
-  const nBlind = IN.filter((r) => Q2_BLIND.indexOf(r.q2) !== -1).length;
+  const nBlind = IN.filter((r) => Q1_BLIND.indexOf(r.q1) !== -1).length;
   const nHit = IN.filter((r) => Q1_HIT.indexOf(r.q1) !== -1).length;
-  const nSolved = IN.filter((r) => r.q2 === Q2_SOLVED).length;
+  const nSolved = IN.filter((r) => r.q1 === Q1_SOLVED).length;
   const nEmail = IN.filter((r) => r.email && r.email.length > 3).length;
 
-  let verdict, vclass;
-  if (IN.length < TARGET) {
-    verdict = `Δείγμα ${IN.length}/${TARGET} — πολύ νωρίς για απόφαση`;
-    vclass = "wait";
-  } else if (nSolved > IN.length / 2) {
-    verdict = "ΚΟΚΚΙΝΟ — το πρόβλημα είναι ήδη λυμένο για τους περισσότερους";
-    vclass = "red";
-  } else if (nBlind >= NEED_BLIND && nHit >= NEED_HIT) {
-    verdict = "ΠΡΑΣΙΝΟ — υπάρχει τυφλό σημείο και υπάρχει ζημιά";
-    vclass = "green";
-  } else {
-    verdict = "ΘΟΛΟ — συνέχισε μέχρι τα 40, χωρίς αλλαγές";
-    vclass = "amber";
-  }
 
   const funnelRows = [
     ["Έφτασαν στη σελίδα", views, views],
@@ -304,7 +289,7 @@ async function dashboard(env) {
     ["Έμειναν 15 δευτερόλεπτα", t15, views],
     ["Απάντησαν την 1η ερώτηση", starts, views],
     ...steps.map((s) => [
-      s.q === 4 ? "Τελευταία οθόνη" : `Ερώτηση ${s.q}`,
+      s.q === 2 ? "Τελευταία οθόνη" : `Ερώτηση ${s.q}`,
       s.reached,
       views,
     ]),
@@ -362,13 +347,12 @@ table{width:100%;border-collapse:collapse}
 <h1>Αποτελέσματα — <span class="mono">/gnomi</span> <span style="color:var(--text3);font-size:15px">v${V}</span></h1>
 <div class="sub">Δικά μας δεδομένα, όχι εκτίμηση πλατφόρμας · ανανέωσε τη σελίδα για επικαιροποίηση<br>Μετράει από <span class="mono">${esc(SINCE.slice(0, 16).replace("T", " "))} UTC</span> — ό,τι προηγήθηκε ανήκει στο παλιό ερωτηματολόγιο και δεν προσμετράται</div>
 
-<div class="verdict ${vclass}">${esc(verdict)}</div>
 <table class="crit">
-  <tr><td class="k">Συμπληρωμένα εντός κοινού</td><td class="n">${IN.length} / ${TARGET}</td></tr>
-  <tr><td class="k">Τυφλοί τη στιγμή της παραλαβής (χρειάζεται ≥ ${NEED_BLIND})</td><td class="n">${nBlind}</td></tr>
-  <tr><td class="k">Έχουν όντως χρεωθεί ακριβότερα (χρειάζεται ≥ ${NEED_HIT})</td><td class="n">${nHit}</td></tr>
-  <tr><td class="k">Το έχουν ήδη λυμένο (κόκκινο αν πλειοψηφία)</td><td class="n">${nSolved}</td></tr>
+  <tr><td class="k">Συμπληρωμένα εντός κοινού</td><td class="n">${IN.length}</td></tr>
   <tr><td class="k">Άφησαν email — το σήμα που κοστίζει κάτι</td><td class="n">${nEmail}</td></tr>
+  <tr><td class="k">Τυφλοί τη στιγμή της παραλαβής</td><td class="n">${nBlind}</td></tr>
+  <tr><td class="k">Έχουν χρεωθεί ακριβότερα</td><td class="n">${nHit}</td></tr>
+  <tr><td class="k">Το έχουν ήδη λυμένο</td><td class="n">${nSolved}</td></tr>
   <tr><td class="k">Δήλωσαν εκτός κοινού</td><td class="n">${OUT.length}</td></tr>
 </table>
 
@@ -395,7 +379,7 @@ ${
         .map(
           (a) =>
             `<tr><td class="k">${esc(
-              (a.q === 4 ? "Τελευταία οθόνη" : "Ερώτηση " + a.q) +
+              (a.q === 2 ? "Τελευταία οθόνη" : "Ερώτηση " + a.q) +
                 " — " +
                 (QLABEL[a.q] || "")
             )}</td><td class="n mono">${a.c}</td><td class="b">${bar(
@@ -410,9 +394,7 @@ ${
 <h2>Σύνοψη απαντήσεων${R.length ? ` <span class="mono" style="color:var(--text3);font-size:14px">(${R.length})</span>` : ""}</h2>
 ${
   R.length
-    ? distTable(QLABEL[1], dist("q1")) +
-      distTable(QLABEL[2], dist("q2", IN)) +
-      distTable(QLABEL[3], dist("q3", IN))
+    ? distTable(QLABEL[1], dist("q1"))
     : `<div class="empty">Καμία απάντηση ακόμα.</div>`
 }
 
@@ -420,15 +402,13 @@ ${
 ${
   R.length
     ? `<table class="resp"><tr>
-<th>Πότε</th><th>Πηγή</th><th>Χώρα</th><th>1 · Χρεώθηκε ακριβότερα;</th><th>2 · Το βλέπει στην παραλαβή;</th><th>3 · Τεμάχια ανά κωδικό</th><th>Email</th><th>Σχόλιο</th></tr>
+<th>Πότε</th><th>Πηγή</th><th>Χώρα</th><th>Χρεώθηκε ακριβότερα;</th><th>Email</th><th>Σχόλιο</th></tr>
 ${R.map(
   (r) => `<tr>
 <td class="mono" style="white-space:nowrap;color:var(--text3)">${esc((r.ts || "").slice(0, 16).replace("T", " "))}</td>
 <td class="mono" style="font-size:12px">${esc(r.src)}</td>
 <td class="mono" style="font-size:12px">${esc(r.country)}</td>
 <td>${esc(r.q1)}</td>
-<td>${esc(r.q2)}</td>
-<td>${esc(r.q3)}</td>
 <td class="mono" style="font-size:12px">${esc(r.email)}</td>
 <td class="c">${esc(r.comment)}</td></tr>`
 ).join("")}
