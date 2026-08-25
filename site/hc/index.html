@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0a0e14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hand Control">
+<meta name="robots" content="noindex, nofollow">
+<title>Hand Control</title>
+<link rel="manifest" href="/hc/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/hc/icons/icon-180.png">
+<link rel="icon" href="/hc/icons/icon-192.png">
+<link rel="stylesheet" href="/hc/hc.css">
+</head>
+<body>
+
+<!-- ══ ΟΘΟΝΗ Α · EMAIL ══════════════════════════════════════════ -->
+<section id="s-email" class="screen setup">
+  <div class="setup-inner">
+    <h1 class="logo">Hand<span>Control</span></h1>
+    <p class="lede">Φωτογραφίζεις το τιμολόγιο στην παραλαβή.<br>Κρατάς τι πλήρωσες, ανά προμηθευτή.</p>
+    <label class="fld">
+      <span>Το email σου</span>
+      <input type="email" id="in-email" inputmode="email" autocomplete="email" placeholder="onoma@example.com">
+    </label>
+    <p class="err" id="err-email" hidden>Γράψε μια σωστή διεύθυνση email.</p>
+    <button class="btn primary" id="go-email">Συνέχεια</button>
+    <p class="fine">Δωρεάν, χωρίς όριο χρόνου. Το email είναι για ενημερώσεις και αναβαθμίσεις.</p>
+  </div>
+</section>
+
+<!-- ══ ΟΘΟΝΗ Β · ΚΛΕΙΔΙ GEMINI ═════════════════════════════════ -->
+<section id="s-key" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h2>Να διαβάζει μόνο του τα ποσά;</h2>
+    <p class="lede">Με δικό σου κλειδί Gemini, η εφαρμογή διαβάζει <b>σύνολο, ΦΠΑ και υπόλοιπο</b> από τη φωτογραφία. Χωρίς κλειδί, τα γράφεις εσύ.</p>
+    <p class="note">Η φωτογραφία πηγαίνει <b>απευθείας από τη συσκευή σου στο Gemini</b>. Δεν περνάει ποτέ από δικό μας διακομιστή. Το κλειδί μένει μόνο εδώ, στο κινητό σου.</p>
+    <label class="fld">
+      <span>Κλειδί Gemini</span>
+      <input type="text" id="in-key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIza…">
+    </label>
+    <a class="howto" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Πώς βγάζω κλειδί — 4 βήματα</a>
+    <button class="btn primary" id="go-key">Αποθήκευση</button>
+    <button class="btn ghost" id="skip-key">Παράλειψη — θα γράφω μόνος μου τα ποσά</button>
+  </div>
+</section>
+
+<!-- ══ ΟΘΟΝΗ 1 · ΚΑΜΕΡΑ ════════════════════════════════════════ -->
+<section id="s-cam" class="screen cam" hidden>
+  <video id="vid" playsinline muted autoplay></video>
+  <div class="cam-top">
+    <span class="pill" id="pending">0 εκκρεμή</span>
+    <button class="icon-btn" id="btn-menu" aria-label="Ρυθμίσεις">⋯</button>
+  </div>
+  <div class="cam-bottom">
+    <button id="shutter" class="shutter" aria-label="Λήψη"></button>
+  </div>
+  <div class="flash" id="flash"></div>
+  <div class="toast" id="toast" hidden>✓ Μπήκε</div>
+  <div class="cam-err" id="cam-err" hidden>
+    <p><b>Δεν άνοιξε η κάμερα.</b></p>
+    <p id="cam-err-msg"></p>
+    <button class="btn ghost" id="cam-retry">Δοκίμασε ξανά</button>
+  </div>
+</section>
+
+<!-- ══ ΟΘΟΝΗ 3 · ΠΟΙΟΣ; ════════════════════════════════════════ -->
+<section id="s-who" class="screen who" hidden>
+  <div class="who-head">
+    <img id="thumb" alt="">
+    <h2>Ποιος;</h2>
+  </div>
+  <div id="sup-list" class="sup-list"></div>
+  <div class="who-new">
+    <input type="text" id="in-sup" placeholder="Νέος προμηθευτής" autocomplete="off">
+    <button class="btn primary" id="add-sup">Καταχώρηση</button>
+  </div>
+  <p class="fine">Γράψε το όνομα που χρησιμοποιείς εσύ — όχι την επωνυμία του τιμολογίου.</p>
+</section>
+
+<script src="/hc/app.js"></script>
+</body>
+</html>
