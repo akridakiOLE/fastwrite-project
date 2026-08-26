@@ -82,3 +82,89 @@ input:focus{outline:none;border-color:var(--accent)}
 }
 .sup:active{background:var(--bg3);border-color:var(--accent)}
 .who-new{display:flex;flex-direction:column;gap:10px}
+
+/* ══ ΦΕΤΑ 2 (26/8/2026) ══════════════════════════════════════ */
+
+/* Η μπάρα της κάμερας: το μενού πάει ΑΡΙΣΤΕΡΑ.
+   Αιτία: το ⋮ του browser κάθεται πάνω δεξιά — δίπλα του κανένα
+   δικό μας κουμπί, ποτέ. Ο μετρητής στο κέντρο. */
+.cam-top{justify-content:space-between}
+.cam-top .spacer{width:44px}
+.icon-btn{min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.note.big{font-size:15px;line-height:1.6}
+
+/* ── Σελίδες (μενού, εκκρεμή, προμηθευτής, κάλεσε, ρυθμίσεις) ── */
+.page{background:var(--bg)}
+.pg-head{
+  display:flex;align-items:center;gap:6px;flex:0 0 auto;
+  padding:max(10px,env(safe-area-inset-top)) 12px 10px;
+  border-bottom:1px solid var(--border);background:var(--bg2);
+}
+.pg-head h2{font-size:18px;font-weight:700}
+.back{
+  background:none;border:0;color:var(--text);font-size:32px;line-height:1;
+  min-width:44px;min-height:44px;cursor:pointer;font-family:inherit;
+}
+.pg-body{
+  flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:16px 16px max(24px,env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:12px;
+}
+.sep{height:1px;background:var(--border);margin:4px 0}
+
+.row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:var(--bg2);border:1px solid var(--border);color:var(--text);
+  border-radius:12px;padding:18px;font-family:inherit;cursor:pointer;text-align:left;
+}
+.row:active{background:var(--bg3)}
+.row-t{font-size:17px;font-weight:600}
+.row-b{color:var(--text3);font-size:15px;font-weight:600}
+.row-b.hot{color:var(--accent)}
+
+.kv{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 4px;font-size:15px}
+.kv span{color:var(--text2)}
+.kv b{color:var(--text);font-weight:600;text-align:right;word-break:break-all}
+
+.btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger);font-weight:600}
+
+/* ── Κάρτα εκκρεμούς ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.card-head{display:flex;align-items:center;gap:12px}
+.card-head img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer}
+.card-meta{flex:1;min-width:0}
+.card-sup{font-size:16px;font-weight:700}
+.card-date{font-size:13px;color:var(--text3)}
+.amts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.amt{display:flex;flex-direction:column;gap:4px}
+.amt span{font-size:12px;color:var(--text2)}
+.amt input{
+  background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:11px 8px;font-size:16px;width:100%;text-align:right;font-family:inherit;
+}
+.amt input:focus{outline:none;border-color:var(--accent)}
+.card .btn{padding:12px}
+
+/* ── Προμηθευτής: μήνες και τιμολόγια ── */
+.mon{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border)}
+.mon-t{font-size:14px;color:var(--text2);text-transform:capitalize}
+.mon-v{font-size:16px;font-weight:700;color:var(--accent)}
+.inv{
+  display:flex;align-items:center;gap:12px;background:var(--bg2);
+  border:1px solid var(--border);border-radius:10px;padding:12px;
+  cursor:pointer;font-family:inherit;text-align:left;color:var(--text);width:100%;
+}
+.inv:active{background:var(--bg3)}
+.inv img{width:44px;height:44px;object-fit:cover;border-radius:6px;background:var(--bg3);flex:0 0 auto}
+.inv-m{flex:1;min-width:0}
+.inv-d{font-size:13px;color:var(--text3)}
+.inv-a{font-size:16px;font-weight:700}
+.inv-a.miss{color:var(--text3);font-weight:500;font-size:14px}
+
+.empty{color:var(--text3);font-size:15px;text-align:center;padding:40px 20px;line-height:1.7}
+
+.linkbox{
+  background:var(--bg2);border:1px dashed var(--accent);border-radius:10px;
+  padding:14px;font-size:14px;color:var(--accent);word-break:break-all;text-align:center;
+}
+.shot-full{width:100%;border-radius:10px;border:1px solid var(--border)}
