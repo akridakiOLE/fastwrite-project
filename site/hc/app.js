@@ -105,6 +105,13 @@
   var MONTHS = ['Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος',
                 'Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος'];
   function mlabel(k) { var p = k.split('-'); return MONTHS[Number(p[1]) - 1] + ' ' + p[0]; }
+  function norm(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .toLocaleUpperCase('el')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+  }
   function num(v) {
     if (v === null || v === undefined) { return ''; }
     return String(v).replace('.', ',');
@@ -216,6 +223,7 @@
   }
 
   /* ══ Ο ΠΡΟΜΗΘΕΥΤΗΣ ΜΟΥ ══ */
+  var FIND_MIN = 8;          // κάτω από αυτό, η μπάρα αναζήτησης δεν εμφανίζεται
   function renderSupPage() {
     var body = el('sup-body');
     body.innerHTML = '';
@@ -226,15 +234,43 @@
       }
       var names = {};
       rows.forEach(function (r) { names[r.supplier] = (names[r.supplier] || 0) + 1; });
-      Object.keys(names).sort(function (a, b) { return names[b] - names[a]; }).forEach(function (nm) {
-        var b = document.createElement('button');
-        b.className = 'row';
-        b.innerHTML = '<span class="row-t"></span><span class="row-b"></span>';
-        b.querySelector('.row-t').textContent = nm;
-        b.querySelector('.row-b').textContent = names[nm] + ' τιμ.';
-        b.onclick = function () { openSupplier(nm, rows); };
-        body.appendChild(b);
-      });
+      var keys = Object.keys(names).sort(function (a, b) { return names[b] - names[a]; });
+
+      var list = document.createElement('div');
+      list.className = 'sup-rows';
+
+      function draw(q) {
+        list.innerHTML = '';
+        var nq = norm(q);
+        var hit = keys.filter(function (nm) { return !nq || norm(nm).indexOf(nq) !== -1; });
+        if (!hit.length) {
+          list.innerHTML = '<p class="empty">Κανένας προμηθευτής με αυτό το όνομα.</p>';
+          return;
+        }
+        hit.forEach(function (nm) {
+          var b = document.createElement('button');
+          b.className = 'row';
+          b.innerHTML = '<span class="row-t"></span><span class="row-b"></span>';
+          b.querySelector('.row-t').textContent = nm;
+          b.querySelector('.row-b').textContent = names[nm] + ' τιμ.';
+          b.onclick = function () { openSupplier(nm, rows); };
+          list.appendChild(b);
+        });
+      }
+
+      if (keys.length > FIND_MIN) {
+        var find = document.createElement('input');
+        find.type = 'text';
+        find.className = 'find';
+        find.placeholder = 'Βρες προμηθευτή';
+        find.setAttribute('autocomplete', 'off');
+        find.setAttribute('autocorrect', 'off');
+        find.setAttribute('autocapitalize', 'off');
+        find.oninput = function () { draw(find.value); };
+        body.appendChild(find);
+      }
+      body.appendChild(list);
+      draw('');
     });
   }
   function openSupplier(name, rows) {
