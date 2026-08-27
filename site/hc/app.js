@@ -178,7 +178,10 @@
     meta.innerHTML = '<div class="card-sup"></div><div class="card-date"></div>';
     meta.querySelector('.card-sup').textContent = r.supplier;
     meta.querySelector('.card-date').textContent = dstr(r.ts);
-    head.appendChild(img); head.appendChild(meta);
+    var thumb = document.createElement('span');
+    thumb.className = 'thumb';
+    thumb.appendChild(img);
+    head.appendChild(thumb); head.appendChild(meta);
 
     var amts = document.createElement('div');
     amts.className = 'amts';
@@ -246,8 +249,8 @@
     var byMonth = {};
     mine.forEach(function (r) {
       var k = mkey(r.ts);
-      if (!byMonth[k]) { byMonth[k] = { sum: 0, rows: [] }; }
-      if (typeof r.total === 'number') { byMonth[k].sum += r.total; }
+      if (!byMonth[k]) { byMonth[k] = { sum: 0, miss: 0, rows: [] }; }
+      if (typeof r.total === 'number') { byMonth[k].sum += r.total; } else { byMonth[k].miss++; }
       byMonth[k].rows.push(r);
     });
 
@@ -256,7 +259,8 @@
       m.className = 'mon';
       m.innerHTML = '<span class="mon-t"></span><span class="mon-v"></span>';
       m.querySelector('.mon-t').textContent = mlabel(k);
-      m.querySelector('.mon-v').textContent = eur(byMonth[k].sum);
+      m.querySelector('.mon-v').textContent = eur(byMonth[k].sum) +
+        (byMonth[k].miss ? ' · +' + byMonth[k].miss + ' χωρίς ποσό' : '');
       body.appendChild(m);
 
       byMonth[k].rows.forEach(function (r) {
@@ -269,7 +273,10 @@
         else { a.className = 'inv-a miss'; a.textContent = 'χωρίς ποσό'; }
         var d = document.createElement('div'); d.className = 'inv-d'; d.textContent = dstr(r.ts);
         mt.appendChild(a); mt.appendChild(d);
-        b.appendChild(im); b.appendChild(mt);
+        var th = document.createElement('span');
+        th.className = 'thumb';
+        th.appendChild(im);
+        b.appendChild(th); b.appendChild(mt);
         b.onclick = function () { openShot(r.id); };
         body.appendChild(b);
       });

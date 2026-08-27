@@ -131,7 +131,7 @@ input:focus{outline:none;border-color:var(--accent)}
 /* ── Κάρτα εκκρεμούς ── */
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px}
 .card-head{display:flex;align-items:center;gap:12px}
-.card-head img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer}
+.card-head img{width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;display:block}
 .card-meta{flex:1;min-width:0}
 .card-sup{font-size:16px;font-weight:700}
 .card-date{font-size:13px;color:var(--text3)}
@@ -155,11 +155,13 @@ input:focus{outline:none;border-color:var(--accent)}
   cursor:pointer;font-family:inherit;text-align:left;color:var(--text);width:100%;
 }
 .inv:active{background:var(--bg3)}
-.inv img{width:44px;height:44px;object-fit:cover;border-radius:6px;background:var(--bg3);flex:0 0 auto}
+.inv img{width:96px;height:96px;object-fit:cover;border-radius:6px;background:var(--bg3);display:block}
 .inv-m{flex:1;min-width:0}
 .inv-d{font-size:13px;color:var(--text3)}
 .inv-a{font-size:16px;font-weight:700}
 .inv-a.miss{color:var(--text3);font-weight:500;font-size:14px}
+.thumb{position:relative;flex:0 0 auto;display:inline-block;cursor:pointer}
+.thumb::after{content:'⤢';position:absolute;right:4px;bottom:4px;width:22px;height:22px;line-height:22px;text-align:center;font-size:13px;border-radius:6px;background:rgba(0,0,0,.62);color:#fff;pointer-events:none}
 
 .empty{color:var(--text3);font-size:15px;text-align:center;padding:40px 20px;line-height:1.7}
 
