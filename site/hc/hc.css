@@ -184,3 +184,16 @@ input:focus{outline:none;border-color:var(--accent)}
   color: var(--accent, #00E5A0);
   opacity: .85;
 }
+
+/* ── φέτα 3β: Ξανά · Διαγραφή · Διαγνωστικό ── */
+.who-head{position:relative}
+.btn.retake{
+  position:absolute;top:0;right:0;
+  padding:6px 14px;font-size:13px;width:auto;
+}
+.acts{display:flex;gap:8px;margin-top:10px}
+.acts .btn{flex:1;margin:0}
+.btn.del{color:var(--danger);border-color:rgba(248,113,113,.4)}
+.btn.del:active{background:rgba(248,113,113,.12)}
+.btn.wide{width:100%;margin-top:16px}
+.kv.diag b{font-size:12px;font-weight:400;color:var(--text2);text-align:right;line-height:1.4}

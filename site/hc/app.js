@@ -15,7 +15,8 @@
     id:    'hc_install_id',
     sups:  'hc_suppliers',
     perm:  'hc_perm_seen',
-    src:   'hc_source'
+    src:   'hc_source',
+    diag:  'hc_ai_diag'
   };
 
   var el = function (id) { return document.getElementById(id); };
@@ -62,6 +63,13 @@
       var q = t.objectStore('shots').get(id);
       q.onsuccess = function () { res(q.result); };
       q.onerror = function () { rej(q.error); };
+    });
+  }
+  function del(id) {
+    return new Promise(function (res, rej) {
+      var t = db.transaction('shots', 'readwrite');
+      t.objectStore('shots').delete(id);
+      t.oncomplete = res; t.onerror = function () { rej(t.error); };
     });
   }
   function isPending(r) { return r.total === null || r.total === undefined; }
@@ -234,7 +242,20 @@
       put(r).then(function () { renderPending(); refreshCount(); });
     };
 
-    c.appendChild(head); c.appendChild(amts); c.appendChild(save);
+    var trash = document.createElement('button');
+    trash.className = 'btn ghost del';
+    trash.textContent = 'Διαγραφή';
+    trash.onclick = function () {
+      if (!confirm('Διαγραφή αυτού του τιμολογίου;\n\n' + r.supplier + ' · ' + dstr(r.ts) +
+                   '\n\nΣβήνεται και η φωτογραφία. Δεν επιστρέφει.')) { return; }
+      del(r.id).then(function () { renderPending(); refreshCount(); });
+    };
+
+    var acts = document.createElement('div');
+    acts.className = 'acts';
+    acts.appendChild(save); acts.appendChild(trash);
+
+    c.appendChild(head); c.appendChild(amts); c.appendChild(acts);
     return c;
   }
 
@@ -356,6 +377,15 @@
         kv.querySelector('b').textContent = p[1];
         body.appendChild(kv);
       });
+      var dl = document.createElement('button');
+      dl.className = 'btn ghost del wide';
+      dl.textContent = 'Διαγραφή τιμολογίου';
+      dl.onclick = function () {
+        if (!confirm('Διαγραφή αυτού του τιμολογίου;\n\n' + r.supplier + ' · ' + dstr(r.ts) +
+                     '\n\nΣβήνεται και η φωτογραφία. Δεν επιστρέφει.')) { return; }
+        del(r.id).then(function () { back(); refreshCount(); });
+      };
+      body.appendChild(dl);
       nav.push('s-shot'); show('s-shot');
     });
   }
@@ -376,6 +406,8 @@
   function renderSettings() {
     el('st-email').textContent = localStorage.getItem(LS.email) || '—';
     el('st-key').textContent = localStorage.getItem(LS.key) ? 'Με κλειδί Gemini' : 'Χειροκίνητα';
+    el('st-ver').textContent = APP_VER;
+    el('st-diag').textContent = localStorage.getItem(LS.diag) || '—';
     all().then(function (rows) { el('st-shots').textContent = rows.length; });
   }
 
@@ -385,7 +417,18 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
+  var APP_VER = 'φέτα 3 · v6';
   var AI_MODEL = 'gemini-2.5-flash';
+  /* Διαγνωστικό: η ΤΕΛΕΥΤΑΙΑ αλήθεια της ανάγνωσης, ωμή. Χωρίς αυτό, η σιωπηλή
+     αποτυχία είναι αδιάγνωστη — μάθημα 29/8/2026. Ορατό μόνο στις Ρυθμίσεις. */
+  function diag(msg) {
+    try {
+      var d = new Date();
+      var t = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+      localStorage.setItem(LS.diag, t + ' · ' + msg);
+    } catch (e) {}
+    if (!el('s-settings').hidden) { renderSettings(); }
+  }
   var AI_MAX_TRY = 3;
   var aiBusy = false, aiHalt = false; // aiHalt: άκυρο κλειδί/όριο — στοπ ως το επόμενο άνοιγμα
 
@@ -418,33 +461,47 @@
         })
       }).then(function (res) {
         if (tmr) { clearTimeout(tmr); }
-        if (!res.ok) { var e = new Error('http'); e.status = res.status; throw e; }
-        return res.json();
+        if (res.ok) { return res.json(); }
+        return res.text().then(function (body) {
+          var m = '';
+          try { m = JSON.parse(body).error.message; } catch (e2) { m = String(body).slice(0, 120); }
+          var e = new Error('http'); e.status = res.status; e.msg = m; throw e;
+        });
       });
     }).then(function (j) {
       var txt = '';
       try { txt = j.candidates[0].content.parts[0].text; } catch (e) {}
       var o = null;
       try { o = JSON.parse(txt); } catch (e) {}
-      if (!o || typeof o !== 'object') { var pe = new Error('parse'); pe.soft = true; throw pe; }
+      if (!o || typeof o !== 'object') {
+        var pe = new Error('parse'); pe.soft = true;
+        pe.msg = 'δεν γύρισε JSON: ' + String(txt).slice(0, 60);
+        throw pe;
+      }
       return { total: aiNum(o.total), vat: aiNum(o.vat), balance: aiNum(o.balance) };
     });
   }
   function aiSweep() {
     var key = localStorage.getItem(LS.key);
-    if (!key || aiBusy || aiHalt || !navigator.onLine) { return; }
+    if (!key) { diag('χωρίς κλειδί — χειροκίνητα'); return; }
+    if (aiHalt) { diag('σταματημένο μετά από σφάλμα — άλλαξε/ξαναβάλε κλειδί'); return; }
+    if (!navigator.onLine) { diag('χωρίς σύνδεση'); return; }
+    if (aiBusy) { return; }
     aiBusy = true;
     all().then(function (rows) {
       var q = rows.filter(function (r) {
         return isPending(r) && !r.sug && (r.aiTry || 0) < AI_MAX_TRY;
       }).sort(function (a, b) { return a.ts - b.ts; }); // παλαιότερο πρώτα, ένα-ένα
-      if (!q.length) { aiBusy = false; return; }
+      if (!q.length) { aiBusy = false; diag('τίποτα σε αναμονή ανάγνωσης'); return; }
       var rec = q[0];
+      diag('διαβάζω…');
       aiRead(rec, key).then(function (sug) {
         if (sug.total === null && sug.vat === null && sug.balance === null) {
           rec.aiTry = (rec.aiTry || 0) + 1; // διάβασε αλλά δεν είδε τίποτα
+          diag('απάντησε αλλά δεν διάβασε ποσά (' + rec.aiTry + '/3)');
         } else {
           rec.sug = sug; rec.aiAt = Date.now();
+          diag('✓ διάβασε: ' + num(sug.total) + ' / ' + num(sug.vat));
         }
         return put(rec).then(function () {
           if (!el('s-pend').hidden) { renderPending(); }
@@ -452,9 +509,15 @@
           setTimeout(aiSweep, 400); // επόμενο της ουράς
         });
       }).catch(function (err) {
-        if (err && err.soft) { rec.aiTry = (rec.aiTry || 0) + 1; put(rec); }
-        else if (err && err.status) { aiHalt = true; } // άκυρο κλειδί/όριο — μη χτυπάς συνέχεια
-        // δικτυακό σφάλμα: τίποτα δεν καίγεται, ξανά στο επόμενο άνοιγμα
+        if (err && err.soft) {
+          rec.aiTry = (rec.aiTry || 0) + 1; put(rec);
+          diag('ακατάλληλη απάντηση · ' + (err.msg || ''));
+        } else if (err && err.status) {
+          aiHalt = true;
+          diag('σφάλμα ' + err.status + ' · ' + (err.msg || 'άγνωστο'));
+        } else {
+          diag('δεν έφτασε στη Google · ' + (err && err.name ? err.name : 'δίκτυο/CORS'));
+        }
         aiBusy = false;
       });
     }).catch(function () { aiBusy = false; });
@@ -565,7 +628,7 @@
   };
   el('go-key').onclick = function () {
     var v = el('in-key').value.trim();
-    if (v) { localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); }
+    if (v) { localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); aiHalt = false; }
     else { localStorage.setItem(LS.skip, '1'); }
     show('s-perm');
   };
@@ -579,6 +642,12 @@
   };
   el('shutter').onclick = capture;
   el('cam-retry').onclick = startCam;
+  el('who-retake').onclick = function () {
+    pendingBlob = null;
+    if (pendingUrl) { URL.revokeObjectURL(pendingUrl); pendingUrl = null; }
+    show('s-cam');
+    startCam();
+  };
   el('add-sup').onclick = function () { assign(el('in-sup').value.trim()); };
   el('in-sup').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { assign(el('in-sup').value.trim()); }
@@ -620,7 +689,25 @@
     v = v.trim();
     if (v) { localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); }
     else { localStorage.removeItem(LS.key); localStorage.setItem(LS.skip, '1'); }
+    aiHalt = false;
     renderSettings();
+    aiSweep();
+  };
+  el('st-test').onclick = function () {
+    aiHalt = false; aiBusy = false;
+    diag('δοκιμή…');
+    all().then(function (rows) {
+      if (!rows.length) { diag('δεν υπάρχει φωτογραφία για δοκιμή'); return; }
+      var key = localStorage.getItem(LS.key);
+      if (!key) { diag('χωρίς κλειδί — χειροκίνητα'); return; }
+      aiRead(rows[0], key).then(function (s) {
+        diag('✓ απάντησε: σύνολο ' + num(s.total) + ' · ΦΠΑ ' + num(s.vat));
+      }).catch(function (err) {
+        if (err && err.status) { diag('σφάλμα ' + err.status + ' · ' + (err.msg || '')); }
+        else if (err && err.soft) { diag('ακατάλληλη απάντηση · ' + (err.msg || '')); }
+        else { diag('δεν έφτασε στη Google · ' + (err && err.name ? err.name : 'δίκτυο/CORS')); }
+      });
+    });
   };
   el('st-reset').onclick = function () {
     if (!confirm('Μηδενισμός εγγραφής σε αυτή τη συσκευή;\n\nΣβήνονται email και κλειδί.\nΤα τιμολόγια και οι φωτογραφίες ΔΕΝ σβήνονται.')) { return; }
