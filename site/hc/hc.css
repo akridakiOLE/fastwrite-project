@@ -171,3 +171,16 @@ input:focus{outline:none;border-color:var(--accent)}
   padding:14px;font-size:14px;color:var(--accent);word-break:break-all;text-align:center;
 }
 .shot-full{width:100%;border-radius:10px;border:1px solid var(--border)}
+
+/* ── φέτα 3: προτάσεις Gemini ── */
+.amt input.ai {
+  border-color: var(--accent, #00E5A0);
+  background: rgba(0, 229, 160, .06);
+}
+.ai-note {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: .78rem;
+  color: var(--accent, #00E5A0);
+  opacity: .85;
+}

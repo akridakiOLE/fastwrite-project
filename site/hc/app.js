@@ -1,8 +1,10 @@
-/* Hand Control — φέτα 2 (26/8/2026)
+/* Hand Control — φέτα 3 (29/8/2026)
    φέτα 1: εγγραφή, κάμερα, ουρά, προμηθευτής.
    φέτα 2: Τα εκκρεμή · Ο προμηθευτής μου · Κάλεσε · κανονικό μενού ·
            οδηγία άδειας κάμερας.
-   Όλα τοπικά στη συσκευή. Καμία αποστολή πουθενά ακόμα. */
+   φέτα 3: ανάγνωση Gemini (BYOK) · αυτόματη ανανέωση έκδοσης.
+   Δεδομένα τοπικά. Η ΜΟΝΗ εξωτερική κλήση: φωτογραφία → Gemini,
+   απευθείας από τη συσκευή, με το κλειδί του χρήστη. Κανένας δικός μας server. */
 (function () {
   'use strict';
 
@@ -159,6 +161,7 @@
 
   /* ══ ΤΑ ΕΚΚΡΕΜΗ ══ */
   function renderPending() {
+    aiSweep();
     var body = el('pend-body');
     body.innerHTML = '';
     all().then(function (rows) {
@@ -193,7 +196,7 @@
     var amts = document.createElement('div');
     amts.className = 'amts';
     var fields = [['Σύνολο','total'], ['ΦΠΑ','vat'], ['Υπόλοιπο','balance']];
-    var inputs = {};
+    var inputs = {}, sug = r.sug || null, prefilled = false;
     fields.forEach(function (f) {
       var w = document.createElement('label');
       w.className = 'amt';
@@ -201,10 +204,23 @@
       var i = document.createElement('input');
       i.type = 'text'; i.inputMode = 'decimal'; i.placeholder = '0,00';
       i.value = num(r[f[1]]);
+      /* Πρόταση Gemini: ΜΟΝΟ σε άδειο πεδίο, σημασμένη — ο άνθρωπος εγκρίνει */
+      if (!i.value && sug && sug[f[1]] !== null && sug[f[1]] !== undefined) {
+        i.value = num(sug[f[1]]);
+        i.classList.add('ai');
+        prefilled = true;
+      }
+      i.addEventListener('input', function () { i.classList.remove('ai'); });
       inputs[f[1]] = i;
       w.appendChild(s); w.appendChild(i);
       amts.appendChild(w);
     });
+    if (prefilled) {
+      var note = document.createElement('p');
+      note.className = 'ai-note';
+      note.textContent = 'Διαβάστηκαν από το Gemini — έλεγξε με τη φωτογραφία και πάτα Αποθήκευση.';
+      amts.appendChild(note);
+    }
 
     var save = document.createElement('button');
     save.className = 'btn primary';
@@ -363,6 +379,87 @@
     all().then(function (rows) { el('st-shots').textContent = rows.length; });
   }
 
+  /* ══ ΑΝΑΓΝΩΣΗ GEMINI (φέτα 3) ══
+     Κανόνες: (α) η φωτογραφία πάει ΑΠΕΥΘΕΙΑΣ συσκευή → Google, με το κλειδί
+     του χρήστη — ποτέ μέσω δικού μας server. (β) Το Gemini ΠΡΟΤΕΙΝΕΙ, δεν
+     αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
+     μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
+     (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
+  var AI_MODEL = 'gemini-2.5-flash';
+  var AI_MAX_TRY = 3;
+  var aiBusy = false, aiHalt = false; // aiHalt: άκυρο κλειδί/όριο — στοπ ως το επόμενο άνοιγμα
+
+  function blobB64(blob) {
+    return new Promise(function (res, rej) {
+      var fr = new FileReader();
+      fr.onload = function () { res(String(fr.result).split(',')[1]); };
+      fr.onerror = function () { rej(fr.error); };
+      fr.readAsDataURL(blob);
+    });
+  }
+  function aiNum(v) {
+    if (typeof v === 'number' && isFinite(v)) { return Math.round(v * 100) / 100; }
+    return null;
+  }
+  function aiRead(rec, key) {
+    return blobB64(rec.blob).then(function (b64) {
+      var ctrl = ('AbortController' in window) ? new AbortController() : null;
+      var tmr = ctrl ? setTimeout(function () { ctrl.abort(); }, 30000) : null;
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        signal: ctrl ? ctrl.signal : undefined,
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { inline_data: { mime_type: 'image/jpeg', data: b64 } },
+            { text: 'Φωτογραφία τιμολογίου ή απόδειξης (ελληνικά ή αγγλικά). Απάντησε ΜΟΝΟ με JSON: {"total": τελικό πληρωτέο ποσό με ΦΠΑ, "vat": συνολικό ποσό ΦΠΑ, "balance": υπόλοιπο οφειλής ΜΟΝΟ αν αναγράφεται ρητά, αλλιώς null}. Αριθμοί με τελεία δεκαδικών, χωρίς σύμβολα και χωρίς κείμενο. Αν ένα ποσό δεν διαβάζεται ΚΑΘΑΡΑ, βάλε null — ποτέ μην μαντεύεις.' }
+          ] }],
+          generationConfig: { response_mime_type: 'application/json', temperature: 0 }
+        })
+      }).then(function (res) {
+        if (tmr) { clearTimeout(tmr); }
+        if (!res.ok) { var e = new Error('http'); e.status = res.status; throw e; }
+        return res.json();
+      });
+    }).then(function (j) {
+      var txt = '';
+      try { txt = j.candidates[0].content.parts[0].text; } catch (e) {}
+      var o = null;
+      try { o = JSON.parse(txt); } catch (e) {}
+      if (!o || typeof o !== 'object') { var pe = new Error('parse'); pe.soft = true; throw pe; }
+      return { total: aiNum(o.total), vat: aiNum(o.vat), balance: aiNum(o.balance) };
+    });
+  }
+  function aiSweep() {
+    var key = localStorage.getItem(LS.key);
+    if (!key || aiBusy || aiHalt || !navigator.onLine) { return; }
+    aiBusy = true;
+    all().then(function (rows) {
+      var q = rows.filter(function (r) {
+        return isPending(r) && !r.sug && (r.aiTry || 0) < AI_MAX_TRY;
+      }).sort(function (a, b) { return a.ts - b.ts; }); // παλαιότερο πρώτα, ένα-ένα
+      if (!q.length) { aiBusy = false; return; }
+      var rec = q[0];
+      aiRead(rec, key).then(function (sug) {
+        if (sug.total === null && sug.vat === null && sug.balance === null) {
+          rec.aiTry = (rec.aiTry || 0) + 1; // διάβασε αλλά δεν είδε τίποτα
+        } else {
+          rec.sug = sug; rec.aiAt = Date.now();
+        }
+        return put(rec).then(function () {
+          if (!el('s-pend').hidden) { renderPending(); }
+          aiBusy = false;
+          setTimeout(aiSweep, 400); // επόμενο της ουράς
+        });
+      }).catch(function (err) {
+        if (err && err.soft) { rec.aiTry = (rec.aiTry || 0) + 1; put(rec); }
+        else if (err && err.status) { aiHalt = true; } // άκυρο κλειδί/όριο — μη χτυπάς συνέχεια
+        // δικτυακό σφάλμα: τίποτα δεν καίγεται, ξανά στο επόμενο άνοιγμα
+        aiBusy = false;
+      });
+    }).catch(function () { aiBusy = false; });
+  }
+
   /* ── Κάμερα ── */
   function startCam() {
     el('cam-err').hidden = true;
@@ -423,6 +520,7 @@
       bumpSupplier(name);
       pendingBlob = null;
       show('s-cam');
+      aiSweep();
       var t = el('toast');
       t.hidden = false;
       setTimeout(function () { t.hidden = true; }, 1100);
@@ -540,11 +638,18 @@
   });
   history.pushState(null, '', location.href);
 
-  openDB().then(boot).catch(function (e) {
+  openDB().then(boot).then(function () { setTimeout(aiSweep, 800); }).catch(function (e) {
     document.body.innerHTML = '<div style="padding:40px;color:#e6e8ec">Δεν άνοιξε η τοπική βάση: ' + e + '</div>';
   });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/hc/sw.js').catch(function () {});
+    /* Νέα έκδοση → η σελίδα ξαναφορτώνει ΜΟΝΗ της. Τέλος το «κλείσ' το δύο φορές». */
+    var reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (reloaded) { return; }
+      reloaded = true;
+      location.reload();
+    });
   }
 })();
