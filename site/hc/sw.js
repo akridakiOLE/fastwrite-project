@@ -1,6 +1,6 @@
 /* Hand Control service worker — κέλυφος offline.
    ⚠ Το CACHE ανεβαίνει σε ΚΑΘΕ αλλαγή αρχείου, αλλιώς μένει το παλιό. */
-var CACHE = 'hc-v6';
+var CACHE = 'hc-v7';
 var SHELL = [
   '/hc/',
   '/hc/index.html',

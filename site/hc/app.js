@@ -16,7 +16,8 @@
     sups:  'hc_suppliers',
     perm:  'hc_perm_seen',
     src:   'hc_source',
-    diag:  'hc_ai_diag'
+    diag:  'hc_ai_diag',
+    model: 'hc_ai_model'
   };
 
   var el = function (id) { return document.getElementById(id); };
@@ -417,8 +418,18 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v6';
-  var AI_MODEL = 'gemini-2.5-flash';
+  var APP_VER = 'φέτα 3 · v7';
+  /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
+     29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
+     ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
+     στα χέρια του πελάτη. Δοκιμάζουμε με τη σειρά, θυμόμαστε ποιο δούλεψε. */
+  var AI_MODELS = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+  function aiModels() {
+    var saved = localStorage.getItem(LS.model);
+    if (!saved) { return AI_MODELS.slice(); }
+    var rest = AI_MODELS.filter(function (m) { return m !== saved; });
+    return [saved].concat(rest);
+  }
   /* Διαγνωστικό: η ΤΕΛΕΥΤΑΙΑ αλήθεια της ανάγνωσης, ωμή. Χωρίς αυτό, η σιωπηλή
      αποτυχία είναι αδιάγνωστη — μάθημα 29/8/2026. Ορατό μόνο στις Ρυθμίσεις. */
   function diag(msg) {
@@ -444,11 +455,34 @@
     if (typeof v === 'number' && isFinite(v)) { return Math.round(v * 100) / 100; }
     return null;
   }
+  /* Δοκιμάζει τα μοντέλα με τη σειρά. 404 = αποσυρμένο → επόμενο.
+     Κάθε άλλο σφάλμα σταματάει αμέσως (δεν καίμε κλήσεις σε άκυρο κλειδί). */
   function aiRead(rec, key) {
+    var list = aiModels(), tried = [];
+    function step(i) {
+      if (i >= list.length) {
+        var e = new Error('http'); e.status = 404;
+        e.msg = 'κανένα διαθέσιμο μοντέλο (' + tried.join(', ') + ')';
+        return Promise.reject(e);
+      }
+      return aiOnce(rec, key, list[i]).then(function (out) {
+        if (localStorage.getItem(LS.model) !== list[i]) {
+          try { localStorage.setItem(LS.model, list[i]); } catch (e2) {}
+        }
+        return out;
+      }).catch(function (err) {
+        if (err && err.status === 404) { tried.push(list[i]); return step(i + 1); }
+        throw err;
+      });
+    }
+    return step(0);
+  }
+
+  function aiOnce(rec, key, model) {
     return blobB64(rec.blob).then(function (b64) {
       var ctrl = ('AbortController' in window) ? new AbortController() : null;
       var tmr = ctrl ? setTimeout(function () { ctrl.abort(); }, 30000) : null;
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent', {
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         signal: ctrl ? ctrl.signal : undefined,
@@ -501,7 +535,8 @@
           diag('απάντησε αλλά δεν διάβασε ποσά (' + rec.aiTry + '/3)');
         } else {
           rec.sug = sug; rec.aiAt = Date.now();
-          diag('✓ διάβασε: ' + num(sug.total) + ' / ' + num(sug.vat));
+          diag('✓ διάβασε: ' + num(sug.total) + ' / ' + num(sug.vat) +
+               ' · ' + (localStorage.getItem(LS.model) || '?'));
         }
         return put(rec).then(function () {
           if (!el('s-pend').hidden) { renderPending(); }
@@ -701,7 +736,8 @@
       var key = localStorage.getItem(LS.key);
       if (!key) { diag('χωρίς κλειδί — χειροκίνητα'); return; }
       aiRead(rows[0], key).then(function (s) {
-        diag('✓ απάντησε: σύνολο ' + num(s.total) + ' · ΦΠΑ ' + num(s.vat));
+        diag('✓ απάντησε: σύνολο ' + num(s.total) + ' · ΦΠΑ ' + num(s.vat) +
+             ' · μοντέλο ' + (localStorage.getItem(LS.model) || '?'));
       }).catch(function (err) {
         if (err && err.status) { diag('σφάλμα ' + err.status + ' · ' + (err.msg || '')); }
         else if (err && err.soft) { diag('ακατάλληλη απάντηση · ' + (err.msg || '')); }
