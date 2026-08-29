@@ -418,7 +418,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v7';
+  var APP_VER = 'φέτα 3 · v8';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -441,7 +441,13 @@
     if (!el('s-settings').hidden) { renderSettings(); }
   }
   var AI_MAX_TRY = 3;
-  var aiBusy = false, aiHalt = false; // aiHalt: άκυρο κλειδί/όριο — στοπ ως το επόμενο άνοιγμα
+  /* ΡΥΘΜΟΣ. Το δωρεάν επίπεδο δίνει 5 αιτήματα/λεπτό (μετρήθηκε 29/8/2026:
+     «limit: 5 · retry in 19.2s»). Ο πραγματικός χρήστης βγάζει ΜΙΑ φωτογραφία
+     στην πόρτα — δεν αγγίζει ποτέ το όριο. Το έσπασε η δική μας ουρά τρέχοντας
+     15 κλήσεις στη σειρά. 13 δευτ. μεταξύ κλήσεων = 4,6/λεπτό, μέσα στο όριο. */
+  var AI_GAP = 13000;
+  var aiBusy = false, aiHalt = false; // aiHalt: άκυρο κλειδί — στοπ ως το επόμενο άνοιγμα
+  var aiWait = 0;                     // 429: ώρα (ms) πριν την οποία δεν ξαναδοκιμάζουμε
 
   function blobB64(blob) {
     return new Promise(function (res, rej) {
@@ -499,7 +505,12 @@
         return res.text().then(function (body) {
           var m = '';
           try { m = JSON.parse(body).error.message; } catch (e2) { m = String(body).slice(0, 120); }
-          var e = new Error('http'); e.status = res.status; e.msg = m; throw e;
+          var e = new Error('http'); e.status = res.status; e.msg = m;
+          if (res.status === 429) {
+            var s = /retry in ([0-9.]+)s/i.exec(m);
+            e.retryAfter = (s ? Math.ceil(parseFloat(s[1])) : 30) * 1000 + 2000;
+          }
+          throw e;
         });
       });
     }).then(function (j) {
@@ -521,11 +532,18 @@
     if (aiHalt) { diag('σταματημένο μετά από σφάλμα — άλλαξε/ξαναβάλε κλειδί'); return; }
     if (!navigator.onLine) { diag('χωρίς σύνδεση'); return; }
     if (aiBusy) { return; }
+    var left = aiWait - Date.now();
+    if (left > 0) {
+      diag('αναμονή ορίου · ξανά σε ' + Math.ceil(left / 1000) + 'ς');
+      setTimeout(aiSweep, left + 500);
+      return;
+    }
     aiBusy = true;
     all().then(function (rows) {
       var q = rows.filter(function (r) {
         return isPending(r) && !r.sug && (r.aiTry || 0) < AI_MAX_TRY;
-      }).sort(function (a, b) { return a.ts - b.ts; }); // παλαιότερο πρώτα, ένα-ένα
+      }).sort(function (a, b) { return b.ts - a.ts; }); // ΝΕΟΤΕΡΟ πρώτα: ο χρήστης
+      // περιμένει αυτό που μόλις τράβηξε, όχι κάτι περσινό
       if (!q.length) { aiBusy = false; diag('τίποτα σε αναμονή ανάγνωσης'); return; }
       var rec = q[0];
       diag('διαβάζω…');
@@ -541,12 +559,19 @@
         return put(rec).then(function () {
           if (!el('s-pend').hidden) { renderPending(); }
           aiBusy = false;
-          setTimeout(aiSweep, 400); // επόμενο της ουράς
+          setTimeout(aiSweep, AI_GAP); // επόμενο της ουράς, με σεβασμό στο όριο
         });
       }).catch(function (err) {
         if (err && err.soft) {
           rec.aiTry = (rec.aiTry || 0) + 1; put(rec);
           diag('ακατάλληλη απάντηση · ' + (err.msg || ''));
+        } else if (err && err.status === 429) {
+          /* Όριο ρυθμού: ΔΕΝ είναι βλάβη. Περιμένουμε όσο λέει η Google και συνεχίζουμε. */
+          aiWait = Date.now() + (err.retryAfter || 32000);
+          diag('όριο ρυθμού · συνεχίζω σε ' + Math.ceil((err.retryAfter || 32000) / 1000) + 'ς');
+          aiBusy = false;
+          setTimeout(aiSweep, (err.retryAfter || 32000) + 500);
+          return;
         } else if (err && err.status) {
           aiHalt = true;
           diag('σφάλμα ' + err.status + ' · ' + (err.msg || 'άγνωστο'));
@@ -735,11 +760,22 @@
       if (!rows.length) { diag('δεν υπάρχει φωτογραφία για δοκιμή'); return; }
       var key = localStorage.getItem(LS.key);
       if (!key) { diag('χωρίς κλειδί — χειροκίνητα'); return; }
-      aiRead(rows[0], key).then(function (s) {
-        diag('✓ απάντησε: σύνολο ' + num(s.total) + ' · ΦΠΑ ' + num(s.vat) +
-             ' · μοντέλο ' + (localStorage.getItem(LS.model) || '?'));
+      var target = rows.filter(isPending)[0] || rows[0];
+      aiRead(target, key).then(function (s) {
+        if (s.total !== null || s.vat !== null || s.balance !== null) {
+          target.sug = s; target.aiAt = Date.now();
+          return put(target).then(function () {
+            diag('✓ αποθηκεύτηκε: σύνολο ' + num(s.total) + ' · ΦΠΑ ' + num(s.vat) +
+                 ' · ' + (localStorage.getItem(LS.model) || '?'));
+            refreshCount();
+          });
+        }
+        diag('απάντησε αλλά δεν διάβασε ποσά · ' + (localStorage.getItem(LS.model) || '?'));
       }).catch(function (err) {
-        if (err && err.status) { diag('σφάλμα ' + err.status + ' · ' + (err.msg || '')); }
+        if (err && err.status === 429) {
+          aiWait = Date.now() + (err.retryAfter || 32000);
+          diag('όριο ρυθμού · ξανά σε ' + Math.ceil((err.retryAfter || 32000) / 1000) + 'ς');
+        } else if (err && err.status) { diag('σφάλμα ' + err.status + ' · ' + (err.msg || '')); }
         else if (err && err.soft) { diag('ακατάλληλη απάντηση · ' + (err.msg || '')); }
         else { diag('δεν έφτασε στη Google · ' + (err && err.name ? err.name : 'δίκτυο/CORS')); }
       });
