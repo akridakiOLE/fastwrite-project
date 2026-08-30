@@ -341,9 +341,33 @@ input:focus{outline:none;border-color:var(--accent)}
 .crop-stage img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;display:block}
 .crop-sel{
   position:absolute;border:3px solid var(--accent);
-  background:rgba(0,229,160,.16);pointer-events:none;border-radius:2px;
-  box-shadow:0 0 0 9999px rgba(0,0,0,.55);
+  background:rgba(0,229,160,.10);pointer-events:none;border-radius:2px;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.58);
 }
+/* Λαβές μεγέθους δαχτύλου. Ορατές, ώστε να ξέρεις ΠΟΥ να πατήσεις. */
+.crop-h{
+  position:absolute;width:30px;height:30px;
+  border:3px solid var(--accent);background:rgba(0,229,160,.25);
+  border-radius:50%;pointer-events:none;
+}
+.h-tl{left:-16px;top:-16px}
+.h-tr{right:-16px;top:-16px}
+.h-bl{left:-16px;bottom:-16px}
+.h-br{right:-16px;bottom:-16px}
 .crop-acts{display:flex;gap:8px;padding-top:14px}
 .crop-acts .btn{flex:1;margin:0;padding:15px 6px;font-size:14px}
 .crop-acts .btn:disabled{opacity:.4}
+
+/* v14 — χειροκίνητη ουρά ανάγνωσης */
+.queue-btn{
+  width:100%;margin:0 0 16px;padding:15px;font-size:15px;
+  border-color:var(--accent);color:var(--accent);
+}
+.queue-run{
+  margin:0 0 16px;padding:13px 14px;border-radius:10px;
+  background:var(--accent-dim);border-left:3px solid var(--accent);
+  color:var(--accent);font-size:14px;font-weight:600;
+}
+
+/* Κάθε μήνυμα μέσα στο πλέγμα των τριών ποσών πιάνει ολόκληρη τη γραμμή */
+.amts .amt-warn,.amts .ai-busy,.amts .date-sug{grid-column:1 / -1}

@@ -241,6 +241,36 @@
         pendOrder = null;
         return;
       }
+      /* v14 — Ο χρήστης βλέπει ΠΟΣΑ μένουν και ΠΟΣΟ θα πάρει, πριν ξεκινήσει.
+         Η αναμονή που την ξέρεις εκ των προτέρων δεν είναι αποτυχία. */
+      var waiting = list.filter(function (r) {
+        return !r.sug && (r.aiTry || 0) < AI_MAX_TRY && !autoIds[r.id];
+      });
+      if (waiting.length && localStorage.getItem(LS.key) && !manualRun) {
+        var qb = document.createElement('button');
+        qb.className = 'btn ghost queue-btn';
+        qb.textContent = '📖 Διάβασε τα υπόλοιπα (' + waiting.length + ')';
+        qb.onclick = function () {
+          var secs = waiting.length * Math.round(AI_GAP / 1000) + 3;
+          var mins = Math.floor(secs / 60), rest = secs % 60;
+          var t = mins ? (mins + ' λεπτ. ' + (rest ? rest + ' δευτ.' : '')) : (secs + ' δευτερόλεπτα');
+          if (!confirm('Ανάγνωση ' + waiting.length + ' τιμολογίων.\n\n' +
+                       'Εκτιμώμενος χρόνος: περίπου ' + t + '.\n\n' +
+                       'Το δωρεάν κλειδί επιτρέπει 5 αναγνώσεις το λεπτό — γι\' αυτό χρειάζεται χρόνος. ' +
+                       'Μπορείς να κλείσεις την οθόνη, η ανάγνωση συνεχίζει.\n\nΝα ξεκινήσω;')) { return; }
+          manualRun = true;
+          aiSweep();
+          renderPending();
+        };
+        body.appendChild(qb);
+      }
+      if (manualRun) {
+        var st = document.createElement('p');
+        st.className = 'queue-run';
+        st.textContent = '📖 Η ανάγνωση τρέχει… μπορείς να φύγεις από αυτή την οθόνη';
+        body.appendChild(st);
+      }
+
       if (!pendOrder) {
         pendOrder = list.map(function (r) { return r.id; });
       } else {
@@ -318,18 +348,33 @@
        Χωρίς ένδειξη, ο χρήστης βλέπει κενά πεδία και συμπεραίνει αποτυχία.
        Το Ζ.4 («ποτέ Διαβάζω…») προστατεύει ΤΗΝ ΠΟΡΤΑ, όπου δεν περιμένεις·
        εδώ ήρθες επίτηδες να δεις αποτέλεσμα, και η σιωπή είναι το πρόβλημα. */
-    if (!sug && localStorage.getItem(LS.key) && !aiHalt &&
-        (r.aiTry || 0) < AI_MAX_TRY && r.net === null && r.vat === null && r.total === null) {
+    /* == null (όχι ===) ώστε να πιάνει ΚΑΙ το undefined των παλιών εγγραφών */
+    var empty = (r.net == null && r.vat == null && r.total == null);
+    if (!sug && localStorage.getItem(LS.key) && empty) {
       var busy = document.createElement('p');
       busy.className = 'ai-busy';
-      /* Χωρίς σύνδεση ΔΕΝ διαβάζεται τίποτα — και στην παραλαβή, μέσα σε
-         αποθήκη, αυτή είναι η κανονική περίπτωση. Ψεύτικο «Διαβάζεται…»
-         είναι χειρότερο από καθόλου: περιμένεις κάτι που δεν έρχεται. */
+      /* ΚΑΘΕ κατάσταση έχει το δικό της μήνυμα. Σιωπή = ο χρήστης νομίζει
+         ότι απέτυχε και ξαναφωτογραφίζει, που τρώει κι άλλο όριο. */
       if (!navigator.onLine) {
         busy.classList.add('off');
         busy.textContent = '📵 Χωρίς σύνδεση — γράψε τα ποσά μόνος σου ή περίμενε δίκτυο';
+      } else if (aiHalt) {
+        busy.classList.add('off');
+        busy.textContent = '⚠ Η ανάγνωση σταμάτησε — δες ☰ Ρυθμίσεις · μπορείς να τα γράψεις μόνος σου';
+      } else if ((r.aiTry || 0) >= AI_MAX_TRY) {
+        busy.classList.add('off');
+        busy.textContent = '⚠ Δεν διαβάστηκαν ποσά μετά από ' + AI_MAX_TRY +
+                           ' προσπάθειες — γράψ\' τα μόνος σου';
+      } else if (!manualRun && !autoIds[r.id]) {
+        /* Δεν είναι στην ουρά και δεν πρόκειται να μπει μόνο του */
+        busy.textContent = '📖 Δεν έχει διαβαστεί — πάτα «Διάβασε τα υπόλοιπα» πάνω, ή γράψ\' τα μόνος σου';
       } else {
-        busy.textContent = '⏳ Διαβάζεται… μπορείς να τα γράψεις και μόνος σου';
+        var w = Math.max(aiWait - Date.now(), aiLast + AI_GAP - Date.now());
+        /* Και στις δύο περιπτώσεις λέγεται ΠΑΝΤΑ ότι δεν είναι υποχρεωμένος
+           να περιμένει — αλλιώς κάθεται και κοιτάει την οθόνη. */
+        busy.textContent = (w > 1000)
+          ? '⏳ Στη σειρά — ανάγνωση σε ' + Math.ceil(w / 1000) + 'ς · μπορείς να τα γράψεις και μόνος σου'
+          : '⏳ Διαβάζεται… μπορείς να τα γράψεις και μόνος σου';
       }
       amts.appendChild(busy);
     }
@@ -683,12 +728,17 @@
     im.alt = '';
     var sel = document.createElement('div');
     sel.className = 'crop-sel';
-    sel.hidden = true;
+    /* Τέσσερις ΜΕΓΑΛΕΣ λαβές — 44px, μέγεθος δαχτύλου */
+    ['tl','tr','bl','br'].forEach(function (k) {
+      var h = document.createElement('span');
+      h.className = 'crop-h h-' + k;
+      sel.appendChild(h);
+    });
     stage.appendChild(im); stage.appendChild(sel);
 
     var hint = document.createElement('p');
     hint.className = 'crop-hint';
-    hint.textContent = 'Σύρε το δάχτυλό σου γύρω από το τιμολόγιο';
+    hint.textContent = 'Σύρε τις γωνίες για να ρυθμίσεις · σύρε μέσα για μετακίνηση';
 
     var acts = document.createElement('div');
     acts.className = 'crop-acts';
@@ -698,13 +748,26 @@
     clear.className = 'btn ghost'; clear.textContent = 'Χωρίς κόψιμο';
     var save = document.createElement('button');
     save.className = 'btn primary'; save.textContent = 'Αποθήκευση';
-    save.disabled = true;
     acts.appendChild(cancel); acts.appendChild(clear); acts.appendChild(save);
 
     ov.appendChild(hint); ov.appendChild(stage); ov.appendChild(acts);
     document.body.appendChild(ov);
 
-    var box = null, sx = 0, sy = 0, drag = false;
+    /* 🔴 ΤΟ ΠΛΑΙΣΙΟ ΥΠΑΡΧΕΙ ΠΑΝΤΑ και ΔΕΝ ΓΙΝΕΤΑΙ ΠΟΤΕ null.
+       Η v12 το έσβηνε σε κάθε νέο άγγιγμα (box = null στο down), οπότε
+       μόλις σήκωνες το δάχτυλο για δεύτερη προσπάθεια, το έχανες.
+       Τώρα ανοίγει με έτοιμο πλαίσιο και το ΡΥΘΜΙΖΕΙΣ όσες φορές θέλεις. */
+    var cur = cropOf(r, i);
+    var box = cur ? { x: cur.x, y: cur.y, w: cur.w, h: cur.h }
+                  : { x: 0.08, y: 0.08, w: 0.84, h: 0.84 };
+    var MIN = 0.08;
+    var mode = null, gx = 0, gy = 0, start = null;
+    /* 🔴 Μετά από touchend ο browser στέλνει ΚΑΙ ψεύτικα mouse events
+       (compatibility). Χωρίς αυτό, κάθε σύρσιμο με το δάχτυλο εκτελείται
+       ΔΥΟ φορές και το πλαίσιο πηδάει. Μόλις δούμε αφή, τα ποντίκια
+       αγνοούνται για πάντα σε αυτή τη συσκευή. */
+    var usedTouch = false;
+
     function rect() { return im.getBoundingClientRect(); }
     function pt(e) {
       var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
@@ -713,36 +776,86 @@
                y: Math.min(1, Math.max(0, (t.clientY - b.top) / b.height)) };
     }
     function paint() {
-      if (!box) { sel.hidden = true; save.disabled = true; return; }
       var b = rect(), st = stage.getBoundingClientRect();
-      sel.hidden = false;
       sel.style.left   = (b.left - st.left + box.x * b.width) + 'px';
       sel.style.top    = (b.top - st.top + box.y * b.height) + 'px';
       sel.style.width  = (box.w * b.width) + 'px';
       sel.style.height = (box.h * b.height) + 'px';
-      save.disabled = !(box.w > 0.05 && box.h > 0.05);
-      hint.textContent = save.disabled
-        ? 'Πολύ μικρό — σύρε ξανά, μεγαλύτερο πλαίσιο'
-        : 'Πάτα Αποθήκευση, ή σύρε ξανά για άλλο πλαίσιο';
     }
-    function down(e) { var q = pt(e); sx = q.x; sy = q.y; drag = true; box = null; paint(); e.preventDefault(); }
-    function move(e) {
-      if (!drag) { return; }
+    /* Ποια γωνία άγγιξες; Ανοχή 12% της εικόνας — γενναιόδωρη για δάχτυλο. */
+    function hitCorner(q) {
+      var T = 0.12, c = [
+        ['tl', box.x,          box.y],
+        ['tr', box.x + box.w,  box.y],
+        ['bl', box.x,          box.y + box.h],
+        ['br', box.x + box.w,  box.y + box.h]
+      ];
+      for (var j = 0; j < c.length; j++) {
+        if (Math.abs(q.x - c[j][1]) < T && Math.abs(q.y - c[j][2]) < T) { return c[j][0]; }
+      }
+      return null;
+    }
+    function inside(q) {
+      return q.x > box.x && q.x < box.x + box.w && q.y > box.y && q.y < box.y + box.h;
+    }
+    function down(e) {
       var q = pt(e);
-      box = { x: Math.min(sx, q.x), y: Math.min(sy, q.y),
-              w: Math.abs(q.x - sx), h: Math.abs(q.y - sy) };
+      mode = hitCorner(q) || (inside(q) ? 'move' : 'new');
+      gx = q.x; gy = q.y;
+      start = { x: box.x, y: box.y, w: box.w, h: box.h };
+      if (mode === 'new') { box = { x: q.x, y: q.y, w: 0, h: 0 }; }
+      hint.textContent = (mode === 'move') ? 'Μετακίνηση…'
+                       : (mode === 'new')  ? 'Νέο πλαίσιο…' : 'Ρύθμιση γωνίας…';
       paint(); e.preventDefault();
     }
-    function up(e) { if (drag) { move(e); drag = false; } }
+    function move(e) {
+      if (!mode) { return; }
+      var q = pt(e), dx = q.x - gx, dy = q.y - gy;
+      if (mode === 'move') {
+        box.x = Math.min(1 - start.w, Math.max(0, start.x + dx));
+        box.y = Math.min(1 - start.h, Math.max(0, start.y + dy));
+      } else if (mode === 'new') {
+        box.x = Math.min(gx, q.x); box.y = Math.min(gy, q.y);
+        box.w = Math.abs(q.x - gx); box.h = Math.abs(q.y - gy);
+      } else {
+        var L = start.x, T2 = start.y, R = start.x + start.w, B = start.y + start.h;
+        if (mode === 'tl' || mode === 'bl') { L = Math.min(q.x, R - MIN); }
+        if (mode === 'tr' || mode === 'br') { R = Math.max(q.x, L + MIN); }
+        if (mode === 'tl' || mode === 'tr') { T2 = Math.min(q.y, B - MIN); }
+        if (mode === 'bl' || mode === 'br') { B = Math.max(q.y, T2 + MIN); }
+        box = { x: L, y: T2, w: R - L, h: B - T2 };
+      }
+      paint(); e.preventDefault();
+    }
+    function up(e) {
+      if (!mode) { return; }
+      move(e);
+      mode = null;
+      /* Πολύ μικρό ή κατά λάθος tap → επαναφορά, ΠΟΤΕ κενή οθόνη */
+      if (box.w < MIN || box.h < MIN) {
+        box = start && start.w >= MIN ? start : { x: 0.08, y: 0.08, w: 0.84, h: 0.84 };
+        hint.textContent = 'Πολύ μικρό — δοκίμασε ξανά, το πλαίσιο επανήλθε';
+      } else {
+        hint.textContent = 'Σύρε τις γωνίες για να ρυθμίσεις · σύρε μέσα για μετακίνηση';
+      }
+      paint();
+    }
 
-    stage.addEventListener('touchstart', down, { passive: false });
+    stage.addEventListener('touchstart', function (e) { usedTouch = true; down(e); }, { passive: false });
     stage.addEventListener('touchmove',  move, { passive: false });
-    stage.addEventListener('touchend',   up);
-    stage.addEventListener('mousedown',  down);
-    stage.addEventListener('mousemove',  move);
-    stage.addEventListener('mouseup',    up);
+    stage.addEventListener('touchend',   up,   { passive: false });
+    stage.addEventListener('touchcancel', up,  { passive: false });
+    stage.addEventListener('mousedown',  function (e) { if (!usedTouch) { down(e); } });
+    stage.addEventListener('mousemove',  function (e) { if (!usedTouch) { move(e); } });
+    stage.addEventListener('mouseup',    function (e) { if (!usedTouch) { up(e); } });
 
-    function close() { document.body.removeChild(ov); }
+    if (im.complete) { setTimeout(paint, 0); } else { im.onload = paint; }
+    window.addEventListener('resize', paint);
+
+    function close() {
+      window.removeEventListener('resize', paint);
+      document.body.removeChild(ov);
+    }
     cancel.onclick = close;
     clear.onclick = function () {
       if (!r.crops) { r.crops = []; }
@@ -750,7 +863,7 @@
       put(r).then(function () { close(); done(); });
     };
     save.onclick = function () {
-      if (!box || box.w <= 0.05 || box.h <= 0.05) { return; }
+      if (box.w < MIN || box.h < MIN) { return; }
       if (!r.crops) { r.crops = []; }
       while (r.crops.length < pgs.length) { r.crops.push(null); }
       r.crops[i] = { x: box.x, y: box.y, w: box.w, h: box.h };
@@ -860,7 +973,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v12';
+  var APP_VER = 'φέτα 3 · v15';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -890,6 +1003,20 @@
   var AI_GAP = 13000;
   var aiBusy = false, aiHalt = false; // aiHalt: άκυρο κλειδί — στοπ ως το επόμενο άνοιγμα
   var aiWait = 0;                     // 429: ώρα (ms) πριν την οποία δεν ξαναδοκιμάζουμε
+  /* ⚠ ΜΕΤΡΗΘΗΚΕ 30/8: το aiBusy εμποδίζει μόνο ΤΑΥΤΟΧΡΟΝΕΣ κλήσεις. Η aiSweep
+     καλείται από ΤΕΣΣΕΡΑ σημεία (renderPending, assign, boot, η ίδια η ουρά) —
+     άρα κάθε ανανέωση οθόνης έστελνε αίτημα ΕΚΤΟΣ ρυθμού και έτρωγε 429.
+     Το aiLast είναι το πραγματικό φρένο: καμία κλήση πριν περάσουν AI_GAP ms
+     από την προηγούμενη, ΑΠΟ ΟΠΟΙΟ ΣΗΜΕΙΟ ΚΙ ΑΝ ΖΗΤΗΘΕΙ. */
+  var aiLast = 0;
+  var aiTimer = null;
+  /* v14 — ΑΥΤΟΜΑΤΑ ΔΙΑΒΑΖΕΤΑΙ ΜΟΝΟ Ο,ΤΙ ΤΡΑΒΗΞΕΣ ΤΩΡΑ (απόφαση Stavros 30/8).
+     Αιτία: με 30 εκκρεμή η ουρά έτρεχε 6,5 λεπτά σε ΚΑΘΕ άνοιγμα, και τα
+     σκουπίδια (άσχετες φωτογραφίες) έκαιγαν 3 κλήσεις το καθένα πριν
+     παραιτηθούν. Τα παλιά διαβάζονται ΜΟΝΟ όταν το ζητήσει ο χρήστης,
+     αφού δει πόσο θα πάρει. */
+  var autoIds = {};        // ids αυτής της συνεδρίας — μόνο αυτά τρέχουν μόνα τους
+  var manualRun = false;   // ο χρήστης ζήτησε ρητά ολόκληρη την ουρά
 
   function blobB64(blob) {
     return new Promise(function (res, rej) {
@@ -988,6 +1115,12 @@
       return { net: aiNum(o.net), vat: aiNum(o.vat), total: aiNum(o.total), date: aiDate(o.date) };
     });
   }
+  /* Ένα και μόνο χρονόμετρο. Χωρίς αυτό, δέκα ανανεώσεις οθόνης άφηναν
+     πίσω τους δέκα setTimeout που ξυπνούσαν όλα μαζί. */
+  function schedule(ms) {
+    if (aiTimer) { clearTimeout(aiTimer); }
+    aiTimer = setTimeout(function () { aiTimer = null; aiSweep(); }, ms);
+  }
   function aiSweep() {
     var key = localStorage.getItem(LS.key);
     if (!key) { diag('χωρίς κλειδί — χειροκίνητα'); return; }
@@ -997,17 +1130,32 @@
     var left = aiWait - Date.now();
     if (left > 0) {
       diag('αναμονή ορίου · ξανά σε ' + Math.ceil(left / 1000) + 'ς');
-      setTimeout(aiSweep, left + 500);
+      schedule(left + 500);
+      return;
+    }
+    /* Το φρένο του ρυθμού — ισχύει για ΚΑΘΕ κλήση, όχι μόνο για την ουρά */
+    var since = Date.now() - aiLast;
+    if (aiLast && since < AI_GAP) {
+      diag('στη σειρά · επόμενη ανάγνωση σε ' + Math.ceil((AI_GAP - since) / 1000) + 'ς');
+      schedule(AI_GAP - since + 200);
       return;
     }
     aiBusy = true;
     all().then(function (rows) {
       var q = rows.filter(function (r) {
-        return isPending(r) && !r.sug && (r.aiTry || 0) < AI_MAX_TRY;
+        return isPending(r) && !r.sug && (r.aiTry || 0) < AI_MAX_TRY &&
+               (manualRun || autoIds[r.id]);
       }).sort(function (a, b) { return b.ts - a.ts; }); // ΝΕΟΤΕΡΟ πρώτα: ο χρήστης
       // περιμένει αυτό που μόλις τράβηξε, όχι κάτι περσινό
-      if (!q.length) { aiBusy = false; diag('τίποτα σε αναμονή ανάγνωσης'); return; }
+      if (!q.length) {
+        aiBusy = false;
+        if (manualRun) { manualRun = false; diag('η ουρά ολοκληρώθηκε'); }
+        else { diag('τίποτα σε αναμονή ανάγνωσης'); }
+        if (!el('s-pend').hidden) { renderPending(); }
+        return;
+      }
       var rec = q[0];
+      aiLast = Date.now();   // ΜΟΝΟ όταν όντως φεύγει αίτημα
       diag('διαβάζω…');
       aiRead(rec, key).then(function (sug) {
         if (sug.total === null && sug.vat === null && sug.net === null) {
@@ -1021,7 +1169,7 @@
         return put(rec).then(function () {
           if (!el('s-pend').hidden) { renderPending(); }
           aiBusy = false;
-          setTimeout(aiSweep, AI_GAP); // επόμενο της ουράς, με σεβασμό στο όριο
+          schedule(AI_GAP);           // επόμενο της ουράς, με σεβασμό στο όριο
         });
       }).catch(function (err) {
         if (err && err.soft) {
@@ -1032,7 +1180,7 @@
           aiWait = Date.now() + (err.retryAfter || 32000);
           diag('όριο ρυθμού · συνεχίζω σε ' + Math.ceil((err.retryAfter || 32000) / 1000) + 'ς');
           aiBusy = false;
-          setTimeout(aiSweep, (err.retryAfter || 32000) + 500);
+          schedule((err.retryAfter || 32000) + 500);
           return;
         } else if (err && err.status) {
           aiHalt = true;
@@ -1186,6 +1334,7 @@
       pages: seq.slice(1),
       net: null, vat: null, total: null
     };
+    autoIds[rec.id] = 1;   // μόλις τραβήχτηκε → διαβάζεται μόνο του
     put(rec).then(function () {
       bumpSupplier(name);
       clearPending();
@@ -1346,7 +1495,7 @@
   });
   history.pushState(null, '', location.href);
 
-  openDB().then(boot).then(function () { setTimeout(aiSweep, 800); }).catch(function (e) {
+  openDB().then(boot).then(function () { schedule(800); }).catch(function (e) {
     document.body.innerHTML = '<div style="padding:40px;color:#e6e8ec">Δεν άνοιξε η τοπική βάση: ' + e + '</div>';
   });
 
