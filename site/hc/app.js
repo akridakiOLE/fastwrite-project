@@ -90,6 +90,35 @@
      Κάθε λίστα, κάθε άθροισμα, κάθε εύρος περνάει ΜΟΝΟ από εδώ — αλλιώς
      τριάντα παλιά τιμολόγια φωτογραφημένα ένα βράδυ πέφτουν όλα σε έναν μήνα. */
   function dateOf(r) { return (r && r.invDate) ? r.invDate : r.ts; }
+
+  /* ══ CROP (v11) ═══════════════════════════════════════════════
+     ΚΑΝΟΝΑΣ: το blob ΔΕΝ αγγίζεται ΠΟΤΕ. Ένα τιμολόγιο είναι λογιστικό
+     τεκμήριο — δεν πετάμε pixel. Αποθηκεύονται μόνο ΠΟΣΟΣΤΑ (0-1) στο
+     r.crops[i], ανεξάρτητα από ανάλυση συσκευής. Σβήνεις το crop και η
+     φωτογραφία επιστρέφει ολόκληρη, όποτε θέλεις. */
+  function cropOf(r, i) {
+    var c = r && r.crops && r.crops[i];
+    if (!c) { return null; }
+    if (!(c.w > 0.05 && c.h > 0.05)) { return null; }   // πολύ μικρό = άκυρο
+    return c;
+  }
+  /* Εμφάνιση με σκέτο CSS: μηδέν επανακωδικοποίηση εικόνας, μηδέν μνήμη. */
+  function cropImg(blob, c, cls) {
+    var img = document.createElement('img');
+    img.src = blobUrl(blob);
+    img.alt = '';
+    if (!c) { img.className = cls; return img; }
+    var box = document.createElement('span');
+    box.className = cls + ' crop-box';
+    img.style.position = 'absolute';
+    img.style.width  = (100 / c.w) + '%';
+    img.style.height = (100 / c.h) + '%';
+    img.style.left   = (-c.x / c.w * 100) + '%';
+    img.style.top    = (-c.y / c.h * 100) + '%';
+    img.style.objectFit = 'fill';
+    box.appendChild(img);
+    return box;
+  }
   function ymd(ts) {
     var d = new Date(ts);
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
@@ -124,7 +153,11 @@
 
   function render(id) {
     if (id === 's-menu')     { renderMenu(); }
-    if (id === 's-pend')     { renderPending(); }
+    /* v11 — ΚΑΘΕ ΕΙΣΟΔΟΣ στην οθόνη παγώνει τη σειρά. Αλλιώς, μόλις
+       διορθώσεις ημερομηνία, η κάρτα πηδάει αλλού και τη χάνεις από τα
+       μάτια σου ακριβώς τη στιγμή που τη δουλεύεις. Φεύγεις και ξαναμπαίνεις
+       → όλα παίρνουν τη σωστή τους σειρά. */
+    if (id === 's-pend')     { pendOrder = null; renderPending(); }
     if (id === 's-sup')      { renderSupPage(); }
     if (id === 's-ref')      { renderRef(); }
     if (id === 's-settings') { renderSettings(); }
@@ -196,6 +229,7 @@
   }
 
   /* ══ ΤΑ ΕΚΚΡΕΜΗ ══ */
+  var pendOrder = null;      // παγωμένη σειρά όσο είσαι μέσα στην οθόνη
   function renderPending() {
     aiSweep();
     var body = el('pend-body');
@@ -204,7 +238,20 @@
       var list = rows.filter(isPending);
       if (!list.length) {
         body.innerHTML = '<p class="empty">Δεν έχεις εκκρεμή.<br>Ό,τι φωτογράφισες έχει ποσά.</p>';
+        pendOrder = null;
         return;
+      }
+      if (!pendOrder) {
+        pendOrder = list.map(function (r) { return r.id; });
+      } else {
+        /* Ό,τι ήταν ήδη εδώ κρατάει τη θέση του· ό,τι μπήκε στο μεταξύ
+           πάει στο τέλος, χωρίς να σπρώξει τίποτα. */
+        var seen = {};
+        pendOrder.forEach(function (id, i) { seen[id] = i; });
+        list.forEach(function (r) {
+          if (!(r.id in seen)) { seen[r.id] = pendOrder.length; pendOrder.push(r.id); }
+        });
+        list.sort(function (a, b) { return seen[a.id] - seen[b.id]; });
       }
       list.forEach(function (r) { body.appendChild(pendCard(r)); });
     });
@@ -215,9 +262,7 @@
 
     var head = document.createElement('div');
     head.className = 'card-head';
-    var img = document.createElement('img');
-    img.src = blobUrl(r.blob);
-    img.alt = '';
+    var img = cropImg(r.blob, cropOf(r, 0), 'thumb-in');
     img.onclick = function () { openShot(r.id); };
     var meta = document.createElement('div');
     meta.className = 'card-meta';
@@ -268,6 +313,26 @@
     warn.className = 'amt-warn';
     warn.hidden = true;
     amts.appendChild(warn);
+
+    /* v11 — Η ουρά κρατάει 13 δευτ. ανάμεσα σε αναγνώσεις (όριο 5/λεπτό).
+       Χωρίς ένδειξη, ο χρήστης βλέπει κενά πεδία και συμπεραίνει αποτυχία.
+       Το Ζ.4 («ποτέ Διαβάζω…») προστατεύει ΤΗΝ ΠΟΡΤΑ, όπου δεν περιμένεις·
+       εδώ ήρθες επίτηδες να δεις αποτέλεσμα, και η σιωπή είναι το πρόβλημα. */
+    if (!sug && localStorage.getItem(LS.key) && !aiHalt &&
+        (r.aiTry || 0) < AI_MAX_TRY && r.net === null && r.vat === null && r.total === null) {
+      var busy = document.createElement('p');
+      busy.className = 'ai-busy';
+      /* Χωρίς σύνδεση ΔΕΝ διαβάζεται τίποτα — και στην παραλαβή, μέσα σε
+         αποθήκη, αυτή είναι η κανονική περίπτωση. Ψεύτικο «Διαβάζεται…»
+         είναι χειρότερο από καθόλου: περιμένεις κάτι που δεν έρχεται. */
+      if (!navigator.onLine) {
+        busy.classList.add('off');
+        busy.textContent = '📵 Χωρίς σύνδεση — γράψε τα ποσά μόνος σου ή περίμενε δίκτυο';
+      } else {
+        busy.textContent = '⏳ Διαβάζεται… μπορείς να τα γράψεις και μόνος σου';
+      }
+      amts.appendChild(busy);
+    }
 
     /* ΙΕΡΑΡΧΙΑ: ΑΝΘΡΩΠΟΣ > GEMINI > ΥΠΟΛΟΓΙΣΜΟΣ.
        Δύο γνωστά ποσά δίνουν το τρίτο με σκέτη πρόσθεση/αφαίρεση — καμία
@@ -573,7 +638,7 @@
     function invRow(r) {
       var b = document.createElement('button');
       b.className = 'inv';
-      var im = document.createElement('img'); im.src = blobUrl(r.blob); im.alt = '';
+      var im = cropImg(r.blob, cropOf(r, 0), 'thumb-in');
       var mt = document.createElement('div'); mt.className = 'inv-m';
       var a = document.createElement('div');
       if (typeof r.total === 'number') { a.className = 'inv-a'; a.textContent = eur(r.total); }
@@ -603,6 +668,96 @@
     wrap.appendChild(b);
   }
 
+  /* ══ ΕΠΕΞΕΡΓΑΣΤΗΣ CROP ═══════════════════════════════════════
+     Ένα σύρσιμο του δαχτύλου ορίζει το πλαίσιο. Δεν αρέσει; Ξανασύρεις.
+     Μοτίβο «η μηχανή προτείνει, ο άνθρωπος εγκρίνει» (απόφαση 29/8) —
+     εδώ ο άνθρωπος ΚΑΙ ορίζει ΚΑΙ εγκρίνει, γιατί κόβει τεκμήριο. */
+  function openCrop(r, i, done) {
+    var pgs = pagesOf(r);
+    var ov = document.createElement('div');
+    ov.className = 'crop-ov';
+    var stage = document.createElement('div');
+    stage.className = 'crop-stage';
+    var im = document.createElement('img');
+    im.src = blobUrl(pgs[i]);
+    im.alt = '';
+    var sel = document.createElement('div');
+    sel.className = 'crop-sel';
+    sel.hidden = true;
+    stage.appendChild(im); stage.appendChild(sel);
+
+    var hint = document.createElement('p');
+    hint.className = 'crop-hint';
+    hint.textContent = 'Σύρε το δάχτυλό σου γύρω από το τιμολόγιο';
+
+    var acts = document.createElement('div');
+    acts.className = 'crop-acts';
+    var cancel = document.createElement('button');
+    cancel.className = 'btn ghost'; cancel.textContent = 'Άκυρο';
+    var clear = document.createElement('button');
+    clear.className = 'btn ghost'; clear.textContent = 'Χωρίς κόψιμο';
+    var save = document.createElement('button');
+    save.className = 'btn primary'; save.textContent = 'Αποθήκευση';
+    save.disabled = true;
+    acts.appendChild(cancel); acts.appendChild(clear); acts.appendChild(save);
+
+    ov.appendChild(hint); ov.appendChild(stage); ov.appendChild(acts);
+    document.body.appendChild(ov);
+
+    var box = null, sx = 0, sy = 0, drag = false;
+    function rect() { return im.getBoundingClientRect(); }
+    function pt(e) {
+      var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+      var b = rect();
+      return { x: Math.min(1, Math.max(0, (t.clientX - b.left) / b.width)),
+               y: Math.min(1, Math.max(0, (t.clientY - b.top) / b.height)) };
+    }
+    function paint() {
+      if (!box) { sel.hidden = true; save.disabled = true; return; }
+      var b = rect(), st = stage.getBoundingClientRect();
+      sel.hidden = false;
+      sel.style.left   = (b.left - st.left + box.x * b.width) + 'px';
+      sel.style.top    = (b.top - st.top + box.y * b.height) + 'px';
+      sel.style.width  = (box.w * b.width) + 'px';
+      sel.style.height = (box.h * b.height) + 'px';
+      save.disabled = !(box.w > 0.05 && box.h > 0.05);
+      hint.textContent = save.disabled
+        ? 'Πολύ μικρό — σύρε ξανά, μεγαλύτερο πλαίσιο'
+        : 'Πάτα Αποθήκευση, ή σύρε ξανά για άλλο πλαίσιο';
+    }
+    function down(e) { var q = pt(e); sx = q.x; sy = q.y; drag = true; box = null; paint(); e.preventDefault(); }
+    function move(e) {
+      if (!drag) { return; }
+      var q = pt(e);
+      box = { x: Math.min(sx, q.x), y: Math.min(sy, q.y),
+              w: Math.abs(q.x - sx), h: Math.abs(q.y - sy) };
+      paint(); e.preventDefault();
+    }
+    function up(e) { if (drag) { move(e); drag = false; } }
+
+    stage.addEventListener('touchstart', down, { passive: false });
+    stage.addEventListener('touchmove',  move, { passive: false });
+    stage.addEventListener('touchend',   up);
+    stage.addEventListener('mousedown',  down);
+    stage.addEventListener('mousemove',  move);
+    stage.addEventListener('mouseup',    up);
+
+    function close() { document.body.removeChild(ov); }
+    cancel.onclick = close;
+    clear.onclick = function () {
+      if (!r.crops) { r.crops = []; }
+      r.crops[i] = null;
+      put(r).then(function () { close(); done(); });
+    };
+    save.onclick = function () {
+      if (!box || box.w <= 0.05 || box.h <= 0.05) { return; }
+      if (!r.crops) { r.crops = []; }
+      while (r.crops.length < pgs.length) { r.crops.push(null); }
+      r.crops[i] = { x: box.x, y: box.y, w: box.w, h: box.h };
+      put(r).then(function () { close(); done(); });
+    };
+  }
+
   /* ══ ΠΡΟΒΟΛΗ ΤΙΜΟΛΟΓΙΟΥ ══ */
   function openShot(id) {
     get(id).then(function (r) {
@@ -620,11 +775,23 @@
           lab.textContent = 'Σελίδα ' + (i + 1) + ' από ' + pgs.length;
           block.appendChild(lab);
         }
-        var img = document.createElement('img');
-        img.className = 'shot-full';
-        img.src = blobUrl(bl);
-        img.alt = 'Τιμολόγιο ' + r.supplier + ' — σελίδα ' + (i + 1);
-        block.appendChild(img);
+        var c = cropOf(r, i);
+        var shown = cropImg(bl, c, 'shot-full');
+        block.appendChild(shown);
+
+        var cb = document.createElement('button');
+        cb.className = 'btn ghost';
+        cb.textContent = c ? '✂ Άλλαξε το κόψιμο' : '✂ Κόψε';
+        cb.onclick = function () {
+          openCrop(r, i, function () { freeUrls(); nav.pop(); openShot(r.id); });
+        };
+        block.appendChild(cb);
+        if (c) {
+          var note = document.createElement('span');
+          note.className = 'pg-label crop-note';
+          note.textContent = 'Κομμένο για εμφάνιση — η πλήρης φωτογραφία δεν χάθηκε';
+          block.appendChild(note);
+        }
         /* Διαγραφή ΜΙΑΣ σελίδας: τράβηξες λάθος δεύτερη, τη σβήνεις
            χωρίς να χάσεις το τιμολόγιο. Η σελίδα 1 σβήνεται μόνο αν
            υπάρχει δεύτερη να πάρει τη θέση της. */
@@ -693,7 +860,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v10';
+  var APP_VER = 'φέτα 3 · v12';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
