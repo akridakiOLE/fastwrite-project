@@ -70,6 +70,19 @@
   <div class="cam-bottom">
     <button id="shutter" class="shutter" aria-label="Λήψη"></button>
   </div>
+
+  <!-- ΠΡΟΕΠΙΣΚΟΠΗΣΗ (v9) — η φωτογραφία ΟΛΟΚΛΗΡΗ, πριν από οτιδήποτε άλλο.
+       Αιτία: το «Ξανά» καθόταν στην οθόνη «Ποιος;» δίπλα σε μικρογραφία 56px
+       με object-fit:cover — ο χρήστης δεν είχε δει ποτέ τι τράβηξε. -->
+  <div class="preview" id="preview" hidden>
+    <img id="prev-img" alt="Η φωτογραφία που μόλις τράβηξες">
+    <span class="prev-count" id="prev-count" hidden></span>
+    <div class="prev-acts">
+      <button class="btn ghost del" id="prev-retake">Ξανά</button>
+      <button class="btn ghost" id="prev-page">+ Σελίδα</button>
+      <button class="btn primary" id="prev-ok">OK</button>
+    </div>
+  </div>
   <div class="flash" id="flash"></div>
   <div class="toast" id="toast" hidden>✓ Μπήκε</div>
   <div class="cam-err" id="cam-err" hidden>
@@ -82,9 +95,8 @@
 <!-- ══ ΟΘΟΝΗ 3 · ΠΟΙΟΣ; ════════════════════════════════════════ -->
 <section id="s-who" class="screen who" hidden>
   <div class="who-head">
-    <img id="thumb" alt="">
+    <span class="thumb-wrap"><img id="thumb" alt=""><span class="pg-badge" id="who-pages" hidden></span></span>
     <h2>Ποιος;</h2>
-    <button class="btn ghost retake" id="who-retake">Ξανά</button>
   </div>
   <div id="sup-list" class="sup-list"></div>
   <div class="who-new">

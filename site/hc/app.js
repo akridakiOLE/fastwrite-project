@@ -22,6 +22,9 @@
 
   var el = function (id) { return document.getElementById(id); };
   var stream = null, pendingBlob = null, pendingUrl = null;
+  var pendingPages = [];   // v9: επιπλέον σελίδες του ΙΔΙΟΥ τιμολογίου
+  var thumbUrl = null;     // objectURL της μικρογραφίας στο «Ποιος;»
+  var MAX_PAGES = 8;       // φρένο: πάνω από αυτό δεν είναι τιμολόγιο, είναι λάθος
   var nav = [];            // στοίβα πλοήγησης για το «πίσω»
   var urls = [];           // objectURLs προς απελευθέρωση
 
@@ -74,11 +77,21 @@
     });
   }
   function isPending(r) { return r.total === null || r.total === undefined; }
+  /* v9 — ΣΧΗΜΑ: το r.blob παραμένει η ΣΕΛΙΔΑ 1, όπως ήταν πάντα.
+     Οι επιπλέον μπαίνουν στο r.pages (νέο, προαιρετικό πεδίο).
+     Οι εγγραφές πριν την v9 δεν έχουν r.pages — δουλεύουν αυτούσιες. */
+  function pagesOf(r) {
+    var extra = (r && r.pages && r.pages.length) ? r.pages : [];
+    return [r.blob].concat(extra);
+  }
+  function pageCount(r) { return pagesOf(r).length; }
 
   /* ── Πλοήγηση ── */
   var SCREENS = ['s-email','s-key','s-perm','s-cam','s-who',
                  's-menu','s-pend','s-sup','s-ref','s-settings','s-shot'];
   function show(id) {
+    var pv = el('preview');
+    if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
     SCREENS.forEach(function (s) { el(s).hidden = (s !== id); });
   }
   function goto(id) { nav.push(id); render(id); show(id); }
@@ -200,6 +213,7 @@
     var thumb = document.createElement('span');
     thumb.className = 'thumb';
     thumb.appendChild(img);
+    addPgBadge(thumb, r);
     head.appendChild(thumb); head.appendChild(meta);
 
     var amts = document.createElement('div');
@@ -350,11 +364,23 @@
         var th = document.createElement('span');
         th.className = 'thumb';
         th.appendChild(im);
+        addPgBadge(th, r);
         b.appendChild(th); b.appendChild(mt);
         b.onclick = function () { openShot(r.id); };
         body.appendChild(b);
       });
     });
+  }
+
+  /* v9 — «3 σελ.» πάνω στη μικρογραφία, μόνο όταν υπάρχουν πολλές */
+  function addPgBadge(wrap, r) {
+    var n = pageCount(r);
+    if (n < 2) { return; }
+    var b = document.createElement('span');
+    b.className = 'pg-badge';
+    b.textContent = n;
+    b.title = n + ' σελίδες';
+    wrap.appendChild(b);
   }
 
   /* ══ ΠΡΟΒΟΛΗ ΤΙΜΟΛΟΓΙΟΥ ══ */
@@ -364,11 +390,39 @@
       el('shot-title').textContent = r.supplier;
       var body = el('shot-body');
       body.innerHTML = '';
-      var img = document.createElement('img');
-      img.className = 'shot-full';
-      img.src = blobUrl(r.blob);
-      img.alt = 'Τιμολόγιο ' + r.supplier;
-      body.appendChild(img);
+      var pgs = pagesOf(r);
+      pgs.forEach(function (bl, i) {
+        var block = document.createElement('div');
+        block.className = 'pg-block';
+        if (pgs.length > 1) {
+          var lab = document.createElement('span');
+          lab.className = 'pg-label';
+          lab.textContent = 'Σελίδα ' + (i + 1) + ' από ' + pgs.length;
+          block.appendChild(lab);
+        }
+        var img = document.createElement('img');
+        img.className = 'shot-full';
+        img.src = blobUrl(bl);
+        img.alt = 'Τιμολόγιο ' + r.supplier + ' — σελίδα ' + (i + 1);
+        block.appendChild(img);
+        /* Διαγραφή ΜΙΑΣ σελίδας: τράβηξες λάθος δεύτερη, τη σβήνεις
+           χωρίς να χάσεις το τιμολόγιο. Η σελίδα 1 σβήνεται μόνο αν
+           υπάρχει δεύτερη να πάρει τη θέση της. */
+        if (pgs.length > 1) {
+          var dp = document.createElement('button');
+          dp.className = 'btn ghost del';
+          dp.textContent = 'Διαγραφή σελίδας ' + (i + 1);
+          dp.onclick = function () {
+            if (!confirm('Διαγραφή της σελίδας ' + (i + 1) + ' από ' + pgs.length + ';\n\nΤο τιμολόγιο και οι υπόλοιπες σελίδες μένουν.')) { return; }
+            var left = pgs.slice(0, i).concat(pgs.slice(i + 1));
+            r.blob = left[0];
+            r.pages = left.slice(1);
+            put(r).then(function () { freeUrls(); nav.pop(); openShot(r.id); });
+          };
+          block.appendChild(dp);
+        }
+        body.appendChild(block);
+      });
       [['Ημερομηνία', dstr(r.ts)], ['Σύνολο', eur(r.total)],
        ['ΦΠΑ', eur(r.vat)], ['Υπόλοιπο', eur(r.balance)]].forEach(function (p) {
         var kv = document.createElement('div');
@@ -418,7 +472,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v8';
+  var APP_VER = 'φέτα 3 · v9';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -485,7 +539,10 @@
   }
 
   function aiOnce(rec, key, model) {
-    return blobB64(rec.blob).then(function (b64) {
+    /* v9 — ΕΠΙΛΟΓΗ Β (απόφαση Stavros 30/8): φεύγουν ΟΛΕΣ οι σελίδες
+       σε ΕΝΑ αίτημα. Το σύνολο συχνά είναι στην τελευταία σελίδα.
+       Μία κλήση όσες σελίδες κι αν έχει — το όριο των 5/λεπτό μένει άθικτο. */
+    return Promise.all(pagesOf(rec).map(blobB64)).then(function (b64s) {
       var ctrl = ('AbortController' in window) ? new AbortController() : null;
       var tmr = ctrl ? setTimeout(function () { ctrl.abort(); }, 30000) : null;
       return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
@@ -493,10 +550,14 @@
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         signal: ctrl ? ctrl.signal : undefined,
         body: JSON.stringify({
-          contents: [{ parts: [
-            { inline_data: { mime_type: 'image/jpeg', data: b64 } },
-            { text: 'Φωτογραφία τιμολογίου ή απόδειξης (ελληνικά ή αγγλικά). Απάντησε ΜΟΝΟ με JSON: {"total": τελικό πληρωτέο ποσό με ΦΠΑ, "vat": συνολικό ποσό ΦΠΑ, "balance": υπόλοιπο οφειλής ΜΟΝΟ αν αναγράφεται ρητά, αλλιώς null}. Αριθμοί με τελεία δεκαδικών, χωρίς σύμβολα και χωρίς κείμενο. Αν ένα ποσό δεν διαβάζεται ΚΑΘΑΡΑ, βάλε null — ποτέ μην μαντεύεις.' }
-          ] }],
+          contents: [{ parts: b64s.map(function (b64) {
+            return { inline_data: { mime_type: 'image/jpeg', data: b64 } };
+          }).concat([
+            { text: (b64s.length > 1
+                ? ('Οι ' + b64s.length + ' φωτογραφίες είναι ΣΕΛΙΔΕΣ ΤΟΥ ΙΔΙΟΥ τιμολογίου, με τη σειρά. Δώσε ΕΝΑ σύνολο για ολόκληρο το τιμολόγιο — το τελικό πληρωτέο, που συνήθως βρίσκεται στην ΤΕΛΕΥΤΑΙΑ σελίδα. ΠΟΤΕ μην προσθέσεις μερικά σύνολα από διαφορετικές σελίδες. ')
+                : 'Φωτογραφία τιμολογίου ή απόδειξης (ελληνικά ή αγγλικά). ') +
+              'Απάντησε ΜΟΝΟ με JSON: {"total": τελικό πληρωτέο ποσό με ΦΠΑ, "vat": συνολικό ποσό ΦΠΑ, "balance": υπόλοιπο οφειλής ΜΟΝΟ αν αναγράφεται ρητά, αλλιώς null}. Αριθμοί με τελεία δεκαδικών, χωρίς σύμβολα και χωρίς κείμενο. Αν ένα ποσό δεν διαβάζεται ΚΑΘΑΡΑ, βάλε null — ποτέ μην μαντεύεις.' }
+          ]) }],
           generationConfig: { response_mime_type: 'application/json', temperature: 0 }
         })
       }).then(function (res) {
@@ -607,7 +668,7 @@
     el('cam-err-msg').textContent = msg;
     el('cam-err').hidden = false;
   }
-  function toCam() { nav = []; show('s-cam'); startCam(); refreshCount(); }
+  function toCam() { nav = []; clearPending(); show('s-cam'); startCam(); refreshCount(); }
 
   function capture() {
     var v = el('vid');
@@ -622,26 +683,86 @@
       pendingBlob = blob;
       if (pendingUrl) { URL.revokeObjectURL(pendingUrl); }
       pendingUrl = URL.createObjectURL(blob);
-      el('thumb').src = pendingUrl;
-      renderSuppliers();
-      el('in-sup').value = '';
-      show('s-who');
+      showPreview();
     }, 'image/jpeg', 0.85);
+  }
+
+  /* ── ΠΡΟΕΠΙΣΚΟΠΗΣΗ (v9) ──────────────────────────────────────
+     Ο χρήστης βλέπει ΟΛΟΚΛΗΡΗ τη φωτογραφία πριν αποφασίσει.
+     Τρία κουμπιά, στη θέση του πράσινου κουμπιού:
+       Ξανά      → σβήνει αυτή τη λήψη, πίσω στην κάμερα
+       + Σελίδα  → την κρατά ως σελίδα του ίδιου τιμολογίου
+       OK        → «Ποιος;» και αποθήκευση                        */
+  function showPreview() {
+    el('prev-img').src = pendingUrl;
+    var n = pendingPages.length;
+    var badge = el('prev-count');
+    if (n) {
+      badge.textContent = 'Σελίδα ' + (n + 1) + ' · ίδιο τιμολόγιο';
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
+    el('prev-page').disabled = (n + 1 >= MAX_PAGES);
+    el('preview').hidden = false;
+  }
+  function hidePreview() {
+    el('preview').hidden = true;
+    el('prev-img').removeAttribute('src');
+  }
+  function dropPending() {
+    pendingBlob = null;
+    if (pendingUrl) { URL.revokeObjectURL(pendingUrl); pendingUrl = null; }
+  }
+  function clearPending() {
+    dropPending();
+    pendingPages = [];
+  }
+  function previewRetake() {   /* σβήνει ΜΟΝΟ την τελευταία λήψη */
+    dropPending();
+    hidePreview();
+    show('s-cam');
+    startCam();
+  }
+  function previewAddPage() {
+    if (!pendingBlob) { return; }
+    if (pendingPages.length + 1 >= MAX_PAGES) { return; }
+    pendingPages.push(pendingBlob);
+    dropPending();
+    hidePreview();
+    show('s-cam');
+    startCam();
+  }
+  function previewOk() {
+    if (!pendingBlob) { return; }
+    hidePreview();
+    var n = pendingPages.length + 1;
+    var wb = el('who-pages');
+    if (n > 1) { wb.textContent = n; wb.hidden = false; } else { wb.hidden = true; }
+    if (thumbUrl) { URL.revokeObjectURL(thumbUrl); }
+    thumbUrl = URL.createObjectURL(pendingPages[0] || pendingBlob);
+    el('thumb').src = thumbUrl;
+    renderSuppliers();
+    el('in-sup').value = '';
+    show('s-who');
   }
 
   /* ── Καταχώρηση ── */
   function assign(name) {
     if (!name || !pendingBlob) { return; }
+    /* Σελίδα 1 = η ΠΡΩΤΗ που τραβήχτηκε. Το pendingBlob είναι η τελευταία. */
+    var seq = pendingPages.concat([pendingBlob]);
     var rec = {
       id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
       ts: Date.now(),
       supplier: name,
-      blob: pendingBlob,
+      blob: seq[0],
+      pages: seq.slice(1),
       total: null, vat: null, balance: null
     };
     put(rec).then(function () {
       bumpSupplier(name);
-      pendingBlob = null;
+      clearPending();
       show('s-cam');
       aiSweep();
       var t = el('toast');
@@ -702,12 +823,9 @@
   };
   el('shutter').onclick = capture;
   el('cam-retry').onclick = startCam;
-  el('who-retake').onclick = function () {
-    pendingBlob = null;
-    if (pendingUrl) { URL.revokeObjectURL(pendingUrl); pendingUrl = null; }
-    show('s-cam');
-    startCam();
-  };
+  el('prev-retake').onclick = previewRetake;
+  el('prev-page').onclick   = previewAddPage;
+  el('prev-ok').onclick     = previewOk;
   el('add-sup').onclick = function () { assign(el('in-sup').value.trim()); };
   el('in-sup').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { assign(el('in-sup').value.trim()); }
@@ -793,6 +911,11 @@
 
   /* Το κουμπί «πίσω» του κινητού κλείνει την τρέχουσα σελίδα, δεν βγάζει από την εφαρμογή */
   window.addEventListener('popstate', function () {
+    if (!el('preview').hidden) {
+      history.pushState(null, '', location.href);
+      previewRetake();
+      return;
+    }
     if (nav.length) { history.pushState(null, '', location.href); back(); }
   });
   history.pushState(null, '', location.href);

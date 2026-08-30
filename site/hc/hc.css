@@ -73,7 +73,7 @@ input:focus{outline:none;border-color:var(--accent)}
 /* ── Ποιος; ──────────────────────────────────────────── */
 .who{background:var(--bg);overflow-y:auto;padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom))}
 .who-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
-#thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:var(--bg2)}
+#thumb{width:56px;height:56px;object-fit:contain;border-radius:8px;border:1px solid var(--border);background:var(--bg2)}
 .sup-list{display:flex;flex-direction:column;gap:10px;margin-bottom:22px}
 .sup{
   background:var(--bg2);border:1px solid var(--border);color:var(--text);
@@ -187,13 +187,55 @@ input:focus{outline:none;border-color:var(--accent)}
 
 /* ── φέτα 3β: Ξανά · Διαγραφή · Διαγνωστικό ── */
 .who-head{position:relative}
-.btn.retake{
-  position:absolute;top:0;right:0;
-  padding:6px 14px;font-size:13px;width:auto;
-}
 .acts{display:flex;gap:8px;margin-top:10px}
 .acts .btn{flex:1;margin:0}
 .btn.del{color:var(--danger);border-color:rgba(248,113,113,.4)}
 .btn.del:active{background:rgba(248,113,113,.12)}
 .btn.wide{width:100%;margin-top:16px}
 .kv.diag b{font-size:12px;font-weight:400;color:var(--text2);text-align:right;line-height:1.4}
+
+/* ══ ΦΕΤΑ 3 · v9 (30/8/2026) — ΠΡΟΕΠΙΣΚΟΠΗΣΗ ══════════════════
+
+   Η φωτογραφία ολόκληρη, στη θέση όπου ήδη κοιτάει ο χρήστης.
+   Τα τρία κουμπιά κάθονται ΑΚΡΙΒΩΣ εκεί που ήταν το πράσινο κουμπί
+   — ο αντίχειρας δεν μετακινείται. */
+.preview{
+  position:absolute;inset:0;z-index:5;
+  background:#000;display:flex;flex-direction:column;
+}
+.preview img{
+  flex:1;min-height:0;width:100%;
+  object-fit:contain;              /* ΠΟΤΕ cover — κόβει το τιμολόγιο */
+  background:#000;
+}
+.prev-count{
+  position:absolute;top:max(14px,env(safe-area-inset-top));left:50%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,.7);color:var(--accent);
+  border:1px solid var(--accent);border-radius:999px;
+  padding:6px 16px;font-size:13px;font-weight:700;
+  white-space:nowrap;max-width:calc(100% - 24px);
+}
+.prev-acts{
+  display:flex;gap:10px;
+  padding:16px 16px max(16px,env(safe-area-inset-bottom));
+  background:rgba(0,0,0,.85);
+}
+.prev-acts .btn{flex:1;margin:0;padding:16px 8px;font-size:16px}
+
+/* Σήμα πλήθους σελίδων πάνω σε κάθε μικρογραφία */
+.thumb-wrap,.thumb{position:relative;display:inline-block}
+.pg-badge{
+  position:absolute;top:-6px;right:-6px;
+  background:var(--accent);color:#06231a;
+  border-radius:999px;padding:2px 7px;
+  font-size:11px;font-weight:800;line-height:1.4;
+  pointer-events:none;
+}
+
+/* Προβολή τιμολογίου με πολλές σελίδες */
+.pg-block{margin-bottom:18px}
+.pg-label{
+  display:block;color:var(--text2);font-size:13px;
+  margin:0 0 6px;font-weight:600;
+}
