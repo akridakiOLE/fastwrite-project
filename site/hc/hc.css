@@ -239,3 +239,68 @@ input:focus{outline:none;border-color:var(--accent)}
   display:block;color:var(--text2);font-size:13px;
   margin:0 0 6px;font-weight:600;
 }
+
+/* ══ v10 (30/8/2026) — τρία ποσά + ημερομηνία τιμολογίου ═══════ */
+
+/* Ποσό που ΔΕΝ διάβασε κανείς — το υπολόγισε η εφαρμογή από τα άλλα δύο.
+   Ξεχωριστό χρώμα από το «ai»: ο χρήστης πρέπει να ξέρει ποιο ήρθε από
+   το χαρτί και ποιο από αριθμητική. */
+.amt input.calc{border-color:var(--text3);color:var(--text2);font-style:italic}
+.amt-warn{
+  margin:8px 0 0;padding:10px 12px;border-radius:8px;
+  background:rgba(248,113,113,.12);border-left:3px solid var(--danger);
+  color:var(--danger);font-size:13px;font-weight:600;
+}
+
+/* Η γραμμή ημερομηνίας στο «Ποιος;» */
+.who-date{
+  display:flex;align-items:center;gap:10px;
+  margin:0 0 16px;padding:10px 12px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+}
+.who-date span{flex:1;font-size:15px;color:var(--text)}
+.who-date .btn{width:auto;margin:0;padding:6px 14px;font-size:13px}
+.who-date input[type="date"]{
+  flex:1;background:var(--bg3);border:1px solid var(--accent);
+  color:var(--text);border-radius:8px;padding:8px 10px;
+  font-family:inherit;font-size:15px;
+}
+
+/* Πρόταση ημερομηνίας από το Gemini, μέσα στα Εκκρεμή */
+.date-sug{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin:10px 0 0;padding:10px 12px;border-radius:8px;
+  background:var(--accent-dim);border-left:3px solid var(--accent);
+  font-size:13px;color:var(--text2);
+}
+.date-sug .btn{width:auto;margin:0;padding:6px 14px;font-size:13px}
+
+/* Μπάρα εύρους στο ιστορικό προμηθευτή */
+.range-bar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.range{
+  flex:0 0 auto;background:var(--bg2);border:1px solid var(--border);
+  color:var(--text2);border-radius:999px;padding:9px 14px;
+  font-size:13px;font-family:inherit;cursor:pointer;white-space:nowrap;
+}
+.range.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-weight:700}
+.range-pick{
+  display:flex;flex-direction:column;gap:10px;margin:0 0 14px;
+  padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;
+}
+.range-pick .btn{margin:0}
+
+/* Η σύνοψη του εύρους — τα τρία ποσά ως μία εγγραφή */
+.range-sum{
+  background:var(--bg2);border:1px solid var(--accent);
+  border-radius:12px;padding:16px;margin:0 0 18px;
+}
+.range-ttl{color:var(--text2);font-size:13px;margin-bottom:12px;font-weight:600}
+.range-row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0}
+.range-row span{color:var(--text2);font-size:15px}
+.range-row b{font-size:17px;font-variant-numeric:tabular-nums}
+.range-row.big{border-top:1px solid var(--border);margin-top:6px;padding-top:12px}
+.range-row.big b{font-size:22px;color:var(--accent)}
+.range-miss{
+  margin-top:10px;padding-top:10px;border-top:1px solid var(--border);
+  color:var(--danger);font-size:13px;font-weight:600;
+}

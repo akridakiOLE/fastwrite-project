@@ -56,7 +56,7 @@
       t.objectStore('shots').openCursor().onsuccess = function (e) {
         var c = e.target.result;
         if (c) { out.push(c.value); c.continue(); }
-        else { out.sort(function (a, b) { return b.ts - a.ts; }); res(out); }
+        else { out.sort(function (a, b) { return dateOf(b) - dateOf(a); }); res(out); }
       };
       t.onerror = function () { rej(t.error); };
     });
@@ -85,6 +85,20 @@
     return [r.blob].concat(extra);
   }
   function pageCount(r) { return pagesOf(r).length; }
+  /* v10 — ΠΟΤΕ: r.invDate = η ημερομηνία ΤΟΥ ΤΙΜΟΛΟΓΙΟΥ (νέο, προαιρετικό).
+     r.ts = πότε το φωτογράφισες, μένει ως έχει.
+     Κάθε λίστα, κάθε άθροισμα, κάθε εύρος περνάει ΜΟΝΟ από εδώ — αλλιώς
+     τριάντα παλιά τιμολόγια φωτογραφημένα ένα βράδυ πέφτουν όλα σε έναν μήνα. */
+  function dateOf(r) { return (r && r.invDate) ? r.invDate : r.ts; }
+  function ymd(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function fromYmd(v) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v || '')) { return null; }
+    var d = new Date(v + 'T12:00:00');
+    return isNaN(d.getTime()) ? null : d.getTime();
+  }
 
   /* ── Πλοήγηση ── */
   var SCREENS = ['s-email','s-key','s-perm','s-cam','s-who',
@@ -209,7 +223,7 @@
     meta.className = 'card-meta';
     meta.innerHTML = '<div class="card-sup"></div><div class="card-date"></div>';
     meta.querySelector('.card-sup').textContent = r.supplier;
-    meta.querySelector('.card-date').textContent = dstr(r.ts);
+    meta.querySelector('.card-date').textContent = dstr(dateOf(r));
     var thumb = document.createElement('span');
     thumb.className = 'thumb';
     thumb.appendChild(img);
@@ -218,7 +232,10 @@
 
     var amts = document.createElement('div');
     amts.className = 'amts';
-    var fields = [['Σύνολο','total'], ['ΦΠΑ','vat'], ['Υπόλοιπο','balance']];
+    /* v10 — ΤΑ ΤΡΙΑ ΠΟΣΑ. Το «Υπόλοιπο» αποσύρθηκε (30/8): σήμαινε δύο
+       διαφορετικά πράγματα στο ίδιο πεδίο. Το r.balance μένει στη βάση
+       παλιών εγγραφών, δεν διαβάζεται και δεν γράφεται πουθενά. */
+    var fields = [['Καθαρό ποσό','net'], ['ΦΠΑ','vat'], ['Συνολικό ποσό','total']];
     var inputs = {}, sug = r.sug || null, prefilled = false;
     fields.forEach(function (f) {
       var w = document.createElement('label');
@@ -233,16 +250,102 @@
         i.classList.add('ai');
         prefilled = true;
       }
-      i.addEventListener('input', function () { i.classList.remove('ai'); });
+      i.addEventListener('input', function () {
+        i.classList.remove('ai'); i.classList.remove('calc');
+        /* Γεμάτο = δικό του, δεν το πατάει τίποτα.
+           Άδειο = «δεν το θέλω δικό μου» — ξαναγίνεται υπολογίσιμο.
+           Χωρίς αυτό, ένα πεδίο που έσβησες έμενε κενό για πάντα. */
+        if (i.value.trim()) { i.dataset.human = '1'; }
+        else { delete i.dataset.human; }
+        recalc();
+      });
       inputs[f[1]] = i;
       w.appendChild(s); w.appendChild(i);
       amts.appendChild(w);
     });
+
+    var warn = document.createElement('p');
+    warn.className = 'amt-warn';
+    warn.hidden = true;
+    amts.appendChild(warn);
+
+    /* ΙΕΡΑΡΧΙΑ: ΑΝΘΡΩΠΟΣ > GEMINI > ΥΠΟΛΟΓΙΣΜΟΣ.
+       Δύο γνωστά ποσά δίνουν το τρίτο με σκέτη πρόσθεση/αφαίρεση — καμία
+       γνώση συντελεστή ΦΠΑ, άρα δουλεύει και με πολλούς συντελεστές στο
+       ίδιο τιμολόγιο, και σε κάθε χώρα.
+       Ανοχή 0,02 €: τα τιμολόγια στρογγυλοποιούν ανά γραμμή. Χωρίς αυτήν
+       θα φώναζε στα μισά τιμολόγια και θα μάθαινες να την αγνοείς. */
+    var TOL = 0.02;
+    function recalc() {
+      /* Ποσό που το είχε βγάλει ΜΟΝΟ η αριθμητική ξαναϋπολογίζεται όταν
+         αλλάζουν τα άλλα — αλλιώς αλλάζεις το Σύνολο και μένει κολλημένο
+         το παλιό ΦΠΑ, βγάζοντας συναγερμό αντί για το σωστό νούμερο.
+         Ό,τι έγραψε άνθρωπος (data-human) ή διάβασε το Gemini (.ai) μένει. */
+      ['net', 'vat', 'total'].forEach(function (k) {
+        var i = inputs[k];
+        if (i.classList.contains('calc') && !i.dataset.human) {
+          i.value = ''; i.classList.remove('calc');
+        }
+      });
+      var v = {
+        net:   parseNum(inputs.net.value),
+        vat:   parseNum(inputs.vat.value),
+        total: parseNum(inputs.total.value)
+      };
+      var known = ['net','vat','total'].filter(function (k) { return v[k] !== null; });
+
+      if (known.length === 2) {
+        var miss = ['net','vat','total'].filter(function (k) { return v[k] === null; })[0];
+        var out = (miss === 'total') ? v.net + v.vat
+                : (miss === 'net')   ? v.total - v.vat
+                :                      v.total - v.net;
+        out = Math.round(out * 100) / 100;
+        if (out >= 0) {
+          inputs[miss].value = num(out);
+          inputs[miss].classList.add('calc');
+          v[miss] = out;
+          known.push(miss);
+        }
+      }
+      if (known.length === 3) {
+        var diff = Math.abs((v.net + v.vat) - v.total);
+        if (diff > TOL) {
+          warn.textContent = 'Τα νούμερα δεν κλείνουν: ' + num(v.net) + ' + ' +
+                             num(v.vat) + ' ≠ ' + num(v.total) +
+                             ' (διαφορά ' + num(Math.round(diff * 100) / 100) + ' €)';
+          warn.hidden = false;
+          return;
+        }
+      }
+      warn.hidden = true;
+    }
+    recalc();
+
     if (prefilled) {
       var note = document.createElement('p');
       note.className = 'ai-note';
       note.textContent = 'Διαβάστηκαν από το Gemini — έλεγξε με τη φωτογραφία και πάτα Αποθήκευση.';
       amts.appendChild(note);
+    }
+
+    /* Η ανάγνωση τρέχει ΜΕΤΑ την αποθήκευση, άρα η ημερομηνία που διάβασε
+       το Gemini εμφανίζεται εδώ — όχι στην προεπισκόπηση, όπου δεν την ξέρουμε
+       ακόμα. Πρόταση με ένα πάτημα, ποτέ αυτόματη αλλαγή. */
+    if (sug && sug.date && Math.abs(sug.date - dateOf(r)) > 86400000) {
+      var ds = document.createElement('div');
+      ds.className = 'date-sug';
+      var dt = document.createElement('span');
+      dt.textContent = 'Το τιμολόγιο γράφει ' + dstr(sug.date) +
+                       ' · τώρα είναι καταχωρημένο ' + dstr(dateOf(r));
+      var db = document.createElement('button');
+      db.className = 'btn ghost';
+      db.textContent = 'Διόρθωσέ το';
+      db.onclick = function () {
+        r.invDate = sug.date;
+        put(r).then(function () { renderPending(); });
+      };
+      ds.appendChild(dt); ds.appendChild(db);
+      amts.appendChild(ds);
     }
 
     var save = document.createElement('button');
@@ -253,7 +356,7 @@
       if (t === null) { inputs.total.focus(); inputs.total.style.borderColor = 'var(--danger)'; return; }
       r.total = t;
       r.vat = parseNum(inputs.vat.value);
-      r.balance = parseNum(inputs.balance.value);
+      r.net = parseNum(inputs.net.value);
       put(r).then(function () { renderPending(); refreshCount(); });
     };
 
@@ -325,51 +428,168 @@
       draw('');
     });
   }
+  /* ══ ΙΣΤΟΡΙΚΟ ΠΡΟΜΗΘΕΥΤΗ (v10) ══════════════════════════════
+     Έτοιμα κουμπιά εύρους αντί για δύο ημερολόγια: στην πράξη θέλεις
+     «3 μήνες» ή «φέτος», όχι 14/03 έως 22/07. Το «Επιλογή…» υπάρχει
+     για τις υπόλοιπες φορές. Ο άξονας χρόνου είναι ΠΑΝΤΑ το dateOf(). */
+  function sumRange(list) {
+    var t = { net: 0, vat: 0, total: 0, miss: 0, n: list.length };
+    list.forEach(function (r) {
+      if (typeof r.total === 'number') { t.total += r.total; } else { t.miss++; }
+      if (typeof r.net === 'number') { t.net += r.net; }
+      if (typeof r.vat === 'number') { t.vat += r.vat; }
+    });
+    return t;
+  }
+  function startOf(kind) {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    if (kind === 'month') { d.setDate(1); }
+    if (kind === 'q')     { d.setDate(1); d.setMonth(d.getMonth() - 2); }
+    if (kind === 'year')  { d.setMonth(0, 1); }
+    return d.getTime();
+  }
   function openSupplier(name, rows) {
     var body = el('sup-body');
-    body.innerHTML = '';
     var mine = rows.filter(function (r) { return r.supplier === name; });
+    var from = null, to = null;          // null = όλα
+    var active = 'all';                  // ποιο κουμπί είναι πατημένο
 
-    var h = document.createElement('h2');
-    h.textContent = name;
-    body.appendChild(h);
+    function draw() {
+      body.innerHTML = '';
+      freeUrls();
 
-    var byMonth = {};
-    mine.forEach(function (r) {
-      var k = mkey(r.ts);
-      if (!byMonth[k]) { byMonth[k] = { sum: 0, miss: 0, rows: [] }; }
-      if (typeof r.total === 'number') { byMonth[k].sum += r.total; } else { byMonth[k].miss++; }
-      byMonth[k].rows.push(r);
-    });
+      var h = document.createElement('h2');
+      h.textContent = name;
+      body.appendChild(h);
 
-    Object.keys(byMonth).sort().reverse().forEach(function (k) {
-      var m = document.createElement('div');
-      m.className = 'mon';
-      m.innerHTML = '<span class="mon-t"></span><span class="mon-v"></span>';
-      m.querySelector('.mon-t').textContent = mlabel(k);
-      m.querySelector('.mon-v').textContent = eur(byMonth[k].sum) +
-        (byMonth[k].miss ? ' · +' + byMonth[k].miss + ' χωρίς ποσό' : '');
-      body.appendChild(m);
+      var bar = document.createElement('div');
+      bar.className = 'range-bar';
+      [['Αυτός ο μήνας','month'], ['3 μήνες','q'], ['Φέτος','year'], ['Όλα','all'], ['Επιλογή…','pick']]
+        .forEach(function (o) {
+          var b = document.createElement('button');
+          /* Το ενεργό βγαίνει από τη μεταβλητή, ΟΧΙ από το στοιχείο:
+             το draw() ξαναχτίζει τη μπάρα, άρα κάθε classList.add μετά
+             από αυτό πέφτει σε κουμπί που δεν υπάρχει πια. */
+          b.className = 'range' + (o[1] === active ? ' on' : '');
+          b.textContent = o[0];
+          b.onclick = function () {
+            if (o[1] === 'pick') { return pick(); }
+            active = o[1];
+            if (o[1] === 'all') { from = null; to = null; }
+            else { from = startOf(o[1]); to = null; }
+            draw();
+          };
+          bar.appendChild(b);
+        });
+      body.appendChild(bar);
 
-      byMonth[k].rows.forEach(function (r) {
-        var b = document.createElement('button');
-        b.className = 'inv';
-        var im = document.createElement('img'); im.src = blobUrl(r.blob); im.alt = '';
-        var mt = document.createElement('div'); mt.className = 'inv-m';
-        var a = document.createElement('div');
-        if (typeof r.total === 'number') { a.className = 'inv-a'; a.textContent = eur(r.total); }
-        else { a.className = 'inv-a miss'; a.textContent = 'χωρίς ποσό'; }
-        var d = document.createElement('div'); d.className = 'inv-d'; d.textContent = dstr(r.ts);
-        mt.appendChild(a); mt.appendChild(d);
-        var th = document.createElement('span');
-        th.className = 'thumb';
-        th.appendChild(im);
-        addPgBadge(th, r);
-        b.appendChild(th); b.appendChild(mt);
-        b.onclick = function () { openShot(r.id); };
-        body.appendChild(b);
+      function pick() {
+        var box = document.createElement('div');
+        box.className = 'range-pick';
+        var a = document.createElement('input'), z = document.createElement('input');
+        a.type = 'date'; z.type = 'date';
+        a.value = ymd(from || startOf('year')); z.value = ymd(to || Date.now());
+        a.max = ymd(Date.now()); z.max = ymd(Date.now());
+        var go = document.createElement('button');
+        go.className = 'btn primary'; go.textContent = 'Δείξε';
+        go.onclick = function () {
+          var f = fromYmd(a.value), t = fromYmd(z.value);
+          if (f === null || t === null) { return; }
+          from = f; to = t + 86399999;    // ως το τέλος της ημέρας
+          active = 'pick';
+          draw();
+        };
+        var l1 = document.createElement('label'); l1.className = 'amt';
+        l1.appendChild(Object.assign(document.createElement('span'), { textContent: 'Από' }));
+        l1.appendChild(a);
+        var l2 = document.createElement('label'); l2.className = 'amt';
+        l2.appendChild(Object.assign(document.createElement('span'), { textContent: 'Έως' }));
+        l2.appendChild(z);
+        box.appendChild(l1); box.appendChild(l2); box.appendChild(go);
+        bar.insertAdjacentElement('afterend', box);
+      }
+
+      var list = mine.filter(function (r) {
+        var d = dateOf(r);
+        return (from === null || d >= from) && (to === null || d <= to);
       });
-    });
+
+      if (from !== null) {
+        var t = sumRange(list);
+        var card = document.createElement('div');
+        card.className = 'range-sum';
+        var ttl = document.createElement('div');
+        ttl.className = 'range-ttl';
+        ttl.textContent = dstr(from) + ' – ' + dstr(to === null ? Date.now() : to) +
+                          ' · ' + t.n + ' τιμ.';
+        card.appendChild(ttl);
+        [['Καθαρό', t.net], ['ΦΠΑ', t.vat], ['Σύνολο', t.total]].forEach(function (p, i) {
+          var row = document.createElement('div');
+          row.className = 'range-row' + (i === 2 ? ' big' : '');
+          row.innerHTML = '<span></span><b></b>';
+          row.querySelector('span').textContent = p[0];
+          row.querySelector('b').textContent = eur(p[1]);
+          card.appendChild(row);
+        });
+        /* Ο κανόνας της 26/8 δεν κάμπτεται πουθενά: αριθμός που αγνοεί
+           τα ελλιπή ψεύδεται σιωπηλά, και εδώ αφορά χρήματα. */
+        if (t.miss) {
+          var m = document.createElement('div');
+          m.className = 'range-miss';
+          m.textContent = '+' + t.miss + ' χωρίς ποσό — δεν μετρήθηκαν';
+          card.appendChild(m);
+        }
+        body.appendChild(card);
+        if (!list.length) {
+          body.appendChild(Object.assign(document.createElement('p'),
+            { className: 'empty', textContent: 'Κανένα τιμολόγιο σε αυτό το διάστημα.' }));
+          return;
+        }
+        list.forEach(function (r) { body.appendChild(invRow(r)); });
+        return;
+      }
+
+      /* Χωρίς εύρος: η γνωστή προβολή ανά μήνα */
+      var byMonth = {};
+      mine.forEach(function (r) {
+        var k = mkey(dateOf(r));
+        if (!byMonth[k]) { byMonth[k] = { sum: 0, miss: 0, rows: [] }; }
+        if (typeof r.total === 'number') { byMonth[k].sum += r.total; } else { byMonth[k].miss++; }
+        byMonth[k].rows.push(r);
+      });
+      Object.keys(byMonth).sort().reverse().forEach(function (k) {
+        var m = document.createElement('div');
+        m.className = 'mon';
+        m.innerHTML = '<span class="mon-t"></span><span class="mon-v"></span>';
+        m.querySelector('.mon-t').textContent = mlabel(k);
+        m.querySelector('.mon-v').textContent = eur(byMonth[k].sum) +
+          (byMonth[k].miss ? ' · +' + byMonth[k].miss + ' χωρίς ποσό' : '');
+        body.appendChild(m);
+        byMonth[k].rows.forEach(function (r) { body.appendChild(invRow(r)); });
+      });
+    }
+
+    function invRow(r) {
+      var b = document.createElement('button');
+      b.className = 'inv';
+      var im = document.createElement('img'); im.src = blobUrl(r.blob); im.alt = '';
+      var mt = document.createElement('div'); mt.className = 'inv-m';
+      var a = document.createElement('div');
+      if (typeof r.total === 'number') { a.className = 'inv-a'; a.textContent = eur(r.total); }
+      else { a.className = 'inv-a miss'; a.textContent = 'χωρίς ποσό'; }
+      var d = document.createElement('div'); d.className = 'inv-d'; d.textContent = dstr(dateOf(r));
+      mt.appendChild(a); mt.appendChild(d);
+      var th = document.createElement('span');
+      th.className = 'thumb';
+      th.appendChild(im);
+      addPgBadge(th, r);
+      b.appendChild(th); b.appendChild(mt);
+      b.onclick = function () { openShot(r.id); };
+      return b;
+    }
+
+    draw();
   }
 
   /* v9 — «3 σελ.» πάνω στη μικρογραφία, μόνο όταν υπάρχουν πολλές */
@@ -423,8 +643,9 @@
         }
         body.appendChild(block);
       });
-      [['Ημερομηνία', dstr(r.ts)], ['Σύνολο', eur(r.total)],
-       ['ΦΠΑ', eur(r.vat)], ['Υπόλοιπο', eur(r.balance)]].forEach(function (p) {
+      [['Ημερομηνία τιμολογίου', dstr(dateOf(r))],
+       ['Καταγράφηκε', dstr(r.ts)], ['Σύνολο', eur(r.total)],
+       ['ΦΠΑ', eur(r.vat)], ['Καθαρό ποσό', eur(r.net)]].forEach(function (p) {
         var kv = document.createElement('div');
         kv.className = 'kv';
         kv.innerHTML = '<span></span><b></b>';
@@ -472,7 +693,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v9';
+  var APP_VER = 'φέτα 3 · v10';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -510,6 +731,17 @@
       fr.onerror = function () { rej(fr.error); };
       fr.readAsDataURL(blob);
     });
+  }
+  /* Ημερομηνία τιμολογίου από το Gemini: δεκτή ΜΟΝΟ ως YYYY-MM-DD και μόνο
+     αν είναι αληθινή ημερομηνία σε λογικό εύρος. Ό,τι άλλο πέφτει σε null —
+     λάθος ημερομηνία είναι χειρότερη από καμία. */
+  function aiDate(v) {
+    if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) { return null; }
+    var d = new Date(v + 'T12:00:00');
+    if (isNaN(d.getTime())) { return null; }
+    var y = d.getFullYear();
+    if (y < 2000 || d.getTime() > Date.now() + 86400000) { return null; }
+    return d.getTime();
   }
   function aiNum(v) {
     if (typeof v === 'number' && isFinite(v)) { return Math.round(v * 100) / 100; }
@@ -556,7 +788,9 @@
             { text: (b64s.length > 1
                 ? ('Οι ' + b64s.length + ' φωτογραφίες είναι ΣΕΛΙΔΕΣ ΤΟΥ ΙΔΙΟΥ τιμολογίου, με τη σειρά. Δώσε ΕΝΑ σύνολο για ολόκληρο το τιμολόγιο — το τελικό πληρωτέο, που συνήθως βρίσκεται στην ΤΕΛΕΥΤΑΙΑ σελίδα. ΠΟΤΕ μην προσθέσεις μερικά σύνολα από διαφορετικές σελίδες. ')
                 : 'Φωτογραφία τιμολογίου ή απόδειξης (ελληνικά ή αγγλικά). ') +
-              'Απάντησε ΜΟΝΟ με JSON: {"total": τελικό πληρωτέο ποσό με ΦΠΑ, "vat": συνολικό ποσό ΦΠΑ, "balance": υπόλοιπο οφειλής ΜΟΝΟ αν αναγράφεται ρητά, αλλιώς null}. Αριθμοί με τελεία δεκαδικών, χωρίς σύμβολα και χωρίς κείμενο. Αν ένα ποσό δεν διαβάζεται ΚΑΘΑΡΑ, βάλε null — ποτέ μην μαντεύεις.' }
+              'Απάντησε ΜΟΝΟ με JSON: {"net": καθαρή αξία ΠΡΟ ΦΠΑ (ελληνικά: καθαρή αξία, μερικό σύνολο, υποσύνολο · αγγλικά: net, subtotal, amount before VAT), "vat": συνολικό ποσό ΦΠΑ όλων των συντελεστών μαζί (ελληνικά: ΦΠΑ · αγγλικά: VAT, tax), "total": τελικό πληρωτέο ΜΕ ΦΠΑ (ελληνικά: σύνολο, γενικό σύνολο, πληρωτέο · αγγλικά: total, grand total, amount due), "date": η ημερομηνία ΤΟΥ ΤΙΜΟΛΟΓΙΟΥ ως "YYYY-MM-DD", ή null}. ' +
+              'ΠΡΟΣΟΧΗ ΣΤΟΥΣ ΑΡΙΘΜΟΥΣ: το χαρτί μπορεί να γράφει 1.234,56 (ελληνικά) ή 1,234.56 (αγγλικά) — και τα δύο σημαίνουν χίλια διακόσια τριάντα τέσσερα και 56 λεπτά. Κατάλαβε ποιο σύστημα χρησιμοποιεί το ΣΥΓΚΕΚΡΙΜΕΝΟ χαρτί και δώσε τον αριθμό ΠΑΝΤΑ με τελεία δεκαδικών και ΧΩΡΙΣ διαχωριστή χιλιάδων: 1234.56. ' +
+              'Χωρίς σύμβολα, χωρίς κείμενο. Αν κάτι δεν διαβάζεται ΚΑΘΑΡΑ, βάλε null — ποτέ μην μαντεύεις.' }
           ]) }],
           generationConfig: { response_mime_type: 'application/json', temperature: 0 }
         })
@@ -584,7 +818,7 @@
         pe.msg = 'δεν γύρισε JSON: ' + String(txt).slice(0, 60);
         throw pe;
       }
-      return { total: aiNum(o.total), vat: aiNum(o.vat), balance: aiNum(o.balance) };
+      return { net: aiNum(o.net), vat: aiNum(o.vat), total: aiNum(o.total), date: aiDate(o.date) };
     });
   }
   function aiSweep() {
@@ -609,7 +843,7 @@
       var rec = q[0];
       diag('διαβάζω…');
       aiRead(rec, key).then(function (sug) {
-        if (sug.total === null && sug.vat === null && sug.balance === null) {
+        if (sug.total === null && sug.vat === null && sug.net === null) {
           rec.aiTry = (rec.aiTry || 0) + 1; // διάβασε αλλά δεν είδε τίποτα
           diag('απάντησε αλλά δεν διάβασε ποσά (' + rec.aiTry + '/3)');
         } else {
@@ -733,6 +967,28 @@
     show('s-cam');
     startCam();
   }
+  var whoDate = null;   // ms — τι ημερομηνία θα πάρει το επόμενο τιμολόγιο
+  function renderWhoDate() {
+    el('who-date-txt').textContent = '📅 ' + dstr(whoDate);
+    el('who-date-inp').hidden = true;
+    el('who-date-edit').hidden = false;
+  }
+  el('who-date-edit') && (el('who-date-edit').onclick = function () {
+    var inp = el('who-date-inp');
+    inp.value = ymd(whoDate);
+    inp.max = ymd(Date.now());
+    inp.hidden = false;
+    el('who-date-edit').hidden = true;
+    el('who-date-txt').textContent = 'Ημερομηνία τιμολογίου:';
+    if (inp.showPicker) { try { inp.showPicker(); } catch (e) {} }
+    else { inp.focus(); }
+  });
+  el('who-date-inp') && (el('who-date-inp').onchange = function () {
+    var t = fromYmd(el('who-date-inp').value);
+    if (t !== null) { whoDate = t; }
+    renderWhoDate();
+  });
+
   function previewOk() {
     if (!pendingBlob) { return; }
     hidePreview();
@@ -742,6 +998,8 @@
     if (thumbUrl) { URL.revokeObjectURL(thumbUrl); }
     thumbUrl = URL.createObjectURL(pendingPages[0] || pendingBlob);
     el('thumb').src = thumbUrl;
+    whoDate = Date.now();          // προεπιλογή: σήμερα
+    renderWhoDate();
     renderSuppliers();
     el('in-sup').value = '';
     show('s-who');
@@ -756,9 +1014,10 @@
       id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
       ts: Date.now(),
       supplier: name,
+      invDate: whoDate || Date.now(),
       blob: seq[0],
       pages: seq.slice(1),
-      total: null, vat: null, balance: null
+      net: null, vat: null, total: null
     };
     put(rec).then(function () {
       bumpSupplier(name);
@@ -880,7 +1139,7 @@
       if (!key) { diag('χωρίς κλειδί — χειροκίνητα'); return; }
       var target = rows.filter(isPending)[0] || rows[0];
       aiRead(target, key).then(function (s) {
-        if (s.total !== null || s.vat !== null || s.balance !== null) {
+        if (s.total !== null || s.vat !== null || s.net !== null) {
           target.sug = s; target.aiAt = Date.now();
           return put(target).then(function () {
             diag('✓ αποθηκεύτηκε: σύνολο ' + num(s.total) + ' · ΦΠΑ ' + num(s.vat) +
