@@ -371,3 +371,13 @@ input:focus{outline:none;border-color:var(--accent)}
 
 /* Κάθε μήνυμα μέσα στο πλέγμα των τριών ποσών πιάνει ολόκληρη τη γραμμή */
 .amts .amt-warn,.amts .ai-busy,.amts .date-sug{grid-column:1 / -1}
+
+/* ── v20 · επιλογή ημερομηνίας με τρεις λίστες ─────────── */
+.dsel{display:flex;align-items:center;gap:8px;margin:0 0 10px;flex-wrap:wrap}
+.dsel-t{color:var(--text2);font-size:14px;min-width:42px}
+.dsel-s{
+  flex:1 1 0;min-width:64px;min-height:44px;padding:8px 10px;font-size:16px;
+  background:var(--card,#161b22);color:inherit;
+  border:1px solid rgba(255,255,255,.18);border-radius:10px;
+}
+.retry-btn{margin-top:10px}

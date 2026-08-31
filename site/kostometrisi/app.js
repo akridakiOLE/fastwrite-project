@@ -373,7 +373,23 @@
       } else if ((r.aiTry || 0) >= AI_MAX_TRY) {
         busy.classList.add('off');
         busy.textContent = '⚠ Δεν διαβάστηκαν ποσά μετά από ' + AI_MAX_TRY +
-                           ' προσπάθειες — γράψ\' τα μόνος σου';
+                           ' προσπάθειες — δοκίμασε ξανά ή γράψ\' τα μόνος σου';
+        /* v20 — ΜΕΧΡΙ ΣΗΜΕΡΑ ΗΤΑΝ ΜΟΝΟΔΡΟΜΟΣ. Τρεις αποτυχημένες αναγνώσεις
+           (κακός φωτισμός, στραβή γωνία) κλείδωναν το τιμολόγιο για πάντα:
+           έβγαινε από την ουρά και καμία διαδρομή δεν το ξανάβαζε. */
+        var again = document.createElement('button');
+        again.className = 'btn ghost retry-btn';
+        again.textContent = '🔄 Δοκίμασε ξανά';
+        again.onclick = function () {
+          again.disabled = true;
+          again.textContent = 'Μπαίνει στην ουρά…';
+          r.aiTry = 0;
+          autoIds[r.id] = true;
+          put(r).then(function () { manualRun = true; aiSweep(); renderPending(); });
+        };
+        amts.appendChild(busy);
+        amts.appendChild(again);
+        busy = null;
       } else if (!manualRun && !autoIds[r.id]) {
         /* Δεν είναι στην ουρά και δεν πρόκειται να μπει μόνο του */
         busy.textContent = '📖 Δεν έχει διαβαστεί — πάτα «Διάβασε τα υπόλοιπα» πάνω, ή γράψ\' τα μόνος σου';
@@ -385,7 +401,7 @@
           ? '⏳ Στη σειρά — ανάγνωση σε ' + Math.ceil(w / 1000) + 'ς · μπορείς να τα γράψεις και μόνος σου'
           : '⏳ Διαβάζεται… μπορείς να τα γράψεις και μόνος σου';
       }
-      amts.appendChild(busy);
+      if (busy) { amts.appendChild(busy); }
     }
 
     /* ΙΕΡΑΡΧΙΑ: ΑΝΘΡΩΠΟΣ > GEMINI > ΥΠΟΛΟΓΙΣΜΟΣ.
@@ -584,7 +600,7 @@
 
       var bar = document.createElement('div');
       bar.className = 'range-bar';
-      [['Αυτός ο μήνας','month'], ['3 μήνες','q'], ['Φέτος','year'], ['Όλα','all'], ['Επιλογή…','pick']]
+      [['Σήμερα','today'], ['Τρέχων μήνας','month'], ['Όλα','all'], ['Επιλογή…','pick']]
         .forEach(function (o) {
           var b = document.createElement('button');
           /* Το ενεργό βγαίνει από τη μεταβλητή, ΟΧΙ από το στοιχείο:
@@ -603,29 +619,74 @@
         });
       body.appendChild(bar);
 
+      /* v20 — ΤΡΕΙΣ ΚΥΛΙΟΜΕΝΕΣ ΛΙΣΤΕΣ, ΟΧΙ ΗΜΕΡΟΛΟΓΙΟ (απόφαση §2, 30/8/2026).
+         Το <input type="date"> ανοίγει το ημερολόγιο του Android: το έτος
+         ανοίγει λίστα, ο μήνας όχι, και δεν υπάρχει καμία ρύθμιση να το
+         αλλάξεις. Οι <select> είναι native, δουλεύουν παντού και ανοίγουν
+         με ένα πάτημα. Ακρίβεια ημέρας. */
+      function dateTriple(title, ts) {
+        var wrap = document.createElement('div');
+        wrap.className = 'dsel';
+        var lab = document.createElement('span');
+        lab.className = 'dsel-t'; lab.textContent = title;
+        var dd = document.createElement('select'), mm = document.createElement('select'),
+            yy = document.createElement('select');
+        dd.className = mm.className = yy.className = 'dsel-s';
+        var MHNES = ['Ιαν','Φεβ','Μαρ','Απρ','Μάι','Ιουν','Ιουλ','Αυγ','Σεπ','Οκτ','Νοε','Δεκ'];
+        var d0 = new Date(ts), nowY = new Date().getFullYear();
+        var minY = nowY;
+        mine.forEach(function (r) { var y = new Date(dateOf(r)).getFullYear(); if (y < minY) { minY = y; } });
+        if (minY > nowY - 1) { minY = nowY - 1; }
+
+        MHNES.forEach(function (nm, i) {
+          var o = document.createElement('option');
+          o.value = i; o.textContent = nm; mm.appendChild(o);
+        });
+        for (var y = nowY; y >= minY; y--) {
+          var oy = document.createElement('option');
+          oy.value = y; oy.textContent = y; yy.appendChild(oy);
+        }
+        /* Οι ημέρες προσαρμόζονται στον μήνα: 28/29/30/31 */
+        function fillDays() {
+          var keep = parseInt(dd.value, 10) || d0.getDate();
+          var last = new Date(parseInt(yy.value, 10), parseInt(mm.value, 10) + 1, 0).getDate();
+          dd.innerHTML = '';
+          for (var i = 1; i <= last; i++) {
+            var od = document.createElement('option');
+            od.value = i; od.textContent = i; dd.appendChild(od);
+          }
+          dd.value = Math.min(keep, last);
+        }
+        yy.value = d0.getFullYear(); mm.value = d0.getMonth();
+        fillDays(); dd.value = d0.getDate();
+        mm.onchange = fillDays; yy.onchange = fillDays;
+
+        wrap.appendChild(lab); wrap.appendChild(dd);
+        wrap.appendChild(mm); wrap.appendChild(yy);
+        return { node: wrap, get: function () {
+          return new Date(parseInt(yy.value, 10), parseInt(mm.value, 10),
+                          parseInt(dd.value, 10), 12, 0, 0, 0).getTime();
+        } };
+      }
+
       function pick() {
+        if (body.querySelector('.range-pick')) { return; }   // ήδη ανοιχτό
         var box = document.createElement('div');
         box.className = 'range-pick';
-        var a = document.createElement('input'), z = document.createElement('input');
-        a.type = 'date'; z.type = 'date';
-        a.value = ymd(from || startOf('year')); z.value = ymd(to || Date.now());
-        a.max = ymd(Date.now()); z.max = ymd(Date.now());
+        var a = dateTriple('Από', from || startOf('month'));
+        var z = dateTriple('Έως', to || Date.now());
         var go = document.createElement('button');
         go.className = 'btn primary'; go.textContent = 'Δείξε';
         go.onclick = function () {
-          var f = fromYmd(a.value), t = fromYmd(z.value);
+          var f = a.get(), t = z.get();
           if (f === null || t === null) { return; }
-          from = f; to = t + 86399999;    // ως το τέλος της ημέρας
+          if (f > t) { var sw = f; f = t; t = sw; }   // ανάποδα άκρα: τα γυρνάμε
+          from = new Date(f).setHours(0, 0, 0, 0);
+          to = new Date(t).setHours(23, 59, 59, 999);
           active = 'pick';
           draw();
         };
-        var l1 = document.createElement('label'); l1.className = 'amt';
-        l1.appendChild(Object.assign(document.createElement('span'), { textContent: 'Από' }));
-        l1.appendChild(a);
-        var l2 = document.createElement('label'); l2.className = 'amt';
-        l2.appendChild(Object.assign(document.createElement('span'), { textContent: 'Έως' }));
-        l2.appendChild(z);
-        box.appendChild(l1); box.appendChild(l2); box.appendChild(go);
+        box.appendChild(a.node); box.appendChild(z.node); box.appendChild(go);
         bar.insertAdjacentElement('afterend', box);
       }
 
@@ -982,7 +1043,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v19';
+  var APP_VER = 'φέτα 3 · v20';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
