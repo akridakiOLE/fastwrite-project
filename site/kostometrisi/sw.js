@@ -1,6 +1,6 @@
 /* Kostometrisi service worker — κέλυφος offline.
    ⚠ Το CACHE ανεβαίνει σε ΚΑΘΕ αλλαγή αρχείου, αλλιώς μένει το παλιό. */
-var CACHE = 'km-v16';
+var CACHE = 'km-v17';
 var SHELL = [
   '/kostometrisi/',
   '/kostometrisi/index.html',
