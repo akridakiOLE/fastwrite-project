@@ -239,6 +239,12 @@
 
   /* ══ ΤΑ ΕΚΚΡΕΜΗ ══ */
   var pendOrder = null;      // παγωμένη σειρά όσο είσαι μέσα στην οθόνη
+  /* v23 — ΜΑΖΙΚΗ ΔΙΑΓΡΑΦΗ (#4 της 30/8, brief Stavros 31/8: επιβεβαίωση ΚΑΙ
+     αναίρεση). Το τιμολόγιο είναι λογιστικό τεκμήριο: η επιβεβαίωση σταματάει
+     το λάθος πάτημα, η αναίρεση σώζει το λάθος που πέρασε την επιβεβαίωση. */
+  var pendPick = {};
+  var undoBin = null, undoTimer = null;
+  var UNDO_MS = 10000;
   function renderPending() {
     aiSweep();
     var body = el('pend-body');
@@ -293,6 +299,77 @@
         list.sort(function (a, b) { return seen[a.id] - seen[b.id]; });
       }
       list.forEach(function (r) { body.appendChild(pendCard(r)); });
+
+      /* Καθαρισμός επιλογών που δεν υπάρχουν πια (π.χ. αποθηκεύτηκαν) */
+      var alive = {};
+      list.forEach(function (r) { alive[r.id] = 1; });
+      Object.keys(pendPick).forEach(function (id) { if (!alive[id]) { delete pendPick[id]; } });
+
+      var bar = document.createElement('div');
+      bar.className = 'multi-bar';
+      var allBtn = document.createElement('button');
+      allBtn.className = 'btn ghost';
+      var delBtn = document.createElement('button');
+      delBtn.className = 'btn del-many';
+      bar.appendChild(allBtn); bar.appendChild(delBtn);
+      body.appendChild(bar);
+
+      window.__syncPendBar = function () {
+        var n = Object.keys(pendPick).length;
+        var oloi = n === list.length && n > 0;
+        allBtn.textContent = oloi ? 'Καθάρισε' : 'Επίλεξε όλα (' + list.length + ')';
+        allBtn.onclick = function () {
+          pendPick = {};
+          if (!oloi) { list.forEach(function (r) { pendPick[r.id] = true; }); }
+          renderPending();
+        };
+        delBtn.hidden = n === 0;
+        delBtn.textContent = '🗑 Διαγραφή (' + n + ')';
+        delBtn.onclick = function () { deleteMany(list); };
+      };
+      syncPendBar();
+
+      if (undoBin) { body.appendChild(undoRow()); }
+    });
+  }
+  function syncPendBar() { if (window.__syncPendBar) { window.__syncPendBar(); } }
+
+  function undoRow() {
+    var u = document.createElement('div');
+    u.className = 'undo-row';
+    var t = document.createElement('span');
+    t.textContent = 'Διαγράφηκαν ' + undoBin.length +
+                    (undoBin.length === 1 ? ' τιμολόγιο' : ' τιμολόγια');
+    var b = document.createElement('button');
+    b.className = 'btn ghost';
+    b.textContent = '↩ Αναίρεση';
+    b.onclick = function () {
+      var back = undoBin; undoBin = null;
+      if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+      Promise.all(back.map(function (r) { return put(r); }))
+        .then(function () { renderPending(); refreshCount(); });
+    };
+    u.appendChild(t); u.appendChild(b);
+    return u;
+  }
+
+  function deleteMany(list) {
+    var ids = Object.keys(pendPick);
+    if (!ids.length) { return; }
+    var recs = list.filter(function (r) { return pendPick[r.id]; });
+    if (!confirm('Διαγραφή ' + ids.length +
+                 (ids.length === 1 ? ' τιμολογίου;' : ' τιμολογίων;') +
+                 '\n\nΣβήνονται και οι φωτογραφίες.\n' +
+                 'Θα έχεις 10 δευτερόλεπτα για αναίρεση.')) { return; }
+    Promise.all(recs.map(function (r) { return del(r.id); })).then(function () {
+      pendPick = {};
+      undoBin = recs;                    // κρατιούνται ΟΛΟΚΛΗΡΕΣ, με το blob
+      if (undoTimer) { clearTimeout(undoTimer); }
+      undoTimer = setTimeout(function () {
+        undoBin = null; undoTimer = null;
+        if (!el('s-pend').hidden) { renderPending(); }
+      }, UNDO_MS);
+      renderPending(); refreshCount();
     });
   }
   function pendCard(r) {
@@ -312,6 +389,17 @@
     thumb.className = 'thumb';
     thumb.appendChild(img);
     addPgBadge(thumb, r);
+    /* v23 — κουτάκι επιλογής, ίδια λογική με τη λίστα προμηθευτών (§5 30/8) */
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'pend-cb';
+    cb.checked = !!pendPick[r.id];
+    cb.setAttribute('aria-label', 'Επίλεξε τιμολόγιο ' + r.supplier);
+    cb.onchange = function () {
+      if (cb.checked) { pendPick[r.id] = true; } else { delete pendPick[r.id]; }
+      syncPendBar();
+    };
+    head.appendChild(cb);
     head.appendChild(thumb); head.appendChild(meta);
 
     var amts = document.createElement('div');
@@ -1112,7 +1200,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v21';
+  var APP_VER = 'φέτα 3 · v23';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1385,6 +1473,43 @@
     el('cam-err-msg').textContent = msg;
     el('cam-err').hidden = false;
   }
+  /* v22 — ΦΥΛΑΚΑΣ ΕΙΚΟΝΑΣ. Οι v18/v19 πιάνουν την κάμερα που πέθανε ΟΤΑΝ
+     ΦΕΥΓΕΙΣ ΚΑΙ ΓΥΡΝΑΣ. Υπάρχει όμως τρίτος δρόμος: η εικόνα παγώνει ΕΝΩ
+     είσαι μέσα στην οθόνη — το κανάλι δηλώνει 'live', το <video> δηλώνει ότι
+     παίζει, και απλώς δεν έρχονται καρέ. Καμία διαδρομή επαναφοράς δεν
+     ενεργοποιείται, γιατί ο χρήστης δεν πάει πουθενά.
+     Μετρήθηκε 31/8/2026: με νεκρό κανάλι, το v.paused ήταν false — το
+     στοιχείο δήλωνε ότι παίζει. Η ΜΟΝΗ αξιόπιστη ένδειξη είναι το
+     currentTime: αν δεν προχωράει, η εικόνα είναι νεκρή όσο «ζωντανή» κι αν
+     δηλώνεται. Δύο δείγματα των 2 δευτ. = 4 δευτ. ακινησίας πριν την
+     επανεκκίνηση, ώστε να μην ξαναζητάει κάμερα σε κάθε μικροκόλλημα. */
+  var camWatch = null, camLastT = -1, camStuck = 0;
+  function camHardRestart() {
+    if (stream) { stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} }); }
+    stream = null;
+    el('vid').srcObject = null;
+    startCam();
+  }
+  function camWatchStart() {
+    if (camWatch) { return; }
+    camWatch = setInterval(function () {
+      var pv = el('preview');
+      /* Δεν επεμβαίνουμε: εκτός οθόνης κάμερας, στο παρασκήνιο, ή όσο ο
+         χρήστης κοιτάει την προεπισκόπηση της λήψης. */
+      if (el('s-cam').hidden || document.hidden || (pv && !pv.hidden)) {
+        camLastT = -1; camStuck = 0; return;
+      }
+      var v = el('vid');
+      if (!stream) { camLastT = -1; camStuck = 0; startCam(); return; }
+      var t = v.currentTime;
+      if (t === camLastT) {
+        camStuck++;
+        if (camStuck >= 2) { camStuck = 0; camLastT = -1; camHardRestart(); }
+      } else { camStuck = 0; camLastT = t; }
+    }, 2000);
+  }
+  camWatchStart();
+
   /* v18 — Η επιστροφή από το παρασκήνιο είναι η πιο συχνή στιγμή που έχει
      πεθάνει η κάμερα: ο χρήστης απαντάει μήνυμα και γυρνάει. Χωρίς αυτό,
      βλέπει παγωμένο καρέ και νομίζει ότι η εφαρμογή χάλασε. */

@@ -394,3 +394,14 @@ input:focus{outline:none;border-color:var(--accent)}
 .multi-who{color:var(--text2);font-size:14px;margin:-8px 0 14px;line-height:1.5}
 .range-brk{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12)}
 .range-brk .range-row span{font-size:14px}
+
+/* ── v23 · μαζική διαγραφή εκκρεμών ───────────────────── */
+.pend-cb{width:26px;height:26px;min-width:26px;accent-color:var(--accent);flex:0 0 auto;margin-right:4px}
+.del-many{background:var(--danger,#f85149);color:#fff;border:0}
+.undo-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:12px;padding:12px 14px;border-radius:12px;
+  background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.4);
+}
+.undo-row span{font-size:15px}
+.undo-row .btn{margin:0}
