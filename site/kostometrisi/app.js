@@ -529,7 +529,9 @@
       var list = document.createElement('div');
       list.className = 'sup-rows';
 
+      var lastQ = '';
       function draw(q) {
+        lastQ = q || '';
         list.innerHTML = '';
         var nq = norm(q);
         var hit = keys.filter(function (nm) { return !nq || norm(nm).indexOf(nq) !== -1; });
@@ -538,14 +540,49 @@
           return;
         }
         hit.forEach(function (nm) {
+          /* v21 — Το κουτάκι ΔΕΝ μπαίνει μέσα στο κουμπί: ένα <input> μέσα σε
+             <button> δεν πατιέται αξιόπιστα σε κινητό. Χωριστά αδέρφια. */
+          var wrap = document.createElement('div');
+          wrap.className = 'sup-line';
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.className = 'sup-cb';
+          cb.checked = !!picked[nm];
+          cb.setAttribute('aria-label', 'Επίλεξε ' + nm);
+          cb.onchange = function () {
+            if (cb.checked) { picked[nm] = true; } else { delete picked[nm]; }
+            syncBar();
+          };
           var b = document.createElement('button');
           b.className = 'row';
           b.innerHTML = '<span class="row-t"></span><span class="row-b"></span>';
           b.querySelector('.row-t').textContent = nm;
           b.querySelector('.row-b').textContent = names[nm] + ' τιμ.';
           b.onclick = function () { openSupplier(nm, rows); };
-          list.appendChild(b);
+          wrap.appendChild(cb); wrap.appendChild(b);
+          list.appendChild(wrap);
         });
+      }
+
+      /* v21 — ΙΣΤΟΡΙΚΟ ΠΟΛΛΩΝ ΠΡΟΜΗΘΕΥΤΩΝ ΜΑΖΙ (#5 της 30/8/2026).
+         Η μπάρα εμφανίζεται ΜΟΝΟ με 2+ επιλεγμένους: με έναν, το σκέτο
+         πάτημα στη γραμμή κάνει ήδη τη δουλειά. */
+      var picked = {};
+      var multiBar = document.createElement('div');
+      multiBar.className = 'multi-bar';
+      multiBar.hidden = true;
+      var mgo = document.createElement('button');
+      mgo.className = 'btn primary';
+      var mclr = document.createElement('button');
+      mclr.className = 'btn ghost';
+      mclr.textContent = 'Καθάρισε';
+      mclr.onclick = function () { picked = {}; draw(lastQ); syncBar(); };
+      multiBar.appendChild(mgo); multiBar.appendChild(mclr);
+      function syncBar() {
+        var n = Object.keys(picked).length;
+        multiBar.hidden = n < 2;
+        mgo.textContent = 'Δες μαζί (' + n + ')';
+        mgo.onclick = function () { openSupplier(Object.keys(picked), rows); };
       }
 
       if (keys.length > FIND_MIN) {
@@ -560,7 +597,9 @@
         body.appendChild(find);
       }
       body.appendChild(list);
+      body.appendChild(multiBar);
       draw('');
+      syncBar();
     });
   }
   /* ══ ΙΣΤΟΡΙΚΟ ΠΡΟΜΗΘΕΥΤΗ (v10) ══════════════════════════════
@@ -586,7 +625,11 @@
   }
   function openSupplier(name, rows) {
     var body = el('sup-body');
-    var mine = rows.filter(function (r) { return r.supplier === name; });
+    /* v21 — δέχεται όνομα Ή πίνακα ονομάτων. Μία διαδρομή, όχι δύο. */
+    var names = (Object.prototype.toString.call(name) === '[object Array]') ? name.slice() : [name];
+    var polloi = names.length > 1;
+    var titlos = polloi ? (names.length + ' προμηθευτές') : names[0];
+    var mine = rows.filter(function (r) { return names.indexOf(r.supplier) !== -1; });
     var from = null, to = null;          // null = όλα
     var active = 'all';                  // ποιο κουμπί είναι πατημένο
 
@@ -595,8 +638,14 @@
       freeUrls();
 
       var h = document.createElement('h2');
-      h.textContent = name;
+      h.textContent = titlos;
       body.appendChild(h);
+      if (polloi) {
+        var who = document.createElement('p');
+        who.className = 'multi-who';
+        who.textContent = names.join(' · ');
+        body.appendChild(who);
+      }
 
       var bar = document.createElement('div');
       bar.className = 'range-bar';
@@ -720,6 +769,25 @@
           m.textContent = '+' + t.miss + ' χωρίς ποσό — δεν μετρήθηκαν';
           card.appendChild(m);
         }
+        /* v21 — Με πολλούς προμηθευτές, το σκέτο σύνολο δεν λέει ΠΟΙΟΣ.
+           Ανάλυση ανά προμηθευτή, με το ίδιο «χωρίς ποσό» δίπλα. */
+        if (polloi) {
+          var brk = document.createElement('div');
+          brk.className = 'range-brk';
+          names.map(function (nm) {
+            return { nm: nm, t: sumRange(list.filter(function (r) { return r.supplier === nm; })) };
+          }).sort(function (a, b) { return b.t.total - a.t.total; })
+            .forEach(function (o) {
+              var row = document.createElement('div');
+              row.className = 'range-row';
+              row.innerHTML = '<span></span><b></b>';
+              row.querySelector('span').textContent = o.nm + ' · ' + o.t.n + ' τιμ.' +
+                (o.t.miss ? ' · +' + o.t.miss + ' χωρίς ποσό' : '');
+              row.querySelector('b').textContent = eur(o.t.total);
+              brk.appendChild(row);
+            });
+          card.appendChild(brk);
+        }
         body.appendChild(card);
         if (!list.length) {
           body.appendChild(Object.assign(document.createElement('p'),
@@ -758,7 +826,8 @@
       var a = document.createElement('div');
       if (typeof r.total === 'number') { a.className = 'inv-a'; a.textContent = eur(r.total); }
       else { a.className = 'inv-a miss'; a.textContent = 'χωρίς ποσό'; }
-      var d = document.createElement('div'); d.className = 'inv-d'; d.textContent = dstr(dateOf(r));
+      var d = document.createElement('div'); d.className = 'inv-d';
+      d.textContent = (polloi ? r.supplier + ' · ' : '') + dstr(dateOf(r));
       mt.appendChild(a); mt.appendChild(d);
       var th = document.createElement('span');
       th.className = 'thumb';
@@ -1043,7 +1112,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v20';
+  var APP_VER = 'φέτα 3 · v21';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της

@@ -381,3 +381,16 @@ input:focus{outline:none;border-color:var(--accent)}
   border:1px solid rgba(255,255,255,.18);border-radius:10px;
 }
 .retry-btn{margin-top:10px}
+
+/* ── v21 · πολλοί προμηθευτές μαζί ────────────────────── */
+.sup-line{display:flex;align-items:center;gap:10px}
+.sup-line .row{flex:1 1 auto}
+.sup-cb{width:26px;height:26px;min-width:26px;accent-color:var(--accent);flex:0 0 auto}
+.multi-bar{
+  position:sticky;bottom:0;display:flex;gap:10px;padding:12px 0 4px;
+  background:linear-gradient(to top,var(--bg,#0a0e14) 70%,transparent);
+}
+.multi-bar .btn{margin:0;flex:1 1 auto}
+.multi-who{color:var(--text2);font-size:14px;margin:-8px 0 14px;line-height:1.5}
+.range-brk{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12)}
+.range-brk .range-row span{font-size:14px}
