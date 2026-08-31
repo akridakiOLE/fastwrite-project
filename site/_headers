@@ -8,14 +8,19 @@
 /style.css
   Cache-Control: public, max-age=86400
 
-# ── Hand Control (25/8/2026) ────────────────────────────────────────
-# Το /* πιο πάνω κλείνει την κάμερα σε ΟΛΟ το site (camera=()). Το Hand
-# Control είναι εφαρμογή κάμερας — χωρίς αυτό το μπλοκ, το getUserMedia
-# απορρίπτεται από τον browser πριν καν ρωτήσει τον χρήστη.
-# Ανοίγει ΜΟΝΟ για το /hc/, ΜΟΝΟ για την ίδια προέλευση (self).
-/hc/*
+# ── Kostometrisi (25/8/2026 · μετονομασία 31/8/2026) ────────────────
+# Το /* πιο πάνω κλείνει την κάμερα σε ΟΛΟ το site (camera=()). Το
+# Kostometrisi είναι εφαρμογή κάμερας — χωρίς αυτό το μπλοκ, το
+# getUserMedia απορρίπτεται από τον browser πριν καν ρωτήσει τον χρήστη.
+# Ανοίγει ΜΟΝΟ για το /kostometrisi/, ΜΟΝΟ για την ίδια προέλευση (self).
+/kostometrisi/*
   Permissions-Policy: camera=(self), geolocation=(), microphone=()
   Cache-Control: no-cache
 
-/hc/icons/*
+/kostometrisi/icons/*
   Cache-Control: public, max-age=604800
+
+# Η παλιά διαδρομή /hc/ — μόνο σελίδα μετακόμισης και service worker
+# αυτοκαταστροφής. Καμία κάμερα, καμία cache.
+/hc/*
+  Cache-Control: no-store
