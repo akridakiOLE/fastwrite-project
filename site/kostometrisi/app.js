@@ -142,7 +142,10 @@
     freeUrls();
     nav.pop();
     var prev = nav[nav.length - 1];
-    if (!prev) { show('s-cam'); refreshCount(); return; }
+    /* v18 — Η επιστροφή στην κάμερα ΞΑΝΑΖΗΤΑΕΙ κάμερα. Μέχρι τώρα το back()
+       απλώς εμφάνιζε την οθόνη· αν το κανάλι είχε πεθάνει στο μεταξύ, ο χρήστης
+       έβλεπε παγωμένο καρέ και καμία διαδρομή δεν το επανέφερε. */
+    if (!prev) { show('s-cam'); startCam(); refreshCount(); return; }
     render(prev); show(prev);
   }
   function freeUrls() {
@@ -224,7 +227,13 @@
       var m = el('m-pend');
       m.textContent = p;
       m.className = 'row-b' + (p > 0 ? ' hot' : '');
-      el('m-sup').textContent = suppliers().length;
+      /* v18 — Ο αριθμός εδώ ΠΡΕΠΕΙ να μετράει ό,τι μετράει και η οθόνη.
+         Το suppliers() είναι η ΜΝΗΜΗ ονομάτων για τα γρήγορα κουμπιά: μεγαλώνει
+         όταν γράφεις όνομα και δεν μικραίνει ποτέ όταν σβήνεις τιμολόγιο.
+         Στις 31/8/2026 το μενού έλεγε 4 και η λίστα έδειχνε 3. */
+      var supNames = {};
+      rows.forEach(function (r) { if (r.supplier) { supNames[r.supplier] = 1; } });
+      el('m-sup').textContent = Object.keys(supNames).length;
     });
   }
 
@@ -973,7 +982,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v17';
+  var APP_VER = 'φέτα 3 · v18';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1204,7 +1213,18 @@
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       return camFail('Ο browser δεν υποστηρίζει κάμερα. Άνοιξε τη σελίδα σε Chrome ή Safari.');
     }
-    if (stream) { return; }
+    /* v18 — «Υπάρχει stream» ΔΕΝ σημαίνει «ζωντανή κάμερα». Όταν το Android
+       παίρνει την κάμερα (παρασκήνιο, κλείδωμα οθόνης, άλλη εφαρμογή), τα
+       κανάλια γίνονται 'ended' αλλά το αντικείμενο μένει — και η οθόνη κρατάει
+       ΠΑΓΩΜΕΝΟ το τελευταίο καρέ, χωρίς κανένα μήνυμα. Μετρήθηκε 31/8/2026:
+       μετά το 'ended', ούτε έξοδος-είσοδος στην οθόνη δεν το επανέφερε. */
+    if (stream) {
+      var zontano = stream.getVideoTracks().some(function (t) { return t.readyState === 'live'; });
+      if (zontano) { return; }
+      stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+      stream = null;
+      el('vid').srcObject = null;
+    }
     navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } },
       audio: false
@@ -1222,6 +1242,13 @@
     el('cam-err-msg').textContent = msg;
     el('cam-err').hidden = false;
   }
+  /* v18 — Η επιστροφή από το παρασκήνιο είναι η πιο συχνή στιγμή που έχει
+     πεθάνει η κάμερα: ο χρήστης απαντάει μήνυμα και γυρνάει. Χωρίς αυτό,
+     βλέπει παγωμένο καρέ και νομίζει ότι η εφαρμογή χάλασε. */
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && !el('s-cam').hidden) { startCam(); }
+  });
+
   function toCam() { nav = []; clearPending(); show('s-cam'); startCam(); refreshCount(); }
 
   function capture() {
