@@ -982,7 +982,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v18';
+  var APP_VER = 'φέτα 3 · v19';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1220,7 +1220,17 @@
        μετά το 'ended', ούτε έξοδος-είσοδος στην οθόνη δεν το επανέφερε. */
     if (stream) {
       var zontano = stream.getVideoTracks().some(function (t) { return t.readyState === 'live'; });
-      if (zontano) { return; }
+      if (zontano) {
+        /* v19 — ΖΩΝΤΑΝΟ ΚΑΝΑΛΙ ΔΕΝ ΣΗΜΑΙΝΕΙ ΚΙΝΟΥΜΕΝΗ ΕΙΚΟΝΑ. Το <video autoplay>
+           ξεκινάει ΜΙΑ φορά· όταν το Android παγώνει την εφαρμογή στο παρασκήνιο,
+           το στοιχείο μένει σε pause και δείχνει το τελευταίο καρέ — με το κανάλι
+           ακόμα 'live'. Σε ΟΛΟ το αρχείο δεν υπήρχε ούτε μία κλήση .play().
+           Γι' αυτό η διόρθωση της v18 έπιασε μόνο τη μισή περίπτωση. */
+        var v0 = el('vid');
+        if (v0.srcObject !== stream) { v0.srcObject = stream; }
+        if (v0.paused) { v0.play().catch(function () {}); }
+        return;
+      }
       stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
       stream = null;
       el('vid').srcObject = null;
@@ -1230,7 +1240,10 @@
       audio: false
     }).then(function (s) {
       stream = s;
-      el('vid').srcObject = s;
+      var v = el('vid');
+      v.srcObject = s;
+      /* v19 — ρητό play(): το autoplay δεν είναι εγγύηση σε κινητό */
+      v.play().catch(function () {});
     }).catch(function (err) {
       var m = 'Σφάλμα: ' + (err && err.name ? err.name : 'άγνωστο');
       if (err && err.name === 'NotAllowedError') { m = 'Δεν δόθηκε άδεια κάμερας. Άνοιξε τις ρυθμίσεις του browser για αυτή τη σελίδα και επίτρεψε την κάμερα.'; }
