@@ -1,197 +1,42 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="el">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0a0e14">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Kostometrisi">
-<meta name="robots" content="noindex, nofollow">
-<title>Kostometrisi</title>
-<link rel="manifest" href="/kostometrisi/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/kostometrisi/icons/icon-180.png">
-<link rel="icon" href="/kostometrisi/icons/icon-192.png">
-<link rel="stylesheet" href="/kostometrisi/app.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Μετακομίσαμε — Kostometro</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+       background:#0a0e14;color:#e6edf3;font:16px/1.6 system-ui,-apple-system,sans-serif;
+       text-align:center;padding:24px}
+  .w{max-width:22rem}
+  h1{font-size:1.4rem;margin:0 0 .6rem}
+  a{display:inline-block;margin-top:1.2rem;padding:.8rem 1.4rem;border-radius:10px;
+    background:#00E5A0;color:#0a0e14;text-decoration:none;font-weight:700}
+  p{color:#9aa7b4;margin:.4rem 0}
+  .ok{color:#00E5A0}
+</style>
 </head>
 <body>
-
-<!-- ══ ΟΘΟΝΗ Α · EMAIL ══════════════════════════════════════════ -->
-<section id="s-email" class="screen setup" hidden>
-  <div class="setup-inner">
-    <h1 class="logo">Kosto<span>metrisi</span></h1>
-    <p class="lede">Φωτογραφίζεις το τιμολόγιο στην παραλαβή.<br>Κρατάς τι πλήρωσες, ανά προμηθευτή.</p>
-    <label class="fld">
-      <span>Το email σου</span>
-      <input type="email" id="in-email" inputmode="email" autocomplete="email" placeholder="onoma@example.com">
-    </label>
-    <p class="err" id="err-email" hidden>Γράψε μια σωστή διεύθυνση email.</p>
-    <button class="btn primary" id="go-email">Συνέχεια</button>
-    <p class="fine">Δωρεάν, χωρίς όριο χρόνου. Το email είναι για ενημερώσεις και αναβαθμίσεις.</p>
-  </div>
-</section>
-
-<!-- ══ ΟΘΟΝΗ Β · ΚΛΕΙΔΙ GEMINI ═════════════════════════════════ -->
-<section id="s-key" class="screen setup" hidden>
-  <div class="setup-inner">
-    <h2>Να διαβάζει μόνο του τα ποσά;</h2>
-    <p class="lede">Με δικό σου κλειδί Gemini, η εφαρμογή διαβάζει <b>σύνολο, ΦΠΑ και υπόλοιπο</b> από τη φωτογραφία. Χωρίς κλειδί, τα γράφεις εσύ.</p>
-    <p class="note">Η φωτογραφία πηγαίνει <b>απευθείας από τη συσκευή σου στο Gemini</b>. Δεν περνάει ποτέ από δικό μας διακομιστή. Το κλειδί μένει μόνο εδώ, στο κινητό σου.</p>
-    <p class="note">Με <b>δωρεάν</b> κλειδί, η Google μπορεί να χρησιμοποιήσει τις φωτογραφίες για βελτίωση των μοντέλων της. Με <b>πληρωμένο</b>, όχι. Η επιλογή είναι δική σου.</p>
-    <label class="fld">
-      <span>Κλειδί Gemini</span>
-      <input type="text" id="in-key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIza…">
-    </label>
-    <a class="howto" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Πώς βγάζω κλειδί — 4 βήματα</a>
-    <button class="btn primary" id="go-key">Αποθήκευση</button>
-    <button class="btn ghost" id="skip-key">Παράλειψη — θα γράφω μόνος μου τα ποσά</button>
-  </div>
-</section>
-
-<!-- ══ ΟΘΟΝΗ Γ · ΑΔΕΙΑ ΚΑΜΕΡΑΣ (φέτα 2) ════════════════════════ -->
-<section id="s-perm" class="screen setup" hidden>
-  <div class="setup-inner">
-    <h2>Ένα πράγμα πριν ξεκινήσουμε</h2>
-    <p class="lede">Το κινητό θα ρωτήσει αν επιτρέπεις την κάμερα.</p>
-    <p class="note big">Διάλεξε <b>«Κατά τη χρήση της εφαρμογής»</b> ή <b>«Να επιτρέπεται πάντα»</b>.<br><br>
-    Αν διαλέξεις <b>«Μόνο αυτή τη φορά»</b>, θα σε ξαναρωτάει <b>κάθε φορά που ανοίγεις την εφαρμογή</b> — και στην πόρτα, με τα χέρια γεμάτα, αυτό κοστίζει.</p>
-    <button class="btn primary" id="go-perm">Κατάλαβα — άνοιξε την κάμερα</button>
-  </div>
-</section>
-
-<!-- ══ ΟΘΟΝΗ 1 · ΚΑΜΕΡΑ ════════════════════════════════════════ -->
-<section id="s-cam" class="screen cam" hidden>
-  <video id="vid" playsinline muted autoplay></video>
-  <div class="cam-top">
-    <button class="icon-btn" id="btn-menu" aria-label="Μενού">☰</button>
-    <span class="pill" id="pending">0 εκκρεμή</span>
-    <span class="spacer"></span>
-  </div>
-  <div class="cam-bottom">
-    <button id="shutter" class="shutter" aria-label="Λήψη"></button>
-  </div>
-
-  <!-- ΠΡΟΕΠΙΣΚΟΠΗΣΗ (v9) — η φωτογραφία ΟΛΟΚΛΗΡΗ, πριν από οτιδήποτε άλλο.
-       Αιτία: το «Ξανά» καθόταν στην οθόνη «Ποιος;» δίπλα σε μικρογραφία 56px
-       με object-fit:cover — ο χρήστης δεν είχε δει ποτέ τι τράβηξε. -->
-  <div class="preview" id="preview" hidden>
-    <img id="prev-img" alt="Η φωτογραφία που μόλις τράβηξες">
-    <span class="prev-count" id="prev-count" hidden></span>
-    <div class="prev-acts">
-      <button class="btn ghost del" id="prev-retake">Ξανά</button>
-      <button class="btn ghost" id="prev-page">+ Σελίδα</button>
-      <button class="btn primary" id="prev-ok">OK</button>
-    </div>
-  </div>
-  <div class="flash" id="flash"></div>
-  <div class="toast" id="toast" hidden>✓ Μπήκε</div>
-  <div class="cam-err" id="cam-err" hidden>
-    <p><b>Δεν άνοιξε η κάμερα.</b></p>
-    <p id="cam-err-msg"></p>
-    <button class="btn ghost" id="cam-retry">Δοκίμασε ξανά</button>
-  </div>
-</section>
-
-<!-- ══ ΟΘΟΝΗ 3 · ΠΟΙΟΣ; ════════════════════════════════════════ -->
-<section id="s-who" class="screen who" hidden>
-  <div class="who-head">
-    <span class="thumb-wrap"><img id="thumb" alt=""><span class="pg-badge" id="who-pages" hidden></span></span>
-    <h2>Ποιος;</h2>
-  </div>
-  <!-- v10: ημερομηνία τιμολογίου. Προεπιλογή η σημερινή· την πατάς ΜΟΝΟ
-       αν το τιμολόγιο είναι άλλης μέρας. Κανένα επιπλέον πάτημα στην πόρτα. -->
-  <div class="who-date">
-    <span id="who-date-txt"></span>
-    <button class="btn ghost" id="who-date-edit">Αλλαγή</button>
-    <input type="date" id="who-date-inp" hidden>
-  </div>
-
-  <div id="sup-list" class="sup-list"></div>
-  <div class="who-new">
-    <input type="text" id="in-sup" placeholder="Νέος προμηθευτής" autocomplete="off">
-    <button class="btn primary" id="add-sup">Καταχώρηση</button>
-  </div>
-  <p class="fine">Γράψε το όνομα που χρησιμοποιείς εσύ — όχι την επωνυμία του τιμολογίου.</p>
-</section>
-
-<!-- ══ ΜΕΝΟΥ (φέτα 2) ══════════════════════════════════════════ -->
-<section id="s-menu" class="screen page" hidden>
-  <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
-    <h2>Μενού</h2>
-  </header>
-  <div class="pg-body">
-    <button class="row" data-go="s-pend"><span class="row-t">Τα εκκρεμή</span><span class="row-b" id="m-pend">0</span></button>
-    <button class="row" data-go="s-sup"><span class="row-t">Ο προμηθευτής μου</span><span class="row-b" id="m-sup">0</span></button>
-    <button class="row" data-go="s-ref"><span class="row-t">Κάλεσε</span><span class="row-b">→</span></button>
-    <div class="sep"></div>
-    <button class="row" data-go="s-settings"><span class="row-t">Ρυθμίσεις</span><span class="row-b">→</span></button>
-  </div>
-</section>
-
-<!-- ══ ΤΑ ΕΚΚΡΕΜΗ ══════════════════════════════════════════════ -->
-<section id="s-pend" class="screen page" hidden>
-  <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
-    <h2>Τα εκκρεμή</h2>
-  </header>
-  <div class="pg-body" id="pend-body"></div>
-</section>
-
-<!-- ══ Ο ΠΡΟΜΗΘΕΥΤΗΣ ΜΟΥ ═══════════════════════════════════════ -->
-<section id="s-sup" class="screen page" hidden>
-  <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
-    <h2>Ο προμηθευτής μου</h2>
-  </header>
-  <div class="pg-body" id="sup-body"></div>
-</section>
-
-<!-- ══ ΚΑΛΕΣΕ ══════════════════════════════════════════════════ -->
-<section id="s-ref" class="screen page" hidden>
-  <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
-    <h2>Κάλεσε</h2>
-  </header>
-  <div class="pg-body">
-    <p class="lede">Στείλε τον σύνδεσμό σου. Όποιος τον ανοίξει παίρνει <b>ακριβώς τα ίδια</b>, δωρεάν, χωρίς όριο χρόνου.</p>
-    <div class="linkbox" id="ref-link"></div>
-    <button class="btn primary" id="ref-share">Στείλε τον σύνδεσμο</button>
-    <button class="btn ghost" id="ref-copy">Αντιγραφή</button>
-    <p class="fine" id="ref-note"></p>
-  </div>
-</section>
-
-<!-- ══ ΡΥΘΜΙΣΕΙΣ ═══════════════════════════════════════════════ -->
-<section id="s-settings" class="screen page" hidden>
-  <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
-    <h2>Ρυθμίσεις</h2>
-  </header>
-  <div class="pg-body">
-    <div class="kv"><span>Email</span><b id="st-email">—</b></div>
-    <div class="kv"><span>Ανάγνωση ποσών</span><b id="st-key">—</b></div>
-    <div class="kv"><span>Τιμολόγια στη συσκευή</span><b id="st-shots">0</b></div>
-    <div class="kv"><span>Έκδοση</span><b id="st-ver">—</b></div>
-    <div class="kv diag"><span>Τελευταία ανάγνωση</span><b id="st-diag">—</b></div>
-    <div class="sep"></div>
-    <button class="btn ghost" id="st-editkey">Αλλαγή κλειδιού Gemini</button>
-    <button class="btn ghost" id="st-test">Δοκιμή ανάγνωσης τώρα</button>
-    <div class="sep"></div>
-    <p class="fine">Ο μηδενισμός σβήνει email και κλειδί από αυτή τη συσκευή. <b>Οι φωτογραφίες και τα τιμολόγια ΔΕΝ σβήνονται.</b></p>
-    <button class="btn danger" id="st-reset">Μηδενισμός εγγραφής</button>
-  </div>
-</section>
-
-<!-- ══ ΠΡΟΒΟΛΗ ΤΙΜΟΛΟΓΙΟΥ ══════════════════════════════════════ -->
-<section id="s-shot" class="screen page" hidden>
-  <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
-    <h2 id="shot-title">Τιμολόγιο</h2>
-  </header>
-  <div class="pg-body" id="shot-body"></div>
-</section>
-
-<script src="/kostometrisi/app.js"></script>
+<div class="w">
+  <h1>Λέγεται τώρα Kostometro</h1>
+  <p>Η εφαρμογή μετακόμισε σε νέα διεύθυνση.</p>
+  <p class="ok"><strong>Τα τιμολόγια και οι φωτογραφίες σου δεν χάθηκαν</strong> — είναι όλα εκεί.</p>
+  <p>Αν την είχες εγκαταστήσει, <strong>σβήσε το παλιό εικονίδιο</strong> και εγκατέστησέ την ξανά από εδώ.</p>
+  <a id="go" href="/kostometro/">Άνοιξε το Kostometro</a>
+</div>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function (rs) {
+    rs.forEach(function (r) { if (r.scope.indexOf('/kostometrisi/') > -1) { r.unregister(); } });
+  }).catch(function () {});
+}
+if (window.caches) {
+  caches.keys().then(function (ks) {
+    ks.forEach(function (k) { if (k.indexOf('km-v') === 0) { caches.delete(k); } });
+  }).catch(function () {});
+}
+document.getElementById('go').href = '/kostometro/' + location.search;
+setTimeout(function () { location.replace('/kostometro/' + location.search); }, 4000);
+</script>
 </body>
 </html>

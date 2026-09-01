@@ -1,0 +1,18 @@
+{
+  "name": "Kostometro",
+  "short_name": "Kostometro",
+  "description": "Φωτογραφίζεις το τιμολόγιο στην παραλαβή. Κρατάς τι πλήρωσες, ανά προμηθευτή.",
+  "lang": "el",
+  "dir": "ltr",
+  "start_url": "/kostometro/",
+  "scope": "/kostometro/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0e14",
+  "theme_color": "#0a0e14",
+  "icons": [
+    { "src": "/kostometro/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/kostometro/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/kostometro/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

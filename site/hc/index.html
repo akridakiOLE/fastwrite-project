@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Μετακομίσαμε — Kostometrisi</title>
+<title>Μετακομίσαμε — Kostometro</title>
 <style>
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
        background:#0a0e14;color:#e6edf3;font:16px/1.6 system-ui,-apple-system,sans-serif;
@@ -17,10 +17,10 @@
 </head>
 <body>
 <div class="w">
-  <h1>Το Hand Control λέγεται τώρα Kostometrisi</h1>
+  <h1>Το Hand Control λέγεται τώρα Kostometro</h1>
   <p>Η εφαρμογή μετακόμισε σε νέα διεύθυνση.</p>
   <p>Αν την είχες εγκαταστήσει, <strong>σβήσε το παλιό εικονίδιο</strong> και εγκατέστησέ την ξανά από εδώ.</p>
-  <a id="go" href="/kostometrisi/">Άνοιξε το Kostometrisi</a>
+  <a id="go" href="/kostometro/">Άνοιξε το Kostometro</a>
 </div>
 <script>
 // Αυτοκαταστροφή του παλιού service worker και των cache του.
@@ -34,8 +34,8 @@ if (window.caches) {
     ks.forEach(function (k) { if (k.indexOf('hc-') === 0) { caches.delete(k); } });
   }).catch(function () {});
 }
-document.getElementById('go').href = '/kostometrisi/' + location.search;
-setTimeout(function () { location.replace('/kostometrisi/' + location.search); }, 4000);
+document.getElementById('go').href = '/kostometro/' + location.search;
+setTimeout(function () { location.replace('/kostometro/' + location.search); }, 4000);
 </script>
 </body>
 </html>

@@ -8,19 +8,24 @@
 /style.css
   Cache-Control: public, max-age=86400
 
-# ── Kostometrisi (25/8/2026 · μετονομασία 31/8/2026) ────────────────
+# ── Kostometro (25/8/2026 · μετονομασίες 31/8 και 1/9/2026) ────────
 # Το /* πιο πάνω κλείνει την κάμερα σε ΟΛΟ το site (camera=()). Το
-# Kostometrisi είναι εφαρμογή κάμερας — χωρίς αυτό το μπλοκ, το
+# Kostometro είναι εφαρμογή κάμερας — χωρίς αυτό το μπλοκ, το
 # getUserMedia απορρίπτεται από τον browser πριν καν ρωτήσει τον χρήστη.
-# Ανοίγει ΜΟΝΟ για το /kostometrisi/, ΜΟΝΟ για την ίδια προέλευση (self).
-/kostometrisi/*
+# Ανοίγει ΜΟΝΟ για το /kostometro/, ΜΟΝΟ για την ίδια προέλευση (self).
+/kostometro/*
   Permissions-Policy: camera=(self), geolocation=(), microphone=()
   Cache-Control: no-cache
 
-/kostometrisi/icons/*
+/kostometro/icons/*
   Cache-Control: public, max-age=604800
 
-# Η παλιά διαδρομή /hc/ — μόνο σελίδα μετακόμισης και service worker
-# αυτοκαταστροφής. Καμία κάμερα, καμία cache.
+# Οι παλιές διαδρομές /hc/ και /kostometrisi/ — μόνο σελίδα μετακόμισης
+# και service worker αυτοκαταστροφής. Καμία κάμερα, καμία cache.
+# ⚠ Τα δεδομένα των χρηστών ΔΕΝ επηρεάζονται: IndexedDB και localStorage
+# ζουν στην ΠΡΟΕΛΕΥΣΗ (fastwrite.tech), όχι στη διαδρομή.
 /hc/*
+  Cache-Control: no-store
+
+/kostometrisi/*
   Cache-Control: no-store

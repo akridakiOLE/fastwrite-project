@@ -1,37 +1,15 @@
-/* Kostometrisi service worker — κέλυφος offline.
-   ⚠ Το CACHE ανεβαίνει σε ΚΑΘΕ αλλαγή αρχείου, αλλιώς μένει το παλιό. */
-var CACHE = 'km-v23';
-var SHELL = [
-  '/kostometrisi/',
-  '/kostometrisi/index.html',
-  '/kostometrisi/app.css',
-  '/kostometrisi/app.js',
-  '/kostometrisi/manifest.webmanifest',
-  '/kostometrisi/icons/icon-192.png',
-  '/kostometrisi/icons/icon-512.png'
-];
-
-self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
-});
-
+/* Παλιός service worker του /kostometrisi/ — αντικαταστάθηκε 1/9/2026 από
+   worker αυτοκαταστροφής. Δεν σερβίρει τίποτα: σβήνει τις cache του,
+   ξεγράφεται, και στέλνει κάθε ανοιχτή καρτέλα στο /kostometro/.
+   ⚠ Τα δεδομένα (IndexedDB + km_* κλειδιά) ΔΕΝ αγγίζονται — ζουν στην
+   προέλευση, όχι στη διαδρομή, και επιβιώνουν ακέραια. */
+self.addEventListener('install', function (e) { e.waitUntil(self.skipWaiting()); });
 self.addEventListener('activate', function (e) {
-  e.waitUntil(caches.keys().then(function (ks) {
-    return Promise.all(ks.map(function (k) { return k === CACHE ? null : caches.delete(k); }));
-  }).then(function () { return self.clients.claim(); }));
-});
-
-self.addEventListener('fetch', function (e) {
-  if (e.request.method !== 'GET') { return; }
-  var u = new URL(e.request.url);
-  if (u.origin !== location.origin || u.pathname.indexOf('/kostometrisi/') !== 0) { return; }
-  e.respondWith(
-    caches.match(e.request).then(function (hit) {
-      return hit || fetch(e.request).then(function (res) {
-        var copy = res.clone();
-        caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
-        return res;
-      }).catch(function () { return caches.match('/kostometrisi/index.html'); });
-    })
+  e.waitUntil(
+    caches.keys()
+      .then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); })
+      .then(function () { return self.registration.unregister(); })
+      .then(function () { return self.clients.matchAll({ type: 'window' }); })
+      .then(function (cs) { cs.forEach(function (c) { c.navigate('/kostometro/'); }); })
   );
 });
