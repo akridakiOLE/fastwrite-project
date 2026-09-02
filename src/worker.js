@@ -20,6 +20,8 @@
 // GDPR: δεν αποθηκεύεται IP. Μόνο χώρα (Cloudflare) και user-agent.
 // ---------------------------------------------------------------------------
 
+import { handleKm } from "./km.js";
+
 const V = 3; // έκδοση ερωτηματολογίου
 
 export default {
@@ -70,6 +72,18 @@ export default {
       } catch (err) {
         console.error("dashboard failed:", err);
         return new Response("Σφάλμα: " + err.message, { status: 500 });
+      }
+    }
+
+    // Kostometro — μητρώο + σφραγισμένος φάκελος (Brief Α, Η.1). Όλα στο src/km.js.
+    if (path.startsWith("/api/km/")) {
+      try {
+        return await handleKm(request, env, ctx, path);
+      } catch (err) {
+        console.error("km failed:", err);
+        return new Response(JSON.stringify({ ok: false, error: "server_error" }), {
+          status: 500, headers: { "Content-Type": "application/json; charset=utf-8" },
+        });
       }
     }
 
