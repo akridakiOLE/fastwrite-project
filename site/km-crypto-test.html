@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kostometro · δοκιμή 12 λέξεων (Η.2α)</title>
+<style>
+  body{margin:0;background:#0a0e14;color:#e6edf3;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:20px;max-width:860px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:#8b98a5;font-size:13px;margin-bottom:18px}
+  button{display:block;width:100%;padding:16px;margin:10px 0;border:0;border-radius:12px;font-size:17px;font-weight:600;background:#00E5A0;color:#0a0e14}
+  button.sec{background:#1c2430;color:#e6edf3}
+  button:disabled{opacity:.4}
+  #log{background:#111822;border-radius:12px;padding:12px;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;min-height:120px;margin-top:14px}
+  .ok{color:#00E5A0}.bad{color:#ff6b6b}.mid{color:#ffd166}.dim{color:#8b98a5}
+  #sum{margin-top:14px;padding:12px;border:1px solid #00E5A0;border-radius:12px;font:14px ui-monospace,Menlo,Consolas,monospace;word-break:break-all;display:none}
+  .words{background:#0d1b17;border:1px solid #00E5A0;border-radius:12px;padding:12px;margin-top:12px;font:15px/1.8 ui-monospace,Menlo,Consolas,monospace;color:#00E5A0;display:none}
+</style>
+</head>
+<body>
+<h1>Δοκιμή 12 λέξεων και σφραγισμένου φακέλου</h1>
+<div class="sub">Brief Α, βήμα Η.2α. Αποδεικνύει ολόκληρη την υπόσχεση: οι 12 λέξεις φτιάχνουν το κλειδί <b>στη συσκευή</b>, τα δεδομένα φεύγουν κρυπτογραφημένα, γυρίζουν ακέραια σε «άλλη συσκευή» με τις <b>ίδιες</b> λέξεις — και με <b>λάθος</b> λέξεις δεν ανοίγουν, ούτε με τη βοήθεια του server. Δεν αγγίζει τα τιμολόγιά σου.</div>
+
+<button id="go">▶ Τρέξε τη δοκιμή</button>
+<button id="copy" class="sec" disabled>Αντιγραφή αποτελέσματος</button>
+
+<div id="words" class="words"></div>
+<div id="log">Πάτα «Τρέξε τη δοκιμή».</div>
+<div id="sum"></div>
+
+<script src="/km-crypto.js"></script>
+<script>
+(function(){
+  var log=document.getElementById('log'), sum=document.getElementById('sum'), wbox=document.getElementById('words');
+  var go=document.getElementById('go'), copy=document.getElementById('copy');
+  var BASE=location.origin, pass=0, fail=0, notes=[];
+
+  function line(t,c){ var d=document.createElement('div'); if(c)d.className=c; d.textContent=t; log.appendChild(d); }
+  function ok(t){ pass++; line('✅ '+t,'ok'); }
+  function bad(t){ fail++; line('❌ '+t,'bad'); notes.push(t); }
+  function hexOf(b){ return Array.prototype.map.call(new Uint8Array(b),function(x){return x.toString(16).padStart(2,'0');}).join(''); }
+
+  go.onclick = async function(){
+    go.disabled=true; log.textContent=''; wbox.style.display='none'; pass=0; fail=0; notes=[]; sum.style.display='none';
+    var kdfMs='-', sealMs='-', upMs='-', downMs='-';
+    try{
+      line('server: '+BASE,'dim');
+
+      // 1 — η λίστα είναι η επίσημη
+      var listHash=hexOf(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(KM_WORDS.join('\n')+'\n')));
+      (KM_WORDS.length===2048 && listHash==='2f5eed53a4727b4bf8880d8f3f199efc90e58503646d9ff8eff3a2ed3b24dbda')
+        ? ok('1 λίστα λέξεων: 2048, επίσημη BIP39 (sha256 ταιριάζει)')
+        : bad('1 λίστα λέξεων: '+KM_WORDS.length+' sha='+listHash.slice(0,16));
+
+      // 2 — παραγωγή 12 λέξεων
+      var w = await kmNewWords();
+      (w.length===12) ? ok('2 φτιάχτηκαν 12 λέξεις') : bad('2 πλήθος λέξεων: '+w.length);
+      wbox.textContent='Οι λέξεις αυτής της δοκιμής:  '+w.join(' · ');
+      wbox.style.display='block';
+
+      // 3 — γίνονται δεκτές όπως κι αν γραφτούν
+      var r=await kmCheckWords('  '+w.join('   ').toUpperCase()+'\n');
+      r.ok ? ok('3 δεκτές με ΚΕΦΑΛΑΙΑ, διπλά κενά και αλλαγή γραμμής') : bad('3 ανοχή γραφής: '+r.error);
+
+      // 4 — άγνωστη λέξη
+      var b1=w.slice(); b1[3]='zzzzz';
+      r=await kmCheckWords(b1.join(' '));
+      (!r.ok && r.badWord===3) ? ok('4 ανύπαρκτη λέξη («zzzzz»): εντοπίστηκε, και λέει ΠΟΙΑ (η 4η)') : bad('4 άγνωστη λέξη: '+JSON.stringify(r));
+
+      // 5 — σωστές λέξεις, λάθος σειρά
+      var b2=w.slice(); var t=b2[0]; b2[0]=b2[1]; b2[1]=t;
+      r=await kmCheckWords(b2.join(' '));
+      (!r.ok) ? ok('5 σωστές λέξεις σε λάθος σειρά: απορρίφθηκαν (ο έλεγχος BIP39 δουλεύει)') : bad('5 λάθος σειρά έγινε δεκτή — ΣΟΒΑΡΟ');
+
+      // 6 — ίδιες λέξεις, ίδια κλειδιά (και πόσο αργεί)
+      var t0=performance.now(); var d1=await kmDerive(w); kdfMs=Math.round(performance.now()-t0);
+      var d2=await kmDerive(w.join(' '));
+      (d1.folderId===d2.folderId && d1.authToken===d2.authToken)
+        ? ok('6 ίδιες λέξεις → ίδια κλειδιά, κάθε φορά ('+kdfMs+' ms)') : bad('6 η παραγωγή κλειδιού δεν είναι σταθερή');
+
+      // 7 — τα τρία είναι διαφορετικά μεταξύ τους
+      (d1.folderId!==d1.authToken) ? ok('7 αναγνωριστικό ≠ κωδικός πρόσβασης (χωριστές ετικέτες HKDF)') : bad('7 folderId ίδιο με authToken — ΣΟΒΑΡΟ');
+
+      // 8 — άλλες λέξεις, άλλος φάκελος
+      var w2=await kmNewWords(); var d3=await kmDerive(w2);
+      (d1.folderId!==d3.folderId) ? ok('8 άλλες 12 λέξεις → εντελώς άλλος φάκελος') : bad('8 δύο διαφορετικές φράσεις έδωσαν τον ίδιο φάκελο — ΣΟΒΑΡΟ');
+
+      // 9 — σφράγισμα/άνοιγμα 200 KB
+      var data=new Uint8Array(200000);
+      for(var off=0;off<data.length;off+=65536){ crypto.getRandomValues(data.subarray(off,Math.min(off+65536,data.length))); }
+      t0=performance.now(); var sealed=await kmSeal(d1.key,data); sealMs=Math.round(performance.now()-t0);
+      var opened=await kmOpen(d1.key,sealed);
+      var same = opened.length===data.length && hexOf(await crypto.subtle.digest('SHA-256',opened))===hexOf(await crypto.subtle.digest('SHA-256',data));
+      same ? ok('9 σφράγισμα+άνοιγμα 200 KB σε '+sealMs+' ms — ίδια δεδομένα (+'+(sealed.length-data.length)+' bytes)') : bad('9 τα δεδομένα άλλαξαν στο σφράγισμα');
+
+      // 10 — δύο σφραγίσματα δεν μοιάζουν
+      var sealed2=await kmSeal(d1.key,data);
+      (hexOf(sealed.slice(0,40))!==hexOf(sealed2.slice(0,40))) ? ok('10 δύο σφραγίσματα των ίδιων δεδομένων βγάζουν άλλα bytes') : bad('10 το σφράγισμα επαναλαμβάνεται — ΣΟΒΑΡΟ');
+
+      // 11 — λάθος κλειδί δεν ανοίγει
+      var opened3=null; try{ opened3=await kmOpen(d3.key,sealed); }catch(e){}
+      (opened3===null) ? ok('11 λάθος 12 λέξεις: ο φάκελος ΔΕΝ ανοίγει') : bad('11 λάθος κλειδί άνοιξε τον φάκελο — ΣΟΒΑΡΟ');
+
+      // ── ζωντανά, στον πραγματικό server ────────────────────────────────
+      var email='h1-test-'+d1.folderId.slice(0,8)+'@fastwrite.tech';
+      var HA={ 'X-Km-Folder':d1.folderId, 'X-Km-Auth':d1.authToken, 'X-Km-Device':'h2-A' };
+      var HB={ 'X-Km-Folder':d1.folderId, 'X-Km-Auth':d1.authToken, 'X-Km-Device':'h2-B' };
+
+      var res=await fetch(BASE+'/api/km/register',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},HA),body:JSON.stringify({email:email,source:'link',device_name:'Δοκιμή Η2 Α'})});
+      var j=await res.json().catch(function(){return null;});
+      (res.status===200 && j && j.account==='new') ? ok('12 εγγραφή στον server με ταυτότητα από τις 12 λέξεις') : bad('12 register ['+res.status+'] '+JSON.stringify(j));
+
+      t0=performance.now();
+      res=await fetch(BASE+'/api/km/folder',{method:'PUT',headers:Object.assign({'X-Km-Base-Version':'0'},HA),body:sealed});
+      upMs=Math.round(performance.now()-t0);
+      j=await res.json().catch(function(){return null;});
+      (res.status===200 && j && j.folder_bytes===sealed.length) ? ok('13 ανέβηκε ο ΣΦΡΑΓΙΣΜΕΝΟΣ φάκελος ('+sealed.length+' bytes, '+upMs+' ms)') : bad('13 ανέβασμα ['+res.status+'] '+JSON.stringify(j));
+
+      await fetch(BASE+'/api/km/register',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},HB),body:JSON.stringify({email:email,device_name:'Δοκιμή Η2 Β'})});
+      t0=performance.now();
+      res=await fetch(BASE+'/api/km/folder',{headers:HB});
+      var down=new Uint8Array(await res.arrayBuffer());
+      downMs=Math.round(performance.now()-t0);
+      (res.status===200 && down.length===sealed.length) ? ok('14 η «άλλη συσκευή» κατέβασε τον φάκελο ('+downMs+' ms)') : bad('14 κατέβασμα ['+res.status+'] len='+down.length);
+
+      // 15 — ανοίγει με τις ΙΔΙΕΣ λέξεις
+      var back=null; try{ back=await kmOpen(d1.key,down); }catch(e){}
+      var backOk = back && back.length===data.length && hexOf(await crypto.subtle.digest('SHA-256',back))===hexOf(await crypto.subtle.digest('SHA-256',data));
+      backOk ? ok('15 άνοιξε με τις ΙΔΙΕΣ 12 λέξεις — τα δεδομένα ΤΑΥΤΙΖΟΝΤΑΙ') : bad('15 ο φάκελος δεν άνοιξε σωστά στην άλλη συσκευή');
+
+      // 16 — δεν ανοίγει με άλλες λέξεις, ούτε με τη βοήθεια του server
+      var back2=null; try{ back2=await kmOpen(d3.key,down); }catch(e){}
+      (back2===null) ? ok('16 με ΑΛΛΕΣ 12 λέξεις ο ίδιος φάκελος δεν ανοίγει — ο server δεν βοηθάει κανέναν') : bad('16 άνοιξε με λάθος λέξεις — ΣΟΒΑΡΟ');
+    }catch(e){
+      bad('εξαίρεση: '+(e&&e.message||e));
+    }
+
+    var s='KM-H2a '+(fail===0?'✅ ΟΛΑ ΠΕΡΑΣΑΝ':'❌ ΑΠΕΤΥΧΑΝ '+fail)+' · '+pass+'/'+(pass+fail)
+      +' · kdf '+kdfMs+'ms · seal '+sealMs+'ms · up '+upMs+'ms · down '+downMs+'ms · '+BASE
+      +(notes.length?(' · '+notes.slice(0,2).join(' | ')):'');
+    sum.textContent=s; sum.style.display='block'; sum.style.borderColor = fail===0 ? '#00E5A0' : '#ff6b6b';
+    copy.disabled=false; go.disabled=false;
+  };
+
+  copy.onclick=function(){
+    var t=sum.textContent;
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){line('📋 Αντιγράφηκε.','mid');},function(){line('Δεν αντιγράφηκε.','mid');});
+    else line('Δεν αντιγράφηκε.','mid');
+  };
+})();
+</script>
+</body>
+</html>
