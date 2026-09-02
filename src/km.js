@@ -91,12 +91,17 @@ async function authed(request, env) {
   return { acc, id };
 }
 
+// ⚠ Το folder_id ΞΑΝΑΓΡΑΦΕΤΑΙ στο ON CONFLICT: η ίδια εγκατάσταση μπορεί να
+// αλλάξει λογαριασμό («ξεκινάω καθαρά», Γ.6). Χωρίς αυτό η συσκευή έμενε
+// δεμένη στον παλιό φάκελο και δεν εμφανιζόταν στη λίστα του νέου.
+// Βρέθηκε 2/9/2026 από τη σελίδα δοκιμής km-test (έλεγχος 14).
 async function touchDevice(env, request, id, name) {
   const ua = clean(request.headers.get("user-agent"), 300);
   await env.DB.prepare(
     `INSERT INTO km_devices (install_id, folder_id, name, created, last_seen, user_agent)
      VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(install_id) DO UPDATE SET last_seen = excluded.last_seen,
+     ON CONFLICT(install_id) DO UPDATE SET folder_id = excluded.folder_id,
+       last_seen = excluded.last_seen,
        name = COALESCE(excluded.name, km_devices.name), user_agent = excluded.user_agent`
   ).bind(id.device, id.folder, clean(name, 80), now(), now(), ua).run();
 }

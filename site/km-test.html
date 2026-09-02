@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kostometro · δοκιμή σφραγισμένου φακέλου (Η.1)</title>
+<style>
+  body{margin:0;background:#0a0e14;color:#e6edf3;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:20px;max-width:820px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:#8b98a5;font-size:13px;margin-bottom:18px}
+  button{display:block;width:100%;padding:16px;margin:10px 0;border:0;border-radius:12px;font-size:17px;font-weight:600;background:#00E5A0;color:#0a0e14}
+  button.sec{background:#1c2430;color:#e6edf3}
+  button:disabled{opacity:.4}
+  #log{background:#111822;border-radius:12px;padding:12px;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;min-height:120px;margin-top:14px}
+  .ok{color:#00E5A0}.bad{color:#ff6b6b}.mid{color:#ffd166}.dim{color:#8b98a5}
+  #sum{margin-top:14px;padding:12px;border:1px solid #00E5A0;border-radius:12px;font:14px ui-monospace,Menlo,Consolas,monospace;word-break:break-all;display:none}
+</style>
+</head>
+<body>
+<h1>Δοκιμή σφραγισμένου φακέλου</h1>
+<div class="sub">Brief Α, βήμα Η.1. Δοκιμάζει ολόκληρη τη ροή στον πραγματικό server: εγγραφή → ανέβασμα 200&nbsp;KB → κατέβασμα από δεύτερη συσκευή → σύγκριση byte-προς-byte → αλλαγή ενεργής συσκευής → οι δύο αρνήσεις (403/409). Δεν αγγίζει δεδομένα σου: φτιάχνει δικό του τυχαίο λογαριασμό.</div>
+
+<button id="go">▶ Τρέξε τη δοκιμή</button>
+<button id="copy" class="sec" disabled>Αντιγραφή αποτελέσματος</button>
+
+<div id="log">Πάτα «Τρέξε τη δοκιμή».</div>
+<div id="sum"></div>
+
+<script>
+(function(){
+  var log=document.getElementById('log'), sum=document.getElementById('sum');
+  var go=document.getElementById('go'), copy=document.getElementById('copy');
+  var BASE = location.origin;
+  var pass=0, fail=0, notes=[];
+
+  function line(t,c){ var d=document.createElement('div'); if(c)d.className=c; d.textContent=t; log.appendChild(d); }
+  function ok(t){ pass++; line('✅ '+t,'ok'); }
+  function bad(t){ fail++; line('❌ '+t,'bad'); notes.push(t); }
+  function hex(n){ var a=new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a).map(function(b){return b.toString(16).padStart(2,'0');}).join(''); }
+  async function sha(buf){ var h=await crypto.subtle.digest('SHA-256',buf); return Array.from(new Uint8Array(h)).map(function(b){return b.toString(16).padStart(2,'0');}).join(''); }
+
+  var F=null, A=null;
+  function H(dev){ return { 'X-Km-Folder':F, 'X-Km-Auth':A, 'X-Km-Device':dev }; }
+
+  async function jreq(method,path,headers,body){
+    var opt={ method:method, headers:Object.assign({},headers||{}) };
+    if(body!==undefined && body!==null){ opt.body=body; if(typeof body==='string') opt.headers['Content-Type']='application/json'; }
+    var r=await fetch(BASE+path,opt);
+    var ct=r.headers.get('content-type')||'';
+    var data = ct.indexOf('json')>=0 ? await r.json().catch(function(){return null;}) : null;
+    return { status:r.status, data:data, res:r };
+  }
+
+  go.onclick = async function(){
+    go.disabled=true; log.textContent=''; pass=0; fail=0; notes=[]; sum.style.display='none';
+    F=hex(32); A=hex(32);
+    var email='h1-test-'+F.slice(0,8)+'@fastwrite.tech';
+    line('server: '+BASE,'dim');
+    line('δοκιμαστικός λογαριασμός: '+email,'dim');
+    line('folder_id: '+F.slice(0,16)+'…','dim');
+    try{
+      // 1 — δεν υπάρχει ακόμα
+      var r=await jreq('GET','/api/km/lookup?email='+encodeURIComponent(email));
+      (r.status===200 && r.data && r.data.exists===false) ? ok('1 lookup: δεν υπάρχει λογαριασμός') : bad('1 lookup ['+r.status+'] '+JSON.stringify(r.data));
+
+      // 2 — εγγραφή, συσκευή Α
+      r=await jreq('POST','/api/km/register',H('h1-A'),JSON.stringify({email:email,source:'link',ref:'H1TEST',has_key:true,device_name:'Δοκιμή Α'}));
+      (r.status===200 && r.data && r.data.account==='new' && r.data.state.active_device_id==='h1-A')
+        ? ok('2 εγγραφή: νέος λογαριασμός, ενεργή η Α') : bad('2 register ['+r.status+'] '+JSON.stringify(r.data));
+
+      // 3 — τώρα υπάρχει
+      r=await jreq('GET','/api/km/lookup?email='+encodeURIComponent(email));
+      (r.data && r.data.exists===true) ? ok('3 lookup: ο λογαριασμός υπάρχει') : bad('3 lookup μετά την εγγραφή: '+JSON.stringify(r.data));
+
+      // 4 — άδειος φάκελος
+      r=await jreq('GET','/api/km/folder',H('h1-A'));
+      (r.status===404) ? ok('4 φάκελος άδειος (404), όπως πρέπει') : bad('4 άδειος φάκελος: περίμενα 404, πήρα '+r.status);
+
+      // 5 — ανέβασμα 200 KB
+      var blob=new Uint8Array(200000);
+      for(var off=0; off<blob.length; off+=65536){ crypto.getRandomValues(blob.subarray(off, Math.min(off+65536, blob.length))); }
+      var hUp=await sha(blob.buffer);
+      var t0=performance.now();
+      r=await jreq('PUT','/api/km/folder',Object.assign(H('h1-A'),{'X-Km-Base-Version':'0'}),blob);
+      var tUp=((performance.now()-t0)/1000).toFixed(1);
+      (r.status===200 && r.data && r.data.folder_version===1 && r.data.folder_bytes===200000)
+        ? ok('5 ανέβασμα 200 KB σε '+tUp+'s — έκδοση 1') : bad('5 ανέβασμα ['+r.status+'] '+JSON.stringify(r.data));
+
+      // 6 — παλιά έκδοση απορρίπτεται
+      r=await jreq('PUT','/api/km/folder',Object.assign(H('h1-A'),{'X-Km-Base-Version':'0'}),blob);
+      (r.status===409 && r.data && r.data.error==='version_mismatch') ? ok('6 ανέβασμα με παλιά έκδοση: απορρίφθηκε (409)') : bad('6 έλεγχος έκδοσης: περίμενα 409, πήρα '+r.status);
+
+      // 7 — λάθος κλειδί
+      r=await jreq('GET','/api/km/status',{'X-Km-Folder':F,'X-Km-Auth':hex(32),'X-Km-Device':'h1-A'});
+      (r.status===403) ? ok('7 λάθος 12 λέξεις: απορρίφθηκε (403)') : bad('7 λάθος auth: περίμενα 403, πήρα '+r.status);
+
+      // 8 — μόνο email, χωρίς κλειδί
+      r=await jreq('GET','/api/km/status');
+      (r.status===400) ? ok('8 χωρίς ταυτότητα: απορρίφθηκε (400) — το email μόνο του δεν ανοίγει τίποτα') : bad('8 χωρίς headers: περίμενα 400, πήρα '+r.status);
+
+      // 9 — δεύτερη συσκευή μπαίνει με τις ίδιες 12 λέξεις
+      r=await jreq('POST','/api/km/register',H('h1-B'),JSON.stringify({email:email,device_name:'Δοκιμή Β'}));
+      (r.status===200 && r.data && r.data.account==='existing' && r.data.state.active_device_id==='h1-B')
+        ? ok('9 δεύτερη συσκευή: μπήκε και έγινε η ενεργή') : bad('9 δεύτερη συσκευή ['+r.status+'] '+JSON.stringify(r.data));
+
+      // 10 — κατεβάζει και συγκρίνει bytes
+      t0=performance.now();
+      var res=await fetch(BASE+'/api/km/folder',{headers:H('h1-B')});
+      var down=await res.arrayBuffer();
+      var tDown=((performance.now()-t0)/1000).toFixed(1);
+      var hDown=await sha(down);
+      (res.status===200 && down.byteLength===200000 && hDown===hUp)
+        ? ok('10 κατέβασμα σε '+tDown+'s — '+down.byteLength+' bytes, ΤΑΥΤΙΖΟΝΤΑΙ (sha256 '+hUp.slice(0,12)+'…)')
+        : bad('10 σύγκριση bytes: '+res.status+' len='+down.byteLength+' up='+hUp.slice(0,12)+' down='+hDown.slice(0,12));
+      (res.headers.get('X-Km-This-Device-Active')==='1') ? ok('10β η Β δηλώνεται ενεργή στα headers') : bad('10β header ενεργής: '+res.headers.get('X-Km-This-Device-Active'));
+
+      // 11 — η Α δεν γράφει πια
+      r=await jreq('PUT','/api/km/folder',H('h1-A'),blob);
+      (r.status===409 && r.data && r.data.error==='not_active_device') ? ok('11 η παλιά συσκευή δεν γράφει πια (409) — διαβάζει μόνο') : bad('11 μη ενεργή συσκευή: περίμενα 409, πήρα '+r.status);
+
+      // 12 — επιστροφή επεξεργασίας στην Α
+      r=await jreq('POST','/api/km/activate',H('h1-A'));
+      (r.status===200 && r.data && r.data.active_device_id==='h1-A' && r.data.previous_device_id==='h1-B')
+        ? ok('12 «κάνε αυτή τη συσκευή ενεργή»: η Α ξαναπήρε την επεξεργασία') : bad('12 activate ['+r.status+'] '+JSON.stringify(r.data));
+
+      // 13 — και τώρα γράφει
+      r=await jreq('PUT','/api/km/folder',Object.assign(H('h1-A'),{'X-Km-Base-Version':'1'}),blob);
+      (r.status===200 && r.data && r.data.folder_version===2) ? ok('13 η Α γράφει ξανά — έκδοση 2') : bad('13 ανέβασμα μετά activate ['+r.status+'] '+JSON.stringify(r.data));
+
+      // 14 — και οι δύο συσκευές στο μητρώο
+      r=await jreq('GET','/api/km/status',H('h1-A'));
+      (r.status===200 && r.data && r.data.devices && r.data.devices.length===2) ? ok('14 μητρώο: 2 συσκευές καταγεγραμμένες') : bad('14 status συσκευές: '+JSON.stringify(r.data&&r.data.devices));
+    }catch(e){
+      bad('εξαίρεση: '+(e&&e.message||e));
+    }
+
+    var s='KM-H1 '+(fail===0?'✅ ΟΛΑ ΠΕΡΑΣΑΝ':'❌ ΑΠΕΤΥΧΑΝ '+fail)+' · '+pass+'/'+(pass+fail)+' · '+BASE+' · test='+ (F?F.slice(0,8):'') + (notes.length?(' · '+notes.slice(0,3).join(' | ')):'');
+    sum.textContent=s; sum.style.display='block'; sum.style.borderColor = fail===0 ? '#00E5A0' : '#ff6b6b';
+    copy.disabled=false; go.disabled=false;
+    line('','dim'); line('Δοκιμαστικός λογαριασμός προς διαγραφή: '+email,'mid');
+  };
+
+  copy.onclick=function(){
+    var t=sum.textContent;
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){line('📋 Αντιγράφηκε.','mid');},function(){line('Δεν αντιγράφηκε.','mid');});
+    else line('Δεν αντιγράφηκε.','mid');
+  };
+})();
+</script>
+</body>
+</html>
