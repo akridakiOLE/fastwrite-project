@@ -15,7 +15,7 @@
    ⚠ Και το /km-crypto.js μπήκε στο πεδίο: ζει ΕΞΩ από το /kostometro/, άρα
    μέχρι τώρα δεν το έπιανε καθόλου ο worker — χωρίς δίκτυο η οθόνη των 12
    λέξεων θα έσπαγε. */
-var CACHE = 'km-v29';
+var CACHE = 'km-v30';
 var SHELL = [
   '/kostometro/',
   '/kostometro/index.html',
@@ -83,6 +83,10 @@ self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') { return; }
   var u = new URL(e.request.url);
   if (u.origin !== location.origin) { return; }
+  /* v30 — ΤΟ ΡΟΛΟΪ ΤΗΣ ΕΚΔΟΣΗΣ ΔΕΝ ΠΕΡΝΑΕΙ ΠΟΤΕ ΑΠΟ ΕΔΩ.
+     Είναι το μόνο αρχείο που ΠΡΕΠΕΙ να λέει την αλήθεια του server, αλλιώς
+     η εφαρμογή ρωτάει τη μνήμη της αν η μνήμη της είναι παλιά. */
+  if (u.pathname === '/kostometro/version.json') { return; }
   var mine = u.pathname.indexOf('/kostometro/') === 0 || u.pathname === '/km-crypto.js';
   if (!mine) { return; }
   e.respondWith(FRESH.indexOf(u.pathname) >= 0 ? netFirst(e.request) : cacheFirst(e.request));

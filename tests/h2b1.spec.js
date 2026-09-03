@@ -27,7 +27,17 @@ async function fresh(context) {
 // κάθε διαδρομή ξεκινάει ΜΟΝΟ αφού το boot() έχει δείξει την πρώτη οθόνη
 async function atStart(p) {
   await p.reload();
-  await expect(p.locator('#s-acc')).toBeVisible({ timeout: 15000 });
+  await expect(p.locator('#s-acc')).toBeVisible({ timeout: 20000 });
+}
+// v30: η εφαρμογή μπορεί να ξαναφορτώσει μόνη της (έλεγχος έκδοσης) και να
+// επαναφέρει την πρώτη οθόνη. Πατάμε ξανά μέχρι να σταθεί η οθόνη του email.
+async function goNew(p) {
+  for (let i = 0; i < 5; i++) {
+    await p.locator('#acc-no').click().catch(() => {});
+    try { await expect(p.locator('#s-email')).toBeVisible({ timeout: 4000 }); return; }
+    catch (e) { await expect(p.locator('#s-acc')).toBeVisible({ timeout: 15000 }).catch(() => {}); }
+  }
+  throw new Error('δεν σταθεροποιήθηκε η οθόνη του email');
 }
 // σπέρνει έναν "υπάρχοντα χρήστη": email + N τιμολόγια στο IndexedDB, ΧΩΡΙΣ λέξεις
 async function seedOldUser(page, n) {
@@ -77,7 +87,7 @@ async function passWords(page) {
 test('1 · νέος χρήστης: πρώτη οθόνη -> email -> 12 λέξεις -> κάμερα, και γράφεται στο μητρώο', async ({ context, request }) => {
   const p = await fresh(context);
   await atStart(p);
-  await p.locator('#acc-no').click();
+  await goNew(p);
   await expect(p.locator('#s-email')).toBeVisible();
   const email = 'neos' + Date.now() + '@example.com';
   await p.locator('#in-email').fill(email);
@@ -94,7 +104,7 @@ test('1 · νέος χρήστης: πρώτη οθόνη -> email -> 12 λέξ�
 test('2 · κλείνει στις λέξεις χωρίς τσεκάρισμα -> ξαναεμφανίζονται στο επόμενο άνοιγμα', async ({ context }) => {
   const p = await fresh(context);
   await atStart(p);
-  await p.locator('#acc-no').click();
+  await goNew(p);
   await p.locator('#in-email').fill('atsek@example.com');
   await p.locator('#go-email').click();
   await expect(p.locator('#w-list li')).toHaveCount(12, { timeout: 10000 });
@@ -161,7 +171,7 @@ test('5 · 11 λέξεις και ανύπαρκτη λέξη -> καθαρό μ
 test('6 · δεύτερη συσκευή με τις ΣΩΣΤΕΣ 12 λέξεις -> συνδέεται', async ({ context }) => {
   const p1 = await fresh(context);
   await atStart(p1);
-  await p1.locator('#acc-no').click();
+  await goNew(p1);
   const email = 'duo' + Date.now() + '@example.com';
   await p1.locator('#in-email').fill(email);
   await p1.locator('#go-email').click();
@@ -186,7 +196,7 @@ test('7 · καμία λέξη δεν εμφανίζεται σε αίτημα �
   const seen = [];
   p.on('request', (r) => { seen.push(r.url() + ' ' + JSON.stringify(r.headers()) + ' ' + (r.postData() || '')); });
   await atStart(p);
-  await p.locator('#acc-no').click();
+  await goNew(p);
   await p.locator('#in-email').fill('leak' + Date.now() + '@example.com');
   await p.locator('#go-email').click();
   const words = await passWords(p);

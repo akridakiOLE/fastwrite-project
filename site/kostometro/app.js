@@ -1258,6 +1258,15 @@
     el('st-key').textContent = localStorage.getItem(LS.key) ? 'Με κλειδί Gemini' : 'Χειροκίνητα';
     el('st-ver').textContent = APP_VER;
     el('st-diag').textContent = localStorage.getItem(LS.diag) || '—';
+    /* v30 — τι τρέχει ΕΔΩ, τι έχει ο server, ποιος worker σερβίρει.
+       Χωρίς αυτά, «δεν ενημερώθηκε» είναι εντύπωση, όχι μέτρηση. */
+    el('st-srvver').textContent = 'ελέγχεται…';
+    serverVersion().then(function (v) {
+      el('st-srvver').textContent = v
+        ? (v === shortVer(APP_VER) ? v + ' — ενημερωμένο' : v + ' — ΝΕΟΤΕΡΗ ΑΠΟ ΑΥΤΗΝ')
+        : 'χωρίς δίκτυο';
+    });
+    el('st-sw').textContent = (navigator.serviceWorker && navigator.serviceWorker.controller) ? 'ενεργός' : 'κανένας';
     all().then(function (rows) { el('st-shots').textContent = rows.length; });
   }
 
@@ -1267,7 +1276,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v29';
+  var APP_VER = 'φέτα 3 · v30';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2066,6 +2075,15 @@
       });
     });
   };
+  el('st-update').onclick = function () {
+    var b = el('st-update');
+    b.disabled = true; b.textContent = 'Έλεγχος…';
+    checkVersion(true).then(function (newer) {
+      b.disabled = false;
+      b.textContent = newer ? 'Βρέθηκε νέα — φορτώνει…' : 'Είσαι στη νεότερη έκδοση ✓';
+      renderSettings();
+    });
+  };
   el('st-newwords').onclick = function () {
     el('nw-err').hidden = true;
     el('nw-box').hidden = !el('nw-box').hidden;
@@ -2112,9 +2130,47 @@
   });
   history.pushState(null, '', location.href);
 
+  checkVersion(false);   // v30 — πρώτο πράγμα σε κάθε φόρτωση
   openDB().then(boot).then(function () { schedule(800); }).catch(function (e) {
     document.body.innerHTML = '<div style="padding:40px;color:#e6e8ec">Δεν άνοιξε η τοπική βάση: ' + e + '</div>';
   });
+
+  /* ── v30 · ΤΟ ΡΟΛΟΪ ΤΗΣ ΕΚΔΟΣΗΣ ────────────────────────────────────
+     ΓΙΑΤΙ ΥΠΑΡΧΕΙ: ως το v29 η εφαρμογή δεν είχε κανέναν τρόπο να ΞΕΡΕΙ ότι
+     τρέχει παλιά. Ο worker σερβίρει δίκτυο-πρώτα με φρένο 2,5″ — σε κινητό
+     που ξυπνάει με δεδομένα κινητής το πρώτο αίτημα ξεπερνάει συχνά τα 2,5″,
+     οπότε σερβίρεται η μνήμη και ο χρήστης βλέπει την ΠΑΛΙΑ έκδοση, χωρίς
+     κανένα σημάδι. Μετρήθηκε τρεις φορές στο κινητό του Stavros (v27, v28, v29).
+     ΤΙ ΚΑΝΕΙ: ένα αρχείο 20 bytes που ΔΕΝ περνάει ποτέ από τον worker λέει
+     ποια έκδοση έχει ο server. Αν διαφέρει από αυτήν που τρέχει, η εφαρμογή
+     ζητάει ενημέρωση και ξαναφορτώνει ΜΙΑ φορά. Το «μία φορά» φυλάγεται σε
+     sessionStorage: αν κάτι πάει στραβά, χάνεται μία ανανέωση, όχι ο χρήστης
+     σε ατέρμονο βρόχο. */
+  var srvVer = null;
+  function shortVer(v) { var m = /v\d+/.exec(v || ''); return m ? m[0] : (v || '—'); }
+  function serverVersion() {
+    return fetch('/kostometro/version.json?nc=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { srvVer = (j && j.v) || null; return srvVer; })
+      .catch(function () { return null; });
+  }
+  function checkVersion(force) {
+    return serverVersion().then(function (v) {
+      if (!v || v === shortVer(APP_VER)) { return false; }
+      var tries = Number(sessionStorage.getItem('km_upd') || 0);
+      if (!force && tries >= 1) { return true; }   // το ξέρουμε, δεν ξαναφορτώνουμε
+      sessionStorage.setItem('km_upd', String(tries + 1));
+      if ('serviceWorker' in navigator) {
+        return navigator.serviceWorker.getRegistration().then(function (reg) {
+          if (reg) { try { reg.update(); } catch (e) {} }
+          setTimeout(function () { location.reload(); }, 1200);
+          return true;
+        }).catch(function () { location.reload(); return true; });
+      }
+      location.reload();
+      return true;
+    });
+  }
 
   if ('serviceWorker' in navigator) {
     /* v28 — ΓΙΑΤΙ ΔΕΝ ΑΡΚΕΙ ΤΟ register(). Το register ελέγχει για νέα έκδοση
@@ -2125,7 +2181,9 @@
        που η εφαρμογή έρχεται μπροστά. */
     navigator.serviceWorker.register('/kostometro/sw.js').then(function (reg) {
       var check = function () {
-        if (document.visibilityState === 'visible') { try { reg.update(); } catch (e) {} }
+        if (document.visibilityState !== 'visible') { return; }
+        try { reg.update(); } catch (e) {}
+        checkVersion(false);
       };
       document.addEventListener('visibilitychange', check);
       window.addEventListener('focus', check);

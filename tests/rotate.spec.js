@@ -19,7 +19,12 @@ async function fresh(context) {
   return p;
 }
 async function onboard(p, email) {
-  await p.locator('#acc-no').click();
+  // v30: η εφαρμογή μπορεί να ξαναφορτώσει μόνη της (έλεγχος έκδοσης)
+  for (let i = 0; i < 5; i++) {
+    await p.locator('#acc-no').click().catch(() => {});
+    try { await expect(p.locator('#s-email')).toBeVisible({ timeout: 4000 }); break; }
+    catch (e) { await expect(p.locator('#s-acc')).toBeVisible({ timeout: 15000 }).catch(() => {}); }
+  }
   await p.locator('#in-email').fill(email);
   await p.locator('#go-email').click();
   await expect(p.locator('#w-list li')).toHaveCount(12, { timeout: 15000 });
