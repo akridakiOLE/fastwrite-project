@@ -43,9 +43,16 @@ database_id = "153089e9-11bd-4051-b0bd-a62438fec07e"
 
 # R2 — οι σφραγισμένοι φάκελοι του Kostometro (Brief Α, Α350 §9.8 Η.1).
 # Ένα κρυπτογραφημένο μπλοκ ανά λογαριασμό: <folder_id>/folder.bin. Ο server
-# δεν το ανοίγει. Το bucket δημιουργείται ΜΙΑ φορά, πριν το πρώτο deploy:
-#   npx wrangler r2 bucket create fastwrite-km
+# δεν το ανοίγει.
+# 3/9/2026: το bucket ζει σε ΔΙΚΑΙΟΔΟΣΙΑ ΕΕ (Α300 §2, 2/9). Η δικαιοδοσία
+# ορίζεται ΜΟΝΟ στη δημιουργία και δεν αλλάζει — γι' αυτό νέο όνομα, όχι το
+# παλιό fastwrite-km (δημιουργήθηκε 2/9 χωρίς δικαιοδοσία, από setup_km_cloud.bat).
+# Δημιουργείται ΜΙΑ φορά, πριν το deploy (setup_km_r2_eu.bat):
+#   npx wrangler r2 bucket create fastwrite-km-eu --jurisdiction eu
 # Χωρίς αυτό το CI αποτυγχάνει (binding σε bucket που δεν υπάρχει).
+# ⚠ Το "jurisdiction" ΕΔΩ είναι υποχρεωτικό: binding χωρίς αυτό δεν βρίσκει
+# bucket που ζει σε δικαιοδοσία.
 [[r2_buckets]]
 binding = "FOLDERS"
-bucket_name = "fastwrite-km"
+bucket_name = "fastwrite-km-eu"
+jurisdiction = "eu"
