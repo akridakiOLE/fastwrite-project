@@ -1267,7 +1267,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v28';
+  var APP_VER = 'φέτα 3 · v29';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1794,12 +1794,33 @@
 
   /* Φτιάχνει 12 λέξεις και τις δείχνει. existing = υπάρχων χρήστης που
      αποκτά λογαριασμό τώρα (τα τιμολόγιά του μένουν άθικτα). */
-  function startWords(existing) {
+  var wordsMode = 'new';    // 'new' | 'existing' | 'rotate'
+  var TITLES = {
+    'new':      'Οι 12 λέξεις σου',
+    'existing': 'Το κλειδί του αρχείου σου',
+    'rotate':   'Οι νέες 12 λέξεις σου'
+  };
+  var LEDES = {
+    'new':      'Αυτές οι 12 λέξεις είναι <b>το κλειδί σου</b>. Με αυτές — και μόνο με αυτές — ανοίγεις τα τιμολόγιά σου σε άλλη συσκευή.',
+    'existing': 'Τα τιμολόγιά σου <b>δεν πειράχτηκαν</b> — είναι όλα εδώ. Από σήμερα έχουν και <b>κλειδί</b>: αυτές τις 12 λέξεις. Με αυτές θα τα ανοίγεις σε άλλη συσκευή.',
+    'rotate':   'Αυτές αντικαθιστούν τις προηγούμενες, που <b>δεν ισχύουν πια</b>. Γράψε τις καινούριες και σκίσε το παλιό χαρτί.'
+  };
+  function startWords(mode) {
+    if (mode === true)  { mode = 'existing'; }
+    if (mode === false) { mode = 'new'; }
+    /* 'auto' = δεν ξέρουμε από ποια διαδρομή ήρθε (π.χ. ξαναάνοιγμα χωρίς
+       τσεκάρισμα). Το κρίνει το ΜΟΝΟ αντικειμενικό στοιχείο: έχει τιμολόγια
+       ή όχι; Αλλιώς ένας ολοκαίνουριος χρήστης διάβαζε «τα τιμολόγιά σου
+       δεν πειράχτηκαν» ενώ δεν έχει κανένα. */
+    if (mode === 'auto') {
+      all().then(function (rows) { startWords(rows.length ? 'existing' : 'new'); })
+           .catch(function () { startWords('new'); });
+      return;
+    }
+    wordsMode = mode || 'new';
     show('s-words');
-    el('w-title').textContent = existing ? 'Το κλειδί του αρχείου σου' : 'Οι 12 λέξεις σου';
-    el('w-lede').innerHTML = existing
-      ? 'Τα τιμολόγιά σου <b>δεν πειράχτηκαν</b> — είναι όλα εδώ. Από σήμερα έχουν και <b>κλειδί</b>: αυτές τις 12 λέξεις. Με αυτές θα τα ανοίγεις σε άλλη συσκευή.'
-      : 'Αυτές οι 12 λέξεις είναι <b>το κλειδί σου</b>. Με αυτές — και μόνο με αυτές — ανοίγεις τα τιμολόγιά σου σε άλλη συσκευή.';
+    el('w-title').textContent = TITLES[wordsMode];
+    el('w-lede').innerHTML = LEDES[wordsMode];
     el('w-list').innerHTML = '<li>…</li>';
     kmNewWords().then(function (words) {
       pendingWords = words;
@@ -1819,8 +1840,17 @@
       kmStore(pendingWords, d);
       localStorage.setItem(LS.wordsOk, '1');
       pendingWords = null;
+      /* Στην αλλαγή λέξεων ο φάκελος είναι ΚΑΙΝΟΥΡΙΟΣ (άλλο folder_id), άρα
+         ξαναγράφεται από την αρχή στο μητρώο. */
+      localStorage.removeItem(LS.reg);
       kmRegister();            // δεν περιμένουμε το δίκτυο
       el('w-go').textContent = 'Συνέχεια';
+      if (wordsMode === 'rotate') {
+        wordsMode = 'new';
+        el('nw-box').hidden = true;
+        goto('s-settings');
+        return;
+      }
       afterAccount();
     }).catch(function () {
       el('w-go').disabled = false;
@@ -1828,6 +1858,24 @@
       el('w-err').textContent = 'Δεν μπόρεσα να φτιάξω το κλειδί σε αυτή τη συσκευή.';
       el('w-err').hidden = false;
     });
+  }
+
+  /* v29 · Ο ΦΡΟΥΡΟΣ ΤΗΣ ΑΛΛΑΓΗΣ ΛΕΞΕΩΝ.
+     Σήμερα ο φάκελος στον server είναι άδειος (το Η.2 δεν έχει γίνει), άρα
+     νέες λέξεις δεν κοστίζουν τίποτα. Μόλις μπει ο συγχρονισμός, αλλαγή
+     λέξεων ΧΩΡΙΣ επανακρυπτογράφηση κάνει τα δεδομένα αδιάβαστα για πάντα.
+     Γι' αυτό ο έλεγχος μπαίνει ΤΩΡΑ και όχι τότε: όταν έρθει το Η.2, το
+     κουμπί κλειδώνει μόνο του αντί να καταστρέψει σιωπηλά το αρχείο.
+     ⚠ Χωρίς δίκτυο ΔΕΝ προχωράει: «δεν μπόρεσα να ελέγξω» δεν είναι «καθαρό». */
+  function folderState() {
+    return fetch(KM_API + 'status', { headers: kmHead() }).then(function (r) {
+      if (r.status === 404) { return { empty: true }; }   // δεν υπάρχει καν λογαριασμός
+      if (!r.ok) { return { unknown: true }; }
+      return r.json().then(function (j) {
+        var v = j && j.state ? j.state.folder_version : 0;
+        return { empty: !v, bytes: (j && j.state && j.state.folder_bytes) || 0 };
+      });
+    }).catch(function () { return { unknown: true }; });
   }
 
   /* Πού πάει ο χρήστης μόλις αποκτήσει λογαριασμό — η παλιά ροή, ίδια. */
@@ -1854,9 +1902,10 @@
        (γ) λέξεις αλλά ΑΤΣΕΚΑΡΙΣΤΕΣ -> ξαναδείχνονται μέχρι να τις γράψει */
     var hasEmail = !!localStorage.getItem(LS.email);
     var hasWords = !!localStorage.getItem(LS.words);
-    if (!hasEmail && !hasWords)             { return show('s-acc'); }
-    if (!hasWords)                          { return startWords(true); }
-    if (!localStorage.getItem(LS.wordsOk))  { return startWords(!hasEmail ? false : true); }
+    /* λέξεις χωρίς email = ασύμφωνη κατάσταση· ξεκινάει από την αρχή */
+    if (!hasEmail)                          { return show('s-acc'); }
+    if (!hasWords)                          { return startWords('auto'); }
+    if (!localStorage.getItem(LS.wordsOk))  { return startWords('auto'); }
     if (!localStorage.getItem(LS.reg))      { kmRegister(); }   // εκκρεμής εγγραφή
     if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
     if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
@@ -2017,13 +2066,38 @@
       });
     });
   };
+  el('st-newwords').onclick = function () {
+    el('nw-err').hidden = true;
+    el('nw-box').hidden = !el('nw-box').hidden;
+  };
+  el('nw-cancel').onclick = function () { el('nw-box').hidden = true; };
+  el('nw-go').onclick = function () {
+    var b = el('nw-go'), e = el('nw-err');
+    e.hidden = true; b.disabled = true; b.textContent = 'Έλεγχος…';
+    var stop = function (msg) { b.disabled = false; b.textContent = 'Ναι, φτιάξε νέες 12 λέξεις'; e.textContent = msg; e.hidden = false; };
+    folderState().then(function (st) {
+      if (st.unknown) { stop('Δεν μπόρεσα να ελέγξω τον φάκελό σου στον server. Χρειάζεσαι δίκτυο για να αλλάξεις λέξεις.'); return; }
+      if (!st.empty)  { stop('Ο φάκελός σου στον server έχει ήδη δεδομένα. Η αλλαγή λέξεων θα τα έκανε αδιάβαστα για πάντα — δεν επιτρέπεται ακόμα.'); return; }
+      b.disabled = false; b.textContent = 'Ναι, φτιάξε νέες 12 λέξεις';
+      startWords('rotate');
+    });
+  };
+
   el('st-reset').onclick = function () {
-    if (!confirm('Μηδενισμός εγγραφής σε αυτή τη συσκευή;\n\nΣβήνονται ΜΟΝΟ το email και το κλειδί.\nΤα τιμολόγια, οι φωτογραφίες και τα ποσά τους μένουν ακέραια.')) { return; }
-    if (!confirm('Σίγουρα; Θα ξαναγράψεις το email σου.')) { return; }
+    if (!confirm('Μηδενισμός εγγραφής σε αυτή τη συσκευή;\n\nΣβήνονται το email, το κλειδί ΚΑΙ ο λογαριασμός — θα πάρεις νέες 12 λέξεις.\nΤα τιμολόγια, οι φωτογραφίες και τα ποσά τους μένουν ακέραια.')) { return; }
+    if (!confirm('Σίγουρα; Οι τωρινές 12 λέξεις δεν θα ισχύουν πια.')) { return; }
     localStorage.removeItem(LS.email);
     localStorage.removeItem(LS.key);
     localStorage.removeItem(LS.skip);
     localStorage.removeItem(LS.perm);
+    /* v29 — ΚΑΙ ο λογαριασμός. Ως το v28 έμεναν πίσω οι λέξεις: η εφαρμογή
+       προσπερνούσε την οθόνη του email και ο χρήστης έμενε ΧΩΡΙΣ email αλλά
+       ΜΕ λογαριασμό — κατάσταση που δεν προβλέπεται πουθενά. */
+    localStorage.removeItem(LS.words);
+    localStorage.removeItem(LS.folder);
+    localStorage.removeItem(LS.auth);
+    localStorage.removeItem(LS.wordsOk);
+    localStorage.removeItem(LS.reg);
     location.reload();
   };
 

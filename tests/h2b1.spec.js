@@ -66,7 +66,7 @@ async function passWords(page) {
   await expect(page.locator('#w-go')).toBeDisabled();      // υποχρεωτικό τσεκάρισμα
   // v27: το «Αντιγραφή» αφαιρέθηκε επίτηδες — δεν πρέπει να ξαναγυρίσει
   await expect(page.locator('#w-copy')).toHaveCount(0);
-  await expect(page.locator('.note.warn')).toContainText('Το χαρτί δεν ανεβαίνει πουθενά');
+  await expect(page.locator('#s-words .note.warn')).toContainText('Το χαρτί δεν ανεβαίνει πουθενά');
   await page.locator('#w-ok').check();
   await expect(page.locator('#w-go')).toBeEnabled();
   await page.locator('#w-go').click();
