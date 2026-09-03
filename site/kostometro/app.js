@@ -1258,6 +1258,21 @@
   }
 
   /* ══ ΡΥΘΜΙΣΕΙΣ ══ */
+  /* v32 — Η ΓΡΑΜΜΗ ΠΡΕΠΕΙ ΝΑ ΚΙΝΕΙΤΑΙ ΟΣΟ Η ΟΘΟΝΗ ΕΙΝΑΙ ΑΝΟΙΧΤΗ.
+     Ως το v31 ζωγραφιζόταν μία φορά, στο άνοιγμα των Ρυθμίσεων: ο αυτόματος
+     συγχρονισμός ξεκινάει 2,5″ μετά το άνοιγμα της εφαρμογής, άρα ο Stavros
+     έβλεπε «δεν έχει τρέξει ακόμα» ενώ έτρεχε — και συμπέρανε ότι δεν γίνεται
+     τίποτα μόνο του. Ακίνητο διαγνωστικό είναι διαγνωστικό που λέει ψέματα. */
+  var syncTick = null;
+  function stopSyncTick() { if (syncTick) { clearInterval(syncTick); syncTick = null; } }
+  function startSyncTick() {
+    stopSyncTick();
+    syncTick = setInterval(function () {
+      if (el('s-settings').hidden) { stopSyncTick(); return; }
+      el('st-sync').textContent = syncLine();
+    }, 700);
+  }
+
   function renderSettings() {
     el('st-email').textContent = localStorage.getItem(LS.email) || '—';
     el('st-key').textContent = localStorage.getItem(LS.key) ? 'Με κλειδί Gemini' : 'Χειροκίνητα';
@@ -1273,6 +1288,7 @@
     });
     el('st-sw').textContent = (navigator.serviceWorker && navigator.serviceWorker.controller) ? 'ενεργός' : 'κανένας';
     el('st-sync').textContent = syncLine();
+    startSyncTick();
     all().then(function (rows) { el('st-shots').textContent = rows.length; });
   }
 
@@ -1282,7 +1298,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v31';
+  var APP_VER = 'φέτα 3 · v32';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2020,7 +2036,7 @@
     if (!localStorage.getItem(LS.folder)) { return 'χωρίς λογαριασμό'; }
     if (syncBusy) { return 'σε εξέλιξη… ' + syncInfo.photos + '/' + syncInfo.total; }
     if (syncInfo.msg) { return syncInfo.msg; }
-    if (!syncInfo.at) { return 'δεν έχει τρέξει ακόμα'; }
+    if (!syncInfo.at) { return syncTimer ? 'ξεκινάει σε λίγο…' : 'δεν έχει τρέξει ακόμα'; }
     var t = syncInfo.at;
     var hh = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
     return syncInfo.photos + '/' + syncInfo.total + ' φωτογραφίες · στοιχεία v' + (syncInfo.ver === null ? '—' : syncInfo.ver) + ' · ' + hh;
@@ -2218,9 +2234,8 @@
   el('st-sync-now').onclick = function () {
     var b = el('st-sync-now');
     b.disabled = true; b.textContent = 'Συγχρονίζεται…';
-    var tick = setInterval(function () { el('st-sync').textContent = syncLine(); }, 400);
+    startSyncTick();
     syncNow().then(function () {
-      clearInterval(tick);
       b.disabled = false; b.textContent = 'Συγχρονισμός τώρα';
       renderSettings();
     });

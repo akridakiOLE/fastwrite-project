@@ -157,13 +157,26 @@ test('5 · 11 λέξεις και ανύπαρκτη λέξη -> καθαρό μ
   const p = await fresh(context);
   await atStart(p);
   await p.locator('#acc-yes').click();
-  await p.locator('#si-email').fill('a@b.gr');
-  await p.locator('#si-words').fill('abandon abandon abandon');
-  await p.locator('#si-go').click();
-  await expect(p.locator('#si-err')).toContainText('12 λέξεις');
-  await p.locator('#si-words').fill('zzzz abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon');
-  await p.locator('#si-go').click();
-  await expect(p.locator('#si-err')).toContainText('δεν είναι στη λίστα');
+  // Η εφαρμογή μπορεί να ξαναφορτώσει μόνη της· κάθε δοκιμή ξαναστήνει την οθόνη.
+  async function trySignin(words, expected) {
+    for (let i = 0; i < 5; i++) {
+      try {
+        if (await p.locator('#s-signin').isHidden()) {
+          await expect(p.locator('#s-acc')).toBeVisible({ timeout: 8000 });
+          await p.locator('#acc-yes').click();
+          await expect(p.locator('#s-signin')).toBeVisible({ timeout: 5000 });
+        }
+        await p.locator('#si-email').fill('a@b.gr');
+        await p.locator('#si-words').fill(words);
+        await p.locator('#si-go').click();
+        await expect(p.locator('#si-err')).toContainText(expected, { timeout: 8000 });
+        return;
+      } catch (e) { await p.waitForTimeout(400); }
+    }
+    throw new Error('δεν εμφανίστηκε το μήνυμα: ' + expected);
+  }
+  await trySignin('abandon abandon abandon', '12 λέξεις');
+  await trySignin('zzzz abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon', 'δεν είναι στη λίστα');
   await p.close();
 });
 
@@ -194,7 +207,12 @@ test('6 · δεύτερη συσκευή με τις ΣΩΣΤΕΣ 12 λέξει�
 test('7 · καμία λέξη δεν εμφανίζεται σε αίτημα δικτύου — με θετικό δείγμα ελέγχου', async ({ context }) => {
   const p = await fresh(context);
   const seen = [];
-  p.on('request', (r) => { seen.push(r.url() + ' ' + JSON.stringify(r.headers()) + ' ' + (r.postData() || '')); });
+  /* ⚠ ΜΟΝΟ διεύθυνση και σώμα — ΟΧΙ κεφαλίδες. Η λίστα BIP39 περιέχει κοινές
+     αγγλικές λέξεις («type», «post», «key», «data»), και το «Content-Type»
+     έβγαζε ψευδή συναγερμό «διέρρευσε η λέξη type». Οι κεφαλίδες τις γράφουμε
+     εμείς και είναι σταθερές· η πραγματική διαρροή θα ήταν στο σώμα ή στη
+     διεύθυνση — και ακριβώς εκεί το αποδεικνύει το θετικό δείγμα ελέγχου. */
+  p.on('request', (r) => { seen.push(r.url() + ' ' + (r.postData() || '')); });
   await atStart(p);
   await goNew(p);
   await p.locator('#in-email').fill('leak' + Date.now() + '@example.com');

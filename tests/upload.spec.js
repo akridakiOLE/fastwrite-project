@@ -20,11 +20,19 @@ async function fresh(context) {
   return p;
 }
 async function onboard(p, email) {
-  for (let i = 0; i < 5; i++) {
-    await p.locator('#acc-no').click().catch(() => {});
-    try { await expect(p.locator('#s-email')).toBeVisible({ timeout: 4000 }); break; } catch (e) {}
+  // Η εφαρμογή μπορεί να ξαναφορτώσει μόνη της (νέος service worker ή έλεγχος
+  // έκδοσης) και να μηδενίσει την οθόνη. Ξαναπροσπαθούμε ΟΛΟ το βήμα.
+  let ok = false;
+  for (let i = 0; i < 6 && !ok; i++) {
+    try {
+      await expect(p.locator('#s-acc')).toBeVisible({ timeout: 8000 });
+      await p.locator('#acc-no').click();
+      await expect(p.locator('#s-email')).toBeVisible({ timeout: 4000 });
+      await p.locator('#in-email').fill(email);
+      ok = true;
+    } catch (e) { await p.waitForTimeout(500); }
   }
-  await p.locator('#in-email').fill(email);
+  if (!ok) { throw new Error('δεν σταθεροποιήθηκε η οθόνη του email'); }
   await p.locator('#go-email').click();
   await expect(p.locator('#w-list li')).toHaveCount(12, { timeout: 15000 });
   const w = await p.locator('#w-list li').allTextContents();
@@ -154,5 +162,30 @@ test('30 · ΤΑ ΤΟΠΙΚΑ ΔΕΔΟΜΕΝΑ ΔΕΝ ΑΓΓΙΖΟΝΤΑΙ ΠΟ�
   }));
   expect(after).toEqual(before);
   expect(after.length).toBe(3);
+  await p.close();
+});
+
+// ── 31. Η ΓΡΑΜΜΗ ΚΙΝΕΙΤΑΙ ΜΟΝΗ ΤΗΣ (v32) ────────────────────────────────
+test('31 · ο συγχρονισμός τρέχει ΜΟΝΟΣ του και η γραμμή το δείχνει χωρίς να πατηθεί κουμπί', async ({ context }) => {
+  const p = await fresh(context);
+  await onboard(p, 'auto' + Date.now() + '@example.com');
+  await seedShots(p, 2, 0);
+
+  // ανοίγουμε την εφαρμογή από την αρχή και πάμε ΚΑΤΕΥΘΕΙΑΝ στις Ρυθμίσεις,
+  // χωρίς να αγγίξουμε το «Συγχρονισμός τώρα»
+  await p.goto(APP, { waitUntil: 'domcontentloaded' }).catch(() => {});
+  await p.waitForFunction(() => typeof kmNewWords === 'function', null, { timeout: 20000 });
+  await p.evaluate(() => {
+    document.querySelectorAll('.screen').forEach((s) => s.hidden = true);
+    document.getElementById('s-settings').hidden = false;
+  });
+  await p.evaluate(() => renderSettings && renderSettings()).catch(() => {});
+
+  // η γραμμή πρέπει να φτάσει μόνη της σε ολοκληρωμένο συγχρονισμό
+  await expect.poll(async () => {
+    try { return await p.locator('#st-sync').textContent(); } catch (e) { return ''; }
+  }, { timeout: 30000 }).toContain('φωτογραφίες');
+  const line = await p.locator('#st-sync').textContent();
+  expect(line).toMatch(/στοιχεία v\d+/);
   await p.close();
 });
