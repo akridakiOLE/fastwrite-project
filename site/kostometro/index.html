@@ -16,6 +16,49 @@
 </head>
 <body>
 
+<!-- ══ ΟΘΟΝΗ Α0 · ΕΧΕΤΕ ΛΟΓΑΡΙΑΣΜΟ; (Η.6) ═════════════════════ -->
+<section id="s-acc" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h1 class="logo">kosto<svg class="logo-mark" viewBox="0 0 34 46" aria-hidden="true"><path d="M6 30 L17 15 L28 30"/></svg>metro</h1>
+    <p class="lede">Φωτογραφίζεις το τιμολόγιο στην παραλαβή.<br>Κρατάς τι πλήρωσες, ανά προμηθευτή.</p>
+    <button class="btn primary" id="acc-no">Ξεκινάω τώρα</button>
+    <button class="btn ghost" id="acc-yes">Έχω ήδη λογαριασμό</button>
+  </div>
+</section>
+
+<!-- ══ ΟΘΟΝΗ Α2 · ΟΙ 12 ΛΕΞΕΙΣ (Η.6 + Γ.2) ════════════════════ -->
+<section id="s-words" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h2 id="w-title">Οι 12 λέξεις σου</h2>
+    <p class="lede" id="w-lede">Αυτές οι 12 λέξεις είναι <b>το κλειδί σου</b>. Με αυτές — και μόνο με αυτές — ανοίγεις τα τιμολόγιά σου σε άλλη συσκευή.</p>
+    <p class="note big">Γράψ᾽ τες <b>σε χαρτί</b>, με τη σειρά. Δεν υπάρχει «ξέχασα τον κωδικό»: <b>δεν τις έχουμε</b> και δεν μπορούμε να σου τις δώσουμε.</p>
+    <ol class="words" id="w-list"></ol>
+    <button class="btn ghost small" id="w-copy">Αντιγραφή</button>
+    <label class="chk"><input type="checkbox" id="w-ok"> <span>Τις έγραψα σε χαρτί.</span></label>
+    <p class="err" id="w-err" hidden></p>
+    <button class="btn primary" id="w-go" disabled>Συνέχεια</button>
+  </div>
+</section>
+
+<!-- ══ ΟΘΟΝΗ Α3 · ΕΧΩ ΛΟΓΑΡΙΑΣΜΟ (Η.6) ════════════════════════ -->
+<section id="s-signin" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h2>Έχω ήδη λογαριασμό</h2>
+    <p class="lede">Γράψε το email σου και τις <b>12 λέξεις</b>, χωρισμένες με κενό.</p>
+    <label class="fld">
+      <span>Το email σου</span>
+      <input type="email" id="si-email" inputmode="email" autocomplete="email" placeholder="onoma@example.com">
+    </label>
+    <label class="fld">
+      <span>Οι 12 λέξεις</span>
+      <textarea id="si-words" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="λέξη1 λέξη2 λέξη3 …"></textarea>
+    </label>
+    <p class="err" id="si-err" hidden></p>
+    <button class="btn primary" id="si-go">Σύνδεση</button>
+    <button class="btn ghost" id="si-back">Πίσω</button>
+  </div>
+</section>
+
 <!-- ══ ΟΘΟΝΗ Α · EMAIL ══════════════════════════════════════════ -->
 <section id="s-email" class="screen setup" hidden>
   <div class="setup-inner">
@@ -192,6 +235,7 @@
   <div class="pg-body" id="shot-body"></div>
 </section>
 
+<script src="/km-crypto.js"></script>
 <script src="/kostometro/app.js"></script>
 </body>
 </html>

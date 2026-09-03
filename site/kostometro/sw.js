@@ -1,11 +1,12 @@
 /* Kostometro service worker — κέλυφος offline.
    ⚠ Το CACHE ανεβαίνει σε ΚΑΘΕ αλλαγή αρχείου, αλλιώς μένει το παλιό. */
-var CACHE = 'km-v25';
+var CACHE = 'km-v26';
 var SHELL = [
   '/kostometro/',
   '/kostometro/index.html',
   '/kostometro/app.css',
   '/kostometro/app.js',
+  '/km-crypto.js',
   '/kostometro/manifest.webmanifest',
   '/kostometro/icons/icon-192.png',
   '/kostometro/icons/icon-512.png'

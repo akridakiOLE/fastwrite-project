@@ -415,3 +415,32 @@ input:focus{outline:none;border-color:var(--accent)}
 }
 .undo-row span{font-size:15px}
 .undo-row .btn{margin:0}
+
+
+/* ── v26 · οι 12 λέξεις (Η.2β-1) ───────────────────────────────── */
+.words{
+  list-style:none;margin:14px 0 10px;padding:12px 10px;
+  display:grid;grid-template-columns:repeat(2,1fr);gap:6px 10px;
+  background:#0f1520;border:1px solid #26313f;border-radius:12px;
+  counter-reset:w;
+}
+.words li{
+  counter-increment:w;display:flex;align-items:baseline;gap:8px;
+  font-size:16px;font-weight:600;letter-spacing:.2px;padding:5px 6px;
+}
+.words li::before{
+  content:counter(w);min-width:18px;text-align:right;
+  font-size:12px;font-weight:500;color:#6b7c93;
+}
+.chk{display:flex;align-items:flex-start;gap:10px;margin:12px 0 4px;font-size:15px;line-height:1.4;}
+.chk input{width:22px;height:22px;flex:0 0 auto;margin-top:1px;accent-color:#2ee6a8;}
+.btn.small{padding:8px 14px;font-size:14px;}
+#s-signin textarea{
+  width:100%;box-sizing:border-box;padding:12px;border-radius:10px;
+  border:1px solid #26313f;background:#0f1520;color:#e8eef6;
+  font-size:16px;line-height:1.5;resize:vertical;
+}
+
+/* v26 — κουμπί που δεν πατιέται ΠΡΕΠΕΙ να φαίνεται ότι δεν πατιέται.
+   Αλλιώς ο χρήστης το πατάει, δεν γίνεται τίποτα, και δεν ξέρει γιατί. */
+.btn[disabled]{opacity:.38;filter:saturate(.35);cursor:default;}

@@ -17,7 +17,15 @@
     perm:  'km_perm_seen',
     src:   'km_source',
     diag:  'km_ai_diag',
-    model: 'km_ai_model'
+    model: 'km_ai_model',
+    /* v26 · Η.2β-1 — ο λογαριασμός. Οι 12 λέξεις ΜΕΝΟΥΝ στη συσκευή:
+       από αυτές βγαίνουν folder/auth (πάνε στον server) και το κλειδί
+       κρυπτογράφησης (ΔΕΝ φεύγει ποτέ). */
+    words:   'km_words',
+    folder:  'km_folder',
+    auth:    'km_auth',
+    wordsOk: 'km_words_ok',
+    reg:     'km_registered'
   };
 
   var el = function (id) { return document.getElementById(id); };
@@ -135,7 +143,7 @@
   }
 
   /* ── Πλοήγηση ── */
-  var SCREENS = ['s-email','s-key','s-perm','s-cam','s-who',
+  var SCREENS = ['s-acc','s-email','s-words','s-signin','s-key','s-perm','s-cam','s-who',
                  's-menu','s-pend','s-sup','s-ref','s-settings','s-shot'];
   function show(id) {
     var pv = el('preview');
@@ -1259,7 +1267,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v25';
+  var APP_VER = 'φέτα 3 · v26';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1717,6 +1725,118 @@
   /* ── Εγγραφή ── */
   function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v); }
 
+  /* ── v26 · Ο ΛΟΓΑΡΙΑΣΜΟΣ (Η.2β-1) ────────────────────────────────
+     Τι κάνει αυτό το κομμάτι: πρώτη οθόνη «έχεις λογαριασμό;», οι 12
+     λέξεις με υποχρεωτικό τσεκάρισμα, και εγγραφή του email στο μητρώο.
+     ⛔ Τι ΔΕΝ κάνει ακόμα: ΔΕΝ ανεβάζει και ΔΕΝ κατεβάζει τιμολόγια
+     (Η.2). Καμία γραμμή εδώ δεν αγγίζει το IndexedDB. */
+  var KM_API = '/api/km/';
+  var pendingWords = null;   // οι λέξεις που μόλις φτιάχτηκαν, πριν τσεκαριστούν
+
+  function kmHead() {
+    return {
+      'Content-Type': 'application/json',
+      'X-Km-Folder':  localStorage.getItem(LS.folder) || '',
+      'X-Km-Auth':    localStorage.getItem(LS.auth)   || '',
+      'X-Km-Device':  localStorage.getItem(LS.id)     || ''
+    };
+  }
+  function devName() {
+    var m = /\(([^)]+)\)/.exec(navigator.userAgent || '');
+    return (m ? m[1] : (navigator.platform || 'συσκευή')).slice(0, 60);
+  }
+
+  /* Αποθηκεύει λέξεις + παράγωγα ΤΟΠΙΚΑ. Το κλειδί δεν αποθηκεύεται —
+     ξαναβγαίνει από τις λέξεις όποτε χρειαστεί (Η.2, επόμενο κομμάτι). */
+  function kmStore(words, d) {
+    localStorage.setItem(LS.words,  words.join(' '));
+    localStorage.setItem(LS.folder, d.folderId);
+    localStorage.setItem(LS.auth,   d.authToken);
+  }
+
+  /* Εγγραφή στο μητρώο. ΠΟΤΕ δεν μπλοκάρει τον χρήστη: χωρίς δίκτυο
+     μένει εκκρεμής και ξαναδοκιμάζεται στο επόμενο άνοιγμα (Α400 §Γ —
+     η φωτογραφία στην πόρτα δεν περιμένει ποτέ το δίκτυο). */
+  function kmRegister() {
+    var email = localStorage.getItem(LS.email);
+    if (!email || !localStorage.getItem(LS.folder)) { return Promise.resolve(false); }
+    var src = localStorage.getItem(LS.src) || 'link';
+    var ref = /^ref:(.+)$/.exec(src);
+    return fetch(KM_API + 'register', {
+      method: 'POST',
+      headers: kmHead(),
+      body: JSON.stringify({
+        email: email,
+        source: ref ? 'link' : src,
+        ref: ref ? ref[1] : null,
+        has_key: !!localStorage.getItem(LS.key),
+        device_name: devName()
+      })
+    }).then(function (r) {
+      if (!r.ok) { return false; }
+      localStorage.setItem(LS.reg, '1');
+      return true;
+    }).catch(function () { return false; });
+  }
+
+  function renderWords(words) {
+    var ol = el('w-list');
+    ol.innerHTML = '';
+    words.forEach(function (w) {
+      var li = document.createElement('li');
+      li.textContent = w;
+      ol.appendChild(li);
+    });
+    el('w-ok').checked = false;
+    el('w-go').disabled = true;
+    el('w-err').hidden = true;
+  }
+
+  /* Φτιάχνει 12 λέξεις και τις δείχνει. existing = υπάρχων χρήστης που
+     αποκτά λογαριασμό τώρα (τα τιμολόγιά του μένουν άθικτα). */
+  function startWords(existing) {
+    show('s-words');
+    el('w-title').textContent = existing ? 'Το κλειδί του αρχείου σου' : 'Οι 12 λέξεις σου';
+    el('w-lede').innerHTML = existing
+      ? 'Τα τιμολόγιά σου <b>δεν πειράχτηκαν</b> — είναι όλα εδώ. Από σήμερα έχουν και <b>κλειδί</b>: αυτές τις 12 λέξεις. Με αυτές θα τα ανοίγεις σε άλλη συσκευή.'
+      : 'Αυτές οι 12 λέξεις είναι <b>το κλειδί σου</b>. Με αυτές — και μόνο με αυτές — ανοίγεις τα τιμολόγιά σου σε άλλη συσκευή.';
+    el('w-list').innerHTML = '<li>…</li>';
+    kmNewWords().then(function (words) {
+      pendingWords = words;
+      renderWords(words);
+    }).catch(function () {
+      el('w-err').textContent = 'Κάτι πήγε στραβά στη δημιουργία των λέξεων. Κλείσε και ξανάνοιξε την εφαρμογή.';
+      el('w-err').hidden = false;
+    });
+  }
+
+  /* Μετά το τσεκάρισμα: παράγει ταυτότητα, αποθηκεύει, εγγράφει, προχωράει. */
+  function wordsAccepted() {
+    if (!pendingWords) { return; }
+    el('w-go').disabled = true;
+    el('w-go').textContent = 'Ένα δευτερόλεπτο…';
+    kmDerive(pendingWords).then(function (d) {
+      kmStore(pendingWords, d);
+      localStorage.setItem(LS.wordsOk, '1');
+      pendingWords = null;
+      kmRegister();            // δεν περιμένουμε το δίκτυο
+      el('w-go').textContent = 'Συνέχεια';
+      afterAccount();
+    }).catch(function () {
+      el('w-go').disabled = false;
+      el('w-go').textContent = 'Συνέχεια';
+      el('w-err').textContent = 'Δεν μπόρεσα να φτιάξω το κλειδί σε αυτή τη συσκευή.';
+      el('w-err').hidden = false;
+    });
+  }
+
+  /* Πού πάει ο χρήστης μόλις αποκτήσει λογαριασμό — η παλιά ροή, ίδια. */
+  function afterAccount() {
+    if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
+    if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
+    toCam();
+  }
+
   function boot() {
     if (!localStorage.getItem(LS.id)) {
       localStorage.setItem(LS.id, 'km_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
@@ -1727,19 +1847,85 @@
       var st = /[?&]src=([A-Za-z0-9:_-]+)/.exec(location.search);
       localStorage.setItem(LS.src, m ? ('ref:' + m[1]) : (st ? st[1] : 'link'));
     }
-    if (!localStorage.getItem(LS.email)) { return show('s-email'); }
+    /* v26 · Η.2β-1 — τρεις καταστάσεις, με αυτή τη σειρά:
+       (α) ούτε email ούτε λέξεις  -> εντελώς νέος, πρώτη οθόνη
+       (β) email αλλά ΟΧΙ λέξεις   -> υπάρχων χρήστης· αποκτά κλειδί τώρα,
+           χωρίς να χάσει ούτε ένα τιμολόγιο
+       (γ) λέξεις αλλά ΑΤΣΕΚΑΡΙΣΤΕΣ -> ξαναδείχνονται μέχρι να τις γράψει */
+    var hasEmail = !!localStorage.getItem(LS.email);
+    var hasWords = !!localStorage.getItem(LS.words);
+    if (!hasEmail && !hasWords)             { return show('s-acc'); }
+    if (!hasWords)                          { return startWords(true); }
+    if (!localStorage.getItem(LS.wordsOk))  { return startWords(!hasEmail ? false : true); }
+    if (!localStorage.getItem(LS.reg))      { kmRegister(); }   // εκκρεμής εγγραφή
     if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
     if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
     toCam();
   }
 
   /* ── Χειριστές ── */
+  el('acc-no').onclick  = function () { show('s-email'); };
+  el('acc-yes').onclick = function () {
+    el('si-err').hidden = true;
+    el('si-email').value = localStorage.getItem(LS.email) || '';
+    el('si-words').value = '';
+    show('s-signin');
+  };
+  el('si-back').onclick = function () { show('s-acc'); };
+
+  /* v26 — «Έχω ήδη λογαριασμό». ⚠ ΔΕΝ καλείται το register πριν
+     επιβεβαιωθεί ότι ο λογαριασμός ΥΠΑΡΧΕΙ: το register με άγνωστο
+     folder_id φτιάχνει ΝΕΟ λογαριασμό, οπότε λάθος (αλλά έγκυρες)
+     λέξεις θα έδιναν σιωπηλά άδειο αρχείο αντί για μήνυμα λάθους. */
+  el('si-go').onclick = function () {
+    var email = el('si-email').value.trim();
+    var raw   = el('si-words').value;
+    var e = el('si-err');
+    e.hidden = true;
+    if (!validEmail(email)) { e.textContent = 'Γράψε μια σωστή διεύθυνση email.'; e.hidden = false; return; }
+    var btn = el('si-go'); btn.disabled = true; btn.textContent = 'Έλεγχος…';
+    function fail(msg) { btn.disabled = false; btn.textContent = 'Σύνδεση'; e.textContent = msg; e.hidden = false; }
+    kmCheckWords(raw).then(function (c) {
+      if (!c.ok) { fail(c.error); return null; }
+      return kmDerive(c.words).then(function (d) {
+        var h = {
+          'X-Km-Folder': d.folderId,
+          'X-Km-Auth':   d.authToken,
+          'X-Km-Device': localStorage.getItem(LS.id) || ''
+        };
+        return fetch(KM_API + 'status', { headers: h }).then(function (r) {
+          if (r.status === 404) { fail('Δεν βρέθηκε λογαριασμός με αυτές τις 12 λέξεις. Έλεγξε τη σειρά τους.'); return; }
+          if (r.status === 403) { fail('Οι λέξεις δεν ταιριάζουν με αυτόν τον λογαριασμό.'); return; }
+          if (!r.ok)            { fail('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); return; }
+          localStorage.setItem(LS.email, email);
+          kmStore(c.words, d);
+          localStorage.setItem(LS.wordsOk, '1');
+          return kmRegister().then(function () {
+            btn.disabled = false; btn.textContent = 'Σύνδεση';
+            afterAccount();
+          });
+        });
+      });
+    }).catch(function () { fail('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); });
+  };
+
+  el('w-ok').onchange = function () { el('w-go').disabled = !this.checked; };
+  el('w-go').onclick  = wordsAccepted;
+  el('w-copy').onclick = function () {
+    var t = (pendingWords || []).join(' ');
+    if (!t) { return; }
+    var done = function () { el('w-copy').textContent = 'Αντιγράφηκε ✓'; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(done).catch(function () {});
+    }
+  };
+
   el('go-email').onclick = function () {
     var v = el('in-email').value.trim();
     if (!validEmail(v)) { el('err-email').hidden = false; return; }
     el('err-email').hidden = true;
     localStorage.setItem(LS.email, v);
-    show('s-key');
+    startWords(false);
   };
   el('go-key').onclick = function () {
     var v = el('in-key').value.trim();
