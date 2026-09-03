@@ -62,6 +62,22 @@ async function seedShots(p, n, pagesEach) {
     return ids;
   }, { n, pagesEach });
 }
+/* Η εφαρμογή συγχρονίζει ΚΑΙ μόνη της (άνοιγμα, κάθε αποθήκευση). Ένας
+   χειροκίνητος συγχρονισμός μπορεί να τελειώσει ενώ ο αυτόματος τρέχει ακόμα,
+   οπότε η γραμμή αλλάζει μετά τη μέτρηση. Περιμένουμε να ΗΣΥΧΑΣΕΙ: ίδια τιμή
+   δύο συνεχόμενες φορές. Χωρίς αυτό τα τεστ πέφτουν τυχαία — και το τυχαίο
+   τεστ είναι χειρότερο από κανένα, γιατί μαθαίνεις να το αγνοείς. */
+async function settled(p) {
+  let last = null;
+  for (let i = 0; i < 40; i++) {
+    let now;
+    try { now = await p.locator('#st-sync').textContent(); } catch (e) { now = null; }
+    if (now && now === last && !/ανεβαίνει|κατεβάζει|εξέλιξη|ξεκινάει/.test(now)) { return now; }
+    last = now;
+    await p.waitForTimeout(500);
+  }
+  return last;
+}
 async function runSync(p) {
   return p.evaluate(() => new Promise((res) => {
     document.querySelectorAll('.screen').forEach((s) => s.hidden = true);
@@ -71,7 +87,7 @@ async function runSync(p) {
       const b = document.getElementById('st-sync-now');
       if (!b.disabled) { clearInterval(t); res(document.getElementById('st-sync').textContent); }
     }, 200);
-  }));
+  })).then(() => settled(p));
 }
 async function idsOnServer(p) {
   return p.evaluate(() => fetch('/api/km/photos', { headers: {
@@ -84,7 +100,7 @@ test('26 · τα στοιχεία ΚΑΙ οι φωτογραφίες ανεβα�
   await onboard(p, 'up' + Date.now() + '@example.com');
   const ids = await seedShots(p, 3, 1);          // 3 τιμολόγια × 2 σελίδες
   const line = await runSync(p);
-  expect(line).toContain('6/6 φωτογραφίες');
+  expect(line).toContain('6/6 φωτογραφίες στον server');
 
   const onSrv = await idsOnServer(p);
   const expected = [];
@@ -106,11 +122,11 @@ test('27 · δεύτερος συγχρονισμός ΔΕΝ ξαναστέλν�
   const p = await fresh(context);
   await onboard(p, 'again' + Date.now() + '@example.com');
   await seedShots(p, 2, 0);
-  expect(await runSync(p)).toContain('2/2 φωτογραφίες');
+  expect(await runSync(p)).toContain('2/2 φωτογραφίες στον server');
 
   // δεύτερη φορά: τίποτα να ανέβει
   const line2 = await runSync(p);
-  expect(line2).toContain('0/0 φωτογραφίες');
+  expect(line2).toContain('2/2 φωτογραφίες στον server');   // v34: λέει τι ΥΠΑΡΧΕΙ, όχι τι έτρεξε
   // αλλά τα στοιχεία ΑΝΕΒΗΚΑΝ ξανά — η έκδοση προχώρησε
   const v1 = Number((line2.match(/στοιχεία v(\d+)/) || [])[1]);
   expect(v1).toBeGreaterThan(1);
@@ -127,8 +143,7 @@ test('28 · νέο τιμολόγιο μετά τον συγχρονισμό: α
   // ⚠ Ο αυτόματος συγχρονισμός του ανοίγματος μπορεί να προλάβει τον χειροκίνητο,
   // οπότε ο μετρητής δεν είναι ντετερμινιστικός. Το ΚΡΙΣΙΜΟ είναι άλλο: ότι
   // ΠΟΤΕ δεν ξαναστέλνονται οι ήδη ανεβασμένες.
-  const uploaded = Number((line.match(/(\d+)\/(\d+) φωτογραφίες/) || [])[2]);
-  expect(uploaded).toBeLessThanOrEqual(2);
+  expect(line).toContain('4/4 φωτογραφίες στον server');
   await expect.poll(async () => (await idsOnServer(p)).length, { timeout: 15000 }).toBe(4);
   await p.close();
 });
@@ -140,7 +155,7 @@ test('29 · χωρίς δίκτυο ο συγχρονισμός ΤΟ ΛΕΕΙ, �
   await p.route('**/api/km/**', (r) => r.abort());
   expect(await runSync(p)).toContain('χωρίς δίκτυο');
   await p.unroute('**/api/km/**');
-  expect(await runSync(p)).toContain('1/1 φωτογραφίες');   // ξαναπροσπαθεί μόνο του
+  expect(await runSync(p)).toContain('1/1 φωτογραφίες στον server');   // ξαναπροσπαθεί μόνο του
   await p.close();
 });
 

@@ -1315,7 +1315,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v33';
+  var APP_VER = 'φέτα 3 · v34';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1935,7 +1935,7 @@
      κάθε ΦΩΤΟΓΡΑΦΙΑ μία φορά. Όλα σφραγισμένα στη συσκευή. */
   var kmKey = null;          // κλειδί AES στη μνήμη — ποτέ στον δίσκο
   var syncBusy = false, syncAgain = false, syncTimer = null;
-  var syncInfo = { photos: 0, total: 0, ver: null, at: null, msg: null };
+  var syncInfo = { photos: 0, total: 0, want: 0, onSrv: 0, ver: null, at: null, msg: null };
 
   function kmKeyReady() {
     if (kmKey) { return Promise.resolve(kmKey); }
@@ -1982,10 +1982,17 @@
   }
 
   function pushPhotos(rows, key, have) {
-    var jobs = [];
+    var jobs = [], want = 0;
     rows.forEach(function (r) {
-      photoIds(r).forEach(function (x) { if (have.indexOf(x.id) < 0) { jobs.push(x); } });
+      photoIds(r).forEach(function (x) { want++; if (have.indexOf(x.id) < 0) { jobs.push(x); } });
     });
+    /* v34 — Ο ΜΕΤΡΗΤΗΣ ΕΔΕΙΧΝΕ ΤΗ ΔΟΥΛΕΙΑ ΤΟΥ ΓΥΡΟΥ, ΟΧΙ ΤΗΝ ΚΑΤΑΣΤΑΣΗ.
+       Όταν όλα είχαν ήδη ανέβει έγραφε «0/0 φωτογραφίες», που ο Stavros
+       διάβασε ως «καμία φωτογραφία» και σκέφτηκε ότι κάτι χάθηκε. Σωστό
+       νούμερο, λάθος ερώτηση: αυτό που θέλει να ξέρει είναι πόσες από τις
+       δικές του βρίσκονται στον server — «24/24», όχι «0/0». */
+    syncInfo.want = want;
+    syncInfo.onSrv = want - jobs.length;
     syncInfo.total = jobs.length;
     syncInfo.photos = 0;
     /* Μία-μία, όχι όλες μαζί: σε δεδομένα κινητής οι παράλληλες αποστολές
@@ -2000,7 +2007,7 @@
           return fetch(KM_API + 'photo?id=' + encodeURIComponent(jobs[i].id), { method: 'PUT', headers: h, body: sealed });
         })
         .then(function (res) {
-          if (res.ok) { syncInfo.photos++; return step(i + 1); }
+          if (res.ok) { syncInfo.photos++; syncInfo.onSrv++; return step(i + 1); }
           if (res.status === 409) { syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return; }
           if (res.status === 413) { syncInfo.msg = 'μία φωτογραφία είναι πολύ μεγάλη'; return step(i + 1); }
           syncInfo.msg = 'σφάλμα ' + res.status;
@@ -2157,14 +2164,16 @@
      και «δεν έτρεξε ποτέ» μοιάζουν ολόιδια. */
   function syncLine() {
     if (!localStorage.getItem(LS.folder)) { return 'χωρίς λογαριασμό'; }
-    if (syncBusy) { return 'σε εξέλιξη… ' + syncInfo.photos + '/' + syncInfo.total; }
+    if (syncBusy) {
+      return syncInfo.total ? ('ανεβαίνει… ' + syncInfo.photos + '/' + syncInfo.total) : 'σε εξέλιξη…';
+    }
     if (syncInfo.msg) { return syncInfo.msg; }
     if (pulling) { return 'κατεβάζει… ' + pullInfo.photos + '/' + pullInfo.need; }
     if (localStorage.getItem(LS.needPull)) { return 'εκκρεμεί κατέβασμα'; }
     if (!syncInfo.at) { return syncTimer ? 'ξεκινάει σε λίγο…' : 'δεν έχει τρέξει ακόμα'; }
     var t = syncInfo.at;
     var hh = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
-    return syncInfo.photos + '/' + syncInfo.total + ' φωτογραφίες · στοιχεία v' + (syncInfo.ver === null ? '—' : syncInfo.ver) + ' · ' + hh;
+    return syncInfo.onSrv + '/' + syncInfo.want + ' φωτογραφίες στον server · στοιχεία v' + (syncInfo.ver === null ? '—' : syncInfo.ver) + ' · ' + hh;
   }
 
   /* Πού πάει ο χρήστης μόλις αποκτήσει λογαριασμό — η παλιά ροή, ίδια. */
@@ -2209,9 +2218,21 @@
     el('si-err').hidden = true;
     el('si-email').value = localStorage.getItem(LS.email) || '';
     el('si-words').value = '';
+    el('si-count').textContent = '0 από 12 λέξεις';
+    el('si-count').style.color = '';
     show('s-signin');
   };
   el('si-back').onclick = function () { show('s-acc'); };
+
+  /* v34 — ΖΩΝΤΑΝΟΣ ΜΕΤΡΗΤΗΣ. Ο Stavros στάθηκε μπροστά σε ένα σκέτο πλαίσιο
+     και ρώτησε «τι κάνω, θα τις γράψω όλες ενωμένες;». Η οδηγία από πάνω
+     λέει το πώς· ο μετρητής λέει αν το πέτυχε, ΠΡΙΝ πατήσει Σύνδεση. */
+  el('si-words').oninput = function () {
+    var n = String(this.value || '').trim().split(/\s+/).filter(function (x) { return x.length; }).length;
+    var e = el('si-count');
+    e.textContent = n + ' από 12 λέξεις' + (n === 12 ? ' ✓' : '');
+    e.style.color = (n === 12) ? '#2ee6a8' : '';
+  };
 
   /* v26 — «Έχω ήδη λογαριασμό». ⚠ ΔΕΝ καλείται το register πριν
      επιβεβαιωθεί ότι ο λογαριασμός ΥΠΑΡΧΕΙ: το register με άγνωστο

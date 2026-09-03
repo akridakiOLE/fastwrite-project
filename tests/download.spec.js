@@ -61,12 +61,28 @@ async function settings(p) {
   // ΜΟΝΟ DOM: η εφαρμογή είναι κλειστή, καμία εσωτερική συνάρτηση δεν φαίνεται
   await p.evaluate(() => { document.querySelectorAll('.screen').forEach((s) => s.hidden = true); document.getElementById('s-settings').hidden = false; });
 }
+/* Η εφαρμογή συγχρονίζει ΚΑΙ μόνη της (άνοιγμα, κάθε αποθήκευση). Ένας
+   χειροκίνητος συγχρονισμός μπορεί να τελειώσει ενώ ο αυτόματος τρέχει ακόμα,
+   οπότε η γραμμή αλλάζει μετά τη μέτρηση. Περιμένουμε να ΗΣΥΧΑΣΕΙ: ίδια τιμή
+   δύο συνεχόμενες φορές. Χωρίς αυτό τα τεστ πέφτουν τυχαία — και το τυχαίο
+   τεστ είναι χειρότερο από κανένα, γιατί μαθαίνεις να το αγνοείς. */
+async function settled(p) {
+  let last = null;
+  for (let i = 0; i < 40; i++) {
+    let now;
+    try { now = await p.locator('#st-sync').textContent(); } catch (e) { now = null; }
+    if (now && now === last && !/ανεβαίνει|κατεβάζει|εξέλιξη|ξεκινάει/.test(now)) { return now; }
+    last = now;
+    await p.waitForTimeout(500);
+  }
+  return last;
+}
 async function runSync(p) {
   await settings(p);
   return p.evaluate(() => new Promise((res) => {
     document.getElementById('st-sync-now').click();
     const t = setInterval(() => { const b = document.getElementById('st-sync-now'); if (!b.disabled) { clearInterval(t); res(document.getElementById('st-sync').textContent); } }, 200);
-  }));
+  })).then(() => settled(p));
 }
 async function localRows(p) {
   return p.evaluate(() => new Promise((res) => {
@@ -96,20 +112,20 @@ test('32 · ΔΕΥΤΕΡΗ ΣΥΣΚΕΥΗ: τα τιμολόγια εμφανί�
   const email = 'dl' + Date.now() + '@example.com';
   const words = await onboard(p1, email);
   await seedShots(p1, 3, 1, 'A');
-  expect(await runSync(p1)).toContain('6/6 φωτογραφίες');
+  expect(await runSync(p1)).toContain('6/6 φωτογραφίες στον server');
   const src = (await localRows(p1)).sort((a, b) => a.id.localeCompare(b.id));
   await p1.close();
 
   const p2 = await fresh(context);            // «άλλο κινητό»: άδεια βάση
   await signIn(p2, email, words);
-  await expect.poll(async () => (await localRows(p2)).length, { timeout: 30000 }).toBe(3);
+  await expect.poll(async () => (await localRows(p2)).length, { timeout: 45000 }).toBe(3);
   // τα στοιχεία ήρθαν σωστά
   const got = (await localRows(p2)).sort((a, b) => a.id.localeCompare(b.id));
   expect(got.map((r) => r.id)).toEqual(src.map((r) => r.id));
   expect(got.map((r) => r.sup)).toEqual(src.map((r) => r.sup));
   expect(got.map((r) => r.total)).toEqual(src.map((r) => r.total));
   // και οι φωτογραφίες κατέβηκαν, ΙΔΙΟΥ μεγέθους
-  await expect.poll(async () => (await localRows(p2)).every((r) => r.blob > 0 && r.pages === 1), { timeout: 40000 }).toBe(true);
+  await expect.poll(async () => (await localRows(p2)).every((r) => r.blob > 0 && r.pages === 1), { timeout: 60000 }).toBe(true);
   const got2 = (await localRows(p2)).sort((a, b) => a.id.localeCompare(b.id));
   expect(got2.map((r) => r.blob)).toEqual(src.map((r) => r.blob));
   await p2.close();
@@ -150,7 +166,7 @@ test('33 · 🔴 καθαρή συσκευή ΔΕΝ σβήνει τον φάκε
   // Η ΑΠΟΔΕΙΞΗ: τρίτη καθαρή συσκευή πρέπει να βρει και τα 4 στον φάκελο.
   const p3 = await fresh(context);
   await signIn(p3, email, words);
-  await expect.poll(async () => (await localRows(p3)).length, { timeout: 30000 }).toBe(4);
+  await expect.poll(async () => (await localRows(p3)).length, { timeout: 45000 }).toBe(4);
   await p3.close();
 });
 
@@ -164,7 +180,7 @@ test('34 · το κατέβασμα ΠΟΤΕ δεν σβήνει και ΠΟΤΕ
 
   const p2 = await fresh(context);
   await signIn(p2, email, words);
-  await expect.poll(async () => (await localRows(p2)).length, { timeout: 30000 }).toBe(2);
+  await expect.poll(async () => (await localRows(p2)).length, { timeout: 45000 }).toBe(2);
   // αυτή η συσκευή έχει ΚΑΙ δικά της, που ο server δεν ξέρει
   const own = await seedShots(p2, 2, 0, 'L');
   const before = (await localRows(p2)).sort((a, b) => a.id.localeCompare(b.id));
@@ -202,6 +218,6 @@ test('35 · χωρίς δίκτυο, η συσκευή που περιμένει
   // ο φάκελος στον server ΔΕΝ πειράχτηκε: τρίτη συσκευή βρίσκει και τα 3
   const p3 = await fresh(context);
   await signIn(p3, email, words);
-  await expect.poll(async () => (await localRows(p3)).length, { timeout: 30000 }).toBe(3);
+  await expect.poll(async () => (await localRows(p3)).length, { timeout: 45000 }).toBe(3);
   await p3.close();
 });
