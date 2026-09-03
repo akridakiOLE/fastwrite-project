@@ -1267,7 +1267,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v27';
+  var APP_VER = 'φέτα 3 · v28';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2043,7 +2043,20 @@
   });
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/kostometro/sw.js').catch(function () {});
+    /* v28 — ΓΙΑΤΙ ΔΕΝ ΑΡΚΕΙ ΤΟ register(). Το register ελέγχει για νέα έκδοση
+       μόνο πάνω σε ΠΛΟΗΓΗΣΗ. Ένα εγκατεστημένο PWA που ξυπνάει από το
+       παρασκήνιο δεν κάνει πλοήγηση — άρα δεν ελέγχει ποτέ, και μένει στην
+       παλιά έκδοση όσες φορές κι αν το «κλείσεις». Μετρήθηκε 3/9/2026:
+       4+ ανοίγματα, καμία ενημέρωση. Τώρα ο έλεγχος γίνεται και κάθε φορά
+       που η εφαρμογή έρχεται μπροστά. */
+    navigator.serviceWorker.register('/kostometro/sw.js').then(function (reg) {
+      var check = function () {
+        if (document.visibilityState === 'visible') { try { reg.update(); } catch (e) {} }
+      };
+      document.addEventListener('visibilitychange', check);
+      window.addEventListener('focus', check);
+      setInterval(check, 3600000);
+    }).catch(function () {});
     /* Νέα έκδοση → η σελίδα ξαναφορτώνει ΜΟΝΗ της. Τέλος το «κλείσ' το δύο φορές». */
     var reloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
