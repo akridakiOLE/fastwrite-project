@@ -452,3 +452,12 @@ input:focus{outline:none;border-color:var(--accent)}
   border-left-color:#ff8a4c;
   color:#f2d9c9;
 }
+
+
+/* v33 — θέση φωτογραφίας που δεν έχει κατέβει ακόμα. Καλύτερα ένα ορατό
+   «κατεβαίνει» παρά κενό που μοιάζει με χαμένο τιμολόγιο. */
+.ph-wait{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:#131b26;border:1px dashed #2c3849;border-radius:8px;
+  color:#5f7285;font-size:18px;
+}

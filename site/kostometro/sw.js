@@ -15,7 +15,7 @@
    ⚠ Και το /km-crypto.js μπήκε στο πεδίο: ζει ΕΞΩ από το /kostometro/, άρα
    μέχρι τώρα δεν το έπιανε καθόλου ο worker — χωρίς δίκτυο η οθόνη των 12
    λέξεων θα έσπαγε. */
-var CACHE = 'km-v32';
+var CACHE = 'km-v33';
 var SHELL = [
   '/kostometro/',
   '/kostometro/index.html',

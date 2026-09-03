@@ -25,7 +25,11 @@
     folder:  'km_folder',
     auth:    'km_auth',
     wordsOk: 'km_words_ok',
-    reg:     'km_registered'
+    reg:     'km_registered',
+    /* v33 — «αυτή η συσκευή ΔΕΝ έχει κατεβάσει ακόμα». Όσο υπάρχει, δεν
+       ανεβαίνει ΤΙΠΟΤΑ. Χωρίς αυτό, μια καθαρή συσκευή που μόλις συνδέθηκε
+       θα ανέβαζε άδεια στοιχεία και θα έσβηνε τον φάκελο στον server. */
+    needPull: 'km_need_pull'
   };
 
   var el = function (id) { return document.getElementById(id); };
@@ -63,8 +67,10 @@
       t.oncomplete = res; t.onerror = function () { rej(t.error); };
     }).then(function (r) {
       /* v31 — ο συγχρονισμός κρεμιέται ΕΔΩ, στο ένα σημείο απ' όπου περνάει
-         κάθε αποθήκευση. Αν κρεμόταν στα σημεία κλήσης, θα ξεχνιόταν ένα. */
-      if (typeof scheduleSync === 'function') { scheduleSync(); }
+         κάθε αποθήκευση. Αν κρεμόταν στα σημεία κλήσης, θα ξεχνιόταν ένα.
+         v33 — ΕΚΤΟΣ όσο τρέχει κατέβασμα: αλλιώς κάθε εγγραφή που μόλις
+         ήρθε από τον server θα σκανδάλιζε ανέβασμα προς τον ίδιο server. */
+      if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
       return r;
     });
   }
@@ -122,6 +128,17 @@
   }
   /* Εμφάνιση με σκέτο CSS: μηδέν επανακωδικοποίηση εικόνας, μηδέν μνήμη. */
   function cropImg(blob, c, cls) {
+    /* v33 — Τιμολόγιο που ήρθε από τον server έχει ΣΤΟΙΧΕΙΑ πριν έχει
+       φωτογραφία: τα στοιχεία κατεβαίνουν πρώτα (κιλομπάιτ, τα βλέπεις
+       αμέσως) και οι εικόνες έρχονται στο παρασκήνιο. Χωρίς αυτόν τον
+       έλεγχο το createObjectURL(undefined) έσπαγε ολόκληρη τη λίστα. */
+    if (!blob) {
+      var ph = document.createElement('span');
+      ph.className = cls + ' ph-wait';
+      ph.textContent = '⟳';
+      ph.title = 'Η φωτογραφία κατεβαίνει';
+      return ph;
+    }
     var img = document.createElement('img');
     img.src = blobUrl(blob);
     img.alt = '';
@@ -1298,7 +1315,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v32';
+  var APP_VER = 'φέτα 3 · v33';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1994,6 +2011,15 @@
 
   function syncNow() {
     if (!localStorage.getItem(LS.folder) || !localStorage.getItem(LS.wordsOk)) { return Promise.resolve(); }
+    /* 🔴 Ο ΠΙΟ ΕΠΙΚΙΝΔΥΝΟΣ ΕΛΕΓΧΟΣ ΟΛΟΥ ΤΟΥ ΣΥΓΧΡΟΝΙΣΜΟΥ.
+       Τα στοιχεία χτίζονται από την ΤΟΠΙΚΗ βάση. Σε συσκευή που μόλις μπήκε
+       σε υπάρχοντα λογαριασμό, η τοπική βάση είναι ΑΔΕΙΑ — και ένα ανέβασμα
+       πριν το κατέβασμα θα έγραφε «μηδέν τιμολόγια» πάνω από το αρχείο του
+       χρήστη. Όσο εκκρεμεί κατέβασμα, ΔΕΝ ανεβαίνει τίποτα. */
+    if (localStorage.getItem(LS.needPull)) {
+      syncInfo.msg = 'περιμένει κατέβασμα';
+      return pullNow();
+    }
     if (syncBusy) { syncAgain = true; return Promise.resolve(); }
     syncBusy = true; syncInfo.msg = null;
     var key, rows;
@@ -2022,6 +2048,103 @@
       });
   }
 
+  /* ── v33 · ΤΟ ΚΑΤΕΒΑΣΜΑ (Η.2γ) ────────────────────────────────────
+     🔴 ΕΔΩ ΓΡΑΦΟΥΜΕ ΣΤΗ ΒΑΣΗ — και γι' αυτό ισχύουν δύο απόλυτοι κανόνες:
+       1. ΠΟΤΕ δεν σβήνεται τοπική εγγραφή. Ό,τι λείπει από τον server μένει.
+       2. ΠΟΤΕ δεν πατιέται τοπική εγγραφή που υπάρχει ήδη. Μόνο ΠΡΟΣΘΗΚΗ.
+     Άρα το χειρότερο που μπορεί να κάνει αυτός ο κώδικας είναι να μη φέρει
+     κάτι — ποτέ να χάσει κάτι. Η συγχώνευση διορθώσεων (ποιο νικάει όταν
+     αλλάξει το ίδιο τιμολόγιο σε δύο συσκευές) θέλει χρονοσήμανση ανά
+     εγγραφή και έρχεται χωριστά· μέχρι τότε δεν προσποιούμαστε ότι γίνεται. */
+  var pulling = false;
+  var pullInfo = { added: 0, photos: 0, need: 0, msg: null, at: null };
+
+  function pullMeta(key) {
+    return fetch(KM_API + 'folder', { headers: kmHead() }).then(function (r) {
+      if (r.status === 404) { return null; }                 // άδειος φάκελος
+      if (!r.ok) { pullInfo.msg = 'σφάλμα ' + r.status; return null; }
+      return r.arrayBuffer().then(function (buf) { return kmOpen(key, buf); });
+    }).then(function (plain) {
+      if (!plain) { return null; }
+      var data = JSON.parse(new TextDecoder().decode(plain));
+      return (data && data.shots) || [];
+    }).catch(function (e) {
+      pullInfo.msg = 'δεν άνοιξε ο φάκελος: ' + (e && e.message ? e.message : e);
+      return null;
+    });
+  }
+
+  function pullPhotos(key) {
+    return all().then(function (rows) {
+      var jobs = [];
+      rows.forEach(function (r) {
+        if (!r.srvPages) { return; }                          // ντόπιο τιμολόγιο
+        if (!r.blob) { jobs.push({ rec: r, id: r.id, slot: 0 }); }
+        for (var i = 2; i <= r.srvPages; i++) {
+          if (!(r.pages && r.pages[i - 2])) { jobs.push({ rec: r, id: r.id + '-p' + i, slot: i - 1 }); }
+        }
+      });
+      pullInfo.need = jobs.length;
+      pullInfo.photos = 0;
+      var step = function (i) {
+        if (i >= jobs.length) { return Promise.resolve(); }
+        var j = jobs[i];
+        return fetch(KM_API + 'photo?id=' + encodeURIComponent(j.id), { headers: kmHead() })
+          .then(function (res) { return res.ok ? res.arrayBuffer() : null; })
+          .then(function (buf) { return buf ? kmOpen(key, buf) : null; })
+          .then(function (plain) {
+            if (!plain) { return; }
+            var blob = new Blob([plain], { type: 'image/jpeg' });
+            return get(j.rec.id).then(function (fresh) {
+              if (!fresh) { return; }
+              if (j.slot === 0) { fresh.blob = blob; }
+              else { fresh.pages = fresh.pages || []; fresh.pages[j.slot - 1] = blob; }
+              return put(fresh).then(function () { pullInfo.photos++; });
+            });
+          })
+          .catch(function () {})
+          .then(function () { return step(i + 1); });
+      };
+      return step(0);
+    });
+  }
+
+  function pullNow() {
+    if (!localStorage.getItem(LS.folder) || !localStorage.getItem(LS.wordsOk)) { return Promise.resolve(); }
+    if (pulling) { return Promise.resolve(); }
+    pulling = true; pullInfo.msg = null; pullInfo.added = 0;
+    var key;
+    return kmKeyReady().then(function (k) { key = k; return pullMeta(k); })
+      .then(function (shots) {
+        if (!shots) { return null; }
+        return all().then(function (rows) {
+          var have = {};
+          rows.forEach(function (r) { have[r.id] = 1; });
+          var news = shots.filter(function (m) { return !have[m.id]; });
+          var step = function (i) {
+            if (i >= news.length) { return Promise.resolve(); }
+            var m = news[i];
+            return put({ id: m.id, ts: m.ts, supplier: m.supplier, invDate: m.invDate,
+                         net: m.net, vat: m.vat, total: m.total,
+                         pages: [], srvPages: m.pages || 1 })
+              .then(function () { pullInfo.added++; return step(i + 1); });
+          };
+          return step(0);
+        });
+      })
+      .then(function () { return key ? pullPhotos(key) : null; })
+      .catch(function (e) { pullInfo.msg = 'σφάλμα: ' + (e && e.message ? e.message : e); })
+      .then(function () {
+        pullInfo.at = new Date();
+        /* Το σήμα φεύγει ΜΟΝΟ αν το κατέβασμα πέτυχε. Σφάλμα ή χωρίς δίκτυο
+           σημαίνει ότι η συσκευή μένει σε «μόνο κατέβασμα» — και δεν
+           μπορεί να πατήσει τον φάκελο με τα δικά της μισά δεδομένα. */
+        if (!pullInfo.msg) { localStorage.removeItem(LS.needPull); }
+        pulling = false;
+        refreshCount();
+      });
+  }
+
   /* Καθυστέρηση επίτηδες: η ανάγνωση Gemini γράφει στη βάση αρκετές φορές
      στη σειρά, και δεν έχει νόημα ένα ανέβασμα ανά γράψιμο. */
   function scheduleSync(ms) {
@@ -2036,6 +2159,8 @@
     if (!localStorage.getItem(LS.folder)) { return 'χωρίς λογαριασμό'; }
     if (syncBusy) { return 'σε εξέλιξη… ' + syncInfo.photos + '/' + syncInfo.total; }
     if (syncInfo.msg) { return syncInfo.msg; }
+    if (pulling) { return 'κατεβάζει… ' + pullInfo.photos + '/' + pullInfo.need; }
+    if (localStorage.getItem(LS.needPull)) { return 'εκκρεμεί κατέβασμα'; }
     if (!syncInfo.at) { return syncTimer ? 'ξεκινάει σε λίγο…' : 'δεν έχει τρέξει ακόμα'; }
     var t = syncInfo.at;
     var hh = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
@@ -2071,7 +2196,8 @@
     if (!hasWords)                          { return startWords('auto'); }
     if (!localStorage.getItem(LS.wordsOk))  { return startWords('auto'); }
     if (!localStorage.getItem(LS.reg))      { kmRegister(); }   // εκκρεμής εγγραφή
-    scheduleSync(2500);   // v31 — ό,τι έμεινε πίσω, ανεβαίνει στο άνοιγμα
+    pullNow();            // v33 — πρώτα ό,τι ήρθε από άλλη συσκευή…
+    scheduleSync(2500);   // v31 — …και μετά ό,τι έμεινε πίσω από εδώ
     if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
     if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
     toCam();
@@ -2114,7 +2240,9 @@
           localStorage.setItem(LS.email, email);
           kmStore(c.words, d);
           localStorage.setItem(LS.wordsOk, '1');
+          localStorage.setItem(LS.needPull, '1');   // v33 — πρώτα κατεβάζει, μετά ανεβάζει
           return kmRegister().then(function () {
+            pullNow();
             btn.disabled = false; btn.textContent = 'Σύνδεση';
             afterAccount();
           });
