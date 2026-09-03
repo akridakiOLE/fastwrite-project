@@ -61,6 +61,11 @@
       var t = db.transaction('shots', 'readwrite');
       t.objectStore('shots').put(rec);
       t.oncomplete = res; t.onerror = function () { rej(t.error); };
+    }).then(function (r) {
+      /* v31 — ο συγχρονισμός κρεμιέται ΕΔΩ, στο ένα σημείο απ' όπου περνάει
+         κάθε αποθήκευση. Αν κρεμόταν στα σημεία κλήσης, θα ξεχνιόταν ένα. */
+      if (typeof scheduleSync === 'function') { scheduleSync(); }
+      return r;
     });
   }
   function all() {
@@ -1267,6 +1272,7 @@
         : 'χωρίς δίκτυο';
     });
     el('st-sw').textContent = (navigator.serviceWorker && navigator.serviceWorker.controller) ? 'ενεργός' : 'κανένας';
+    el('st-sync').textContent = syncLine();
     all().then(function (rows) { el('st-shots').textContent = rows.length; });
   }
 
@@ -1276,7 +1282,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v30';
+  var APP_VER = 'φέτα 3 · v31';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1887,6 +1893,139 @@
     }).catch(function () { return { unknown: true }; });
   }
 
+  /* ── v31 · ΤΟ ΑΝΕΒΑΣΜΑ (Η.2β, Δρόμος Β) ───────────────────────────
+     🔴 ΑΥΤΟ ΤΟ ΜΠΛΟΚ ΔΙΑΒΑΖΕΙ ΜΟΝΟ. Δεν γράφει, δεν σβήνει και δεν
+     πειράζει ΤΙΠΟΤΑ στην τοπική βάση. Το κατέβασμα, που είναι το μέρος
+     που γράφει, έρχεται σε ξεχωριστό κομμάτι — έτσι ένα λάθος εδώ δεν
+     μπορεί να αγγίξει τιμολόγιο.
+     Τι ταξιδεύει: τα ΣΤΟΙΧΕΙΑ σε ένα μικρό μπλοκ σε κάθε αποθήκευση, και
+     κάθε ΦΩΤΟΓΡΑΦΙΑ μία φορά. Όλα σφραγισμένα στη συσκευή. */
+  var kmKey = null;          // κλειδί AES στη μνήμη — ποτέ στον δίσκο
+  var syncBusy = false, syncAgain = false, syncTimer = null;
+  var syncInfo = { photos: 0, total: 0, ver: null, at: null, msg: null };
+
+  function kmKeyReady() {
+    if (kmKey) { return Promise.resolve(kmKey); }
+    var w = localStorage.getItem(LS.words);
+    if (!w) { return Promise.reject(new Error('χωρίς λέξεις')); }
+    return kmDerive(w.split(' ')).then(function (d) { kmKey = d.key; return kmKey; });
+  }
+
+  /* Τα στοιχεία ενός τιμολογίου — ΧΩΡΙΣ καμία φωτογραφία. */
+  function metaOf(r) {
+    return { id: r.id, ts: r.ts, supplier: r.supplier, invDate: r.invDate,
+             net: r.net, vat: r.vat, total: r.total,
+             pages: 1 + ((r.pages && r.pages.length) || 0) };
+  }
+  /* Τα id των φωτογραφιών ενός τιμολογίου: η πρώτη σελίδα παίρνει το id του
+     τιμολογίου, οι υπόλοιπες <id>-p2, <id>-p3… Σταθερά, ώστε να μην
+     ξαναστέλνεται ποτέ ό,τι έχει ήδη σταλεί. */
+  function photoIds(r) {
+    var out = [{ id: r.id, blob: r.blob }];
+    (r.pages || []).forEach(function (b, i) { out.push({ id: r.id + '-p' + (i + 2), blob: b }); });
+    return out.filter(function (x) { return !!x.blob; });
+  }
+
+  function blobBytes(b) {
+    return (b.arrayBuffer ? b.arrayBuffer() : new Response(b).arrayBuffer())
+      .then(function (ab) { return new Uint8Array(ab); });
+  }
+
+  function kmStatus() {
+    return fetch(KM_API + 'status', { headers: kmHead() }).then(function (r) {
+      if (!r.ok) { return null; }
+      return r.json();
+    }).catch(function () { return null; });
+  }
+
+  function pushMeta(rows, key, baseVer) {
+    var payload = new TextEncoder().encode(JSON.stringify({ v: 1, shots: rows.map(metaOf) }));
+    return kmSeal(key, payload).then(function (sealed) {
+      var h = kmHead();
+      h['Content-Type'] = 'application/octet-stream';
+      if (baseVer !== null && baseVer !== undefined) { h['X-Km-Base-Version'] = String(baseVer); }
+      return fetch(KM_API + 'folder', { method: 'PUT', headers: h, body: sealed });
+    });
+  }
+
+  function pushPhotos(rows, key, have) {
+    var jobs = [];
+    rows.forEach(function (r) {
+      photoIds(r).forEach(function (x) { if (have.indexOf(x.id) < 0) { jobs.push(x); } });
+    });
+    syncInfo.total = jobs.length;
+    syncInfo.photos = 0;
+    /* Μία-μία, όχι όλες μαζί: σε δεδομένα κινητής οι παράλληλες αποστολές
+       μεγάλων αρχείων αποτυγχάνουν όλες μαζί. */
+    var step = function (i) {
+      if (i >= jobs.length) { return Promise.resolve(); }
+      return blobBytes(jobs[i].blob)
+        .then(function (bytes) { return kmSeal(key, bytes); })
+        .then(function (sealed) {
+          var h = kmHead();
+          h['Content-Type'] = 'application/octet-stream';
+          return fetch(KM_API + 'photo?id=' + encodeURIComponent(jobs[i].id), { method: 'PUT', headers: h, body: sealed });
+        })
+        .then(function (res) {
+          if (res.ok) { syncInfo.photos++; return step(i + 1); }
+          if (res.status === 409) { syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return; }
+          if (res.status === 413) { syncInfo.msg = 'μία φωτογραφία είναι πολύ μεγάλη'; return step(i + 1); }
+          syncInfo.msg = 'σφάλμα ' + res.status;
+        });
+    };
+    return step(0);
+  }
+
+  function syncNow() {
+    if (!localStorage.getItem(LS.folder) || !localStorage.getItem(LS.wordsOk)) { return Promise.resolve(); }
+    if (syncBusy) { syncAgain = true; return Promise.resolve(); }
+    syncBusy = true; syncInfo.msg = null;
+    var key, rows;
+    return kmKeyReady().then(function (k) { key = k; return all(); })
+      .then(function (rs) { rows = rs; return kmStatus(); })
+      .then(function (st) {
+        if (!st) { syncInfo.msg = 'χωρίς δίκτυο'; return null; }
+        if (st.this_device_active === false) { syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return null; }
+        return pushMeta(rows, key, st.state ? st.state.folder_version : null).then(function (res) {
+          if (res.ok) { return res.json().then(function (j) { syncInfo.ver = j.folder_version; }); }
+          if (res.status === 409) { syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return null; }
+          syncInfo.msg = 'σφάλμα στοιχείων ' + res.status;
+          return null;
+        }).then(function () {
+          if (syncInfo.msg) { return null; }
+          return fetch(KM_API + 'photos', { headers: kmHead() })
+            .then(function (r) { return r.ok ? r.json() : { photos: [] }; })
+            .then(function (j) { return pushPhotos(rows, key, (j.photos || []).map(function (p) { return p.id; })); });
+        });
+      })
+      .catch(function (e) { syncInfo.msg = 'σφάλμα: ' + (e && e.message ? e.message : e); })
+      .then(function () {
+        syncInfo.at = new Date();
+        syncBusy = false;
+        if (syncAgain) { syncAgain = false; scheduleSync(400); }
+      });
+  }
+
+  /* Καθυστέρηση επίτηδες: η ανάγνωση Gemini γράφει στη βάση αρκετές φορές
+     στη σειρά, και δεν έχει νόημα ένα ανέβασμα ανά γράψιμο. */
+  function scheduleSync(ms) {
+    if (syncTimer) { clearTimeout(syncTimer); }
+    syncTimer = setTimeout(function () { syncTimer = null; syncNow(); }, ms || 3000);
+  }
+
+  /* Μία γραμμή που λέει την ΑΛΗΘΕΙΑ για τον συγχρονισμό. Κανόνας Α400:
+     σιωπηλή αυτόματη εργασία δεν είναι ελεγχόμενη — «έτρεξε και όλα καλά»
+     και «δεν έτρεξε ποτέ» μοιάζουν ολόιδια. */
+  function syncLine() {
+    if (!localStorage.getItem(LS.folder)) { return 'χωρίς λογαριασμό'; }
+    if (syncBusy) { return 'σε εξέλιξη… ' + syncInfo.photos + '/' + syncInfo.total; }
+    if (syncInfo.msg) { return syncInfo.msg; }
+    if (!syncInfo.at) { return 'δεν έχει τρέξει ακόμα'; }
+    var t = syncInfo.at;
+    var hh = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
+    return syncInfo.photos + '/' + syncInfo.total + ' φωτογραφίες · στοιχεία v' + (syncInfo.ver === null ? '—' : syncInfo.ver) + ' · ' + hh;
+  }
+
   /* Πού πάει ο χρήστης μόλις αποκτήσει λογαριασμό — η παλιά ροή, ίδια. */
   function afterAccount() {
     if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
@@ -1916,6 +2055,7 @@
     if (!hasWords)                          { return startWords('auto'); }
     if (!localStorage.getItem(LS.wordsOk))  { return startWords('auto'); }
     if (!localStorage.getItem(LS.reg))      { kmRegister(); }   // εκκρεμής εγγραφή
+    scheduleSync(2500);   // v31 — ό,τι έμεινε πίσω, ανεβαίνει στο άνοιγμα
     if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
     if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
     toCam();
@@ -2073,6 +2213,16 @@
         else if (err && err.soft) { diag('ακατάλληλη απάντηση · ' + (err.msg || '')); }
         else { diag('δεν έφτασε στη Google · ' + (err && err.name ? err.name : 'δίκτυο/CORS')); }
       });
+    });
+  };
+  el('st-sync-now').onclick = function () {
+    var b = el('st-sync-now');
+    b.disabled = true; b.textContent = 'Συγχρονίζεται…';
+    var tick = setInterval(function () { el('st-sync').textContent = syncLine(); }, 400);
+    syncNow().then(function () {
+      clearInterval(tick);
+      b.disabled = false; b.textContent = 'Συγχρονισμός τώρα';
+      renderSettings();
     });
   };
   el('st-update').onclick = function () {
