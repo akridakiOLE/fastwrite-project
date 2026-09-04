@@ -461,3 +461,20 @@ input:focus{outline:none;border-color:var(--accent)}
   background:#131b26;border:1px dashed #2c3849;border-radius:8px;
   color:#5f7285;font-size:18px;
 }
+
+/* ── v35 · Η.3 — ΑΝΑΓΝΩΣΤΡΙΑ ΣΥΣΚΕΥΗ ──────────────────────────────
+   Δεν είναι σφάλμα, άρα δεν μοιάζει με σφάλμα: ίδια δομή με το .cam-err
+   (καλύπτει την κάμερα ολόκληρη — δεν υπάρχει τρόπος να φωτογραφίσεις
+   κατά λάθος) αλλά με τον τόνο της μάρκας, όχι κόκκινο. */
+.ro{gap:12px;overflow-y:auto}
+.ro .ro-t{color:var(--text);font-size:19px}
+.ro .fld{margin:0}
+.ro .fine{margin:0}
+
+/* Γραμμή «μόνο ανάγνωση» μέσα στις κάρτες των Εκκρεμών: εξηγεί ΓΙΑΤΙ
+   λείπουν τα κουμπιά. Κουμπί που εξαφανίστηκε χωρίς εξήγηση διαβάζεται
+   ως σφάλμα της εφαρμογής. */
+.ro-note{
+  background:rgba(255,138,76,.10);border-left:3px solid #ff8a4c;
+  color:#f2d9c9;padding:10px 12px;border-radius:6px;font-size:13px;margin-top:10px;
+}

@@ -29,7 +29,14 @@
     /* v33 — «αυτή η συσκευή ΔΕΝ έχει κατεβάσει ακόμα». Όσο υπάρχει, δεν
        ανεβαίνει ΤΙΠΟΤΑ. Χωρίς αυτό, μια καθαρή συσκευή που μόλις συνδέθηκε
        θα ανέβαζε άδεια στοιχεία και θα έσβηνε τον φάκελο στον server. */
-    needPull: 'km_need_pull'
+    needPull: 'km_need_pull',
+    /* v35 · Η.3 — Η ΤΕΛΕΥΤΑΙΑ ΓΝΩΣΤΗ ΑΠΑΝΤΗΣΗ ΤΟΥ SERVER στο «είμαι εγώ η
+       ενεργή;». Κρατιέται τοπικά ΕΠΙΤΗΔΕΣ: χωρίς δίκτυο στην πόρτα, η
+       εφαρμογή πρέπει να ξέρει τι είναι — και «δεν μπόρεσα να ρωτήσω» ΔΕΝ
+       είναι «είμαι ενεργή». Απουσία τιμής = ενεργή, γιατί όποια συσκευή
+       βάζει τις 12 λέξεις γίνεται ενεργή την ίδια στιγμή (Η.3). */
+    active:   'km_active',
+    activeAt: 'km_active_since'
   };
 
   var el = function (id) { return document.getElementById(id); };
@@ -296,7 +303,7 @@
       var waiting = list.filter(function (r) {
         return !r.sug && (r.aiTry || 0) < AI_MAX_TRY && !autoIds[r.id];
       });
-      if (waiting.length && localStorage.getItem(LS.key) && !manualRun) {
+      if (waiting.length && localStorage.getItem(LS.key) && !manualRun && !isReader()) {
         var qb = document.createElement('button');
         qb.className = 'btn ghost queue-btn';
         qb.textContent = '📖 Διάβασε τα υπόλοιπα (' + waiting.length + ')';
@@ -340,6 +347,15 @@
       list.forEach(function (r) { alive[r.id] = 1; });
       Object.keys(pendPick).forEach(function (id) { if (!alive[id]) { delete pendPick[id]; } });
 
+      /* v35 · Η.3 — καμία μαζική ενέργεια σε αναγνώστρια συσκευή. */
+      if (isReader()) {
+        var rb = document.createElement('p');
+        rb.className = 'ro-note';
+        rb.textContent = 'Αυτή η συσκευή είναι σε ανάγνωση. Για να επεξεργαστείς ή να διαγράψεις, κάν᾽ την ενεργή από την οθόνη της κάμερας.';
+        body.appendChild(rb);
+        if (undoBin) { body.appendChild(undoRow()); }
+        return;
+      }
       var bar = document.createElement('div');
       bar.className = 'multi-bar';
       var allBtn = document.createElement('button');
@@ -437,6 +453,7 @@
     var cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.className = 'pend-cb';
+    cb.hidden = isReader();          // v35 — χωρίς μαζική διαγραφή, χωρίς επιλογή
     cb.checked = !!pendPick[r.id];
     cb.setAttribute('aria-label', 'Επίλεξε τιμολόγιο ' + r.supplier);
     cb.onchange = function () {
@@ -511,6 +528,7 @@
            έβγαινε από την ουρά και καμία διαδρομή δεν το ξανάβαζε. */
         var again = document.createElement('button');
         again.className = 'btn ghost retry-btn';
+        again.hidden = isReader();
         again.textContent = '🔄 Δοκίμασε ξανά';
         again.onclick = function () {
           again.disabled = true;
@@ -598,7 +616,7 @@
     /* Η ανάγνωση τρέχει ΜΕΤΑ την αποθήκευση, άρα η ημερομηνία που διάβασε
        το Gemini εμφανίζεται εδώ — όχι στην προεπισκόπηση, όπου δεν την ξέρουμε
        ακόμα. Πρόταση με ένα πάτημα, ποτέ αυτόματη αλλαγή. */
-    if (sug && sug.date && Math.abs(sug.date - dateOf(r)) > 86400000) {
+    if (sug && sug.date && !isReader() && Math.abs(sug.date - dateOf(r)) > 86400000) {
       var ds = document.createElement('div');
       ds.className = 'date-sug';
       var dt = document.createElement('span');
@@ -613,6 +631,23 @@
       };
       ds.appendChild(dt); ds.appendChild(db);
       amts.appendChild(ds);
+    }
+
+    /* v35 · Η.3 — ΣΕ ΑΝΑΓΝΩΣΤΡΙΑ ΣΥΣΚΕΥΗ ΔΕΝ ΥΠΑΡΧΕΙ ΑΠΟΘΗΚΕΥΣΗ.
+       Τα πεδία μένουν ορατά (ο χρήστης θέλει να ΔΕΙ τα ποσά) αλλά κλειστά,
+       και μια γραμμή λέει γιατί — κουμπί που εξαφανίστηκε χωρίς εξήγηση
+       διαβάζεται ως σφάλμα της εφαρμογής. */
+    if (isReader()) {
+      ['net', 'vat', 'total'].forEach(function (k) {
+        inputs[k].readOnly = true;
+        inputs[k].tabIndex = -1;
+      });
+      var ron = document.createElement('p');
+      ron.className = 'ro-note';
+      ron.textContent = 'Μόνο ανάγνωση — η επεξεργασία γίνεται στην ενεργή συσκευή.';
+      amts.appendChild(ron);
+      c.appendChild(head); c.appendChild(amts);
+      return c;
     }
 
     var save = document.createElement('button');
@@ -1210,6 +1245,7 @@
 
         var cb = document.createElement('button');
         cb.className = 'btn ghost';
+        cb.hidden = isReader();       // v35 — η περικοπή γράφει στη βάση
         cb.textContent = c ? '✂ Άλλαξε το κόψιμο' : '✂ Κόψε';
         cb.onclick = function () {
           openCrop(r, i, function () { freeUrls(); nav.pop(); openShot(r.id); });
@@ -1227,6 +1263,7 @@
         if (pgs.length > 1) {
           var dp = document.createElement('button');
           dp.className = 'btn ghost del';
+          dp.hidden = isReader();
           dp.textContent = 'Διαγραφή σελίδας ' + (i + 1);
           dp.onclick = function () {
             if (!confirm('Διαγραφή της σελίδας ' + (i + 1) + ' από ' + pgs.length + ';\n\nΤο τιμολόγιο και οι υπόλοιπες σελίδες μένουν.')) { return; }
@@ -1251,6 +1288,7 @@
       });
       var dl = document.createElement('button');
       dl.className = 'btn ghost del wide';
+      dl.hidden = isReader();
       dl.textContent = 'Διαγραφή τιμολογίου';
       dl.onclick = function () {
         if (!confirm('Διαγραφή αυτού του τιμολογίου;\n\n' + r.supplier + ' · ' + dstr(r.ts) +
@@ -1304,6 +1342,12 @@
         : 'χωρίς δίκτυο';
     });
     el('st-sw').textContent = (navigator.serviceWorker && navigator.serviceWorker.controller) ? 'ενεργός' : 'κανένας';
+    /* v35 — μία γραμμή που απαντάει στην ερώτηση του ΧΡΗΣΤΗ («γιατί δεν
+       φωτογραφίζει;»), όχι του προγραμματιστή. */
+    var w = whenStr(localStorage.getItem(LS.activeAt));
+    el('st-active').textContent = !hasAccount()
+      ? 'μία συσκευή'
+      : (isReader() ? ('μόνο ανάγνωση' + (w ? ' · από ' + w : '')) : 'ενεργή — γράφει');
     el('st-sync').textContent = syncLine();
     startSyncTick();
     all().then(function (rows) { el('st-shots').textContent = rows.length; });
@@ -1315,7 +1359,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v34';
+  var APP_VER = 'φέτα 3 · v35';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1464,6 +1508,11 @@
     aiTimer = setTimeout(function () { aiTimer = null; aiSweep(); }, ms);
   }
   function aiSweep() {
+    /* v35 · Η.3 — Η ΑΝΑΓΝΩΣΗ ΕΙΝΑΙ ΓΡΑΨΙΜΟ. Αποθηκεύει προτάσεις ποσών στη
+       βάση· σε αναγνώστρια συσκευή αυτά δεν θα ανέβαιναν ποτέ και θα τα
+       πατούσε το επόμενο κατέβασμα. Χειρότερα: θα έκαιγε το όριο του
+       κλειδιού Gemini για δουλειά που πετιέται. */
+    if (isReader()) { diag('μόνο ανάγνωση — γράφει η ενεργή συσκευή'); return; }
     var key = localStorage.getItem(LS.key);
     if (!key) { diag('χωρίς κλειδί — χειροκίνητα'); return; }
     if (aiHalt) { diag('σταματημένο μετά από σφάλμα — άλλαξε/ξαναβάλε κλειδί'); return; }
@@ -1541,7 +1590,25 @@
   }
 
   /* ── Κάμερα ── */
+  function stopCam() {
+    if (stream) { stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} }); }
+    stream = null;
+    el('vid').srcObject = null;
+  }
   function startCam() {
+    /* v35 · Η.3 — ΠΡΩΤΟ ΦΡΕΝΟ. Σε αναγνώστρια συσκευή η κάμερα δεν ανοίγει
+       καν: ούτε άδεια ζητιέται, ούτε μπαταρία καίγεται, και — το κύριο —
+       δεν υπάρχει τρόπος να τραβηχτεί φωτογραφία που δεν θα φύγει ποτέ. */
+    if (isReader()) {
+      stopCam();
+      el('cam-err').hidden = true;
+      var wasHidden = el('ro').hidden;
+      roRender();
+      if (wasHidden) { roClear(); }   // καθαρή οθόνη μόνο στο άνοιγμα
+      el('ro').hidden = false;
+      return;
+    }
+    el('ro').hidden = true;
     el('cam-err').hidden = true;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       return camFail('Ο browser δεν υποστηρίζει κάμερα. Άνοιξε τη σελίδα σε Chrome ή Safari.');
@@ -1564,9 +1631,7 @@
         if (v0.paused) { v0.play().catch(function () {}); }
         return;
       }
-      stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
-      stream = null;
-      el('vid').srcObject = null;
+      stopCam();
     }
     navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } },
@@ -1600,9 +1665,7 @@
      επανεκκίνηση, ώστε να μην ξαναζητάει κάμερα σε κάθε μικροκόλλημα. */
   var camWatch = null, camLastT = -1, camStuck = 0;
   function camHardRestart() {
-    if (stream) { stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} }); }
-    stream = null;
-    el('vid').srcObject = null;
+    stopCam();
     startCam();
   }
   function camWatchStart() {
@@ -1611,7 +1674,7 @@
       var pv = el('preview');
       /* Δεν επεμβαίνουμε: εκτός οθόνης κάμερας, στο παρασκήνιο, ή όσο ο
          χρήστης κοιτάει την προεπισκόπηση της λήψης. */
-      if (el('s-cam').hidden || document.hidden || (pv && !pv.hidden)) {
+      if (el('s-cam').hidden || document.hidden || (pv && !pv.hidden) || isReader()) {
         camLastT = -1; camStuck = 0; return;
       }
       var v = el('vid');
@@ -1635,6 +1698,11 @@
   function toCam() { nav = []; clearPending(); show('s-cam'); startCam(); refreshCount(); }
 
   function capture() {
+    /* Δεύτερο φρένο, επίτηδες: το πρώτο είναι η οθόνη. Αν ποτέ μια διαδρομή
+       φτάσει εδώ με την κάμερα ανοιχτή σε αναγνώστρια συσκευή, η λήψη δεν
+       γίνεται — καλύτερα ένα κουμπί που δεν κάνει τίποτα παρά ένα τιμολόγιο
+       που ο χρήστης νομίζει ότι κατέγραψε. */
+    if (isReader()) { startCam(); return; }
     var v = el('vid');
     if (!v.videoWidth) { return; }
     var c = document.createElement('canvas');
@@ -1773,6 +1841,94 @@
   /* ── Εγγραφή ── */
   function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v); }
 
+  /* ── v35 · Η.3 · ΕΝΕΡΓΗ ΣΥΣΚΕΥΗ ────────────────────────────────────
+     ΤΟ ΚΕΝΟ ΠΟΥ ΚΛΕΙΝΕΙ: ο server επιβάλλει από 2/9 «μία γράφει, οι άλλες
+     διαβάζουν» — ανέβασμα από μη-ενεργή γυρίζει 409. Η ΟΘΟΝΗ όμως δεν το
+     έλεγε πουθενά: η αναγνώστρια συσκευή άφηνε τον χρήστη να φωτογραφίσει,
+     το έσωζε τοπικά, και δεν έφευγε ΠΟΤΕ. Δουλειά που καταπίνεται σιωπηλά.
+     Ο ΚΑΝΟΝΑΣ: όποια συσκευή βάλει τις 12 λέξεις γίνεται η ενεργή· κάθε
+     άλλη περνάει σε ανάγνωση — βλέπει τα πάντα, δεν φωτογραφίζει, δεν
+     επεξεργάζεται. Καμία συγχώνευση, άρα κανένα λογιστικό τεκμήριο δεν
+     χάνεται ποτέ από σύγκρουση δύο συσκευών. */
+
+  /* ✅ ΑΠΟΦΑΣΗ STAVROS 4/9/2026 — ΕΠΙΒΕΒΑΙΩΣΗ, ΟΧΙ 12 ΛΕΞΕΙΣ.
+     Αναθεωρεί το Brief Α Η.3, που έλεγε «ζητάει τις 12 λέξεις».
+     Το σκεπτικό, μετρημένο στον ίδιο τον κώδικα: η συσκευή έχει ΗΔΗ τις 12
+     λέξεις αποθηκευμένες (μπήκαν όταν συνδέθηκε) και τις διαβάζει μόνη της
+     σε κάθε κρυπτογράφηση. Όποιος κρατάει το ξεκλείδωτο κινητό τις έχει —
+     άρα το πληκτρολόγιο δεν αγοράζει ασφάλεια. Αγοράζει μόνο προστασία από
+     το κατά λάθος πάτημα, και αυτό το δίνει εξίσου μια επιβεβαίωση, σε δύο
+     δευτερόλεπτα αντί για δώδεκα λέξεις από χαρτί στην πόρτα.
+     ⚠ ΤΙ ΔΕΝ ΑΛΛΑΖΕΙ: η σύνδεση σε ΝΕΑ συσκευή θέλει ΠΑΝΤΑ τις 12 λέξεις.
+     Εκεί δεν υπάρχει τίποτα αποθηκευμένο — οι λέξεις ΕΙΝΑΙ το κλειδί. */
+  var ACTIVATE_NEEDS_WORDS = false;
+
+  function hasAccount() {
+    return !!localStorage.getItem(LS.folder) && !!localStorage.getItem(LS.wordsOk);
+  }
+  /* ⚠ Χωρίς λογαριασμό ΔΕΝ υπάρχει αναγνώστρια κατάσταση: μία συσκευή, δική
+     της βάση, γράφει πάντα. Αλλιώς μια αποτυχία δικτύου θα κλείδωνε την
+     κάμερα σε χρήστη που δεν έχει καν φάκελο. */
+  function isReader() {
+    return hasAccount() && localStorage.getItem(LS.active) === '0';
+  }
+  function setActiveState(on, since) {
+    var was = localStorage.getItem(LS.active);
+    localStorage.setItem(LS.active, on ? '1' : '0');
+    if (since) { localStorage.setItem(LS.activeAt, since); }
+    if (was === (on ? '1' : '0')) { return; }
+    /* Η αλλαγή φαίνεται ΑΜΕΣΩΣ, όχι στο επόμενο άνοιγμα: αν ο χρήστης
+       στέκεται στην κάμερα τη στιγμή που άλλη συσκευή πήρε τη σκυτάλη,
+       πρέπει να το δει πριν τραβήξει φωτογραφία που δεν θα φύγει ποτέ. */
+    if (!el('s-cam').hidden) { startCam(); }
+    if (!el('s-pend').hidden) { renderPending(); }
+    if (!el('s-settings').hidden) { renderSettings(); }
+  }
+  /* Ρωτάει τον server. Χωρίς δίκτυο ΔΕΝ αλλάζει τίποτα — κρατιέται η
+     τελευταία γνωστή κατάσταση (Α400 §Γ: «δεν μπόρεσα να ελέγξω» δεν
+     είναι απάντηση). */
+  function refreshActive() {
+    if (!hasAccount()) { return Promise.resolve(null); }
+    return kmStatus().then(function (st) {
+      if (!st) { return null; }
+      setActiveState(st.this_device_active !== false,
+                     st.state && st.state.active_since);
+      return st;
+    });
+  }
+  function whenStr(iso) {
+    if (!iso) { return ''; }
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) { return ''; }
+    return dstr(d.getTime()) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  /* Η οθόνη ανάγνωσης — γεμίζει κάθε φορά που εμφανίζεται, ώστε η ώρα και
+     ο αριθμός των μη-ανεβασμένων να λένε την ΤΩΡΙΝΗ αλήθεια. */
+  function roRender() {
+    var w = whenStr(localStorage.getItem(LS.activeAt));
+    el('ro-when').textContent = w
+      ? ('Η επεξεργασία μεταφέρθηκε σε άλλη συσκευή στις ' + w + '.')
+      : 'Η επεξεργασία έχει μεταφερθεί σε άλλη συσκευή.';
+    var n = pullInfo.notUp || 0;
+    var pe = el('ro-pend');
+    if (n > 0) {
+      pe.hidden = false;
+      pe.textContent = n === 1
+        ? '1 τιμολόγιο από αυτή τη συσκευή δεν έχει ανέβει. Θα ανέβει μόλις την ξανακάνεις ενεργή — δεν χάνεται.'
+        : n + ' τιμολόγια από αυτή τη συσκευή δεν έχουν ανέβει. Θα ανέβουν μόλις την ξανακάνεις ενεργή — δεν χάνονται.';
+    } else { pe.hidden = true; }
+    el('ro-wbox').hidden = !ACTIVATE_NEEDS_WORDS;
+  }
+  /* Το πεδίο καθαρίζει ΜΟΝΟ όταν η οθόνη πρωτοεμφανίζεται — ποτέ σε ανανέωση
+     από δουλειά του παρασκηνίου. */
+  function roClear() {
+    el('ro-err').hidden = true;
+    if (!ACTIVATE_NEEDS_WORDS) { return; }
+    el('ro-words').value = '';
+    el('ro-count').textContent = '0 από 12 λέξεις';
+    el('ro-count').style.color = '';
+  }
+
   /* ── v26 · Ο ΛΟΓΑΡΙΑΣΜΟΣ (Η.2β-1) ────────────────────────────────
      Τι κάνει αυτό το κομμάτι: πρώτη οθόνη «έχεις λογαριασμό;», οι 12
      λέξεις με υποχρεωτικό τσεκάρισμα, και εγγραφή του email στο μητρώο.
@@ -1823,7 +1979,13 @@
     }).then(function (r) {
       if (!r.ok) { return false; }
       localStorage.setItem(LS.reg, '1');
-      return true;
+      /* Το register ΚΑΝΕΙ αυτή τη συσκευή ενεργή στον server (Η.3: όποια
+         βάλει τις 12 λέξεις γίνεται η ενεργή). Το γράφουμε ρητά, τη στιγμή
+         που το μαθαίνουμε από την απάντηση — όχι με υπόθεση αργότερα. */
+      return r.json().then(function (j) {
+        setActiveState(true, j && j.state && j.state.active_since);
+        return true;
+      }).catch(function () { setActiveState(true); return true; });
     }).catch(function () { return false; });
   }
 
@@ -2008,7 +2170,7 @@
         })
         .then(function (res) {
           if (res.ok) { syncInfo.photos++; syncInfo.onSrv++; return step(i + 1); }
-          if (res.status === 409) { syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return; }
+          if (res.status === 409) { setActiveState(false); syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return; }
           if (res.status === 413) { syncInfo.msg = 'μία φωτογραφία είναι πολύ μεγάλη'; return step(i + 1); }
           syncInfo.msg = 'σφάλμα ' + res.status;
         });
@@ -2034,10 +2196,18 @@
       .then(function (rs) { rows = rs; return kmStatus(); })
       .then(function (st) {
         if (!st) { syncInfo.msg = 'χωρίς δίκτυο'; return null; }
-        if (st.this_device_active === false) { syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return null; }
+        /* v35 — Η ΑΠΑΝΤΗΣΗ ΤΟΥ SERVER ΓΙΝΕΤΑΙ ΟΘΟΝΗ, ΟΧΙ ΜΟΝΟ ΓΡΑΜΜΗ.
+           Ως το v34 αυτό έμενε μια σημείωση στις Ρυθμίσεις που κανείς δεν
+           διάβαζε, ενώ η κάμερα συνέχιζε να δέχεται φωτογραφίες. */
+        if (st.this_device_active === false) {
+          setActiveState(false, st.state && st.state.active_since);
+          syncInfo.msg = 'δεν είναι η ενεργή συσκευή';
+          return null;
+        }
+        setActiveState(true, st.state && st.state.active_since);
         return pushMeta(rows, key, st.state ? st.state.folder_version : null).then(function (res) {
           if (res.ok) { return res.json().then(function (j) { syncInfo.ver = j.folder_version; }); }
-          if (res.status === 409) { syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return null; }
+          if (res.status === 409) { setActiveState(false); syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return null; }
           syncInfo.msg = 'σφάλμα στοιχείων ' + res.status;
           return null;
         }).then(function () {
@@ -2064,7 +2234,18 @@
      αλλάξει το ίδιο τιμολόγιο σε δύο συσκευές) θέλει χρονοσήμανση ανά
      εγγραφή και έρχεται χωριστά· μέχρι τότε δεν προσποιούμαστε ότι γίνεται. */
   var pulling = false;
-  var pullInfo = { added: 0, photos: 0, need: 0, msg: null, at: null };
+  var pullInfo = { added: 0, upd: 0, photos: 0, need: 0, notUp: 0, msg: null, at: null };
+
+  /* v35 — ΤΟ ΚΕΝΟ ΠΟΥ ΒΡΕΘΗΚΕ ΔΙΑΒΑΖΟΝΤΑΣ ΤΟΝ ΚΩΔΙΚΑ ΤΟΥ v34.
+     Ως το v34 το κατέβασμα έφερνε ΜΟΝΟ τιμολόγια που δεν υπήρχαν τοπικά.
+     Στην πραγματική χρήση όμως η σειρά είναι: φωτογραφία στην πόρτα →
+     ανέβασμα → ποσά αργότερα, με την ησυχία του. Άρα η αναγνώστρια συσκευή
+     έπαιρνε το τιμολόγιο ΑΔΕΙΟ και δεν έβλεπε ΠΟΤΕ τα ποσά — έμενε
+     «εκκρεμές» για πάντα, ενώ στην ενεργή ήταν κλεισμένο. */
+  function metaDiffers(a, b) {
+    return a.supplier !== b.supplier || a.invDate !== b.invDate ||
+           a.net !== b.net || a.vat !== b.vat || a.total !== b.total;
+  }
 
   function pullMeta(key) {
     return fetch(KM_API + 'folder', { headers: kmHead() }).then(function (r) {
@@ -2126,15 +2307,42 @@
         if (!shots) { return null; }
         return all().then(function (rows) {
           var have = {};
-          rows.forEach(function (r) { have[r.id] = 1; });
-          var news = shots.filter(function (m) { return !have[m.id]; });
+          rows.forEach(function (r) { have[r.id] = r; });
+          /* Πόσα ΔΙΚΑ ΜΑΣ δεν έχουν φτάσει στον φάκελο — το λέει η οθόνη
+             ανάγνωσης, ώστε κανείς να μη νομίσει ότι χάθηκε δουλειά. */
+          var srv = {};
+          shots.forEach(function (m) { srv[m.id] = 1; });
+          pullInfo.notUp = rows.filter(function (r) { return !srv[r.id]; }).length;
+          var reader = isReader();
+          pullInfo.upd = 0;
           var step = function (i) {
-            if (i >= news.length) { return Promise.resolve(); }
-            var m = news[i];
-            return put({ id: m.id, ts: m.ts, supplier: m.supplier, invDate: m.invDate,
-                         net: m.net, vat: m.vat, total: m.total,
-                         pages: [], srvPages: m.pages || 1 })
-              .then(function () { pullInfo.added++; return step(i + 1); });
+            if (i >= shots.length) { return Promise.resolve(); }
+            var m = shots[i];
+            var cur = have[m.id];
+            if (!cur) {
+              return put({ id: m.id, ts: m.ts, supplier: m.supplier, invDate: m.invDate,
+                           net: m.net, vat: m.vat, total: m.total,
+                           pages: [], srvPages: m.pages || 1 })
+                .then(function () { pullInfo.added++; return step(i + 1); });
+            }
+            /* 🔴 ΜΟΝΟ σε ΑΝΑΓΝΩΣΤΡΙΑ συσκευή ενημερώνονται τα στοιχεία
+               υπάρχοντος τιμολογίου. Είναι ασφαλές ΑΚΡΙΒΩΣ επειδή η
+               αναγνώστρια δεν έχει δικές της διορθώσεις — δεν της
+               επιτρέπεται να γράψει. Στην ΕΝΕΡΓΗ ισχύει αναλλοίωτος ο
+               κανόνας του v33: ποτέ δεν πατιέται τοπική εγγραφή, γιατί
+               εκεί οι δικές της αλλαγές μπορεί να μην έχουν ανέβει ακόμα.
+               Η φωτογραφία δεν αγγίζεται ποτέ, σε καμία περίπτωση. */
+            if (!reader || !metaDiffers(cur, m)) { return step(i + 1); }
+            return get(m.id).then(function (fresh) {
+              if (!fresh) { return; }
+              fresh.supplier = m.supplier;
+              fresh.invDate = m.invDate;
+              fresh.net = m.net;
+              fresh.vat = m.vat;
+              fresh.total = m.total;
+              fresh.srvPages = m.pages || fresh.srvPages || 1;
+              return put(fresh).then(function () { pullInfo.upd++; });
+            }).then(function () { return step(i + 1); });
           };
           return step(0);
         });
@@ -2149,7 +2357,41 @@
         if (!pullInfo.msg) { localStorage.removeItem(LS.needPull); }
         pulling = false;
         refreshCount();
+        /* Ό,τι μόλις ήρθε φαίνεται ΤΩΡΑ. Χωρίς αυτό, ο χρήστης που στέκεται
+           στα Εκκρεμή βλέπει την παλιά εικόνα και συμπεραίνει ότι δεν ήρθε
+           τίποτα (Α400 §Γ: ακίνητο διαγνωστικό λέει ψέματα εξίσου). */
+        if (!el('s-pend').hidden) { renderPending(); }
+        if (!el('s-cam').hidden && isReader()) { roRender(); }
       });
+  }
+
+  /* Περιμένει το τρέχον κατέβασμα αντί να επιστρέψει «έτοιμο» από πάνω του.
+     Το pullNow() βγαίνει αμέσως αν τρέχει ήδη — χωρίς αυτό, η ενεργοποίηση
+     θα νόμιζε ότι κατέβασε ενώ το κατέβασμα ήταν στη μέση. */
+  function pullSettled() {
+    if (!pulling) { return pullNow(); }
+    /* Περιμένει να ησυχάσει το τρέχον ΚΑΙ ΜΕΤΑ τρέχει δικό του: μόνο έτσι
+       είναι βέβαιο ότι ό,τι ανέβηκε στο μεταξύ βρίσκεται εδώ. */
+    return new Promise(function (res) {
+      var t = setInterval(function () {
+        if (!pulling) { clearInterval(t); res(pullNow()); }
+      }, 300);
+    });
+  }
+
+  /* v35 · Η.3 — ΤΟ ΚΑΤΕΒΑΣΜΑ ΤΡΕΧΕΙ ΚΑΙ ΣΤΗΝ ΕΠΑΝΑΦΟΡΑ.
+     Ως το v34 έτρεχε ΜΟΝΟ στο boot: η δεύτερη συσκευή έβλεπε νέο τιμολόγιο
+     μόνο αν την έκλεινες και την ξανάνοιγες — και ένα εγκατεστημένο PWA που
+     ξυπνάει από το παρασκήνιο δεν κάνει πλοήγηση (Α440, μετρημένο 3/9).
+     Φρένο 30″: εναλλαγή εφαρμογών στο κινητό είναι δεκάδες φορές τη μέρα. */
+  var PULL_GAP = 30000;
+  var lastPull = 0;
+  function maybePull() {
+    if (document.hidden || !hasAccount()) { return; }
+    if (Date.now() - lastPull < PULL_GAP) { return; }
+    lastPull = Date.now();
+    refreshActive();
+    pullNow();
   }
 
   /* Καθυστέρηση επίτηδες: η ανάγνωση Gemini γράφει στη βάση αρκετές φορές
@@ -2205,6 +2447,8 @@
     if (!hasWords)                          { return startWords('auto'); }
     if (!localStorage.getItem(LS.wordsOk))  { return startWords('auto'); }
     if (!localStorage.getItem(LS.reg))      { kmRegister(); }   // εκκρεμής εγγραφή
+    lastPull = Date.now();
+    refreshActive();      // v35 — ενεργή ή αναγνώστρια; πριν ανοίξει η κάμερα
     pullNow();            // v33 — πρώτα ό,τι ήρθε από άλλη συσκευή…
     scheduleSync(2500);   // v31 — …και μετά ό,τι έμεινε πίσω από εδώ
     if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
@@ -2304,6 +2548,65 @@
   };
   el('shutter').onclick = capture;
   el('cam-retry').onclick = startCam;
+
+  /* ── v35 · Η.3 — ΕΠΙΣΤΡΟΦΗ ΤΗΣ ΕΠΕΞΕΡΓΑΣΙΑΣ ΣΕ ΑΥΤΗ ΤΗ ΣΥΣΚΕΥΗ ────
+     🔴 Η ΣΕΙΡΑ ΕΙΝΑΙ ΔΕΣΜΕΥΤΙΚΗ: ΚΑΤΕΒΑΖΕΙ ΠΡΩΤΑ, ΓΙΝΕΤΑΙ ΕΝΕΡΓΗ ΜΕΤΑ.
+     Αν γινόταν πρώτα ενεργή και το κατέβασμα αποτύγχανε, το επόμενο
+     ανέβασμα θα έγραφε τα ΜΙΣΑ δεδομένα αυτής της συσκευής πάνω στον
+     φάκελο — ακριβώς η παγίδα που πιάστηκε στις 3/9 («ποτέ ανέβασμα πριν
+     το κατέβασμα»). Γι' αυτό μπαίνει ΚΑΙ το σήμα km_need_pull πριν από
+     οτιδήποτε: όσο εκκρεμεί, τίποτα δεν ανεβαίνει. */
+  el('ro-menu').onclick = function () { goto('s-menu'); };
+  if (ACTIVATE_NEEDS_WORDS) {
+    el('ro-words').oninput = function () {
+      var n = String(this.value || '').trim().split(/\s+/).filter(function (x) { return x.length; }).length;
+      var e = el('ro-count');
+      e.textContent = n + ' από 12 λέξεις' + (n === 12 ? ' ✓' : '');
+      e.style.color = (n === 12) ? '#2ee6a8' : '';
+    };
+  }
+  el('ro-go').onclick = function () {
+    var b = el('ro-go'), e = el('ro-err');
+    e.hidden = true;
+    var stop = function (msg) {
+      b.disabled = false; b.textContent = 'Κάνε αυτή τη συσκευή ενεργή';
+      e.textContent = msg; e.hidden = false;
+    };
+    var run = function () {
+      b.disabled = true; b.textContent = 'Κατεβάζει…';
+      localStorage.setItem(LS.needPull, '1');
+      return pullSettled().then(function () {
+        if (pullInfo.msg) { stop('Δεν κατέβηκαν τα τιμολόγια της άλλης συσκευής: ' + pullInfo.msg + ' Δοκίμασε ξανά με δίκτυο.'); return; }
+        b.textContent = 'Ενεργοποιεί…';
+        return fetch(KM_API + 'activate', { method: 'POST', headers: kmHead() }).then(function (r) {
+          if (!r.ok) { stop('Δεν έγινε η ενεργοποίηση (σφάλμα ' + r.status + '). Δοκίμασε ξανά.'); return; }
+          return r.json().then(function (j) {
+            setActiveState(true, j.active_since);
+            b.disabled = false; b.textContent = 'Κάνε αυτή τη συσκευή ενεργή';
+            scheduleSync(400);
+            startCam();
+          });
+        });
+      }).catch(function () { stop('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); });
+    };
+    if (!ACTIVATE_NEEDS_WORDS) {
+      if (!confirm('Να γίνει ΑΥΤΗ η συσκευή η ενεργή;\n\nΗ άλλη συσκευή περνάει σε ανάγνωση: θα βλέπει τα πάντα, δεν θα φωτογραφίζει.\n\nΚανένα τιμολόγιο δεν χάνεται.')) { return; }
+      return run();
+    }
+    b.disabled = true; b.textContent = 'Έλεγχος…';
+    kmCheckWords(el('ro-words').value).then(function (c) {
+      if (!c.ok) { stop(c.error); return; }
+      return kmDerive(c.words).then(function (d) {
+        /* Σύγκριση με τον ΔΙΚΟ ΜΑΣ φάκελο: λάθος (αλλά έγκυρες) λέξεις
+           δείχνουν άλλον λογαριασμό — δεν στέλνουμε τίποτα στον server. */
+        if (d.folderId !== localStorage.getItem(LS.folder)) {
+          stop('Αυτές οι 12 λέξεις ανοίγουν άλλον λογαριασμό, όχι αυτόν. Έλεγξε τη σειρά τους.');
+          return;
+        }
+        return run();
+      });
+    }).catch(function () { stop('Κάτι πήγε στραβά στον έλεγχο των λέξεων. Δοκίμασε ξανά.'); });
+  };
   el('prev-retake').onclick = previewRetake;
   el('prev-page').onclick   = previewAddPage;
   el('prev-ok').onclick     = previewOk;
@@ -2444,6 +2747,12 @@
   });
   history.pushState(null, '', location.href);
 
+  /* v35 · Η.3 — το κατέβασμα και ο έλεγχος «ποια συσκευή γράφει» τρέχουν σε
+     κάθε επαναφορά. ΕΞΩ από το μπλοκ του service worker επίτηδες: πρέπει να
+     δουλεύουν ακόμα κι αν η καταχώρηση του worker αποτύχει. */
+  document.addEventListener('visibilitychange', maybePull);
+  window.addEventListener('focus', maybePull);
+
   checkVersion(false);   // v30 — πρώτο πράγμα σε κάθε φόρτωση
   openDB().then(boot).then(function () { schedule(800); }).catch(function (e) {
     document.body.innerHTML = '<div style="padding:40px;color:#e6e8ec">Δεν άνοιξε η τοπική βάση: ' + e + '</div>';
@@ -2503,12 +2812,21 @@
       window.addEventListener('focus', check);
       setInterval(check, 3600000);
     }).catch(function () {});
-    /* Νέα έκδοση → η σελίδα ξαναφορτώνει ΜΟΝΗ της. Τέλος το «κλείσ' το δύο φορές». */
+    /* Νέα έκδοση → η σελίδα ξαναφορτώνει ΜΟΝΗ της. Τέλος το «κλείσ' το δύο φορές».
+       ⚠ v35 — ΑΛΛΑ ΜΟΝΟ ΑΝ ΤΡΕΧΟΥΜΕ ΟΝΤΩΣ ΠΑΛΙΑ ΕΚΔΟΣΗ. Στην ΠΡΩΤΗ
+       εγκατάσταση ο worker αναλαμβάνει σελίδα που μόλις κατέβηκε φρέσκια από
+       το δίκτυο: το reload εκεί δεν διορθώνει τίποτα — είναι ένα ορατό
+       τρεμόπαιγμα πάνω στην πρώτη οθόνη που βλέπει ποτέ ο νέος χρήστης.
+       Το ρολόι της έκδοσης (v30) ξέρει ήδη την απάντηση· τη ρωτάμε. */
     var reloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (reloaded) { return; }
-      reloaded = true;
-      location.reload();
+      serverVersion().then(function (v) {
+        if (reloaded) { return; }
+        if (!v || v === shortVer(APP_VER)) { return; }   // ήδη τρέχει η σωστή
+        reloaded = true;
+        location.reload();
+      });
     });
   }
 })();

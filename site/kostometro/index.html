@@ -130,6 +130,27 @@
   </div>
   <div class="flash" id="flash"></div>
   <div class="toast" id="toast" hidden>✓ Μπήκε</div>
+  <!-- ══ v35 · Η.3 — ΑΝΑΓΝΩΣΤΡΙΑ ΣΥΣΚΕΥΗ ═══════════════════════
+       Ο server επιβάλλει από 2/9 «μία γράφει, οι άλλες διαβάζουν» (409 σε
+       ανέβασμα από μη-ενεργή). Ως το v34 η ΟΘΟΝΗ δεν το έλεγε: η αναγνώστρια
+       συσκευή άφηνε τον χρήστη να φωτογραφίσει, το έσωζε τοπικά, και δεν
+       έφευγε ΠΟΤΕ. Κενό που κατάπινε δουλειά σιωπηλά. -->
+  <div class="cam-err ro" id="ro" hidden>
+    <p class="ro-t"><b>Η επεξεργασία είναι σε άλλη συσκευή.</b></p>
+    <p id="ro-when"></p>
+    <p class="note">Εδώ βλέπεις κανονικά όλα τα τιμολόγια και τους προμηθευτές σου. Για να <b>φωτογραφίσεις</b> από αυτή τη συσκευή, κάν᾽ την ενεργή — η άλλη περνάει σε ανάγνωση.</p>
+    <p class="note warn" id="ro-pend" hidden></p>
+    <div id="ro-wbox" hidden>
+      <label class="fld">
+        <span>Οι 12 λέξεις σου</span>
+        <textarea id="ro-words" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="λέξη1 λέξη2 λέξη3 …"></textarea>
+      </label>
+      <p class="fine" id="ro-count">0 από 12 λέξεις</p>
+    </div>
+    <p class="err" id="ro-err" hidden></p>
+    <button class="btn primary" id="ro-go">Κάνε αυτή τη συσκευή ενεργή</button>
+    <button class="btn ghost" id="ro-menu">☰ Δες τα τιμολόγια</button>
+  </div>
   <div class="cam-err" id="cam-err" hidden>
     <p><b>Δεν άνοιξε η κάμερα.</b></p>
     <p id="cam-err-msg"></p>
@@ -218,6 +239,7 @@
     <div class="kv"><span>Ανάγνωση ποσών</span><b id="st-key">—</b></div>
     <div class="kv"><span>Τιμολόγια στη συσκευή</span><b id="st-shots">0</b></div>
     <div class="kv"><span>Έκδοση</span><b id="st-ver">—</b></div>
+    <div class="kv"><span>Αυτή η συσκευή</span><b id="st-active">—</b></div>
     <div class="kv"><span>Συγχρονισμός</span><b id="st-sync">—</b></div>
     <div class="kv"><span>Έκδοση στον server</span><b id="st-srvver">—</b></div>
     <div class="kv diag"><span>Αποθήκευση offline</span><b id="st-sw">—</b></div>
@@ -237,7 +259,7 @@
       <button class="btn ghost" id="nw-cancel">Άκυρο</button>
     </div>
     <div class="sep"></div>
-    <p class="fine">Ο μηδενισμός σβήνει <b>το email, το κλειδί και τον λογαριασμό</b> από αυτή τη συσκευή — θα πάρεις καινούριες 12 λέξεις. Οι φωτογραφίες και όλα τα καταχωρημένα στοιχεία τους — ποσά, προμηθευτές, ημερομηνίες — <b>μένουν ακέραια εδώ</b> και τα βλέπεις κανονικά.<br><b>Προσοχή:</b> τα δεδομένα ζουν σε αυτή τη συσκευή. Δεν μεταφέρονται σε άλλο κινητό.</p>
+    <p class="fine">Ο μηδενισμός σβήνει <b>το email, το κλειδί και τον λογαριασμό</b> από αυτή τη συσκευή — θα πάρεις καινούριες 12 λέξεις. Οι φωτογραφίες και όλα τα καταχωρημένα στοιχεία τους — ποσά, προμηθευτές, ημερομηνίες — <b>μένουν ακέραια εδώ</b> και τα βλέπεις κανονικά.<br><b>Τα τιμολόγιά σου μεταφέρονται</b> σε άλλη συσκευή με τις 12 λέξεις. Ο μηδενισμός δίνει <b>καινούριες</b> λέξεις — οι παλιές, και ό,τι άνοιγαν, δεν ισχύουν πια από εδώ.</p>
     <button class="btn danger" id="st-reset">Μηδενισμός εγγραφής</button>
   </div>
 </section>
