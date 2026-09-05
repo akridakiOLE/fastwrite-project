@@ -36,7 +36,12 @@
        είναι «είμαι ενεργή». Απουσία τιμής = ενεργή, γιατί όποια συσκευή
        βάζει τις 12 λέξεις γίνεται ενεργή την ίδια στιγμή (Η.3). */
     active:   'km_active',
-    activeAt: 'km_active_since'
+    activeAt: 'km_active_since',
+    /* v36 · Γ.3 — το διαπιστευτήριο της συσκευής που φυλάει τις 12 λέξεις.
+       ΔΕΝ είναι κλειδί κρυπτογράφησης και δεν ξεκλειδώνει τίποτα από μόνο
+       του: είναι απλώς η ταυτότητα που δείχνουμε στο Android/iOS για να
+       ρωτήσει «είσαι εσύ;». Αν χαθεί, ξαναφτιάχνεται με νέα επιβεβαίωση. */
+    lockCred: 'km_lock_cred'
   };
 
   var el = function (id) { return document.getElementById(id); };
@@ -172,8 +177,12 @@
   }
 
   /* ── Πλοήγηση ── */
+  /* ⚠ ΚΑΘΕ ΝΕΑ ΟΘΟΝΗ ΓΡΑΦΕΤΑΙ ΚΑΙ ΕΔΩ. Το show() κρύβει ΜΟΝΟ όσες είναι σε
+     αυτή τη λίστα και ξεκρύβει τη ζητούμενη — οθόνη εκτός λίστας μένει
+     αόρατη για πάντα, σιωπηλά, χωρίς κανένα σφάλμα. (Το έπιασε το τεστ α1
+     στις 5/9· με ανάγνωση δεν φαινόταν.) */
   var SCREENS = ['s-acc','s-email','s-words','s-signin','s-key','s-perm','s-cam','s-who',
-                 's-menu','s-pend','s-sup','s-ref','s-settings','s-shot'];
+                 's-menu','s-pend','s-sup','s-ref','s-settings','s-shot','s-mywords'];
   function show(id) {
     var pv = el('preview');
     if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
@@ -1359,7 +1368,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v35';
+  var APP_VER = 'φέτα 3 · v36';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2029,6 +2038,9 @@
     }
     wordsMode = mode || 'new';
     show('s-words');
+    /* v36 — η διαδρομή διαφυγής. Στη «rotate» ο χρήστης έχει ήδη λογαριασμό
+       και βρίσκεται εδώ επίτηδες, άρα το κουμπί θα ήταν παραπλανητικό. */
+    el('w-signin').hidden = (wordsMode === 'rotate');
     el('w-title').textContent = TITLES[wordsMode];
     el('w-lede').innerHTML = LEDES[wordsMode];
     el('w-list').innerHTML = '<li>…</li>';
@@ -2425,6 +2437,81 @@
     toCam();
   }
 
+  /* ══ v36 · Γ.3 — ΟΙ 12 ΛΕΞΕΙΣ ΜΟΥ, ΠΙΣΩ ΑΠΟ ΤΟ ΚΛΕΙΔΩΜΑ ΤΗΣ ΣΥΣΚΕΥΗΣ ══
+     Το κενό της 4/9: οι λέξεις ήταν στη συσκευή (km_words) και καμία οθόνη
+     δεν τις έδειχνε — όποιος έχανε το χαρτί κρατούσε το κλειδί στο χέρι του
+     χωρίς να μπορεί να το δει.
+     🔴 ΓΙΑΤΙ ΠΥΛΗ ΚΑΙ ΟΧΙ ΣΚΕΤΟ ΚΟΥΜΠΙ: οι 12 λέξεις ΕΙΝΑΙ ο λογαριασμός.
+     Χωρίς επιβεβαίωση, όποιος πιάσει το ξεκλείδωτο κινητό για ένα λεπτό τις
+     αντιγράφει και ανοίγει τα τιμολόγια για πάντα, από παντού.
+     Ο κώδικας είναι αυτός που επαληθεύτηκε στο Η.0 (bio-test, 2/9) σε
+     κινητό ΚΑΙ tablet — μαζί με τον «Τρόπο Β», που χρειάστηκε πραγματικά. */
+  function lockAvailable() {
+    if (!window.PublicKeyCredential || !window.isSecureContext) { return Promise.resolve(false); }
+    return PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+      .then(function (ok) { return !!ok; })
+      .catch(function () { return false; });
+  }
+  function lockRnd(n) { var a = new Uint8Array(n); crypto.getRandomValues(a); return a; }
+  function lockB64(buf) {
+    var b = new Uint8Array(buf), s = '';
+    for (var i = 0; i < b.length; i++) { s += String.fromCharCode(b[i]); }
+    return btoa(s);
+  }
+  function lockUnb64(str) {
+    var raw = atob(str), a = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) { a[i] = raw.charCodeAt(i); }
+    return a;
+  }
+  /* Πρώτη φορά: καταχώριση. Η ίδια η καταχώριση ζητάει δακτυλικό/PIN με
+     userVerification:'required', άρα είναι κι αυτή πραγματικό ξεκλείδωμα. */
+  function lockEnroll() {
+    return navigator.credentials.create({ publicKey: {
+      rp: { name: 'Kostometro', id: location.hostname },
+      user: { id: lockRnd(16), name: 'km@' + location.hostname, displayName: 'Kostometro' },
+      challenge: lockRnd(32),
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
+      timeout: 60000, attestation: 'none'
+    }}).then(function (c) {
+      try { localStorage.setItem(LS.lockCred, lockB64(c.rawId)); } catch (e) {}
+      return true;
+    });
+  }
+  function lockAsk(allow) {
+    return navigator.credentials.get({ publicKey: {
+      challenge: lockRnd(32), rpId: location.hostname,
+      userVerification: 'required', timeout: 60000, allowCredentials: allow
+    }}).then(function () { return true; });
+  }
+  /* Επιστρέφει Promise<true> μόνο αν ο κάτοχος επιβεβαιώθηκε τώρα. */
+  function lockVerify() {
+    var id = localStorage.getItem(LS.lockCred);
+    if (!id) { return lockEnroll(); }
+    var allow;
+    try { allow = [{ type: 'public-key', id: lockUnb64(id), transports: ['internal'] }]; }
+    catch (e) { allow = []; }
+    return lockAsk(allow).catch(function () {
+      /* Τρόπος Β (Η.0, 2/9): σε μερικές συσκευές το allowCredentials πέφτει
+         ενώ το ίδιο διαπιστευτήριο υπάρχει. Ζητάμε ό,τι έχει η συσκευή για
+         αυτό το site. Αν πέσει κι αυτό, ΔΕΝ δείχνουμε τίποτα. */
+      return lockAsk([]);
+    });
+  }
+
+  function showMyWords() {
+    var w = localStorage.getItem(LS.words);
+    if (!w) { return; }
+    var ol = el('mw-list');
+    ol.innerHTML = '';
+    w.split(' ').forEach(function (word) {
+      var li = document.createElement('li');
+      li.textContent = word;
+      ol.appendChild(li);
+    });
+    goto('s-mywords');
+  }
+
   function boot() {
     if (!localStorage.getItem(LS.id)) {
       localStorage.setItem(LS.id, 'km_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
@@ -2458,15 +2545,30 @@
 
   /* ── Χειριστές ── */
   el('acc-no').onclick  = function () { show('s-email'); };
-  el('acc-yes').onclick = function () {
+
+  /* v36 — Η σύνδεση ανοίγει πλέον από ΔΥΟ σημεία: την πρώτη οθόνη και την
+     οθόνη των 12 λέξεων. Το «Πίσω» πρέπει να γυρίζει εκεί απ' όπου ήρθε,
+     αλλιώς ο χρήστης της δεύτερης διαδρομής πέφτει σε οθόνη που δεν είδε
+     ποτέ. */
+  var signinFrom = 's-acc';
+  function openSignin(from) {
+    signinFrom = from || 's-acc';
     el('si-err').hidden = true;
     el('si-email').value = localStorage.getItem(LS.email) || '';
     el('si-words').value = '';
     el('si-count').textContent = '0 από 12 λέξεις';
     el('si-count').style.color = '';
     show('s-signin');
+  }
+  el('acc-yes').onclick = function () { openSignin('s-acc'); };
+  el('w-signin').onclick = function () { openSignin('s-words'); };
+  el('si-back').onclick = function () {
+    /* 🔴 ΟΧΙ startWords() εδώ: θα παρήγαγε ΑΛΛΕΣ 12 λέξεις, και όποιος
+       τις είχε ήδη γράψει στο χαρτί θα κρατούσε λάθος κλειδί. Η οθόνη
+       ξαναδείχνεται όπως ήταν — το pendingWords μένει άθικτο. */
+    if (signinFrom === 's-words') { show('s-words'); return; }
+    show('s-acc');
   };
-  el('si-back').onclick = function () { show('s-acc'); };
 
   /* v34 — ΖΩΝΤΑΝΟΣ ΜΕΤΡΗΤΗΣ. Ο Stavros στάθηκε μπροστά σε ένα σκέτο πλαίσιο
      και ρώτησε «τι κάνω, θα τις γράψω όλες ενωμένες;». Η οδηγία από πάνω
@@ -2701,6 +2803,32 @@
       renderSettings();
     });
   };
+  el('st-mywords').onclick = function () {
+    var b = el('st-mywords'), e = el('mw-err');
+    e.hidden = true;
+    b.disabled = true; b.textContent = 'Επιβεβαίωση…';
+    function done() { b.disabled = false; b.textContent = 'Οι 12 λέξεις μου'; }
+    function stop(msg) { done(); e.textContent = msg; e.hidden = false; }
+    if (!localStorage.getItem(LS.words)) {
+      stop('Αυτή η συσκευή δεν έχει 12 λέξεις.');
+      return;
+    }
+    lockAvailable().then(function (ok) {
+      if (!ok) {
+        /* Συσκευή χωρίς κανένα κλείδωμα. Δεν δείχνουμε: όποιος τη σηκώσει
+           θα κρατούσε τον λογαριασμό. Λέμε ΤΙ να κάνει, όχι σκέτο «όχι». */
+        stop('Για να δεις τις 12 λέξεις, η συσκευή σου πρέπει να έχει κλείδωμα (δακτυλικό, πρόσωπο ή PIN). Βάλ᾽ το από τις Ρυθμίσεις της συσκευής και ξαναδοκίμασε.');
+        return;
+      }
+      lockVerify().then(function () {
+        done();
+        showMyWords();
+      }).catch(function () {
+        stop('Δεν επιβεβαιώθηκε το κλείδωμα της συσκευής. Δοκίμασε ξανά.');
+      });
+    });
+  };
+
   el('st-newwords').onclick = function () {
     el('nw-err').hidden = true;
     el('nw-box').hidden = !el('nw-box').hidden;

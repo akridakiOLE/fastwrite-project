@@ -37,6 +37,12 @@
     <label class="chk"><input type="checkbox" id="w-ok"> <span>Τις έγραψα σε χαρτί.</span></label>
     <p class="err" id="w-err" hidden></p>
     <button class="btn primary" id="w-go" disabled>Συνέχεια</button>
+    <!-- v36 · Η ΕΞΟΔΟΣ ΑΠΟ ΤΟ ΑΔΙΕΞΟΔΟ (κενό 4/9). Χωρίς αυτό, υπάρχων
+         χρήστης που προσγειώνεται εδώ έχει ΕΝΑ κουμπί και καμία διαδρομή
+         προς τον λογαριασμό του — και καταλήγει με δύο ασύνδετους
+         λογαριασμούς. Κρύβεται στη λειτουργία «rotate»: εκεί ο χρήστης
+         ΕΧΕΙ ήδη λογαριασμό και απλώς αλλάζει λέξεις. -->
+    <button class="btn ghost" id="w-signin" hidden>Έχω ήδη λογαριασμό</button>
   </div>
 </section>
 
@@ -58,6 +64,21 @@
     <p class="err" id="si-err" hidden></p>
     <button class="btn primary" id="si-go">Σύνδεση</button>
     <button class="btn ghost" id="si-back">Πίσω</button>
+  </div>
+</section>
+
+<!-- ══ ΟΘΟΝΗ · ΟΙ 12 ΛΕΞΕΙΣ ΜΟΥ (Γ.3) ═════════════════════════
+     Ανοίγει ΜΟΝΟ αφού η συσκευή επιβεβαιώσει τον κάτοχό της (δακτυλικό,
+     πρόσωπο ή PIN). Το χαρτί μένει η πρώτη ασφάλεια· αυτό είναι η δεύτερη. -->
+<section id="s-mywords" class="screen page" hidden>
+  <div class="page-head">
+    <button class="back" data-back aria-label="Πίσω">‹</button>
+    <h2>Οι 12 λέξεις σου</h2>
+  </div>
+  <div class="setup-inner">
+    <p class="lede">Αυτές ανοίγουν τα τιμολόγιά σου σε <b>άλλη συσκευή</b>. Γράψ᾽ τες με τη σειρά.</p>
+    <ol class="words" id="mw-list"></ol>
+    <p class="note warn">Μην τις φωτογραφίσεις και μην τις αντιγράψεις. Το στιγμιότυπο ανεβαίνει στο cloud του κινητού σου και το πρόχειρο το διαβάζουν άλλες εφαρμογές. <b>Το χαρτί δεν ανεβαίνει πουθενά.</b></p>
   </div>
 </section>
 
@@ -250,6 +271,11 @@
     <button class="btn ghost" id="st-editkey">Αλλαγή κλειδιού Gemini</button>
     <button class="btn ghost" id="st-test">Δοκιμή ανάγνωσης τώρα</button>
     <div class="sep"></div>
+    <!-- v36 · Γ.3 — ΟΙ 12 ΛΕΞΕΙΣ ΜΟΥ. Ήταν γραμμένο στο Brief Α από την
+         πρώτη μέρα και δεν είχε υλοποιηθεί ποτέ: οι λέξεις ζούσαν στη
+         συσκευή και καμία οθόνη δεν τις έδειχνε. -->
+    <button class="btn ghost" id="st-mywords">Οι 12 λέξεις μου</button>
+    <p class="err" id="mw-err" hidden></p>
     <!-- v29 · Η.2β-2 — αλλαγή των 12 λέξεων -->
     <button class="btn ghost" id="st-newwords">Νέες 12 λέξεις</button>
     <div id="nw-box" hidden>

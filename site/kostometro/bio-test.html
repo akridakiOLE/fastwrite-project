@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kostometro · δοκιμή δακτυλικού (Η.0)</title>
+<title>Kostometro · δοκιμή δακτυλικού (Η.0) v2</title>
 <style>
   body{margin:0;background:#0a0e14;color:#e6edf3;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:20px}
   h1{font-size:20px;margin:0 0 4px}
@@ -18,7 +18,7 @@
 </head>
 <body>
 <h1>Δοκιμή δακτυλικού μέσα από PWA</h1>
-<div class="sub">Brief Α, βήμα Η.0. Τρία κουμπιά με τη σειρά. Στο τέλος πάτα «Αντιγραφή» και στείλε τη γραμμή στον Claude.</div>
+<div class="sub">Brief Α, βήμα Η.0 — <b>v2</b>. Τρία κουμπιά με τη σειρά. Στο τέλος πάτα «Αντιγραφή» και στείλε τη γραμμή στον Claude.</div>
 
 <button id="b1" class="go">1 · Έλεγχος συσκευής</button>
 <button id="b2" disabled>2 · Καταχώριση δακτυλικού</button>
@@ -43,7 +43,7 @@
   function standalone(){ return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true; }
   function ua(){ var u=navigator.userAgent; var b = /Brave/.test(u)?'Brave':(navigator.brave?'Brave':(/Edg\//.test(u)?'Edge':(/Chrome\//.test(u)?'Chrome':(/Safari\//.test(u)?'Safari':'?')))); var os=/Android/.test(u)?'Android':(/iPhone|iPad/.test(u)?'iOS':'other'); return b+'/'+os; }
   function summary(){
-    var s = 'BIO ' + (R.get===true?'✅':(R.create===true?'🟡':'❌'))
+    var s = 'BIO v2 ' + (R.get===true?'✅':(R.create===true?'🟡':'❌'))
       + ' · avail:' + (R.avail===null?'?':(R.avail?'yes':'no'))
       + ' · create:' + (R.create===null?'-':(R.create?('ok '+R.tCreate+'s'):'FAIL'))
       + ' · get:' + (R.get===null?'-':(R.get?('ok '+R.tGet+'s'):'FAIL'))
@@ -88,20 +88,32 @@
     });
   };
 
-  b3.onclick = function(){
-    line('… ζητάω ξεκλείδωμα — πρέπει να εμφανιστεί ξανά το δακτυλικό');
+  function doGet(label, allow){
     var t0 = performance.now();
-    var id = credId || (function(){ try{return localStorage.getItem('km_biotest_cred');}catch(e){return null;} })();
-    navigator.credentials.get({ publicKey: {
+    return navigator.credentials.get({ publicKey: {
       challenge: rnd(32), rpId: location.hostname, userVerification: 'required', timeout: 60000,
-      allowCredentials: id ? [{ type:'public-key', id: unb64(id), transports:['internal'] }] : []
+      allowCredentials: allow
     }}).then(function(a){
-      R.get = true; R.tGet = ((performance.now()-t0)/1000).toFixed(1);
-      line('✅ Ξεκλείδωσε σε '+R.tGet+'s. Η δοκιμή ΠΕΡΑΣΕ.', 'ok');
-      summary();
+      var t = ((performance.now()-t0)/1000).toFixed(1);
+      return { ok:true, label:label, t:t };
     }).catch(function(e){
-      R.get = false; R.err = String(e.name||e);
-      line('❌ Ξεκλείδωμα απέτυχε: '+(e.name||'')+' — '+(e.message||e), 'bad'); summary();
+      var t = ((performance.now()-t0)/1000).toFixed(1);
+      return { ok:false, label:label, t:t, name:String(e.name||e), msg:String(e.message||'') };
+    });
+  }
+  b3.onclick = function(){
+    var id = credId || (function(){ try{return localStorage.getItem('km_biotest_cred');}catch(e){return null;} })();
+    line('… Τρόπος Α: ζητάω ΑΥΤΟ το κλειδί (allowCredentials)');
+    var allowA = id ? [{ type:'public-key', id: unb64(id), transports:['internal'] }] : [];
+    doGet('A', allowA).then(function(rA){
+      if (rA.ok) { R.get=true; R.tGet=rA.t; R.err='A ok'; line('✅ Τρόπος Α ξεκλείδωσε σε '+rA.t+'s. Η δοκιμή ΠΕΡΑΣΕ.', 'ok'); summary(); return; }
+      line('❌ Τρόπος Α απέτυχε σε '+rA.t+'s: '+rA.name+' — '+rA.msg, 'bad');
+      line('… Τρόπος Β: ζητάω ΟΠΟΙΟ κλειδί έχει η συσκευή για '+location.hostname+' (χωρίς allowCredentials)');
+      return doGet('B', []).then(function(rB){
+        if (rB.ok) { R.get=true; R.tGet=rB.t; R.err='A fail '+rA.t+'s '+rA.name+' / B ok'; line('✅ Τρόπος Β ξεκλείδωσε σε '+rB.t+'s. ΠΕΡΑΣΕ με τον Β.', 'ok'); }
+        else { R.get=false; R.err='A '+rA.t+'s '+rA.name+' / B '+rB.t+'s '+rB.name; line('❌ Τρόπος Β απέτυχε σε '+rB.t+'s: '+rB.name+' — '+rB.msg, 'bad'); }
+        summary();
+      });
     });
   };
 
