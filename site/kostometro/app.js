@@ -46,7 +46,8 @@
        υπάρχει σίγουρα και εκεί και μπορεί να ξανακατέβει. Φωτογραφία που
        τραβήχτηκε ΣΕ ΑΥΤΗ τη συσκευή δεν μπαίνει ποτέ, άρα δεν πετιέται
        ποτέ: [{ id, b (bytes), at (πότε ζητήθηκε) }]. */
-    pcache:   'km_photo_cache'
+    pcache:   'km_photo_cache',
+    gone:     'km_gone'          // v43 — τα id όσων διαγράφηκαν, ώστε να μη γυρίζουν
   };
 
   var el = function (id) { return document.getElementById(id); };
@@ -110,11 +111,52 @@
       q.onerror = function () { rej(q.error); };
     });
   }
-  function del(id) {
+  /* ══ v43 · Η ΔΙΑΓΡΑΦΗ ΠΡΕΠΕΙ ΝΑ ΤΑΞΙΔΕΥΕΙ ══════════════════════════
+     5/9/2026, Stavros: «το κάνω διαγραφή αλλά μετά εμφανίζεται». Δεν ήταν
+     τύχη. Η διαγραφή έσβηνε ΜΟΝΟ τοπικά· ο σφραγισμένος φάκελος κρατούσε
+     το τιμολόγιο, και ο κανόνας του v33 («το κατέβασμα ποτέ δεν σβήνει
+     τοπική εγγραφή, μόνο προσθέτει») το ξανάφερνε στον επόμενο γύρο —
+     κάθε 30 δευτερόλεπτα, για πάντα. Σε δεύτερη συσκευή δεν έφευγε ποτέ.
+
+     Τώρα κάθε διαγραφή αφήνει ΤΑΦΟΠΕΤΡΑ: το id μπαίνει σε κατάλογο που
+     ταξιδεύει μέσα στον ίδιο κρυπτογραφημένο φάκελο (πεδίο «gone»). Καμία
+     αλλαγή στον server — ο φάκελος είναι αδιαφανής για εκείνον. Όποια
+     συσκευή κατεβάζει: σβήνει ό,τι είναι στον κατάλογο και δεν το ξαναφέρνει.
+     Στον κατάλογο μπαίνει ΜΟΝΟ το id — κανένα ποσό, κανένα όνομα. */
+  function goneRead() {
+    try { var a = JSON.parse(localStorage.getItem(LS.gone) || '[]'); return a.length ? a : []; }
+    catch (e) { return []; }
+  }
+  function goneWrite(a) { try { localStorage.setItem(LS.gone, JSON.stringify(a)); } catch (e) {} }
+  function goneAdd(ids) {
+    var a = goneRead(), seen = {};
+    a.forEach(function (x) { seen[x] = 1; });
+    ids.forEach(function (id) { if (!seen[id]) { seen[id] = 1; a.push(id); } });
+    goneWrite(a);
+  }
+  function goneDrop(ids) {                 // η αναίρεση ανασταίνει το τιμολόγιο
+    var out = {}; ids.forEach(function (id) { out[id] = 1; });
+    goneWrite(goneRead().filter(function (x) { return !out[x]; }));
+  }
+  function goneMap() {
+    var m = {}; goneRead().forEach(function (x) { m[x] = 1; }); return m;
+  }
+  /* Σβήσιμο ΜΟΝΟ από την τοπική βάση — χωρίς ταφόπετρα. Το χρησιμοποιεί
+     το κατέβασμα, που εκτελεί ταφόπετρα ΑΛΛΗΣ συσκευής: δεν την ξαναγράφει. */
+  function dbDel(id) {
     return new Promise(function (res, rej) {
       var t = db.transaction('shots', 'readwrite');
       t.objectStore('shots').delete(id);
       t.oncomplete = res; t.onerror = function () { rej(t.error); };
+    });
+  }
+  function del(id) {
+    goneAdd([id]);
+    return dbDel(id).then(function (r) {
+      /* Η ταφόπετρα ανεβαίνει με τον ίδιο μηχανισμό που ανεβαίνει κάθε
+         αλλαγή — το put() δεν περνάει από εδώ, οπότε το λέμε ρητά. */
+      if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
+      return r;
     });
   }
   function isPending(r) { return r.total === null || r.total === undefined; }
@@ -217,7 +259,11 @@
        μάτια σου ακριβώς τη στιγμή που τη δουλεύεις. Φεύγεις και ξαναμπαίνεις
        → όλα παίρνουν τη σωστή τους σειρά. */
     if (id === 's-pend')     { pendOrder = null; renderPending(); }
-    if (id === 's-sup')      { renderSupPage(); }
+    if (id === 's-sup')      {
+      /* v43 — η προβολή προμηθευτή επιβιώνει της επιστροφής από τη φωτογραφία. */
+      if (supView) { var v = supView; all().then(function (rs) { openSupplier(v, rs); }); }
+      else { renderSupPage(); }
+    }
     if (id === 's-ref')      { renderRef(); }
     if (id === 's-settings') { renderSettings(); }
   }
@@ -453,6 +499,7 @@
     b.onclick = function () {
       var back = undoBin; undoBin = null;
       if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+      goneDrop(back.map(function (r) { return r.id; }));   // v43 — σηκώνεται και η ταφόπετρα
       Promise.all(back.map(function (r) { return put(r); }))
         .then(function () { renderPending(); refreshCount(); });
     };
@@ -729,6 +776,7 @@
   /* ══ Ο ΠΡΟΜΗΘΕΥΤΗΣ ΜΟΥ ══ */
   var FIND_MIN = 8;          // κάτω από αυτό, η μπάρα αναζήτησης δεν εμφανίζεται
   function renderSupPage() {
+    supView = null;
     var body = el('sup-body');
     body.innerHTML = '';
     all().then(function (rows) {
@@ -854,10 +902,20 @@
     if (kind === 'year')  { d.setMonth(0, 1); }
     return d.getTime();
   }
+  /* ══ v43 · Η ΕΠΙΣΤΡΟΦΗ ΓΥΡΙΖΕΙ ΕΚΕΙ ΠΟΥ ΗΣΟΥΝ ══════════════════════
+     5/9/2026, Stavros: ανοίγει προμηθευτή, ανοίγει φωτογραφία, πατάει
+     «Επιστροφή» — και βρίσκεται στη λίστα ΟΛΩΝ των προμηθευτών, όχι σε
+     αυτόν που είχε ανοίξει. Αιτία: η προβολή ενός (ή πολλών μαζί)
+     προμηθευτών ζωγραφιζόταν ΜΕΣΑ στην οθόνη «Προμηθευτές» χωρίς να
+     αφήνει ίχνος· η επιστροφή έκανε render('s-sup') και ξανάχτιζε τη
+     λίστα από την αρχή. Τώρα η επιλογή κρατιέται (supView) — και κρατιέται
+     ΟΛΟΚΛΗΡΗ, δηλαδή και το «Δες μαζί (Α/Β/Γ)», όχι μόνο ένα όνομα. */
+  var supView = null;
   function openSupplier(name, rows) {
     var body = el('sup-body');
     /* v21 — δέχεται όνομα Ή πίνακα ονομάτων. Μία διαδρομή, όχι δύο. */
     var names = (Object.prototype.toString.call(name) === '[object Array]') ? name.slice() : [name];
+    supView = names.slice();
     var polloi = names.length > 1;
     var titlos = polloi ? (names.length + ' προμηθευτές') : names[0];
     var mine = rows.filter(function (r) { return names.indexOf(r.supplier) !== -1; });
@@ -1450,7 +1508,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v42';
+  var APP_VER = 'φέτα 3 · v43';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1786,7 +1844,7 @@
     if (!document.hidden && !el('s-cam').hidden) { startCam(); }
   });
 
-  function toCam() { nav = []; clearPending(); show('s-cam'); startCam(); refreshCount(); }
+  function toCam() { nav = []; supView = null; clearPending(); show('s-cam'); startCam(); refreshCount(); }
 
   function capture() {
     /* Δεύτερο φρένο, επίτηδες: το πρώτο είναι η οθόνη. Αν ποτέ μια διαδρομή
@@ -2226,12 +2284,34 @@
   }
 
   function pushMeta(rows, key, baseVer) {
-    var payload = new TextEncoder().encode(JSON.stringify({ v: 1, shots: rows.map(metaOf) }));
+    /* v43 — «gone»: τα id όσων διαγράφηκαν. Παλιότερες εκδόσεις αγνοούν
+       άγνωστο πεδίο, οπότε ο φάκελος μένει συμβατός προς τα πίσω. */
+    var payload = new TextEncoder().encode(JSON.stringify({ v: 1, shots: rows.map(metaOf), gone: goneRead() }));
     return kmSeal(key, payload).then(function (sealed) {
       var h = kmHead();
       h['Content-Type'] = 'application/octet-stream';
       if (baseVer !== null && baseVer !== undefined) { h['X-Km-Base-Version'] = String(baseVer); }
       return fetch(KM_API + 'folder', { method: 'PUT', headers: h, body: sealed });
+    });
+  }
+
+  /* v43 — Η ταφόπετρα σβήνει και τη φωτογραφία από τον server. Χωρίς αυτό
+     το τιμολόγιο εξαφανιζόταν από την οθόνη αλλά τα megabyte του έμεναν
+     να πληρώνονται για πάντα. Ο server έχει ήδη DELETE /api/km/photo. */
+  function killPhotos(have) {
+    var dead = goneMap();
+    var out = have.filter(function (id) { return dead[pidSplit(id).rec]; });
+    if (!out.length) { return Promise.resolve(); }
+    var step = function (i) {
+      if (i >= out.length) { return Promise.resolve(); }
+      return fetch(KM_API + 'photo?id=' + encodeURIComponent(out[i]), { method: 'DELETE', headers: kmHead() })
+        .catch(function () {})
+        .then(function () { return step(i + 1); });
+    };
+    return step(0).then(function () {
+      var g = {};
+      out.forEach(function (id) { g[id] = 1; });
+      pcWrite(pcRead().filter(function (x) { return !g[x.id]; }));
     });
   }
 
@@ -2306,7 +2386,12 @@
           if (syncInfo.msg) { return null; }
           return fetch(KM_API + 'photos', { headers: kmHead() })
             .then(function (r) { return r.ok ? r.json() : { photos: [] }; })
-            .then(function (j) { return pushPhotos(rows, key, (j.photos || []).map(function (p) { return p.id; })); });
+            .then(function (j) {
+              var ids = (j.photos || []).map(function (p) { return p.id; });
+              return killPhotos(ids).then(function () {
+                return pushPhotos(rows, key, ids.filter(function (id) { return !goneMap()[pidSplit(id).rec]; }));
+              });
+            });
         });
       })
       .catch(function (e) { syncInfo.msg = 'σφάλμα: ' + (e && e.message ? e.message : e); })
@@ -2326,7 +2411,7 @@
      αλλάξει το ίδιο τιμολόγιο σε δύο συσκευές) θέλει χρονοσήμανση ανά
      εγγραφή και έρχεται χωριστά· μέχρι τότε δεν προσποιούμαστε ότι γίνεται. */
   var pulling = false;
-  var pullInfo = { added: 0, upd: 0, photos: 0, need: 0, notUp: 0, msg: null, at: null };
+  var pullInfo = { added: 0, upd: 0, photos: 0, need: 0, notUp: 0, del: 0, msg: null, at: null };
 
   /* v35 — ΤΟ ΚΕΝΟ ΠΟΥ ΒΡΕΘΗΚΕ ΔΙΑΒΑΖΟΝΤΑΣ ΤΟΝ ΚΩΔΙΚΑ ΤΟΥ v34.
      Ως το v34 το κατέβασμα έφερνε ΜΟΝΟ τιμολόγια που δεν υπήρχαν τοπικά.
@@ -2347,7 +2432,8 @@
     }).then(function (plain) {
       if (!plain) { return null; }
       var data = JSON.parse(new TextDecoder().decode(plain));
-      return (data && data.shots) || [];
+      if (!data) { return null; }
+      return { shots: data.shots || [], gone: data.gone || [] };
     }).catch(function (e) {
       pullInfo.msg = 'δεν άνοιξε ο φάκελος: ' + (e && e.message ? e.message : e);
       return null;
@@ -2546,9 +2632,23 @@
     pulling = true; pullInfo.msg = null; pullInfo.added = 0;
     var key;
     return kmKeyReady().then(function (k) { key = k; return pullMeta(k); })
-      .then(function (shots) {
-        if (!shots) { return null; }
+      .then(function (folder) {
+        if (!folder) { return null; }
+        var shots = folder.shots;
+        /* Ο κατάλογος του φακέλου ΕΝΩΝΕΤΑΙ με τον δικό μας: ταφόπετρα από
+           άλλη συσκευή εκτελείται εδώ, και η δική μας δεν χάνεται όταν
+           ανέβει ξανά ο φάκελος. */
+        goneAdd(folder.gone || []);
+        var dead = goneMap();
+        shots = shots.filter(function (m) { return !dead[m.id]; });
         return all().then(function (rows) {
+          /* 🔴 Το ΜΟΝΟ σημείο όπου το κατέβασμα σβήνει τοπική εγγραφή —
+             και μόνο επειδή κάποιος ζήτησε ρητά τη διαγραφή. */
+          var kill = rows.filter(function (r) { return dead[r.id]; });
+          var killed = kill.length ? Promise.all(kill.map(function (r) { return dbDel(r.id); })) : Promise.resolve();
+          rows = rows.filter(function (r) { return !dead[r.id]; });
+          pullInfo.del = kill.length;
+          return killed.then(function () {
           var have = {};
           rows.forEach(function (r) { have[r.id] = r; });
           /* Πόσα ΔΙΚΑ ΜΑΣ δεν έχουν φτάσει στον φάκελο — το λέει η οθόνη
@@ -2588,6 +2688,7 @@
             }).then(function () { return step(i + 1); });
           };
           return step(0);
+          });
         });
       })
       .then(function () { return key ? pullPhotos(key) : null; })
@@ -2953,7 +3054,13 @@
   el('btn-menu').onclick = function () { goto('s-menu'); };
 
   Array.prototype.forEach.call(document.querySelectorAll('[data-back]'), function (b) {
-    b.onclick = back;
+    b.onclick = function () {
+      /* v43 — μέσα στους Προμηθευτές η «Επιστροφή» έχει δύο σκαλιά:
+         προβολή προμηθευτή → λίστα ονομάτων → έξω. Χωρίς αυτό, ένα πάτημα
+         πετούσε τον χρήστη δύο επίπεδα πίσω. */
+      if (!el('s-sup').hidden && supView) { renderSupPage(); return; }
+      back();
+    };
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-go]'), function (b) {
     b.onclick = function () { goto(b.getAttribute('data-go')); };
@@ -3020,7 +3127,11 @@
     var b = el('st-sync-now');
     b.disabled = true; b.textContent = 'Συγχρονίζεται…';
     startSyncTick();
-    syncNow().then(function () {
+    /* v43 — «Συγχρονισμός τώρα» σημαίνει ΚΑΙ ΤΑ ΔΥΟ. Ως τη v42 έκανε μόνο
+       ανέβασμα: ο χρήστης που πατούσε το κουμπί περιμένοντας να δει τι
+       άλλαξε σε άλλη συσκευή, έβλεπε την ίδια οθόνη και συμπέραινε ότι ο
+       συγχρονισμός δεν δουλεύει. Το κατέβασμα ΠΡΩΤΑ (κανόνας v33). */
+    pullNow().then(function () { return syncNow(); }).then(function () {
       b.disabled = false; b.textContent = 'Συγχρονισμός τώρα';
       renderSettings();
     });
