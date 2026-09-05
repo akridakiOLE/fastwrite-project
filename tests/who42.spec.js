@@ -220,11 +220,17 @@ test('59 · v43 · η μπάρα αναζήτησης μένει ορατή όσ
      καμία μπάρα δεν κολλάει και η διόρθωση είναι φαινομενική. */
   expect(scroller.top).toBeGreaterThan(100);
   await p.waitForTimeout(300);
-  /* 🔴 Χωρίς position:sticky η μπάρα βγαίνει εκτός οθόνης και για να γράψεις
-     πρέπει να ανέβεις ως την κορυφή (Stavros 5/9, στιγμιότυπο). */
+  /* 🔴 Χωρίς position:sticky το κεφάλι βγαίνει εκτός οθόνης και για να
+     γράψεις ή να αλλάξεις επιλογή πρέπει να ανέβεις ως την κορυφή
+     (Stavros 5/9, στιγμιότυπο). ΟΛΟ το κεφάλι μένει, όχι μόνο το πεδίο:
+     οι δύο επιλογές είναι το «πού βρίσκομαι» της οθόνης. */
+  await expect(p.locator('#who-tab-list')).toBeInViewport();
+  await expect(p.locator('#who-tab-new')).toBeInViewport();
   await expect(p.locator('#who-find')).toBeInViewport();
   const y = (await p.locator('#who-find').boundingBox()).y;
-  expect(y).toBeLessThan(60);
+  expect(y).toBeLessThan(130);
+  const segY = (await p.locator('#who-tab-list').boundingBox()).y;
+  expect(segY).toBeLessThan(70);
   /* 🔴 ΚΑΙ ΤΟ ΔΕΥΤΕΡΟ ΜΙΣΟ (Stavros 5/9, στιγμιότυπο): η λωρίδα ΠΑΝΩ από
      το πεδίο πρέπει να ανήκει στη μπάρα, όχι στη λίστα. Με σκέτο sticky
      το περιθώριο της οθόνης έμενε ακάλυπτο και οι γραμμές φαίνονταν να
@@ -232,8 +238,8 @@ test('59 · v43 · η μπάρα αναζήτησης μένει ορατή όσ
   const over = await p.evaluate((yy) => {
     const el = document.elementFromPoint(200, Math.max(2, yy - 8));
     return el ? (el.className || el.tagName) : null;
-  }, y);
-  console.log('πάνω από τη μπάρα:', over);
-  expect(String(over)).toContain('findbar');
+  }, segY);
+  console.log('πάνω από το κεφάλι:', over);
+  expect(String(over)).toContain('who-stick');
   await ctx.close();
 });

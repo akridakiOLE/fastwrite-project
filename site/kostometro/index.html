@@ -195,12 +195,17 @@
   <!-- v42: δύο δρόμοι, ρητοί. Η λίστα χτίζεται από τα ΤΙΜΟΛΟΓΙΑ (ίδια πηγή
        με την οθόνη Προμηθευτές), όχι από τοπική μνήμη ονομάτων — 5/9/2026:
        σε νέα συσκευή η μνήμη ήταν άδεια και δεν φαινόταν κανένα όνομα. -->
-  <div class="who-seg" role="tablist">
-    <button class="seg on" id="who-tab-list" role="tab">Προμηθευτές</button>
-    <button class="seg" id="who-tab-new" role="tab">Νέος προμηθευτής</button>
+  <!-- v45: οι δύο επιλογές ΚΑΙ η αναζήτηση μένουν στη θέση τους· κυλάει
+       μόνο η λίστα. Αίτημα Stavros 5/9 — χωρίς αυτό, μόλις κατέβεις λίγο
+       δεν βλέπεις πια πού βρίσκεσαι ούτε πώς να αλλάξεις επιλογή. -->
+  <div class="who-stick">
+    <div class="who-seg" role="tablist">
+      <button class="seg on" id="who-tab-list" role="tab">Προμηθευτές</button>
+      <button class="seg" id="who-tab-new" role="tab">Νέος προμηθευτής</button>
+    </div>
+    <div class="findbar" id="who-findbar"><input type="text" id="who-find" placeholder="Βρες προμηθευτή" autocomplete="off"></div>
   </div>
   <div id="who-list-wrap">
-    <div class="findbar"><input type="text" id="who-find" placeholder="Βρες προμηθευτή" autocomplete="off"></div>
     <div id="sup-list" class="sup-list"></div>
     <p class="fine" id="who-empty" hidden>Δεν υπάρχει ακόμη κανένας προμηθευτής — γράψε τον πρώτο.</p>
   </div>
