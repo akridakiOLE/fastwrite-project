@@ -133,6 +133,9 @@ input:focus{outline:none;border-color:var(--accent)}
   display:flex;flex-direction:column;gap:12px;
 }
 .sep{height:1px;background:var(--border);margin:4px 0}
+/* v40 — η θέση της φωτογραφίας που δεν κατέβηκε. Ποτέ κενό: ή κουμπί ή
+   αυτή η γραμμή. Χρώμα κειμένου, όχι κόκκινο — δεν είναι σφάλμα. */
+.ph-need{display:block;color:var(--text2);line-height:1.5;padding:10px 0}
 
 .row{
   display:flex;align-items:center;justify-content:space-between;gap:12px;
