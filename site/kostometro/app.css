@@ -110,7 +110,12 @@ input:focus{outline:none;border-color:var(--accent)}
 .back{
   background:none;border:0;color:var(--text);font-size:32px;line-height:1;
   min-width:44px;min-height:44px;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;gap:2px;padding:0 8px 0 4px;
 }
+/* v37 — η λέξη δίπλα στο βέλος (αίτημα Stavros 5/9): το σκέτο «‹» είναι
+   καθιερωμένο αλλά όχι αυτονόητο. Μικρότερη γραμματοσειρά ώστε να μην
+   ανταγωνίζεται τον τίτλο της οθόνης. */
+.back span{font-size:15px;font-weight:600;line-height:1}
 .pg-body{
   flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
   padding:16px 16px max(24px,env(safe-area-inset-bottom));

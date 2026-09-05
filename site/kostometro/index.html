@@ -71,8 +71,8 @@
      Ανοίγει ΜΟΝΟ αφού η συσκευή επιβεβαιώσει τον κάτοχό της (δακτυλικό,
      πρόσωπο ή PIN). Το χαρτί μένει η πρώτη ασφάλεια· αυτό είναι η δεύτερη. -->
 <section id="s-mywords" class="screen page" hidden>
-  <div class="page-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
+  <div class="pg-head">
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
     <h2>Οι 12 λέξεις σου</h2>
   </div>
   <div class="setup-inner">
@@ -204,7 +204,7 @@
 <!-- ══ ΜΕΝΟΥ (φέτα 2) ══════════════════════════════════════════ -->
 <section id="s-menu" class="screen page" hidden>
   <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
     <h2>Μενού</h2>
   </header>
   <div class="pg-body">
@@ -219,7 +219,7 @@
 <!-- ══ ΤΑ ΕΚΚΡΕΜΗ ══════════════════════════════════════════════ -->
 <section id="s-pend" class="screen page" hidden>
   <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
     <h2>Εκκρεμή</h2>
   </header>
   <div class="pg-body" id="pend-body"></div>
@@ -228,7 +228,7 @@
 <!-- ══ Ο ΠΡΟΜΗΘΕΥΤΗΣ ΜΟΥ ═══════════════════════════════════════ -->
 <section id="s-sup" class="screen page" hidden>
   <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
     <h2>Προμηθευτές</h2>
   </header>
   <div class="pg-body" id="sup-body"></div>
@@ -237,7 +237,7 @@
 <!-- ══ ΚΑΛΕΣΕ ══════════════════════════════════════════════════ -->
 <section id="s-ref" class="screen page" hidden>
   <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
     <h2>Κάλεσε</h2>
   </header>
   <div class="pg-body">
@@ -252,7 +252,7 @@
 <!-- ══ ΡΥΘΜΙΣΕΙΣ ═══════════════════════════════════════════════ -->
 <section id="s-settings" class="screen page" hidden>
   <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
     <h2>Ρυθμίσεις</h2>
   </header>
   <div class="pg-body">
@@ -275,6 +275,13 @@
          πρώτη μέρα και δεν είχε υλοποιηθεί ποτέ: οι λέξεις ζούσαν στη
          συσκευή και καμία οθόνη δεν τις έδειχνε. -->
     <button class="btn ghost" id="st-mywords">Οι 12 λέξεις μου</button>
+    <!-- v37 — ΤΟ ΛΕΜΕ ΠΡΙΝ, ΟΧΙ ΜΕΤΑ. Στο πρώτο πάτημα το Android γράφει
+         «Δημιουργία κλειδιού πρόσβασης» — λέξεις που διαβάζονται ως «φτιάχνω
+         νέο λογαριασμό» ακριβώς τη στιγμή που ο χρήστης ζητάει να δει το
+         κλειδί που ΗΔΗ έχει. Ο Stavros ρώτησε πριν πατήσει· ο επόμενος θα
+         πατήσει «Άκυρο» και θα νομίσει ότι κάτι χάλασε. (Εύρημα 5/9, από
+         στιγμιότυπο σε πραγματική συσκευή.) -->
+    <p class="fine">Η συσκευή θα σου ζητήσει δακτυλικό, πρόσωπο ή PIN. <b>Την πρώτη φορά</b> φτιάχνει ένα κλειδί μόνο γι᾽ αυτή τη συσκευή — <b>δεν είναι νέος λογαριασμός</b> και <b>δεν περιέχει τις 12 λέξεις σου</b>.</p>
     <p class="err" id="mw-err" hidden></p>
     <!-- v29 · Η.2β-2 — αλλαγή των 12 λέξεων -->
     <button class="btn ghost" id="st-newwords">Νέες 12 λέξεις</button>
@@ -293,7 +300,7 @@
 <!-- ══ ΠΡΟΒΟΛΗ ΤΙΜΟΛΟΓΙΟΥ ══════════════════════════════════════ -->
 <section id="s-shot" class="screen page" hidden>
   <header class="pg-head">
-    <button class="back" data-back aria-label="Πίσω">‹</button>
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
     <h2 id="shot-title">Τιμολόγιο</h2>
   </header>
   <div class="pg-body" id="shot-body"></div>
