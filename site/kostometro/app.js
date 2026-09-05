@@ -13,7 +13,6 @@
     key:   'km_key',
     skip:  'km_key_skipped',
     id:    'km_install_id',
-    sups:  'km_suppliers',
     perm:  'km_perm_seen',
     src:   'km_source',
     diag:  'km_ai_diag',
@@ -255,27 +254,61 @@
   }
 
   /* ── Προμηθευτές ── */
-  function suppliers() {
-    try { return JSON.parse(localStorage.getItem(LS.sups) || '[]'); } catch (e) { return []; }
+  /* v42 — Η ΛΙΣΤΑ ΤΩΝ ΠΡΟΜΗΘΕΥΤΩΝ ΣΤΟ «ΠΡΟΜΗΘΕΥΤΗΣ;» ΒΓΑΙΝΕΙ ΑΠΟ ΤΑ ΤΙΜΟΛΟΓΙΑ.
+     Μέχρι τη v41 έβγαινε από τοπική μνήμη ονομάτων (km_suppliers) που γέμιζε
+     μόνο όταν πληκτρολογούσες στη συσκευή αυτή, έδειχνε 5 και δεν ξαναχτιζόταν
+     ποτέ από τον φάκελο: σε επαναφορά με 12 λέξεις έβγαινε άδεια (5/9/2026).
+     Τώρα: ΟΛΑ τα ονόματα, τα πιο πρόσφατα (κατά dateOf) πρώτα, με φίλτρο. */
+  try { localStorage.removeItem('km_suppliers'); } catch (e) {}
+  function supplierNames(rows) {
+    var seen = {}, out = [];
+    rows.forEach(function (r) {
+      var name = String(r.supplier || '').trim();
+      if (!name) { return; }
+      var k = name.toLowerCase(), d = dateOf(r) || 0;   // άξονας χρόνου: ΠΑΝΤΑ dateOf (Α320)
+      if (!seen[k]) { seen[k] = { name: name, n: 0, last: 0 }; out.push(seen[k]); }
+      seen[k].n++;
+      if (d > seen[k].last) { seen[k].last = d; }
+    });
+    out.sort(function (a, b) { return b.last - a.last; });
+    return out;
   }
-  function bumpSupplier(name) {
-    var list = suppliers(), hit = null;
-    list.forEach(function (s) { if (s.name === name) { hit = s; } });
-    if (hit) { hit.n++; } else { list.push({ name: name, n: 1 }); }
-    list.sort(function (a, b) { return b.n - a.n; });
-    localStorage.setItem(LS.sups, JSON.stringify(list));
+  var whoNames = [];
+  function whoMode(m) {
+    el('who-tab-list').classList.toggle('on', m === 'list');
+    el('who-tab-new').classList.toggle('on', m === 'new');
+    el('who-list-wrap').hidden = (m !== 'list');
+    el('who-new-wrap').hidden = (m !== 'new');
+    if (m === 'new') { setTimeout(function () { el('in-sup').focus(); }, 50); }
   }
-  function renderSuppliers() {
+  function drawSuppliers() {
+    var q = el('who-find').value.trim().toLowerCase();
     var box = el('sup-list');
     box.innerHTML = '';
-    suppliers().slice(0, 5).forEach(function (s) {
+    whoNames.forEach(function (s) {
+      if (q && s.name.toLowerCase().indexOf(q) < 0) { return; }
       var b = document.createElement('button');
       b.className = 'sup';
       b.textContent = s.name;
+      var n = document.createElement('span');
+      n.className = 'sup-n'; n.textContent = s.n + ' τιμ.';
+      b.appendChild(n);
       b.onclick = function () { assign(s.name); };
       box.appendChild(b);
     });
+    el('who-empty').hidden = whoNames.length > 0;
   }
+  function renderSuppliers() {
+    return all().then(function (rows) {
+      whoNames = supplierNames(rows);
+      el('who-find').value = '';
+      drawSuppliers();
+      whoMode(whoNames.length ? 'list' : 'new');
+    });
+  }
+  el('who-tab-list').onclick = function () { whoMode('list'); };
+  el('who-tab-new').onclick  = function () { whoMode('new'); };
+  el('who-find').addEventListener('input', drawSuppliers);
 
   /* ══ ΜΕΝΟΥ ══ */
   function renderMenu() {
@@ -284,10 +317,9 @@
       var m = el('m-pend');
       m.textContent = p;
       m.className = 'row-b' + (p > 0 ? ' hot' : '');
-      /* v18 — Ο αριθμός εδώ ΠΡΕΠΕΙ να μετράει ό,τι μετράει και η οθόνη.
-         Το suppliers() είναι η ΜΝΗΜΗ ονομάτων για τα γρήγορα κουμπιά: μεγαλώνει
-         όταν γράφεις όνομα και δεν μικραίνει ποτέ όταν σβήνεις τιμολόγιο.
-         Στις 31/8/2026 το μενού έλεγε 4 και η λίστα έδειχνε 3. */
+      /* v18 — Ο αριθμός εδώ ΠΡΕΠΕΙ να μετράει ό,τι μετράει και η οθόνη
+         (31/8/2026: το μενού έλεγε 4, η λίστα 3 — η παλιά μνήμη ονομάτων
+         δεν μίκραινε ποτέ). Από τη v42 όλα βγαίνουν από τα τιμολόγια. */
       var supNames = {};
       rows.forEach(function (r) { if (r.supplier) { supNames[r.supplier] = 1; } });
       el('m-sup').textContent = Object.keys(supNames).length;
@@ -1418,7 +1450,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v41';
+  var APP_VER = 'φέτα 3 · v42';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1857,9 +1889,9 @@
     el('thumb').src = thumbUrl;
     whoDate = Date.now();          // προεπιλογή: σήμερα
     renderWhoDate();
-    renderSuppliers();
     el('in-sup').value = '';
-    show('s-who');
+    /* Πρώτα η λίστα, μετά η οθόνη — ποτέ κενή λίστα για μια στιγμή. */
+    renderSuppliers().then(function () { show('s-who'); }, function () { whoMode('new'); show('s-who'); });
   }
 
   /* ── Καταχώρηση ── */
@@ -1878,7 +1910,6 @@
     };
     autoIds[rec.id] = 1;   // μόλις τραβήχτηκε → διαβάζεται μόνο του
     put(rec).then(function () {
-      bumpSupplier(name);
       clearPending();
       show('s-cam');
       aiSweep();

@@ -183,7 +183,7 @@
 <section id="s-who" class="screen who" hidden>
   <div class="who-head">
     <span class="thumb-wrap"><img id="thumb" alt=""><span class="pg-badge" id="who-pages" hidden></span></span>
-    <h2>Ποιος;</h2>
+    <h2>Προμηθευτής</h2>
   </div>
   <!-- v10: ημερομηνία τιμολογίου. Προεπιλογή η σημερινή· την πατάς ΜΟΝΟ
        αν το τιμολόγιο είναι άλλης μέρας. Κανένα επιπλέον πάτημα στην πόρτα. -->
@@ -192,13 +192,23 @@
     <button class="btn ghost" id="who-date-edit">Αλλαγή</button>
     <input type="date" id="who-date-inp" hidden>
   </div>
-
-  <div id="sup-list" class="sup-list"></div>
-  <div class="who-new">
-    <input type="text" id="in-sup" placeholder="Νέος προμηθευτής" autocomplete="off">
-    <button class="btn primary" id="add-sup">Καταχώρηση</button>
+  <!-- v42: δύο δρόμοι, ρητοί. Η λίστα χτίζεται από τα ΤΙΜΟΛΟΓΙΑ (ίδια πηγή
+       με την οθόνη Προμηθευτές), όχι από τοπική μνήμη ονομάτων — 5/9/2026:
+       σε νέα συσκευή η μνήμη ήταν άδεια και δεν φαινόταν κανένα όνομα. -->
+  <div class="who-seg" role="tablist">
+    <button class="seg on" id="who-tab-list" role="tab">Προμηθευτές</button>
+    <button class="seg" id="who-tab-new" role="tab">Νέος προμηθευτής</button>
   </div>
-  <p class="fine">Γράψε το όνομα που χρησιμοποιείς εσύ — όχι την επωνυμία του τιμολογίου.</p>
+  <div id="who-list-wrap">
+    <input type="text" id="who-find" placeholder="Βρες προμηθευτή" autocomplete="off">
+    <div id="sup-list" class="sup-list"></div>
+    <p class="fine" id="who-empty" hidden>Δεν υπάρχει ακόμη κανένας προμηθευτής — γράψε τον πρώτο.</p>
+  </div>
+  <div class="who-new" id="who-new-wrap" hidden>
+    <input type="text" id="in-sup" placeholder="Όνομα προμηθευτή" autocomplete="off">
+    <button class="btn primary" id="add-sup">Καταχώρηση</button>
+    <p class="fine">Γράψε το όνομα που χρησιμοποιείς εσύ — όχι την επωνυμία του τιμολογίου.</p>
+  </div>
 </section>
 
 <!-- ══ ΜΕΝΟΥ (φέτα 2) ══════════════════════════════════════════ -->

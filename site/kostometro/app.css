@@ -99,6 +99,11 @@ input:focus{outline:none;border-color:var(--accent)}
 }
 .sup:active{background:var(--bg3);border-color:var(--accent)}
 .who-new{display:flex;flex-direction:column;gap:10px}
+.who-seg{display:flex;gap:6px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:12px}
+.seg{flex:1;background:transparent;border:0;color:var(--text2);border-radius:9px;padding:11px 8px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer}
+.seg.on{background:var(--accent);color:#08130f}
+#who-find{width:100%;box-sizing:border-box;margin-bottom:10px}
+.sup .sup-n{float:right;color:var(--text2);font-weight:500;font-size:14px}
 
 /* ══ ΦΕΤΑ 2 (26/8/2026) ══════════════════════════════════════ */
 
