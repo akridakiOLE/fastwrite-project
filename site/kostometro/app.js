@@ -1368,7 +1368,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v38';
+  var APP_VER = 'φέτα 3 · v39';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2069,7 +2069,6 @@
       el('w-go').textContent = 'Συνέχεια';
       if (wordsMode === 'rotate') {
         wordsMode = 'new';
-        el('nw-box').hidden = true;
         goto('s-settings');
         return;
       }
@@ -2829,22 +2828,10 @@
     });
   };
 
-  el('st-newwords').onclick = function () {
-    el('nw-err').hidden = true;
-    el('nw-box').hidden = !el('nw-box').hidden;
-  };
-  el('nw-cancel').onclick = function () { el('nw-box').hidden = true; };
-  el('nw-go').onclick = function () {
-    var b = el('nw-go'), e = el('nw-err');
-    e.hidden = true; b.disabled = true; b.textContent = 'Έλεγχος…';
-    var stop = function (msg) { b.disabled = false; b.textContent = 'Ναι, φτιάξε νέες 12 λέξεις'; e.textContent = msg; e.hidden = false; };
-    folderState().then(function (st) {
-      if (st.unknown) { stop('Δεν μπόρεσα να ελέγξω τον φάκελό σου στον server. Χρειάζεσαι δίκτυο για να αλλάξεις λέξεις.'); return; }
-      if (!st.empty)  { stop('Ο φάκελός σου στον server έχει ήδη δεδομένα. Η αλλαγή λέξεων θα τα έκανε αδιάβαστα για πάντα — δεν επιτρέπεται ακόμα.'); return; }
-      b.disabled = false; b.textContent = 'Ναι, φτιάξε νέες 12 λέξεις';
-      startWords('rotate');
-    });
-  };
+  /* v39 — Οι χειριστές του «Νέες 12 λέξεις» αφαιρέθηκαν μαζί με το κουμπί
+     (απόφαση Stavros 5/9). Το mode 'rotate' του startWords() και το
+     folderState() ΜΕΝΟΥΝ: είναι ο μηχανισμός που θα χρειαστεί η
+     επανακρυπτογράφηση, και ο φρουρός της v29 δεν χάνεται. */
 
   el('st-reset').onclick = function () {
     if (!confirm('Μηδενισμός εγγραφής σε αυτή τη συσκευή;\n\nΣβήνονται το email, το κλειδί ΚΑΙ ο λογαριασμός — θα πάρεις νέες 12 λέξεις.\nΤα τιμολόγια, οι φωτογραφίες και τα ποσά τους μένουν ακέραια.')) { return; }

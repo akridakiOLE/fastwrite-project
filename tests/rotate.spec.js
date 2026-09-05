@@ -39,66 +39,24 @@ async function toSettings(p) {
   await p.evaluate(() => { document.querySelectorAll('.screen').forEach(s => s.hidden = true); document.getElementById('s-settings').hidden = false; });
 }
 
-test('12 · νέες 12 λέξεις: αλλάζουν πραγματικά, και οι παλιές παύουν να ισχύουν', async ({ context }) => {
+/* v39 · ΤΑ ΤΕΣΤ 12/13/14 ΕΙΝΑΙ ΠΑΡΩΧΗΜΕΝΑ, ΟΧΙ ΑΠΟΤΥΧΙΕΣ (κανόνας Α400 §Γ 30/8).
+   Δοκίμαζαν το κουμπί «Νέες 12 λέξεις», που αφαιρέθηκε 5/9/2026 με απόφαση
+   Stavros: μπλοκαριζόταν μόλις ο φάκελος είχε δεδομένα, άρα η δηλωμένη χρήση
+   του ήταν πρακτικά ανέφικτη — η μόνη πράξη που πετύχαινε ήταν δεύτερος
+   λογαριασμός. Στη θέση τους ΕΝΑΣ φρουρός: το κουμπί δεν ξαναμπαίνει σιωπηλά.
+   Ο μηχανισμός (mode 'rotate', folderState) μένει στον κώδικα για την
+   επανακρυπτογράφηση — τότε ξαναγράφονται και τα τεστ. */
+test('12 · v39: το «Νέες 12 λέξεις» ΔΕΝ υπάρχει πια στις Ρυθμίσεις — και το «Οι 12 λέξεις μου» υπάρχει', async ({ context }) => {
   const p = await fresh(context);
-  const email = 'rot' + Date.now() + '@example.com';
-  const oldW = await onboard(p, email);
-  const oldFolder = await p.evaluate(() => localStorage.getItem('km_folder'));
-
+  await onboard(p, 'nonw' + Date.now() + '@example.com');
   await toSettings(p);
-  await p.locator('#st-newwords').click();
-  await expect(p.locator('#nw-box')).toBeVisible();
-  await p.locator('#nw-go').click();
-
-  await expect(p.locator('#w-title')).toHaveText('Οι νέες 12 λέξεις σου', { timeout: 15000 });
-  await expect(p.locator('#w-list li')).toHaveCount(12);
-  const newW = await p.locator('#w-list li').allTextContents();
-  expect(newW.join(' ')).not.toBe(oldW.join(' '));
-  await expect(p.locator('#w-go')).toBeDisabled();       // πάλι υποχρεωτικό τσεκάρισμα
-  await p.locator('#w-ok').check();
-  await p.locator('#w-go').click();
-  await expect(p.locator('#s-settings')).toBeVisible({ timeout: 15000 });
-  await p.waitForTimeout(800);
-
-  const nowFolder = await p.evaluate(() => localStorage.getItem('km_folder'));
-  expect(nowFolder).not.toBe(oldFolder);
-  expect(await p.evaluate(() => localStorage.getItem('km_words'))).toBe(newW.join(' '));
-
-  // ΟΙ ΠΑΛΙΕΣ ΔΕΝ ΑΝΟΙΓΟΥΝ ΠΙΑ ΤΟΝ ΝΕΟ ΛΟΓΑΡΙΑΣΜΟ: σε καθαρή συσκευή απορρίπτονται;
-  const p2 = await fresh(context);
-  await p2.locator('#acc-yes').click();
-  await p2.locator('#si-email').fill(email);
-  await p2.locator('#si-words').fill(newW.join(' '));
-  await p2.locator('#si-go').click();
-  await expect(p2.locator('#s-key')).toBeVisible({ timeout: 15000 });   // οι ΝΕΕΣ δουλεύουν
-  await p2.close(); await p.close();
-});
-
-test('13 · ο φρουρός: με δεδομένα στον φάκελο η αλλαγή λέξεων ΑΠΑΓΟΡΕΥΕΤΑΙ', async ({ context }) => {
-  const p = await fresh(context);
-  await onboard(p, 'guard' + Date.now() + '@example.com');
-  await toSettings(p);
-  // ο server απαντάει ότι ο φάκελος έχει δεδομένα (όπως θα γίνει μετά το Η.2)
-  await p.route('**/api/km/status*', (r) => r.fulfill({
-    status: 200, contentType: 'application/json',
-    body: JSON.stringify({ ok: true, state: { folder_version: 3, folder_bytes: 51234 } })
-  }));
-  await p.locator('#st-newwords').click();
-  await p.locator('#nw-go').click();
-  await expect(p.locator('#nw-err')).toContainText('αδιάβαστα για πάντα', { timeout: 15000 });
-  await expect(p.locator('#s-words')).toBeHidden();
-  await p.close();
-});
-
-test('14 · χωρίς δίκτυο η αλλαγή λέξεων ΔΕΝ προχωράει στα τυφλά', async ({ context }) => {
-  const p = await fresh(context);
-  await onboard(p, 'noNet' + Date.now() + '@example.com');
-  await toSettings(p);
-  await p.route('**/api/km/**', (r) => r.abort());
-  await p.locator('#st-newwords').click();
-  await p.locator('#nw-go').click();
-  await expect(p.locator('#nw-err')).toContainText('Χρειάζεσαι δίκτυο', { timeout: 15000 });
-  await expect(p.locator('#s-words')).toBeHidden();
+  /* ΚΑΙ τι βρήκε, όχι μόνο «βρέθηκε» (κανόνας 4/9): τυπώνουμε τα κουμπιά. */
+  const labels = await p.locator('#s-settings button').allTextContents();
+  console.log('Κουμπιά Ρυθμίσεων:', labels.map((t) => t.trim()).filter(Boolean).join(' · '));
+  expect(labels.some((t) => /Νέες 12 λέξεις/.test(t))).toBe(false);
+  expect(labels.some((t) => /Οι 12 λέξεις μου/.test(t))).toBe(true);
+  await expect(p.locator('#st-newwords')).toHaveCount(0);
+  await expect(p.locator('#nw-box')).toHaveCount(0);
   await p.close();
 });
 
