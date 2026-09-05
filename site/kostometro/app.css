@@ -88,7 +88,12 @@ input:focus{outline:none;border-color:var(--accent)}
 .cam-err p{color:var(--text2);font-size:15px}
 
 /* ── Ποιος; ──────────────────────────────────────────── */
-.who{background:var(--bg);overflow-y:auto;padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom))}
+/* v46 — Η οθόνη χωρίζεται σε ΑΚΙΝΗΤΟ κεφάλι και κυλιόμενη λίστα. Το
+   .screen είναι ήδη flex column· εδώ ορίζεται ποιο κομμάτι κυλάει. */
+.who{background:var(--bg);overflow:hidden;padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom))}
+.who-top{flex:0 0 auto}
+#who-list-wrap{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
+.who-new{flex:0 0 auto}
 .who-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
 #thumb{width:56px;height:56px;object-fit:contain;border-radius:8px;border:1px solid var(--border);background:var(--bg2)}
 .sup-list{display:flex;flex-direction:column;gap:10px;margin-bottom:22px}
@@ -102,25 +107,12 @@ input:focus{outline:none;border-color:var(--accent)}
 .who-seg{display:flex;gap:6px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:12px}
 .seg{flex:1;background:transparent;border:0;color:var(--text2);border-radius:9px;padding:11px 8px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer}
 .seg.on{background:var(--accent);color:#08130f}
-/* v43/v45 — ΤΟ ΚΕΦΑΛΙ ΤΗΣ ΟΘΟΝΗΣ ΜΕΝΕΙ, ΚΥΛΑΕΙ ΜΟΝΟ Η ΛΙΣΤΑ (Stavros 5/9).
-   Με 15 προμηθευτές, μόλις κατέβαινες λίγο έφευγαν και οι δύο επιλογές και
-   το πεδίο αναζήτησης: για να γράψεις ή να αλλάξεις επιλογή έπρεπε να
-   ανέβεις ως την κορυφή.
-
-   ⚠ Το sticky ΔΕΝ αρκεί μόνο του: το top:0 μετριέται από την κορυφή του
-   κυλιόμενου κουτιού, ΟΧΙ από το εσωτερικό περιθώριό του. Με σκέτο sticky
-   έμενε μια λωρίδα ακάλυπτη από πάνω και οι γραμμές φαίνονταν να περνούν
-   μέσα από εκεί. Γι' αυτό το κεφάλι ΑΚΥΡΩΝΕΙ το περιθώριο με αρνητικά
-   margin και το ξαναβάζει ως δικό του padding — το φόντο φτάνει ως την
-   άκρη και τίποτα δεν περνάει από πάνω. */
-.who-stick{
-  position:sticky;top:0;z-index:3;
-  background:var(--bg);
-  margin:0 -20px;padding:max(20px,env(safe-area-inset-top)) 20px 10px;
-  box-shadow:0 8px 12px -8px rgba(0,0,0,.6);
-}
-.who-stick .who-seg{margin-bottom:10px}
-.findbar{background:var(--bg)}
+/* v46 — Η ΜΠΑΡΑ ΑΝΑΖΗΤΗΣΗΣ ΤΗΣ ΟΘΟΝΗΣ «ΠΡΟΜΗΘΕΥΤΕΣ» (η άλλη οθόνη) μένει
+   ορατή όσο κυλάει η λίστα. Εκεί κυλάει ολόκληρο το .pg-body, οπότε το
+   sticky είναι ο μόνος δρόμος — και χρειάζεται δικό του κουτί που ακυρώνει
+   το περιθώριο, αλλιώς μένει λωρίδα ακάλυπτη και οι γραμμές περνούν από
+   μέσα της (5/9, στιγμιότυπο Stavros). */
+.findbar{background:var(--bg);margin-bottom:10px}
 #who-find{width:100%;box-sizing:border-box}
 .findbar-p{
   position:sticky;top:0;z-index:3;

@@ -210,10 +210,11 @@ test('59 · v43 · η μπάρα αναζήτησης μένει ορατή όσ
   await toCam(p); await shoot(p);
   await expect(p.locator('#sup-list .sup')).toHaveCount(25);
 
+  const titleBefore = await p.locator('#s-who h2').boundingBox();
   const scroller = await p.evaluate(() => {
-    const s = document.getElementById('s-who');
+    const s = document.getElementById('who-list-wrap');
     s.scrollTop = 99999;
-    return { top: s.scrollTop, max: s.scrollHeight - s.clientHeight, win: window.scrollY };
+    return { top: s.scrollTop, max: s.scrollHeight - s.clientHeight, who: document.getElementById('s-who').scrollTop };
   });
   console.log('scroller:', JSON.stringify(scroller));
   /* Ο κύλινδρος ΠΡΕΠΕΙ να είναι η ίδια η οθόνη — αν κυλάει το παράθυρο,
@@ -224,22 +225,24 @@ test('59 · v43 · η μπάρα αναζήτησης μένει ορατή όσ
      γράψεις ή να αλλάξεις επιλογή πρέπει να ανέβεις ως την κορυφή
      (Stavros 5/9, στιγμιότυπο). ΟΛΟ το κεφάλι μένει, όχι μόνο το πεδίο:
      οι δύο επιλογές είναι το «πού βρίσκομαι» της οθόνης. */
+  /* v46 — ΟΛΟ το κεφάλι μένει: μικρογραφία, τίτλος, ημερομηνία, οι δύο
+     επιλογές, η αναζήτηση. Κυλάει μόνο η λίστα (στιγμιότυπο 3563). */
+  await expect(p.locator('#s-who h2')).toBeInViewport();
+  await expect(p.locator('.who-date')).toBeInViewport();
   await expect(p.locator('#who-tab-list')).toBeInViewport();
   await expect(p.locator('#who-tab-new')).toBeInViewport();
   await expect(p.locator('#who-find')).toBeInViewport();
-  const y = (await p.locator('#who-find').boundingBox()).y;
-  expect(y).toBeLessThan(130);
-  const segY = (await p.locator('#who-tab-list').boundingBox()).y;
-  expect(segY).toBeLessThan(70);
+  /* Και ΔΕΝ κουνήθηκε: η θέση του τίτλου πριν και μετά την κύλιση ίδια. */
+  expect(await p.locator('#s-who h2').boundingBox()).toEqual(titleBefore);
   /* 🔴 ΚΑΙ ΤΟ ΔΕΥΤΕΡΟ ΜΙΣΟ (Stavros 5/9, στιγμιότυπο): η λωρίδα ΠΑΝΩ από
      το πεδίο πρέπει να ανήκει στη μπάρα, όχι στη λίστα. Με σκέτο sticky
      το περιθώριο της οθόνης έμενε ακάλυπτο και οι γραμμές φαίνονταν να
      περνούν από μέσα του. */
-  const over = await p.evaluate((yy) => {
-    const el = document.elementFromPoint(200, Math.max(2, yy - 8));
-    return el ? (el.className || el.tagName) : null;
-  }, segY);
-  console.log('πάνω από το κεφάλι:', over);
-  expect(String(over)).toContain('who-stick');
+  const bar = await p.locator('#who-find').boundingBox();
+  const wrap = await p.locator('#who-list-wrap').boundingBox();
+  console.log('μπάρα κάτω:', bar.y + bar.height, '· λίστα πάνω:', wrap.y);
+  /* 🔴 Η λίστα ΑΡΧΙΖΕΙ κάτω από τη μπάρα και κυλάει μέσα στο δικό της
+     κουτί — καμία γραμμή δεν περνάει ποτέ από πάνω της. */
+  expect(wrap.y).toBeGreaterThanOrEqual(bar.y + bar.height - 1);
   await ctx.close();
 });

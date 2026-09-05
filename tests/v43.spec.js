@@ -265,3 +265,38 @@ test('58 · η μπάρα αναζήτησης μένει ορατή όσο κυ
   await ctx.close();
 });
 
+
+test('60 · v46 · η συσκευή ΑΝΑΓΝΩΣΗΣ δεν μένει με παλιό νούμερο εκκρεμών', async ({ browser }) => {
+  const A = await device(browser);
+  const email = 'g60' + Date.now() + '@test.gr';
+  const words = await onboard(A.p, email);
+  await seed(A.p, SEED.map((x) => ({ ...x, total: null })));   // τρία εκκρεμή
+  await runSync(A.p);
+
+  const B = await device(browser);
+  await signIn(B.p, email, words);
+  await runSync(B.p);
+  await B.p.waitForTimeout(1500);
+  /* Η Β πήρε τη σκυτάλη· η Α είναι πλέον ανάγνωση — αυτή είναι η
+     περίπτωση του Stavros: υπολογιστής ενεργός, κινητό ανάγνωση. */
+  const menu = async (p) => {
+    await p.evaluate(() => { document.querySelectorAll('.screen').forEach((s) => s.hidden = true); });
+    await p.locator('#s-cam').evaluate((e) => { e.hidden = false; });
+    await p.locator('#btn-menu').click();
+    await expect(p.locator('#s-menu')).toBeVisible({ timeout: 8000 });
+  };
+  await menu(A.p);
+  await expect(A.p.locator('#m-pend')).toHaveText('3', { timeout: 15000 });
+
+  await delViaUi(B.p, 'ΒΗΤΑ');
+  await runSync(B.p);
+
+  /* Ο χρήστης ΔΕΝ αγγίζει την Α — μένει ανοιχτή στο μενού, όπως ένα κινητό
+     αφημένο στο τραπέζι. Το νούμερο πρέπει να διορθωθεί μόνο του. */
+  await A.p.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('focus')); });
+  /* 🔴 Ως τη v45 το κατέβασμα γινόταν σωστά αλλά η ΟΘΟΝΗ έμενε στην παλιά
+     εικόνα: ο υπολογιστής έδειχνε 2 και το κινητό 4 για τα ίδια δεδομένα. */
+  await expect(A.p.locator('#m-pend')).toHaveText('2', { timeout: 30000 });
+  console.log('μενού συσκευής ανάγνωσης:', await A.p.locator('#m-pend').textContent());
+  await A.ctx.close(); await B.ctx.close();
+});
