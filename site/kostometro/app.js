@@ -41,7 +41,13 @@
        ΔΕΝ είναι κλειδί κρυπτογράφησης και δεν ξεκλειδώνει τίποτα από μόνο
        του: είναι απλώς η ταυτότητα που δείχνουμε στο Android/iOS για να
        ρωτήσει «είσαι εσύ;». Αν χαθεί, ξαναφτιάχνεται με νέα επιβεβαίωση. */
-    lockCred: 'km_lock_cred'
+    lockCred: 'km_lock_cred',
+    /* v40 — ΕΥΡΕΤΗΡΙΟ ΤΩΝ ΦΩΤΟΓΡΑΦΙΩΝ ΠΟΥ ΚΑΤΕΒΑΣΕ ΑΥΤΗ Η ΣΥΣΚΕΥΗ.
+       Κρατάει ΜΟΝΟ ό,τι ήρθε από τον server — άρα ό,τι είναι εδώ μέσα
+       υπάρχει σίγουρα και εκεί και μπορεί να ξανακατέβει. Φωτογραφία που
+       τραβήχτηκε ΣΕ ΑΥΤΗ τη συσκευή δεν μπαίνει ποτέ, άρα δεν πετιέται
+       ποτέ: [{ id, b (bytes), at (πότε ζητήθηκε) }]. */
+    pcache:   'km_photo_cache'
   };
 
   var el = function (id) { return document.getElementById(id); };
@@ -1238,7 +1244,12 @@
       el('shot-title').textContent = r.supplier;
       var body = el('shot-body');
       body.innerHTML = '';
-      var pgs = pagesOf(r);
+      /* v40 — ο αριθμός σελίδων βγαίνει από τον server ΚΑΙ από τα τοπικά:
+         μια φωτογραφία που δεν κατέβηκε δεν πρέπει να εξαφανίζει τη σελίδα
+         της. Κενή θέση διαβάζεται ως χαμένο τιμολόγιο. */
+      var nPg = Math.max(pageCount(r), r.srvPages || 1);
+      var pgs = [];
+      for (var pi = 0; pi < nPg; pi++) { pgs.push(pi === 0 ? r.blob : (r.pages && r.pages[pi - 1])); }
       pgs.forEach(function (bl, i) {
         var block = document.createElement('div');
         block.className = 'pg-block';
@@ -1249,6 +1260,45 @@
           block.appendChild(lab);
         }
         var c = cropOf(r, i);
+
+        /* 🔴 Η ΦΩΤΟΓΡΑΦΙΑ ΛΕΙΠΕΙ ΤΟΠΙΚΑ — v40, κατ' απαίτηση.
+           ΠΟΤΕ κενό: ή κουμπί που την κατεβάζει, ή καθαρή γραμμή που λέει
+           ότι χρειάζεται δίκτυο. Ο χρήστης πρέπει να ξέρει ότι το τιμολόγιο
+           υπάρχει και δεν χάθηκε. */
+        if (!bl && r.srvPages) {
+          if (navigator.onLine === false) {
+            var off = document.createElement('span');
+            off.className = 'pg-label ph-need';
+            off.textContent = '📷 Χρειάζεται δίκτυο για να δεις τη φωτογραφία — το τιμολόγιο δεν χάθηκε.';
+            block.appendChild(off);
+          } else {
+            var gb = document.createElement('button');
+            gb.className = 'btn ghost';
+            gb.textContent = '📷 Δείξε τη φωτογραφία';
+            gb.onclick = function () {
+              gb.disabled = true; gb.textContent = 'Κατεβαίνει…';
+              fetchPhoto(r.id, i).then(function () {
+                /* (β) — μία κατ' απαίτηση ανά προμηθευτή. Τρέχει ΜΟΝΟ στο
+                   πάτημα του χρήστη· το αυτόματο σύνολο δεν το αγγίζει. */
+                return all().then(function (rows) {
+                  return pcDropSameSupplier(rows, pidOf(r.id, i), r.supplier);
+                }).catch(function () {});
+              }).then(function () {
+                freeUrls(); nav.pop(); openShot(r.id);
+              }).catch(function (e) {
+                gb.disabled = false; gb.textContent = '📷 Δείξε τη φωτογραφία';
+                var er = document.createElement('span');
+                er.className = 'pg-label ph-need';
+                er.textContent = 'Δεν κατέβηκε: ' + (e && e.message ? e.message : 'χωρίς δίκτυο') + '. Δοκίμασε ξανά.';
+                block.appendChild(er);
+              });
+            };
+            block.appendChild(gb);
+          }
+          body.appendChild(block);
+          return;                     // χωρίς φωτογραφία δεν υπάρχει κόψιμο
+        }
+
         var shown = cropImg(bl, c, 'shot-full');
         block.appendChild(shown);
 
@@ -1368,7 +1418,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v36';
+  var APP_VER = 'φέτα 3 · v41';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2069,7 +2119,6 @@
       el('w-go').textContent = 'Συνέχεια';
       if (wordsMode === 'rotate') {
         wordsMode = 'new';
-        el('nw-box').hidden = true;
         goto('s-settings');
         return;
       }
@@ -2274,38 +2323,189 @@
     });
   }
 
+  /* ══ v40 · ΦΩΤΟΓΡΑΦΙΕΣ ΚΑΤ' ΑΠΑΙΤΗΣΗ ══════════════════════════════
+     Ως τη v39 κατέβαιναν ΟΛΕΣ οι φωτογραφίες κάθε τιμολογίου. Μετρημένο
+     (Α320, 4/9): 20 τιμολόγια/μέρα × ~400 KB = 8 MB/μέρα · ~2,4 GB/χρόνο —
+     και ο browser μπορεί να σβήσει μόνος του τον χώρο όταν πιέζεται η
+     συσκευή. Δεν έσπαγε τίποτα σήμερα· χτυπούσε τον πρώτο πραγματικό
+     πελάτη μέσα στον πρώτο χρόνο, σιωπηλά.
+     Από εδώ και μπρος: **αυτόματα μόνο το τελευταίο τιμολόγιο ΑΝΑ
+     ΠΡΟΜΗΘΕΥΤΗ** (διατύπωση Stavros: «έτσι θα έχει εικόνα συνολική»),
+     κάθε άλλη **με πάτημα**. Τα ΣΤΟΙΧΕΙΑ κατεβαίνουν πάντα, όλα — είναι
+     κείμενο και ψάχνονται χωρίς δίκτυο. Ίδιο σε ΔΩΡΕΑΝ και PRO. */
+  var PHOTO_BUDGET = 200 * 1024 * 1024;   // ο «κάδος»: 200 MB
+
+  function pcRead() {
+    try { var a = JSON.parse(localStorage.getItem(LS.pcache) || '[]'); return a.length ? a : []; }
+    catch (e) { return []; }
+  }
+  function pcWrite(a) { try { localStorage.setItem(LS.pcache, JSON.stringify(a)); } catch (e) {} }
+  function pcBytes(a) { return a.reduce(function (n, x) { return n + (x.b || 0); }, 0); }
+  /* Κάθε φορά που μια φωτογραφία κατεβαίνει ή ξαναζητιέται, πάει στο τέλος
+     της ουράς — ο κάδος πετάει ΠΑΝΤΑ την παλαιότερη (απόφαση Stavros 5/9). */
+  function pcTouch(pid, bytes) {
+    var a = pcRead().filter(function (x) { return x.id !== pid; });
+    a.push({ id: pid, b: bytes || 0, at: Date.now() });
+    pcWrite(a);
+  }
+  /* `<id>` = σελίδα 1 · `<id>-pN` = σελίδα N. Σταθερό από τη v31. */
+  function pidOf(recId, slot) { return slot === 0 ? recId : recId + '-p' + (slot + 1); }
+  function pidSplit(pid) {
+    var m = /^(.*)-p(\d+)$/.exec(pid);
+    return m ? { rec: m[1], slot: (+m[2]) - 1 } : { rec: pid, slot: 0 };
+  }
+
+  /* Το τελευταίο τιμολόγιο κάθε προμηθευτή, με κριτήριο την ΗΜΕΡΟΜΗΝΙΑ ΤΟΥ
+     ΤΙΜΟΛΟΓΙΟΥ (dateOf), όχι την ώρα λήψης: «τι πλήρωσα την τελευταία φορά
+     σε αυτόν» είναι ερώτηση του τιμολογίου. Ισοπαλία → το νεότερο ts. */
+  function lastPerSupplier(rows) {
+    var best = {};
+    rows.forEach(function (r) {
+      var k = String(r.supplier || '').trim().toLowerCase();
+      if (!k) { return; }
+      var cur = best[k];
+      if (!cur || dateOf(r) > dateOf(cur) || (dateOf(r) === dateOf(cur) && r.ts > cur.ts)) { best[k] = r; }
+    });
+    return best;
+  }
+  /* ⚠ ΟΧΙ «autoIds» — το όνομα ΥΠΑΡΧΕΙ ΗΔΗ (var autoIds = {}, η ουρά
+     αυτόματης ανάγνωσης). Η δήλωση συνάρτησης ανυψώνεται και μετά η παλιά
+     μεταβλητή τη σβήνει: «autoIds is not a function», σιωπηλά, μέσα σε
+     catch. Το node --check δεν το πιάνει· το έπιασε το τεστ 43. */
+  function autoPhotoIds(rows) {
+    var keep = {}, best = lastPerSupplier(rows);
+    Object.keys(best).forEach(function (k) {
+      var r = best[k], n = Math.max(pageCount(r), r.srvPages || 1);
+      for (var i = 0; i < n; i++) { keep[pidOf(r.id, i)] = 1; }
+    });
+    return keep;
+  }
+
+  /* 🔴 Ο ΦΡΟΥΡΟΣ: πετιέται ΜΟΝΟ ό,τι είναι γραμμένο στο ευρετήριο, δηλαδή
+     μόνο ό,τι κατέβηκε από τον server και άρα υπάρχει ακόμα εκεί. Ποτέ
+     φωτογραφία που τραβήχτηκε εδώ και μπορεί να μην έχει ανέβει — αυτό θα
+     ήταν διαγραφή δεδομένων που φτιάξαμε μόνοι μας (παγίδα 3/9). Και ποτέ
+     ό,τι είναι στο σημερινό αυτόματο σύνολο. */
+  function pcEvict(keep) {
+    var a = pcRead();
+    var total = pcBytes(a);
+    if (total <= PHOTO_BUDGET) { return Promise.resolve(0); }
+    a.sort(function (x, y) { return x.at - y.at; });
+    var drop = [];
+    for (var i = 0; i < a.length && total > PHOTO_BUDGET; i++) {
+      if (keep && keep[a[i].id]) { continue; }
+      drop.push(a[i]); total -= (a[i].b || 0);
+    }
+    if (!drop.length) { return Promise.resolve(0); }
+    var step = function (i) {
+      if (i >= drop.length) { return Promise.resolve(drop.length); }
+      var q = pidSplit(drop[i].id);
+      return get(q.rec).then(function (fresh) {
+        if (!fresh) { return; }
+        if (q.slot === 0) { fresh.blob = null; }
+        else if (fresh.pages) { fresh.pages[q.slot - 1] = null; }
+        return put(fresh);
+      }).catch(function () {}).then(function () { return step(i + 1); });
+    };
+    return step(0).then(function (n) {
+      var gone = {};
+      drop.forEach(function (x) { gone[x.id] = 1; });
+      pcWrite(pcRead().filter(function (x) { return !gone[x.id]; }));
+      return n;
+    });
+  }
+
+  /* v40 (β) — ΜΙΑ ΚΑΤ' ΑΠΑΙΤΗΣΗ ΦΩΤΟΓΡΑΦΙΑ ΑΝΑ ΠΡΟΜΗΘΕΥΤΗ (απόφαση Stavros
+     5/9). Όταν ζητηθεί δεύτερη φωτογραφία του ΙΔΙΟΥ προμηθευτή, η
+     προηγούμενη φεύγει αμέσως αντί να περιμένει τον κάδο.
+     ⚠ Ένσταση Claude που ΑΠΟΡΡΙΦΘΗΚΕ και δεν ξανασυζητιέται: «χαλάει τη
+     σύγκριση δύο τιμολογίων του ίδιου προμηθευτή». Διατύπωση Stavros:
+     *«Η σύγκριση γίνεται ΠΑΝΤΑ με τα δεδομένα, ΠΟΤΕ με τη φωτογραφία. Η
+     φωτογραφία είναι απλά η επιβεβαίωση των γραπτών δεδομένων»*. Άρα δύο
+     φωτογραφίες του ίδιου προμηθευτή δεν χρειάζονται ποτέ ταυτόχρονα.
+     🔴 Ο ΙΔΙΟΣ ΦΡΟΥΡΟΣ ΙΣΧΥΕΙ: φεύγει μόνο ό,τι είναι στο ευρετήριο (άρα
+     κατέβηκε από τον server) και μόνο ό,τι ΔΕΝ είναι στο αυτόματο σύνολο. */
+  function pcDropSameSupplier(rows, keepPid, supplier) {
+    var keepAuto = autoPhotoIds(rows);
+    var sup = String(supplier || '').trim().toLowerCase();
+    if (!sup) { return Promise.resolve(0); }
+    var mine = {};
+    rows.forEach(function (r) {
+      if (String(r.supplier || '').trim().toLowerCase() !== sup) { return; }
+      var n = Math.max(pageCount(r), r.srvPages || 1);
+      for (var i = 0; i < n; i++) { mine[pidOf(r.id, i)] = 1; }
+    });
+    var out = pcRead().filter(function (x) {
+      return mine[x.id] && x.id !== keepPid && !keepAuto[x.id];
+    });
+    if (!out.length) { return Promise.resolve(0); }
+    var step = function (i) {
+      if (i >= out.length) { return Promise.resolve(out.length); }
+      var q = pidSplit(out[i].id);
+      return get(q.rec).then(function (fresh) {
+        if (!fresh) { return; }
+        if (q.slot === 0) { fresh.blob = null; }
+        else if (fresh.pages) { fresh.pages[q.slot - 1] = null; }
+        return put(fresh);
+      }).catch(function () {}).then(function () { return step(i + 1); });
+    };
+    return step(0).then(function (n) {
+      var gone = {};
+      out.forEach(function (x) { gone[x.id] = 1; });
+      pcWrite(pcRead().filter(function (x) { return !gone[x.id]; }));
+      return n;
+    });
+  }
+
+  /* Μία φωτογραφία, τώρα. Χρησιμοποιείται ΚΑΙ από το αυτόματο κατέβασμα
+     ΚΑΙ από το πάτημα του χρήστη — ένας δρόμος, ένα ευρετήριο. */
+  function fetchPhoto(recId, slot) {
+    var pid = pidOf(recId, slot);
+    return kmKeyReady().then(function (key) {
+      return fetch(KM_API + 'photo?id=' + encodeURIComponent(pid), { headers: kmHead() })
+        .then(function (res) { if (!res.ok) { throw new Error('η φωτογραφία δεν βρέθηκε στον server'); } return res.arrayBuffer(); })
+        .then(function (buf) { return kmOpen(key, buf); })
+        .then(function (plain) {
+          var blob = new Blob([plain], { type: 'image/jpeg' });
+          return get(recId).then(function (fresh) {
+            if (!fresh) { throw new Error('η εγγραφή δεν υπάρχει πια'); }
+            if (slot === 0) { fresh.blob = blob; }
+            else { fresh.pages = fresh.pages || []; fresh.pages[slot - 1] = blob; }
+            return put(fresh).then(function () { pcTouch(pid, blob.size); return blob; });
+          });
+        });
+    });
+  }
+
   function pullPhotos(key) {
     return all().then(function (rows) {
+      /* v40 — ΤΟ ΑΥΤΟΜΑΤΟ ΣΥΝΟΛΟ, ΚΑΙ ΤΙΠΟΤΑ ΑΛΛΟ: μία εγγραφή ανά
+         προμηθευτή, η τελευταία. Ό,τι λείπει από αυτήν κατεβαίνει μόνο του·
+         κάθε άλλη φωτογραφία περιμένει πάτημα (openShot). */
+      var keep = autoPhotoIds(rows);
       var jobs = [];
       rows.forEach(function (r) {
         if (!r.srvPages) { return; }                          // ντόπιο τιμολόγιο
-        if (!r.blob) { jobs.push({ rec: r, id: r.id, slot: 0 }); }
-        for (var i = 2; i <= r.srvPages; i++) {
-          if (!(r.pages && r.pages[i - 2])) { jobs.push({ rec: r, id: r.id + '-p' + i, slot: i - 1 }); }
+        var n = Math.max(pageCount(r), r.srvPages || 1);
+        for (var i = 0; i < n; i++) {
+          var pid = pidOf(r.id, i);
+          if (!keep[pid]) { continue; }                       // δεν είναι το τελευταίο του προμηθευτή
+          var have = (i === 0) ? r.blob : (r.pages && r.pages[i - 1]);
+          if (!have) { jobs.push({ rec: r, slot: i }); }
         }
       });
       pullInfo.need = jobs.length;
       pullInfo.photos = 0;
       var step = function (i) {
         if (i >= jobs.length) { return Promise.resolve(); }
-        var j = jobs[i];
-        return fetch(KM_API + 'photo?id=' + encodeURIComponent(j.id), { headers: kmHead() })
-          .then(function (res) { return res.ok ? res.arrayBuffer() : null; })
-          .then(function (buf) { return buf ? kmOpen(key, buf) : null; })
-          .then(function (plain) {
-            if (!plain) { return; }
-            var blob = new Blob([plain], { type: 'image/jpeg' });
-            return get(j.rec.id).then(function (fresh) {
-              if (!fresh) { return; }
-              if (j.slot === 0) { fresh.blob = blob; }
-              else { fresh.pages = fresh.pages || []; fresh.pages[j.slot - 1] = blob; }
-              return put(fresh).then(function () { pullInfo.photos++; });
-            });
-          })
+        return fetchPhoto(jobs[i].rec.id, jobs[i].slot)
+          .then(function () { pullInfo.photos++; })
           .catch(function () {})
           .then(function () { return step(i + 1); });
       };
-      return step(0);
+      /* Ο κάδος αδειάζει ΜΕΤΑ το κατέβασμα, ώστε ό,τι μόλις ήρθε να μετράει
+         και αυτό — και ποτέ δεν πετάει κάτι από το σημερινό αυτόματο σύνολο. */
+      return step(0).then(function () { return pcEvict(keep); });
     });
   }
 
@@ -2829,22 +3029,10 @@
     });
   };
 
-  el('st-newwords').onclick = function () {
-    el('nw-err').hidden = true;
-    el('nw-box').hidden = !el('nw-box').hidden;
-  };
-  el('nw-cancel').onclick = function () { el('nw-box').hidden = true; };
-  el('nw-go').onclick = function () {
-    var b = el('nw-go'), e = el('nw-err');
-    e.hidden = true; b.disabled = true; b.textContent = 'Έλεγχος…';
-    var stop = function (msg) { b.disabled = false; b.textContent = 'Ναι, φτιάξε νέες 12 λέξεις'; e.textContent = msg; e.hidden = false; };
-    folderState().then(function (st) {
-      if (st.unknown) { stop('Δεν μπόρεσα να ελέγξω τον φάκελό σου στον server. Χρειάζεσαι δίκτυο για να αλλάξεις λέξεις.'); return; }
-      if (!st.empty)  { stop('Ο φάκελός σου στον server έχει ήδη δεδομένα. Η αλλαγή λέξεων θα τα έκανε αδιάβαστα για πάντα — δεν επιτρέπεται ακόμα.'); return; }
-      b.disabled = false; b.textContent = 'Ναι, φτιάξε νέες 12 λέξεις';
-      startWords('rotate');
-    });
-  };
+  /* v39 — Οι χειριστές του «Νέες 12 λέξεις» αφαιρέθηκαν μαζί με το κουμπί
+     (απόφαση Stavros 5/9). Το mode 'rotate' του startWords() και το
+     folderState() ΜΕΝΟΥΝ: είναι ο μηχανισμός που θα χρειαστεί η
+     επανακρυπτογράφηση, και ο φρουρός της v29 δεν χάνεται. */
 
   el('st-reset').onclick = function () {
     if (!confirm('Μηδενισμός εγγραφής σε αυτή τη συσκευή;\n\nΣβήνονται το email, το κλειδί ΚΑΙ ο λογαριασμός — θα πάρεις νέες 12 λέξεις.\nΤα τιμολόγια, οι φωτογραφίες και τα ποσά τους μένουν ακέραια.')) { return; }
