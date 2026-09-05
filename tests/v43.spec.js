@@ -254,5 +254,14 @@ test('58 · η μπάρα αναζήτησης μένει ορατή όσο κυ
   /* 🔴 Χωρίς position:sticky η μπάρα βγαίνει εκτός οθόνης και για να γράψεις
      πρέπει να ανέβεις ως την κορυφή. */
   await expect(find).toBeInViewport();
+  const y = (await find.boundingBox()).y;
+  const over = await p.evaluate((yy) => {
+    const el = document.elementFromPoint(200, Math.max(2, yy - 6));
+    return el ? (el.className || el.tagName) : null;
+  }, y);
+  console.log('πάνω από τη μπάρα:', over);
+  /* 🔴 Η λωρίδα πάνω από το πεδίο ανήκει στη μπάρα, όχι στις γραμμές. */
+  expect(String(over)).toContain('findbar');
   await ctx.close();
 });
+

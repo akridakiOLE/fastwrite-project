@@ -104,19 +104,28 @@ input:focus{outline:none;border-color:var(--accent)}
 .seg.on{background:var(--accent);color:#08130f}
 /* v43 — Η ΜΠΑΡΑ ΑΝΑΖΗΤΗΣΗΣ ΜΕΝΕΙ ΟΡΑΤΗ ΟΣΟ ΚΥΛΑΕΙ Η ΛΙΣΤΑ (Stavros 5/9).
    Με 15 προμηθευτές, χωρίς αυτό, μόλις κατεβείς λίγο το πεδίο φεύγει από
-   την οθόνη και για να γράψεις πρέπει να ανέβεις πάλι ως την κορυφή. */
-#who-find{
-  width:100%;box-sizing:border-box;margin-bottom:10px;
+   την οθόνη και για να γράψεις πρέπει να ανέβεις πάλι ως την κορυφή.
+
+   ⚠ Το sticky ΔΕΝ αρκεί μόνο του: το top:0 μετριέται από την κορυφή του
+   κυλιόμενου κουτιού, ΟΧΙ από το εσωτερικό περιθώριό του. Με σκέτο sticky
+   έμενε μια λωρίδα ακάλυπτη πάνω από τη μπάρα και οι γραμμές φαίνονταν να
+   περνούν μέσα από εκεί. Γι' αυτό η μπάρα ζει σε δικό της κουτί που
+   ΑΚΥΡΩΝΕΙ το περιθώριο με αρνητικά margin και το ξαναβάζει ως padding —
+   έτσι το φόντο της φτάνει ως την άκρη και τίποτα δεν περνάει από πάνω. */
+.findbar{
   position:sticky;top:0;z-index:3;
-  background:var(--bg2);
-  box-shadow:0 6px 10px -6px rgba(0,0,0,.55);
+  background:var(--bg);
+  margin:0 -20px;padding:calc(max(20px,env(safe-area-inset-top))) 20px 10px;
+  box-shadow:0 8px 12px -8px rgba(0,0,0,.6);
 }
-.find{
+#who-find{width:100%;box-sizing:border-box}
+.findbar-p{
   position:sticky;top:0;z-index:3;
-  background:var(--bg2);
-  box-shadow:0 6px 10px -6px rgba(0,0,0,.55);
+  background:var(--bg);
+  margin:0 -16px;padding:16px 16px 10px;
+  box-shadow:0 8px 12px -8px rgba(0,0,0,.6);
 }
-.sup .sup-n{float:right;color:var(--text2);font-weight:500;font-size:14px}
+.findbar-p .find{width:100%;box-sizing:border-box}.sup .sup-n{float:right;color:var(--text2);font-weight:500;font-size:14px}
 
 /* ══ ΦΕΤΑ 2 (26/8/2026) ══════════════════════════════════════ */
 

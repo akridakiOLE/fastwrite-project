@@ -199,3 +199,41 @@ test('52 · Η ΠΕΡΙΠΤΩΣΗ ΤΗΣ 5/9: νέα συσκευή με 12 λέ
   expect(got).toEqual(['ΒΗΤΑ', 'ΓΑΜΜΑ', 'ΑΛΦΑ']);
   await A.ctx.close(); await B.ctx.close();
 });
+
+test('59 · v43 · η μπάρα αναζήτησης μένει ορατή όσο κυλάει η λίστα των προμηθευτών', async ({ browser }) => {
+  const { ctx, p } = await device(browser);
+  await onboard(p, 'w59' + Date.now() + '@test.gr');
+  const many = [];
+  for (let i = 0; i < 25; i++) { many.push({ id: 'w' + i, sup: 'Προμηθευτής ' + i, inv: D('2026-05-01'), ts: D('2026-09-01') }); }
+  await seed(p, many);
+  await p.setViewportSize({ width: 390, height: 700 });
+  await toCam(p); await shoot(p);
+  await expect(p.locator('#sup-list .sup')).toHaveCount(25);
+
+  const scroller = await p.evaluate(() => {
+    const s = document.getElementById('s-who');
+    s.scrollTop = 99999;
+    return { top: s.scrollTop, max: s.scrollHeight - s.clientHeight, win: window.scrollY };
+  });
+  console.log('scroller:', JSON.stringify(scroller));
+  /* Ο κύλινδρος ΠΡΕΠΕΙ να είναι η ίδια η οθόνη — αν κυλάει το παράθυρο,
+     καμία μπάρα δεν κολλάει και η διόρθωση είναι φαινομενική. */
+  expect(scroller.top).toBeGreaterThan(100);
+  await p.waitForTimeout(300);
+  /* 🔴 Χωρίς position:sticky η μπάρα βγαίνει εκτός οθόνης και για να γράψεις
+     πρέπει να ανέβεις ως την κορυφή (Stavros 5/9, στιγμιότυπο). */
+  await expect(p.locator('#who-find')).toBeInViewport();
+  const y = (await p.locator('#who-find').boundingBox()).y;
+  expect(y).toBeLessThan(60);
+  /* 🔴 ΚΑΙ ΤΟ ΔΕΥΤΕΡΟ ΜΙΣΟ (Stavros 5/9, στιγμιότυπο): η λωρίδα ΠΑΝΩ από
+     το πεδίο πρέπει να ανήκει στη μπάρα, όχι στη λίστα. Με σκέτο sticky
+     το περιθώριο της οθόνης έμενε ακάλυπτο και οι γραμμές φαίνονταν να
+     περνούν από μέσα του. */
+  const over = await p.evaluate((yy) => {
+    const el = document.elementFromPoint(200, Math.max(2, yy - 8));
+    return el ? (el.className || el.tagName) : null;
+  }, y);
+  console.log('πάνω από τη μπάρα:', over);
+  expect(String(over)).toContain('findbar');
+  await ctx.close();
+});

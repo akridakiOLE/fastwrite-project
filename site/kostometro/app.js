@@ -873,7 +873,12 @@
         find.setAttribute('autocorrect', 'off');
         find.setAttribute('autocapitalize', 'off');
         find.oninput = function () { draw(find.value); };
-        body.appendChild(find);
+        /* v43 — δικό της κουτί, ώστε το φόντο να φτάνει ως την άκρη της
+           οθόνης όταν κολλάει· αλλιώς οι γραμμές περνούν από πάνω της. */
+        var fb = document.createElement('div');
+        fb.className = 'findbar-p';
+        fb.appendChild(find);
+        body.appendChild(fb);
       }
       body.appendChild(list);
       body.appendChild(multiBar);
@@ -1508,7 +1513,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v43';
+  var APP_VER = 'φέτα 3 · v44';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
