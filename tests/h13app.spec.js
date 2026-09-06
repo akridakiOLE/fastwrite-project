@@ -380,3 +380,67 @@ test('Κ7 · «Ν ανέβαστα»: Η ΙΔΙΑ Η ΕΦΑΡΜΟΓΗ το στ�
   expect(info.unsynced_at).toBeTruthy();
   await ctx.close();
 });
+
+test('Κ8 · v48 · μετά την υιοθέτηση της κλειδαριάς τα δεδομένα φαίνονται ΑΜΕΣΩΣ (< 3s), όχι στον επόμενο γύρο των 4s', async ({ browser }) => {
+  /* Μετρήθηκε 6/9 στον πραγματικό λογαριασμό: το κινητό είχε μείνει με το
+     παλιό κλειδί ενώ ο φάκελος είχε ήδη περάσει στο Κ. Στο πρώτο άνοιγμα το
+     κατέβασμα τρέχει ΠΡΙΝ την υιοθέτηση, αποτυγχάνει, και ο χρήστης βλέπει
+     άδεια οθόνη μέχρι να τρέξει ο προγραμματισμένος συγχρονισμός.
+     🔴 ΤΟ ΚΑΤΩΦΛΙ ΔΕΝ ΕΙΝΑΙ ΑΥΘΑΙΡΕΤΟ: χωρίς τη διόρθωση η ανάκαμψη έχει
+     ΔΑΠΕΔΟ τα 4000 ms (scheduleSync(4000) στο boot). Με τη διόρθωση γίνεται
+     μέσα στο ίδιο boot. Τα 3000 ms είναι κάτω από το δάπεδο, άρα το τεστ
+     ξεχωρίζει τις δύο περιπτώσεις χωρίς να κρέμεται από την ταχύτητα του
+     μηχανήματος. */
+  const { ctx, p } = await device(browser);
+  const mail = email('k8-');
+  await makeLegacyAccount(p, mail);
+  await seedLegacyData(p, 'inv_k8');
+  await p.reload();
+  await p.waitForFunction(() => typeof kmUnwrapK === 'function');
+  await p.waitForFunction(() => !!localStorage.getItem('km_lock'), null, { timeout: 40000 });
+  await p.waitForTimeout(500);
+  const state = await p.evaluate(() => ({ w: localStorage.getItem('km_words'), f: localStorage.getItem('km_folder'), a: localStorage.getItem('km_auth'), e: localStorage.getItem('km_email') }));
+
+  /* Δεύτερη συσκευή ΟΠΩΣ ΤΟ ΚΙΝΗΤΟ: λέξεις και παλιά ταυτότητα, καμία
+     κλειδαριά, και ο φάκελος στον server ήδη με το Κ. */
+  const T = await device(browser);
+  await T.p.evaluate((st) => {
+    localStorage.setItem('km_words', st.w);
+    localStorage.setItem('km_folder', st.f);
+    localStorage.setItem('km_auth', st.a);
+    localStorage.setItem('km_email', st.e);
+    localStorage.setItem('km_words_ok', '1');
+    localStorage.setItem('km_registered', '1');
+    localStorage.setItem('km_need_pull', '1');
+  }, state);
+
+  const shots = () => T.p.evaluate(() => new Promise((res) => {
+    const r = indexedDB.open('kostometrisi');
+    r.onsuccess = () => {
+      try {
+        const q = r.result.transaction('shots').objectStore('shots').getAll();
+        q.onsuccess = () => res(q.result.length);
+        q.onerror = () => res(-1);
+      } catch (e) { res(-1); }
+    };
+    r.onerror = () => res(-1);
+  }));
+
+  const t0 = Date.now();
+  await T.p.reload();
+  await T.p.waitForFunction(() => typeof kmUnwrapK === 'function');
+  let n = 0;
+  while (Date.now() - t0 < 20000) {
+    n = await shots();
+    if (n === 1) { break; }
+    await T.p.waitForTimeout(150);
+  }
+  const ms = Date.now() - t0;
+  expect(n, 'το τιμολόγιο δεν έφτασε ποτέ').toBe(1);
+  expect(ms, 'ανάκαμψη σε ' + ms + ' ms — περίμενε τον γύρο των 4s αντί να κατεβάσει αμέσως').toBeLessThan(3000);
+
+  /* Και το «εκκρεμεί κατέβασμα» φεύγει — όσο μένει, η συσκευή ΔΕΝ ανεβάζει
+     τίποτα (v33), οπότε αν κολλούσε εδώ το κινητό θα ήταν σιωπηλά άχρηστο. */
+  await expect.poll(async () => ls(T.p, 'km_need_pull'), { timeout: 12000, intervals: [400] }).toBeNull();
+  await ctx.close(); await T.ctx.close();
+});
