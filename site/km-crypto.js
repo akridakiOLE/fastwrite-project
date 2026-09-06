@@ -196,3 +196,14 @@ async function kmUnwrapK(kek, wrappedHex) {
   if (k.length !== 32) throw new Error("Η κλειδαριά άνοιξε αλλά δεν περιείχε κλειδί.");
   return k;
 }
+
+// Από hex σε bytes — για το Κ που ζει αποθηκευμένο ως 64 hex στη συσκευή.
+// ⚠ Αυστηρό: ό,τι δεν είναι ακριβώς hex πετάει σφάλμα αντί να δώσει σκουπίδια,
+// γιατί «κλειδί από σκουπίδια» σημαίνει δεδομένα που δεν ανοίγουν ποτέ ξανά.
+function kmHexToBytes(hex) {
+  var s = String(hex || "");
+  if (s.length % 2 !== 0 || !/^[0-9a-f]*$/.test(s)) throw new Error("Δεν είναι hex.");
+  var out = new Uint8Array(s.length / 2);
+  for (var i = 0; i < out.length; i++) out[i] = parseInt(s.substr(i * 2, 2), 16);
+  return out;
+}

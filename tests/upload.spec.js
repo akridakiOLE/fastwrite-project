@@ -89,10 +89,20 @@ async function runSync(p) {
     }, 200);
   })).then(() => settled(p));
 }
+/* v47 · Η.13 — Η ΤΑΥΤΟΤΗΤΑ ΤΟΥ ΒΟΗΘΗΤΙΚΟΥ ΕΝΗΜΕΡΩΘΗΚΕ ΡΗΤΑ (Α400 §Γ:
+   παρωχημένο τεστ, όχι αποτυχία). Σε λογαριασμό που φτιάχτηκε με τη νέα
+   βάση, ο κωδικός του λογαριασμού ΕΙΝΑΙ της κλειδαριάς — η παλιά ταυτότητα
+   δεν ανοίγει τίποτα, και σωστά. Στέλνουμε ό,τι στέλνει η εφαρμογή. */
 async function idsOnServer(p) {
-  return p.evaluate(() => fetch('/api/km/photos', { headers: {
-    'X-Km-Folder': localStorage.getItem('km_folder'), 'X-Km-Auth': localStorage.getItem('km_auth'), 'X-Km-Device': localStorage.getItem('km_install_id')
-  }}).then((r) => r.json()).then((j) => j.photos.map((x) => x.id).sort()));
+  return p.evaluate(() => {
+    const h = { 'X-Km-Folder': localStorage.getItem('km_folder'), 'X-Km-Device': localStorage.getItem('km_install_id') };
+    const lock = localStorage.getItem('km_lock'), la = localStorage.getItem('km_lock_auth');
+    if (lock && la) { h['X-Km-Lock'] = lock; h['X-Km-Auth'] = la; }
+    else { h['X-Km-Auth'] = localStorage.getItem('km_auth'); }
+    return fetch('/api/km/photos', { headers: h })
+      .then((r) => r.json())
+      .then((j) => (j.photos || []).map((x) => x.id).sort());
+  });
 }
 
 test('26 · τα στοιχεία ΚΑΙ οι φωτογραφίες ανεβαίνουν — και ο server δεν μπορεί να τα διαβάσει', async ({ context }) => {

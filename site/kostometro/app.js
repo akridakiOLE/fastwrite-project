@@ -47,7 +47,32 @@
        τραβήχτηκε ΣΕ ΑΥΤΗ τη συσκευή δεν μπαίνει ποτέ, άρα δεν πετιέται
        ποτέ: [{ id, b (bytes), at (πότε ζητήθηκε) }]. */
     pcache:   'km_photo_cache',
-    gone:     'km_gone'          // v43 — τα id όσων διαγράφηκαν, ώστε να μη γυρίζουν
+    gone:     'km_gone',         // v43 — τα id όσων διαγράφηκαν, ώστε να μη γυρίζουν
+    /* v47 · Η.13 — Η ΝΕΑ ΒΑΣΗ Κ (Α350 §9.8 Η.13, απόφαση Stavros 6/9/2026).
+       Ως τη v46 το κλειδί των δεδομένων ΕΒΓΑΙΝΕ από τις 12 λέξεις, άρα
+       αλλαγή λέξεων σήμαινε ξανακρυπτογράφηση των πάντων — αδύνατη σε
+       κινητό που από τη v40 δεν έχει καν όλες τις φωτογραφίες.
+       Από εδώ: το κλειδί Κ είναι ΤΥΧΑΙΟ και ζει εδώ (64 hex). Οι λέξεις
+       φτιάχνουν μια «κλειδαριά» που κλειδώνει το Κ στον server (~60 bytes).
+       Αλλαγή λέξεων = νέα κλειδαριά, ΙΔΙΟ Κ, μηδέν ξανακρυπτογράφηση. */
+    kkey:     'km_k',            // το κλειδί των δεδομένων, 64 hex
+    lock:     'km_lock',         // lock_id — ποια κλειδαριά ανοίγει αυτόν τον φάκελο
+    lockAuth: 'km_lock_auth',    // ο κωδικός πρόσβασης αυτής της κλειδαριάς
+    /* Όσο υπάρχει, η μετανάστευση δεν έχει τελειώσει: στον server ζουν ΚΑΙ
+       φωτογραφίες με το παλιό κλειδί. Το άνοιγμα δοκιμάζει Κ, μετά το παλιό
+       (kmOpenAny). Σβήνει ΜΟΝΟ όταν επαληθευτεί ότι όλα άνοιξαν με το Κ. */
+    mig:      'km_mig',
+    /* «Ν ανέβαστα»: πόσες τοπικές αλλαγές δεν έχουν φύγει. Φεύγει σε κάθε
+       κλήση ως header, ώστε ΝΕΑ συσκευή να ρωτάει τον SERVER — ποτέ το παλιό
+       κινητό, που μπορεί να είναι σπασμένο ή κλεμμένο (Α320, 6/9). */
+    unsy:     'km_unsynced',
+    /* 🔴 ΤΟ Κ ΚΛΕΙΔΩΜΕΝΟ ΜΕ ΤΙΣ ΛΕΞΕΙΣ, ΩΣΠΟΥ ΝΑ ΦΤΑΣΕΙ ΣΤΟΝ SERVER.
+       Βρέθηκε 6/9 από το τεστ 8 (εγγραφή χωρίς δίκτυο): αν μένει σε
+       μεταβλητή της σελίδας, χάνεται στο κλείσιμο — και η εκκρεμής εγγραφή
+       φεύγει χωρίς κλειδαριά, αφήνοντας συσκευή που νομίζει ότι έχει
+       κλειδαριά ενώ ο server δεν έχει καμία. Δεν είναι μυστικό: το ίδιο
+       ακριβώς ζει στον server· το μυστικό είναι οι λέξεις που το ανοίγουν. */
+    wrapped:  'km_wrapped'
   };
 
   var el = function (id) { return document.getElementById(id); };
@@ -88,6 +113,10 @@
          κάθε αποθήκευση. Αν κρεμόταν στα σημεία κλήσης, θα ξεχνιόταν ένα.
          v33 — ΕΚΤΟΣ όσο τρέχει κατέβασμα: αλλιώς κάθε εγγραφή που μόλις
          ήρθε από τον server θα σκανδάλιζε ανέβασμα προς τον ίδιο server. */
+      /* v47 · Η.13 — εδώ, στο ένα σημείο απ' όπου περνάει κάθε τοπική
+         εγγραφή, μετριέται και το «δεν ανέβηκε ακόμα». Ό,τι γράφει το
+         κατέβασμα ΔΕΝ μετράει: ήρθε από τον server, δεν του χρωστάμε τίποτα. */
+      if (!pulling && typeof unsyncedBump === 'function') { unsyncedBump(); }
       if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
       return r;
     });
@@ -155,6 +184,10 @@
     return dbDel(id).then(function (r) {
       /* Η ταφόπετρα ανεβαίνει με τον ίδιο μηχανισμό που ανεβαίνει κάθε
          αλλαγή — το put() δεν περνάει από εδώ, οπότε το λέμε ρητά. */
+      /* v47 · Η.13 — εδώ, στο ένα σημείο απ' όπου περνάει κάθε τοπική
+         εγγραφή, μετριέται και το «δεν ανέβηκε ακόμα». Ό,τι γράφει το
+         κατέβασμα ΔΕΝ μετράει: ήρθε από τον server, δεν του χρωστάμε τίποτα. */
+      if (!pulling && typeof unsyncedBump === 'function') { unsyncedBump(); }
       if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
       return r;
     });
@@ -1514,7 +1547,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v46';
+  var APP_VER = 'φέτα 3 · v47';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2091,13 +2124,39 @@
   var KM_API = '/api/km/';
   var pendingWords = null;   // οι λέξεις που μόλις φτιάχτηκαν, πριν τσεκαριστούν
 
+  /* v47 · Η.13 — Η ΤΑΥΤΟΤΗΤΑ ΕΧΕΙ ΔΥΟ ΜΟΡΦΕΣ, ΚΑΙ ΟΙ ΔΥΟ ΔΕΚΤΕΣ ΑΠΟ ΤΟΝ SERVER.
+     Με κλειδαριά (μετά τη μετανάστευση): X-Km-Lock + ο κωδικός της.
+     Χωρίς (v46, και ΚΑΤΑ τη διάρκεια της μετανάστευσης): ο παλιός κωδικός
+     του λογαριασμού. Η δεύτερη μορφή ΠΡΕΠΕΙ να μείνει: χωρίς αυτήν, η
+     συσκευή δεν θα μπορούσε να μιλήσει στον server για να μεταναστεύσει. */
   function kmHead() {
-    return {
+    var h = {
       'Content-Type': 'application/json',
       'X-Km-Folder':  localStorage.getItem(LS.folder) || '',
-      'X-Km-Auth':    localStorage.getItem(LS.auth)   || '',
+      'X-Km-Auth':    localStorage.getItem(LS.lockAuth) || localStorage.getItem(LS.auth) || '',
       'X-Km-Device':  localStorage.getItem(LS.id)     || ''
     };
+    var lk = localStorage.getItem(LS.lock);
+    if (lk && localStorage.getItem(LS.lockAuth)) { h['X-Km-Lock'] = lk; }
+    h['X-Km-Unsynced'] = String(unsyncedGet());
+    return h;
+  }
+
+  /* ── v47 · Η.13 — «Ν ΑΝΕΒΑΣΤΑ» ────────────────────────────────────
+     Ο αριθμός που ρωτάει η ΝΕΑ συσκευή πριν πάρει τη σκυτάλη. Ανεβαίνει σε
+     κάθε τοπική εγγραφή και μηδενίζει ΜΟΝΟ σε πλήρως επιτυχημένο ανέβασμα
+     (στοιχεία ΚΑΙ φωτογραφίες). ⚠ Ποτέ δεν μηδενίζει σε μερική επιτυχία:
+     αριθμός που λέει 0 ενώ κάτι έμεινε πίσω είναι χειρότερος από κανέναν
+     αριθμό — πάνω του στηρίζεται η απόφαση «η παλιά δεν έχει τίποτα, προχώρα». */
+  function unsyncedGet() {
+    var n = Number(localStorage.getItem(LS.unsy) || 0);
+    return (isFinite(n) && n > 0) ? Math.min(Math.round(n), 1000000) : 0;
+  }
+  function unsyncedBump() {
+    try { localStorage.setItem(LS.unsy, String(unsyncedGet() + 1)); } catch (e) {}
+  }
+  function unsyncedClear() {
+    try { localStorage.setItem(LS.unsy, '0'); } catch (e) {}
   }
   function devName() {
     var m = /\(([^)]+)\)/.exec(navigator.userAgent || '');
@@ -2111,6 +2170,19 @@
     localStorage.setItem(LS.folder, d.folderId);
     localStorage.setItem(LS.auth,   d.authToken);
   }
+
+  /* ══ v47 · Η.13 — Η ΚΛΕΙΔΑΡΙΑ ══════════════════════════════════════
+     Τα τρία που κρατάει η συσκευή για να ξεκλειδώνει μόνη της: ποια
+     κλειδαριά, με ποιον κωδικό, και το Κ που βγήκε από μέσα της.
+     ⚠ Το Κ γράφεται ΠΡΩΤΟ και ΠΑΝΤΑ πριν αγγιχτεί οτιδήποτε στον server:
+     αν χαθεί το Κ ενώ υπάρχουν δεδομένα κρυπτογραφημένα με αυτό, τα
+     δεδομένα δεν ξανανοίγουν ποτέ. */
+  function kStore(kHex) { localStorage.setItem(LS.kkey, kHex); kmKey = null; }
+  function lockStore(L) {
+    localStorage.setItem(LS.lock,     L.lockId);
+    localStorage.setItem(LS.lockAuth, L.authToken);
+  }
+  function kmHexOf(bytes) { return kmBytesToHex(bytes); }
 
   /* Εγγραφή στο μητρώο. ΠΟΤΕ δεν μπλοκάρει τον χρήστη: χωρίς δίκτυο
      μένει εκκρεμής και ξαναδοκιμάζεται στο επόμενο άνοιγμα (Α400 §Γ —
@@ -2128,11 +2200,17 @@
         source: ref ? 'link' : src,
         ref: ref ? ref[1] : null,
         has_key: !!localStorage.getItem(LS.key),
-        device_name: devName()
+        device_name: devName(),
+        /* v47 · Η.13 — σε ΝΕΟ λογαριασμό, η πρώτη κλειδαριά γράφεται στην
+           ίδια κλήση με την εγγραφή: μία πράξη, όχι δύο που μπορεί να
+           χωρίσουν από χαμένο δίκτυο και να αφήσουν λογαριασμό χωρίς
+           κλειδαριά (= φάκελο που δεν ξανανοίγει από άλλη συσκευή). */
+        wrapped_k: localStorage.getItem(LS.wrapped) || null
       })
     }).then(function (r) {
       if (!r.ok) { return false; }
       localStorage.setItem(LS.reg, '1');
+      localStorage.removeItem(LS.wrapped);   // v47 — η κλειδαριά γράφτηκε μαζί με τον λογαριασμό
       /* Το register ΚΑΝΕΙ αυτή τη συσκευή ενεργή στον server (Η.3: όποια
          βάλει τις 12 λέξεις γίνεται η ενεργή). Το γράφουμε ρητά, τη στιγμή
          που το μαθαίνουμε από την απάντηση — όχι με υπόθεση αργότερα. */
@@ -2140,6 +2218,158 @@
         setActiveState(true, j && j.state && j.state.active_since);
         return true;
       }).catch(function () { setActiveState(true); return true; });
+    }).catch(function () { return false; });
+  }
+
+  /* ══ v47 · Η.13 — ΑΠΟ ΤΗ v46 ΣΤΗ ΝΕΑ ΒΑΣΗ Κ ════════════════════════
+     Τρεις καταστάσεις, και η συσκευή μπαίνει μόνη της στη σωστή:
+
+     (α) έχει ήδη κλειδαριά ΚΑΙ Κ            -> τίποτα, δουλεύει.
+     (β) ο λογαριασμός ΕΧΕΙ κλειδαριά, αυτή η συσκευή όχι  -> adoptLock():
+         βγάζει την κλειδαριά από τις λέξεις που ήδη κρατάει, ρωτάει τον
+         server, ξεκλειδώνει το Κ. Καμία ενέργεια από τον χρήστη — έτσι το
+         tablet συγχρονίζεται μόνο του αφού μεταναστεύσει το κινητό.
+     (γ) ο λογαριασμός ΔΕΝ έχει κλειδαριά    -> migrateToK(), και ΜΟΝΟ από
+         την ενεργή συσκευή: αυτή έχει τα δεδομένα και το δικαίωμα γραφής.
+
+     🔴 Η ΜΕΤΑΝΑΣΤΕΥΣΗ ΕΙΝΑΙ ΦΤΙΑΓΜΕΝΗ ΝΑ ΔΙΑΚΟΠΤΕΤΑΙ.
+     Το Κ γράφεται ΠΡΩΤΟ στη συσκευή μαζί με το km_mig, πριν αγγιχτεί
+     οτιδήποτε στον server. Από εκείνη τη στιγμή κάθε άνοιγμα δοκιμάζει Κ
+     και μετά το παλιό κλειδί (kmOpenAny), άρα χαμένο δίκτυο ή κλείσιμο της
+     εφαρμογής στη μέση αφήνει μια κατάσταση που ΔΟΥΛΕΥΕΙ και συνεχίζει
+     μόνη της την επόμενη φορά. Η κλειδαριά γράφεται ΤΕΛΕΥΤΑΙΑ: όσο δεν
+     υπάρχει, καμία άλλη συσκευή δεν προσπαθεί να διαβάσει με το Κ. */
+  var migBusy = false;
+
+  function adoptLock() {
+    var w = localStorage.getItem(LS.words);
+    if (!w) { return Promise.resolve(false); }
+    return kmDeriveLock(w.split(' ')).then(function (L) {
+      return fetch(KM_API + 'unlock', {
+        method: 'POST',
+        headers: { 'X-Km-Lock': L.lockId, 'X-Km-Auth': L.authToken, 'X-Km-Device': localStorage.getItem(LS.id) || '' }
+      }).then(function (r) {
+        if (!r.ok) { return false; }
+        return r.json().then(function (j) {
+          return kmUnwrapK(L.kek, j.wrapped_k).then(function (K) {
+            kStore(kmHexOf(K));
+            lockStore(L);
+            localStorage.setItem(LS.folder, j.folder_id);
+            localStorage.removeItem(LS.mig);   // η κλειδαριά υπάρχει: όλα είναι με το Κ
+            return true;
+          });
+        });
+      });
+    }).catch(function () { return false; });
+  }
+
+  function migrateToK(st) {
+    if (migBusy) { return Promise.resolve(false); }
+    /* Όσο εκκρεμεί κατέβασμα, τα τοπικά στοιχεία ΔΕΝ είναι η αλήθεια του
+       φακέλου — και η μετανάστευση ξαναγράφει τα στοιχεία. Περιμένει. */
+    if (localStorage.getItem(LS.needPull)) { return Promise.resolve(false); }
+    var w = localStorage.getItem(LS.words);
+    if (!w) { return Promise.resolve(false); }
+    migBusy = true;
+    var L = null, key = null;
+
+    return kmDeriveLock(w.split(' ')).then(function (lock) {
+      L = lock;
+      /* ΒΗΜΑ 1 — το Κ, μία φορά, και ΠΡΙΝ από οτιδήποτε άλλο. Αν υπάρχει
+         ήδη (διακοπείσα προσπάθεια), ΞΑΝΑΧΡΗΣΙΜΟΠΟΙΕΙΤΑΙ: νέο Κ θα άφηνε
+         ό,τι ξανακρυπτογραφήθηκε την προηγούμενη φορά κλειδωμένο για πάντα. */
+      if (!localStorage.getItem(LS.kkey)) {
+        localStorage.setItem(LS.mig, '1');
+        kStore(kmHexOf(kmNewK()));
+      } else if (!localStorage.getItem(LS.mig)) {
+        localStorage.setItem(LS.mig, '1');
+      }
+      return kmKeyReady();
+    }).then(function (k) {
+      key = k;
+      /* ΒΗΜΑ 2 — κάθε φωτογραφία του server: αν ανοίγει με το Κ είναι ήδη
+         περασμένη· αλλιώς ανοίγει με το παλιό και ξανανεβαίνει με το Κ,
+         στο ΙΔΙΟ id. Το ίδιο id σημαίνει ότι δεύτερο ανέβασμα είναι απλή
+         επανάληψη, ποτέ σύγκρουση (ο server το λέει ρητά στο putPhoto). */
+      return fetch(KM_API + 'photos', { headers: kmHead() })
+        .then(function (r) { return r.ok ? r.json() : null; });
+    }).then(function (j) {
+      if (!j) { throw new Error('δεν διάβασα τη λίστα φωτογραφιών'); }
+      var ids = (j.photos || []).map(function (x) { return x.id; });
+      var i = 0;
+      var step = function () {
+        if (i >= ids.length) { return Promise.resolve(); }
+        var id = ids[i++];
+        return fetch(KM_API + 'photo?id=' + encodeURIComponent(id), { headers: kmHead() })
+          .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
+          .then(function (buf) {
+            if (!buf) { return null; }
+            return kmOpen(key, buf).then(function () { return null; })      // ήδη με το Κ
+              .catch(function () {
+                return kmLegacyKey().then(function (old) { return kmOpen(old, buf); });
+              });
+          })
+          .then(function (plain) {
+            if (!plain) { return null; }                                     // τίποτα να κάνω
+            return kmSeal(key, plain).then(function (sealed) {
+              var h = kmHead();
+              h['Content-Type'] = 'application/octet-stream';
+              return fetch(KM_API + 'photo?id=' + encodeURIComponent(id), { method: 'PUT', headers: h, body: sealed })
+                .then(function (res) {
+                  if (!res.ok) { throw new Error('φωτογραφία ' + id + ': ' + res.status); }
+                });
+            });
+          })
+          .then(step);
+      };
+      return step();
+    }).then(function () {
+      /* ΒΗΜΑ 3 — τα στοιχεία με το Κ. Πρέπει να προηγηθεί της κλειδαριάς:
+         μόλις υπάρξει κλειδαριά, άλλη συσκευή θα διαβάσει τον φάκελο με το
+         Κ και δεν έχει επαναφορά στο παλιό κλειδί. */
+      return all().then(function (rows) {
+        return kmStatus().then(function (st2) {
+          var ver = (st2 && st2.state) ? st2.state.folder_version : null;
+          return pushMeta(rows, key, ver).then(function (res) {
+            if (!res.ok) { throw new Error('στοιχεία: ' + res.status); }
+          });
+        });
+      });
+    }).then(function () {
+      /* ΒΗΜΑ 4 — η κλειδαριά, ΤΕΛΕΥΤΑΙΑ. Από εδώ ο φάκελος ανοίγει από
+         οποιαδήποτε συσκευή με τις 12 λέξεις, χωρίς το παλιό κλειδί. */
+      return kmWrapK(L.kek, kmHexToBytes(localStorage.getItem(LS.kkey))).then(function (wrapped) {
+        return fetch(KM_API + 'lock', {
+          method: 'POST', headers: kmHead(),
+          body: JSON.stringify({ lock_id: L.lockId, auth_token: L.authToken, wrapped_k: wrapped, kind: 'words' })
+        }).then(function (r) {
+          if (!r.ok && r.status !== 409) { throw new Error('κλειδαριά: ' + r.status); }
+          lockStore(L);
+          localStorage.removeItem(LS.mig);   // τελείωσε: όλα ανοίγουν με το Κ
+          return true;
+        });
+      });
+    }).catch(function (e) {
+      /* ⚠ ΤΙΠΟΤΑ ΔΕΝ ΞΕΓΡΑΦΕΤΑΙ ΣΕ ΑΠΟΤΥΧΙΑ. Το Κ και το km_mig μένουν,
+         άρα ό,τι πρόλαβε να περάσει διαβάζεται κανονικά και η επόμενη
+         προσπάθεια συνεχίζει από εκεί που έμεινε. */
+      diag('μετανάστευση: ' + (e && e.message ? e.message : e));
+      return false;
+    }).then(function (ok) { migBusy = false; return ok; });
+  }
+
+  /* Καλείται στο άνοιγμα. Δεν μπλοκάρει ποτέ τον χρήστη: χωρίς δίκτυο δεν
+     κάνει τίποτα και ξαναδοκιμάζει την επόμενη φορά. */
+  function ensureLock() {
+    if (!hasAccount()) { return Promise.resolve(false); }
+    if (localStorage.getItem(LS.lock) && localStorage.getItem(LS.kkey) && !localStorage.getItem(LS.mig)) {
+      return Promise.resolve(true);
+    }
+    return kmStatus().then(function (st) {
+      if (!st) { return false; }
+      if (st.has_lock) { return adoptLock(); }
+      if (st.this_device_active === false) { return false; }   // μόνο η ενεργή μεταναστεύει
+      return migrateToK(st);
     }).catch(function () { return false; });
   }
 
@@ -2203,7 +2433,24 @@
     if (!pendingWords) { return; }
     el('w-go').disabled = true;
     el('w-go').textContent = 'Ένα δευτερόλεπτο…';
-    kmDerive(pendingWords).then(function (d) {
+    /* v47 · Η.13 — ΝΕΟΣ ΛΟΓΑΡΙΑΣΜΟΣ ΜΕ ΤΗ ΝΕΑ ΒΑΣΗ.
+       Το κλειδί των δεδομένων Κ είναι ΤΥΧΑΙΟ και δεν βγαίνει από τις λέξεις·
+       το folder_id είναι ΤΥΧΑΙΟ και δεν βγαίνει από τις λέξεις. Οι λέξεις
+       φτιάχνουν μόνο την κλειδαριά που κλειδώνει το Κ. Έτσι η αλλαγή λέξεων
+       αύριο είναι νέα κλειδαριά πάνω στο ΙΔΙΟ Κ — μηδέν ξανακρυπτογράφηση.
+       Το παλιό kmDerive μένει: δίνει το km_auth που ο server δέχεται ως
+       εναλλακτική ταυτότητα, και το χρειάζεται κάθε συσκευή v46. */
+    var K = kmNewK();
+    Promise.all([kmDerive(pendingWords), kmDeriveLock(pendingWords)]).then(function (dl) {
+      var d = dl[0], L = dl[1];
+      return kmWrapK(L.kek, K).then(function (wrapped) {
+        d.folderId = kmNewFolderId();
+        kStore(kmHexOf(K));
+        lockStore(L);
+        localStorage.setItem(LS.wrapped, wrapped);
+        return d;
+      });
+    }).then(function (d) {
       kmStore(pendingWords, d);
       localStorage.setItem(LS.wordsOk, '1');
       pendingWords = null;
@@ -2255,11 +2502,40 @@
   var syncBusy = false, syncAgain = false, syncTimer = null;
   var syncInfo = { photos: 0, total: 0, want: 0, onSrv: 0, ver: null, at: null, msg: null };
 
+  /* v47 · Η.13 — ΤΟ ΚΛΕΙΔΙ ΤΩΝ ΔΕΔΟΜΕΝΩΝ ΕΙΝΑΙ ΤΟ Κ, ΟΧΙ ΟΙ ΛΕΞΕΙΣ.
+     Αν υπάρχει Κ στη συσκευή, αυτό είναι. Αλλιώς (λογαριασμός v46 που δεν
+     έχει μεταναστεύσει ακόμα) πέφτουμε στο παλιό κλειδί-από-λέξεις. */
   function kmKeyReady() {
     if (kmKey) { return Promise.resolve(kmKey); }
+    var k = localStorage.getItem(LS.kkey);
+    if (k) {
+      return kmImportK(kmHexToBytes(k)).then(function (key) { kmKey = key; return key; });
+    }
+    return kmLegacyKey();
+  }
+  /* Το ΠΑΛΙΟ κλειδί (v46): βγαίνει από τις 12 λέξεις που είναι ήδη στη
+     συσκευή. Χρειάζεται σε δύο σημεία και μόνο σε αυτά — στη μετανάστευση,
+     και στο άνοιγμα όσων δεν έχουν ξανακρυπτογραφηθεί ακόμα. */
+  var kmOld = null;
+  function kmLegacyKey() {
+    if (kmOld) { return Promise.resolve(kmOld); }
     var w = localStorage.getItem(LS.words);
     if (!w) { return Promise.reject(new Error('χωρίς λέξεις')); }
-    return kmDerive(w.split(' ')).then(function (d) { kmKey = d.key; return kmKey; });
+    return kmDerive(w.split(' ')).then(function (d) { kmOld = d.key; return kmOld; });
+  }
+  /* 🔴 ΤΟ ΑΝΟΙΓΜΑ ΠΟΥ ΚΑΝΕΙ ΤΗ ΜΕΤΑΝΑΣΤΕΥΣΗ ΑΘΡΑΥΣΤΗ.
+     Όσο τρέχει η μετανάστευση, στον server ζουν ΚΑΙ φωτογραφίες με το παλιό
+     κλειδί ΚΑΙ φωτογραφίες με το Κ — και δεν υπάρχει τρόπος να ξεχωρίσεις
+     ποια είναι ποια κοιτώντας τα bytes. Γι' αυτό δοκιμάζουμε το Κ, και αν
+     δεν ανοίξει, το παλιό. Έτσι διακοπή στη μέση (χαμένο δίκτυο, κλείσιμο
+     εφαρμογής) ΔΕΝ χαλάει τίποτα: η επόμενη φορά συνεχίζει από εκεί που
+     έμεινε. Μόλις επαληθευτεί ότι όλα άνοιξαν με το Κ, το km_mig σβήνει και
+     αυτή η συνάρτηση ξαναγίνεται σκέτο kmOpen. */
+  function kmOpenAny(key, blob) {
+    return kmOpen(key, blob).catch(function (e) {
+      if (!localStorage.getItem(LS.mig)) { throw e; }
+      return kmLegacyKey().then(function (ok) { return kmOpen(ok, blob); });
+    });
   }
 
   /* Τα στοιχεία ενός τιμολογίου — ΧΩΡΙΣ καμία φωτογραφία. */
@@ -2397,7 +2673,13 @@
               return killPhotos(ids).then(function () {
                 return pushPhotos(rows, key, ids.filter(function (id) { return !goneMap()[pidSplit(id).rec]; }));
               });
-            });
+            })
+            /* v47 · Η.13 — Ο ΜΕΤΡΗΤΗΣ ΜΗΔΕΝΙΖΕΙ ΕΔΩ ΚΑΙ ΜΟΝΟ ΕΔΩ: αφού
+               πέρασαν ΚΑΙ τα στοιχεία ΚΑΙ οι φωτογραφίες, χωρίς κανένα
+               μήνυμα σφάλματος. Οποιοδήποτε syncInfo.msg σημαίνει ότι κάτι
+               έμεινε πίσω — και τότε ο αριθμός ΠΡΕΠΕΙ να μείνει, γιατί πάνω
+               του κρίνεται αν μια νέα συσκευή θα πάρει τη σκυτάλη. */
+            .then(function () { if (!syncInfo.msg) { unsyncedClear(); } });
         });
       })
       .catch(function (e) { syncInfo.msg = 'σφάλμα: ' + (e && e.message ? e.message : e); })
@@ -2434,7 +2716,7 @@
     return fetch(KM_API + 'folder', { headers: kmHead() }).then(function (r) {
       if (r.status === 404) { return null; }                 // άδειος φάκελος
       if (!r.ok) { pullInfo.msg = 'σφάλμα ' + r.status; return null; }
-      return r.arrayBuffer().then(function (buf) { return kmOpen(key, buf); });
+      return r.arrayBuffer().then(function (buf) { return kmOpenAny(key, buf); });
     }).then(function (plain) {
       if (!plain) { return null; }
       var data = JSON.parse(new TextDecoder().decode(plain));
@@ -2587,7 +2869,7 @@
     return kmKeyReady().then(function (key) {
       return fetch(KM_API + 'photo?id=' + encodeURIComponent(pid), { headers: kmHead() })
         .then(function (res) { if (!res.ok) { throw new Error('η φωτογραφία δεν βρέθηκε στον server'); } return res.arrayBuffer(); })
-        .then(function (buf) { return kmOpen(key, buf); })
+        .then(function (buf) { return kmOpenAny(key, buf); })
         .then(function (plain) {
           var blob = new Blob([plain], { type: 'image/jpeg' });
           return get(recId).then(function (fresh) {
@@ -2883,8 +3165,12 @@
     if (!localStorage.getItem(LS.reg))      { kmRegister(); }   // εκκρεμής εγγραφή
     lastPull = Date.now();
     refreshActive();      // v35 — ενεργή ή αναγνώστρια; πριν ανοίξει η κάμερα
-    pullNow();            // v33 — πρώτα ό,τι ήρθε από άλλη συσκευή…
-    scheduleSync(2500);   // v31 — …και μετά ό,τι έμεινε πίσω από εδώ
+    /* v47 · Η.13 — η μετανάστευση στη νέα βάση Κ τρέχει ΜΕΤΑ το κατέβασμα
+       (τα τοπικά στοιχεία πρέπει να είναι η αλήθεια του φακέλου πριν
+       ξαναγραφτούν) και ΠΡΙΝ ξεκινήσει ο κανονικός συγχρονισμός. Χωρίς
+       δίκτυο δεν κάνει τίποτα και ξαναδοκιμάζει την επόμενη φορά. */
+    pullNow().then(function () { return ensureLock(); });
+    scheduleSync(4000);   // v31 — …και μετά ό,τι έμεινε πίσω από εδώ
     if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
     if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
     toCam();
@@ -2941,26 +3227,73 @@
     function fail(msg) { btn.disabled = false; btn.textContent = 'Σύνδεση'; e.textContent = msg; e.hidden = false; }
     kmCheckWords(raw).then(function (c) {
       if (!c.ok) { fail(c.error); return null; }
-      return kmDerive(c.words).then(function (d) {
-        var h = {
-          'X-Km-Folder': d.folderId,
-          'X-Km-Auth':   d.authToken,
-          'X-Km-Device': localStorage.getItem(LS.id) || ''
-        };
-        return fetch(KM_API + 'status', { headers: h }).then(function (r) {
-          if (r.status === 404) { fail('Δεν βρέθηκε λογαριασμός με αυτές τις 12 λέξεις. Έλεγξε τη σειρά τους.'); return; }
-          if (r.status === 403) { fail('Οι λέξεις δεν ταιριάζουν με αυτόν τον λογαριασμό.'); return; }
-          if (!r.ok)            { fail('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); return; }
-          localStorage.setItem(LS.email, email);
-          kmStore(c.words, d);
-          localStorage.setItem(LS.wordsOk, '1');
-          localStorage.setItem(LS.needPull, '1');   // v33 — πρώτα κατεβάζει, μετά ανεβάζει
-          return kmRegister().then(function () {
-            pullNow();
-            btn.disabled = false; btn.textContent = 'Σύνδεση';
-            afterAccount();
+      /* v47 · Η.13 — Η ΣΥΝΔΕΣΗ ΠΕΡΝΑΕΙ ΠΡΩΤΑ ΑΠΟ ΤΗΝ ΚΛΕΙΔΑΡΙΑ.
+         Οι λέξεις δίνουν πλέον κλειδαριά, όχι φάκελο: το unlock επιστρέφει
+         ΠΟΙΟΣ είναι ο φάκελος και το Κ κλειδωμένο. Αν ο λογαριασμός δεν
+         έχει μεταναστεύσει ακόμα (403 = καμία τέτοια κλειδαριά), πέφτουμε
+         στην παλιά διαδρομή της v46 — αυτή είναι η μόνη διαδρομή που
+         δουλεύει όσο το κινητό δεν έχει τρέξει ακόμα τη μετανάστευση. */
+      return kmDeriveLock(c.words).then(function (L) {
+        var lh = { 'X-Km-Lock': L.lockId, 'X-Km-Auth': L.authToken, 'X-Km-Device': localStorage.getItem(LS.id) || '' };
+        return fetch(KM_API + 'unlock', { method: 'POST', headers: lh }).then(function (r) {
+          if (r.status === 403 || r.status === 404) { return legacySignin(); }
+          if (!r.ok) { fail('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); return; }
+          return r.json().then(function (j) {
+            return kmUnwrapK(L.kek, j.wrapped_k).then(function (K) {
+              localStorage.setItem(LS.email, email);
+              /* Το παλιό kmDerive δίνει ΜΟΝΟ το km_auth (εναλλακτική
+                 ταυτότητα)· ο φάκελος έρχεται από τον server, όχι από τις
+                 λέξεις. Γι' αυτό γράφεται μετά, από πάνω. */
+              return kmDerive(c.words).then(function (d) {
+                kmStore(c.words, d);
+                localStorage.setItem(LS.folder, j.folder_id);
+                kStore(kmHexOf(K));
+                lockStore(L);
+                localStorage.removeItem(LS.mig);
+                localStorage.setItem(LS.wordsOk, '1');
+                localStorage.setItem(LS.needPull, '1');   // v33 — πρώτα κατεβάζει, μετά ανεβάζει
+                unsyncedClear();                          // καθαρή συσκευή, δεν χρωστάει τίποτα
+                return kmRegister().then(function () {
+                  pullNow();
+                  btn.disabled = false; btn.textContent = 'Σύνδεση';
+                  afterAccount();
+                });
+              });
+            }).catch(function () {
+              fail('Οι λέξεις δεν άνοιξαν το κλειδί αυτού του λογαριασμού.');
+            });
           });
         });
+
+        function legacySignin() {
+          return kmDerive(c.words).then(function (d) {
+            var h = {
+              'X-Km-Folder': d.folderId,
+              'X-Km-Auth':   d.authToken,
+              'X-Km-Device': localStorage.getItem(LS.id) || ''
+            };
+            return fetch(KM_API + 'status', { headers: h }).then(function (r2) {
+              if (r2.status === 404) { fail('Δεν βρέθηκε λογαριασμός με αυτές τις 12 λέξεις. Έλεγξε τη σειρά τους.'); return; }
+              if (r2.status === 403) { fail('Οι λέξεις δεν ταιριάζουν με αυτόν τον λογαριασμό.'); return; }
+              if (!r2.ok)            { fail('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); return; }
+              localStorage.setItem(LS.email, email);
+              kmStore(c.words, d);
+              localStorage.removeItem(LS.kkey);      // λογαριασμός v46: κλειδί = οι λέξεις
+              localStorage.removeItem(LS.lock);
+              localStorage.removeItem(LS.lockAuth);
+              localStorage.removeItem(LS.mig);
+              kmKey = null; kmOld = null;
+              localStorage.setItem(LS.wordsOk, '1');
+              localStorage.setItem(LS.needPull, '1');
+              unsyncedClear();
+              return kmRegister().then(function () {
+                pullNow();
+                btn.disabled = false; btn.textContent = 'Σύνδεση';
+                afterAccount();
+              });
+            });
+          });
+        }
       });
     }).catch(function () { fail('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); });
   };
