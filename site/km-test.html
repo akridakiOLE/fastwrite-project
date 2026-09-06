@@ -130,11 +130,71 @@
       // 14 — και οι δύο συσκευές στο μητρώο
       r=await jreq('GET','/api/km/status',H('h1-A'));
       (r.status===200 && r.data && r.data.devices && r.data.devices.length===2) ? ok('14 μητρώο: 2 συσκευές καταγεγραμμένες') : bad('14 status συσκευές: '+JSON.stringify(r.data&&r.data.devices));
+
+      // ── Η.13 · Η ΝΕΑ ΒΑΣΗ Κ (6/9/2026) ──────────────────────────────────
+      // 15 — λογαριασμός v46 δηλώνει «χωρίς κλειδαριά» = θέλει μετανάστευση
+      (r.data && r.data.has_lock===false) ? ok('15 Η.13: παλιός λογαριασμός → has_lock=false (θέλει μετανάστευση)') : bad('15 has_lock: '+JSON.stringify(r.data&&r.data.has_lock));
+
+      // 16 — μετανάστευση: πρώτη κλειδαριά με την ΠΑΛΙΑ ταυτότητα
+      var L1=hex(32), LA1=hex(32), WK1=hex(60);
+      r=await jreq('POST','/api/km/lock',H('h1-A'),JSON.stringify({lock_id:L1,auth_token:LA1,wrapped_k:WK1,kind:'words'}));
+      (r.status===200 && r.data && r.data.locks && r.data.locks.length===1) ? ok('16 Η.13: πρώτη κλειδαριά (μετανάστευση) γράφτηκε') : bad('16 lock ['+r.status+'] '+JSON.stringify(r.data));
+
+      // 17 — unlock από «νέα συσκευή»: δίνει τον φάκελο + wrapped_k, ΔΕΝ ενεργοποιεί
+      r=await jreq('POST','/api/km/unlock',{'X-Km-Lock':L1,'X-Km-Auth':LA1,'X-Km-Device':'h1-C'});
+      (r.status===200 && r.data && r.data.folder_id===F && r.data.wrapped_k===WK1 && r.data.this_device_active===false && r.data.active && r.data.active.device_id==='h1-A')
+        ? ok('17 Η.13: unlock → σωστός φάκελος, wrapped_k ακέραιο, η Α παραμένει ενεργή') : bad('17 unlock ['+r.status+'] '+JSON.stringify(r.data));
+
+      // 18 — λάθος κωδικός και άγνωστη κλειδαριά: ίδια απάντηση 403
+      var r1=await jreq('POST','/api/km/unlock',{'X-Km-Lock':L1,'X-Km-Auth':hex(32),'X-Km-Device':'h1-C'});
+      var r2=await jreq('POST','/api/km/unlock',{'X-Km-Lock':hex(32),'X-Km-Auth':LA1,'X-Km-Device':'h1-C'});
+      (r1.status===403 && r2.status===403 && JSON.stringify(r1.data)===JSON.stringify(r2.data)) ? ok('18 Η.13: λάθος κωδικός = άγνωστη κλειδαριά = 403, ίδια απάντηση') : bad('18 unlock αρνήσεις: '+r1.status+'/'+r2.status);
+
+      // 19 — Ν ανέβαστα: η Α λέει 3, η νέα το βλέπει στο unlock
+      var CL=L1, CA=LA1;   // η τρέχουσα κλειδαριά — αλλάζει στο 20
+      var HL=function(dev,u){ var h={'X-Km-Folder':F,'X-Km-Lock':CL,'X-Km-Auth':CA,'X-Km-Device':dev}; if(u!==undefined) h['X-Km-Unsynced']=String(u); return h; };
+      await jreq('GET','/api/km/status',HL('h1-A',3));
+      r=await jreq('POST','/api/km/unlock',{'X-Km-Lock':L1,'X-Km-Auth':LA1,'X-Km-Device':'h1-C'});
+      (r.data && r.data.active && r.data.active.unsynced===3) ? ok('19 Η.13: «Ν ανέβαστα» = 3, το θυμάται ο server') : bad('19 unsynced: '+JSON.stringify(r.data&&r.data.active));
+
+      // 20 — αλλαγή λέξεων: νέα κλειδαριά, η παλιά πεθαίνει, ΙΔΙΟΣ φάκελος
+      var L2=hex(32), LA2=hex(32), WK2=hex(60);
+      r=await jreq('POST','/api/km/lock',HL('h1-A'),JSON.stringify({lock_id:L2,auth_token:LA2,wrapped_k:WK2,kind:'words',replace:L1}));
+      if(r.status===200){ CL=L2; CA=LA2; }
+      var dead=await jreq('POST','/api/km/unlock',{'X-Km-Lock':L1,'X-Km-Auth':LA1,'X-Km-Device':'h1-C'});
+      var live=await jreq('POST','/api/km/unlock',{'X-Km-Lock':L2,'X-Km-Auth':LA2,'X-Km-Device':'h1-C'});
+      (r.status===200 && dead.status===403 && live.status===200 && live.data.folder_id===F && live.data.wrapped_k===WK2)
+        ? ok('20 Η.13: αλλαγή λέξεων → η παλιά κλειδαριά νεκρή, η νέα ανοίγει τον ΙΔΙΟ φάκελο') : bad('20 replace ['+r.status+'] dead='+dead.status+' live='+live.status);
+
+      // 21 — η Β γίνεται ενεργή· η Α: folder 409, inbox 200
+      var HB2=HL('h1-B');
+      r=await jreq('POST','/api/km/activate',HB2);
+      var fa=await jreq('PUT','/api/km/folder',Object.assign(HL('h1-A'),{'X-Km-Base-Version':'2'}),blob);
+      var ib=new Uint8Array(1000); crypto.getRandomValues(ib); var hIb=await sha(ib.buffer);
+      var ia=await jreq('PUT','/api/km/inbox',HL('h1-A'),ib);
+      (r.status===200 && r.data.previous && r.data.previous.unsynced===3 && fa.status===409 && ia.status===200)
+        ? ok('21 Η.13: η Β ενεργή (είδε 3 ανέβαστα της Α) · η Α δεν γράφει folder (409) αλλά γράφει inbox') : bad('21 activate='+r.status+' folder='+fa.status+' inbox='+ia.status+' '+JSON.stringify(r.data&&r.data.previous));
+
+      // 22 — η Β παίρνει το inbox ΑΚΕΡΑΙΟ και το σβήνει
+      var lst=await jreq('GET','/api/km/inbox',HB2);
+      var got=await fetch(BASE+'/api/km/inbox?id=h1-A',{headers:HB2}); var gb=await got.arrayBuffer(); var hGot=await sha(gb);
+      var dl=await jreq('DELETE','/api/km/inbox?id=h1-A',HB2);
+      var lst2=await jreq('GET','/api/km/inbox',HB2);
+      (lst.data && lst.data.count===1 && got.status===200 && hGot===hIb && dl.status===200 && lst2.data && lst2.data.count===0)
+        ? ok('22 Η.13: inbox → λίστα 1, bytes ΤΑΥΤΙΖΟΝΤΑΙ, σβήστηκε, λίστα 0') : bad('22 inbox: list='+(lst.data&&lst.data.count)+' get='+got.status+' same='+(hGot===hIb)+' del='+dl.status);
+
+      // 23 — το ιστορικό συσκευής δεν σβήνει: η Α δέθηκε και σε ΔΕΥΤΕΡΟ λογαριασμό
+      var F2=hex(32), L3=hex(32), LA3=hex(32);
+      r=await jreq('POST','/api/km/register',{'X-Km-Folder':F2,'X-Km-Lock':L3,'X-Km-Auth':LA3,'X-Km-Device':'h1-A'},JSON.stringify({email:'h1-test2-'+F2.slice(0,8)+'@fastwrite.tech',wrapped_k:hex(60)}));
+      var s1=await jreq('GET','/api/km/status',HB2);
+      var has=s1.data && s1.data.devices && s1.data.devices.some(function(d){return d.install_id==='h1-A';});
+      (r.status===200 && has) ? ok('23 Η.13: η Α έφτιαξε 2ο λογαριασμό και ο 1ος ΑΚΟΜΑ τη βλέπει (km_device_links)') : bad('23 device_links: reg='+r.status+' has='+has);
+      line('Δεύτερος δοκιμαστικός λογαριασμός προς διαγραφή: h1-test2-'+F2.slice(0,8)+'@fastwrite.tech','mid');
     }catch(e){
       bad('εξαίρεση: '+(e&&e.message||e));
     }
 
-    var s='KM-H1 '+(fail===0?'✅ ΟΛΑ ΠΕΡΑΣΑΝ':'❌ ΑΠΕΤΥΧΑΝ '+fail)+' · '+pass+'/'+(pass+fail)+' · '+BASE+' · test='+ (F?F.slice(0,8):'') + (notes.length?(' · '+notes.slice(0,3).join(' | ')):'');
+    var s='KM-H1+H13 '+(fail===0?'✅ ΟΛΑ ΠΕΡΑΣΑΝ':'❌ ΑΠΕΤΥΧΑΝ '+fail)+' · '+pass+'/'+(pass+fail)+' · '+BASE+' · test='+ (F?F.slice(0,8):'') + (notes.length?(' · '+notes.slice(0,3).join(' | ')):'');
     sum.textContent=s; sum.style.display='block'; sum.style.borderColor = fail===0 ? '#00E5A0' : '#ff6b6b';
     copy.disabled=false; go.disabled=false;
     line('','dim'); line('Δοκιμαστικός λογαριασμός προς διαγραφή: '+email,'mid');

@@ -77,7 +77,13 @@ test('22 · id με διαδρομή («../») ΔΕΝ γίνεται δεκτό 
   await api.dispose();
 });
 
-test('23 · μόνο η ΕΝΕΡΓΗ συσκευή γράφει· η αναγνώστρια διαβάζει αλλά δεν ανεβάζει', async () => {
+test('23 · Η.13: και η ΜΗ ενεργή συσκευή ανεβάζει φωτογραφίες (αμετάβλητες)· ΔΕΝ σβήνει', async () => {
+  /* Ως τη v46: «μόνο η ενεργή γράφει» ίσχυε και για φωτογραφίες. Από την
+     Η.13 (απόφαση Stavros 6/9, «inbox + προσθήκη») η συσκευή που βγήκε
+     εκτός λειτουργίας στέλνει τις φωτογραφίες της κανονικά — μια φωτογραφία
+     δεν αλλάζει ποτέ περιεχόμενο, άρα δεν υπάρχει σύγκρουση. Το τεστ
+     ενημερώθηκε ΡΗΤΑ (Α400 §Γ: παρωχημένο, όχι αποτυχία). Η διαγραφή
+     μένει μόνο για την ενεργή — αυτό φυλάει τώρα. */
   const api = await pwRequest.newContext();
   const id = await newAccount(api);
   await api.put(B + '/api/km/photo?id=p1', { headers: dev(id.folder, id.auth, id.device), data: bin(512, 9) });
@@ -85,13 +91,15 @@ test('23 · μόνο η ΕΝΕΡΓΗ συσκευή γράφει· η αναγν
   // δεύτερη συσκευή, ΙΔΙΕΣ 12 λέξεις, χωρίς να γίνει ενεργή
   const reader = dev(id.folder, id.auth, 'dev' + hex(6));
   expect((await api.get(B + '/api/km/photo?id=p1', { headers: reader })).status()).toBe(200);     // διαβάζει
-  const w = await api.put(B + '/api/km/photo?id=p2', { headers: reader, data: bin(512, 9) });
-  expect(w.status()).toBe(409);                                                                   // ΔΕΝ γράφει
-  expect((await w.json()).error).toBe('not_active_device');
+  expect((await api.put(B + '/api/km/photo?id=p2', { headers: reader, data: bin(512, 9) })).status()).toBe(200); // ΚΑΙ ανεβάζει
+  const d = await api.delete(B + '/api/km/photo?id=p1', { headers: reader });
+  expect(d.status()).toBe(409);                                                                   // ΔΕΝ σβήνει
+  expect((await d.json()).error).toBe('not_active_device');
+  expect((await api.get(B + '/api/km/photo?id=p1', { headers: dev(id.folder, id.auth, id.device) })).status()).toBe(200); // η p1 ζει
 
-  // μόλις γίνει ενεργή, γράφει
+  // μόλις γίνει ενεργή, σβήνει
   expect((await api.post(B + '/api/km/activate', { headers: reader })).status()).toBe(200);
-  expect((await api.put(B + '/api/km/photo?id=p2', { headers: reader, data: bin(512, 9) })).status()).toBe(200);
+  expect((await api.delete(B + '/api/km/photo?id=p1', { headers: reader })).status()).toBe(200);
   await api.dispose();
 });
 

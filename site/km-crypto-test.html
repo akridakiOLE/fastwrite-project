@@ -131,11 +131,36 @@
       // 16 — δεν ανοίγει με άλλες λέξεις, ούτε με τη βοήθεια του server
       var back2=null; try{ back2=await kmOpen(d3.key,down); }catch(e){}
       (back2===null) ? ok('16 με ΑΛΛΕΣ 12 λέξεις ο ίδιος φάκελος δεν ανοίγει — ο server δεν βοηθάει κανέναν') : bad('16 άνοιξε με λάθος λέξεις — ΣΟΒΑΡΟ');
+
+      // ── Η.13 · Η ΝΕΑ ΒΑΣΗ Κ (6/9/2026): οι λέξεις κλειδώνουν το Κ, δεν ΕΙΝΑΙ το Κ ──
+      // 17 — τυχαίο Κ, κλειδώνεται με τις λέξεις σε 60 bytes, ξεκλειδώνει ίδιο
+      var K=kmNewK(); var L1=await kmDeriveLock(w); var WK=await kmWrapK(L1.kek,K);
+      var K1=await kmUnwrapK((await kmDeriveLock(w.join('  ').toUpperCase())).kek, WK);
+      (K.length===32 && WK.length===120 && hexOf(K1)===hexOf(K)) ? ok('17 Η.13: τυχαίο Κ 32 bytes → κλειδαριά 60 bytes → ξεκλειδώνει το ΙΔΙΟ Κ (όπως κι αν γραφτούν οι λέξεις)') : bad('17 wrap/unwrap: K='+K.length+' WK='+WK.length+' same='+(hexOf(K1)===hexOf(K)));
+
+      // 18 — η κλειδαριά δεν ξαναχρησιμοποιεί ΤΙΠΟΤΑ από το παλιό σχήμα
+      (L1.lockId!==d1.folderId && L1.authToken!==d1.authToken && L1.lockId!==L1.authToken) ? ok('18 Η.13: lockId ≠ παλιό folderId, lock-auth ≠ παλιό auth, lockId ≠ lock-auth') : bad('18 το νέο σχήμα μοιράζεται τιμές με το παλιό — ΣΟΒΑΡΟ');
+
+      // 19 — αλλαγή λέξεων: ΑΛΛΗ κλειδαριά, ΙΔΙΟ Κ, τα δεδομένα ανοίγουν χωρίς ξανακρυπτογράφηση
+      var L2=await kmDeriveLock(w2); var WK2=await kmWrapK(L2.kek,K); var K2=await kmUnwrapK(L2.kek,WK2);
+      var sealedK=await kmSeal(await kmImportK(K), data);
+      var openedK=await kmOpen(await kmImportK(K2), sealedK);
+      var sameK = hexOf(K2)===hexOf(K) && openedK.length===data.length && hexOf(await crypto.subtle.digest('SHA-256',openedK))===hexOf(await crypto.subtle.digest('SHA-256',data));
+      (L2.lockId!==L1.lockId && sameK) ? ok('19 Η.13: άλλες 12 λέξεις → άλλη κλειδαριά, ΙΔΙΟ Κ — τα δεδομένα άνοιξαν χωρίς ξανακρυπτογράφηση') : bad('19 αλλαγή λέξεων: sameK='+sameK);
+
+      // 20 — λάθος λέξεις ΔΕΝ ξεκλειδώνουν (σφάλμα, όχι σκουπίδια)· χαλασμένη κλειδαριά επίσης
+      var wrongK=null; try{ wrongK=await kmUnwrapK(L2.kek,WK); }catch(e){}
+      var badK=null; try{ badK=await kmUnwrapK(L1.kek,WK.slice(0,118)+'00'); }catch(e){}
+      (wrongK===null && badK===null) ? ok('20 Η.13: λάθος λέξεις ή πειραγμένη κλειδαριά → το Κ ΔΕΝ βγαίνει') : bad('20 ξεκλείδωσε με λάθος λέξεις — ΣΟΒΑΡΟ');
+
+      // 21 — οι λέξεις ΜΟΝΕΣ τους (παλιό σχήμα) δεν ανοίγουν πια δεδομένα του Κ
+      var oldOpens=null; try{ await kmOpen(d1.key,sealedK); oldOpens=true; }catch(e){ oldOpens=false; }
+      (oldOpens===false && /^[0-9a-f]{64}$/.test(kmNewFolderId())) ? ok('21 Η.13: το παλιό κλειδί-από-λέξεις δεν ανοίγει δεδομένα του Κ · folder_id τυχαίο 64 hex') : bad('21 το παλιό κλειδί άνοιξε δεδομένα του Κ — ΣΟΒΑΡΟ');
     }catch(e){
       bad('εξαίρεση: '+(e&&e.message||e));
     }
 
-    var s='KM-H2a '+(fail===0?'✅ ΟΛΑ ΠΕΡΑΣΑΝ':'❌ ΑΠΕΤΥΧΑΝ '+fail)+' · '+pass+'/'+(pass+fail)
+    var s='KM-H2a+H13 '+(fail===0?'✅ ΟΛΑ ΠΕΡΑΣΑΝ':'❌ ΑΠΕΤΥΧΑΝ '+fail)+' · '+pass+'/'+(pass+fail)
       +' · kdf '+kdfMs+'ms · seal '+sealMs+'ms · up '+upMs+'ms · down '+downMs+'ms · '+BASE
       +(notes.length?(' · '+notes.slice(0,2).join(' | ')):'');
     sum.textContent=s; sum.style.display='block'; sum.style.borderColor = fail===0 ? '#00E5A0' : '#ff6b6b';

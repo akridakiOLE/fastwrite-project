@@ -127,3 +127,72 @@ async function kmOpen(key, blob) {
   var plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b.subarray(0, 12) }, key, b.subarray(12));
   return new Uint8Array(plain);
 }
+
+// ── Η.13 · Η ΝΕΑ ΒΑΣΗ Κ (Brief Γ, 6/9/2026) ────────────────────────────────
+// Ως τη v46: λέξεις → κλειδί δεδομένων. Άρα αλλαγή λέξεων = ξανακρυπτογράφηση
+// των πάντων (αδύνατη σε κινητό που από τη v40 δεν έχει καν τις φωτογραφίες).
+// Από εδώ: τα δεδομένα κρυπτογραφούνται με ΤΥΧΑΙΟ κλειδί Κ που δεν βγαίνει
+// από λέξεις. Οι 12 λέξεις παράγουν ΜΟΝΟ μια «κλειδαριά»:
+//   lockId    — δημόσιο αναγνωριστικό της κλειδαριάς (πάει στον server)
+//   authToken — κωδικός πρόσβασης της κλειδαριάς (ο server κρατά sha256)
+//   kek       — κλειδί που ΚΛΕΙΔΩΝΕΙ το Κ. ⛔ ΔΕΝ ΦΕΥΓΕΙ ΠΟΤΕ ΑΠΟ ΤΗ ΣΥΣΚΕΥΗ.
+// Στον server ζει το Κ κλειδωμένο με το kek (~60 bytes). Αλλαγή λέξεων =
+// νέα κλειδαριά με το ΙΔΙΟ Κ, μηδέν ξανακρυπτογράφηση. Η ίδια δομή σηκώνει
+// το backup ανάκτησης (δύο μισά) και τις προσκλήσεις του PRO.
+// Οι παλιές συναρτήσεις (kmDerive) ΜΕΝΟΥΝ: τις χρειάζεται η μετανάστευση
+// του ενός υπάρχοντος λογαριασμού και ο κώδικας v46 μέχρι τη v47.
+// Ετικέτες HKDF ΔΙΑΦΟΡΕΤΙΚΕΣ από τις παλιές («folder»/«auth»/«enc»), ώστε
+// τίποτα από το παλιό σχήμα να μη γίνεται μυστικό του νέου.
+
+function kmRandomHex(n) {
+  var a = new Uint8Array(n);
+  crypto.getRandomValues(a);
+  return kmBytesToHex(a);
+}
+
+// Το Κ: 32 τυχαία bytes. Γεννιέται ΜΙΑ φορά ανά φάκελο, στη συσκευή.
+function kmNewK() {
+  var k = new Uint8Array(32);
+  crypto.getRandomValues(k);
+  return k;
+}
+
+// Το folder_id δεν βγαίνει πια από λέξεις: τυχαίο, μόνιμο.
+function kmNewFolderId() { return kmRandomHex(32); }
+
+// Από τα 32 bytes του Κ στο κλειδί AES που ανοίγει/σφραγίζει τα δεδομένα.
+async function kmImportK(rawK) {
+  return crypto.subtle.importKey("raw", rawK, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+// Από τις 12 λέξεις στην κλειδαριά. Ίδιο PBKDF2 (αργό επίτηδες), άλλες ετικέτες.
+async function kmDeriveLock(words) {
+  var phrase = (Array.isArray(words) ? words : kmNormalize(words)).join(" ");
+  var base = await crypto.subtle.importKey("raw", new TextEncoder().encode(phrase), "PBKDF2", false, ["deriveBits"]);
+  var seed = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: new TextEncoder().encode(KM_KDF_SALT), iterations: KM_KDF_ITER, hash: "SHA-256" },
+    base, 256
+  );
+  var seedKey = await crypto.subtle.importKey("raw", seed, "HKDF", false, ["deriveBits"]);
+  var lockBits = await kmHkdf(seedKey, "lock", 256);
+  var authBits = await kmHkdf(seedKey, "lock-auth", 256);
+  var kekBits = await kmHkdf(seedKey, "kek", 256);
+  var kek = await crypto.subtle.importKey("raw", kekBits, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  return { lockId: kmBytesToHex(lockBits), authToken: kmBytesToHex(authBits), kek: kek };
+}
+
+// Κλείδωμα του Κ: IV(12) + AES-GCM(32 + 16 tag) = 60 bytes. Επιστρέφει hex.
+async function kmWrapK(kek, rawK) {
+  if (!(rawK instanceof Uint8Array) || rawK.length !== 32) throw new Error("Το Κ πρέπει να είναι 32 bytes.");
+  return kmBytesToHex(await kmSeal(kek, rawK));
+}
+
+// Ξεκλείδωμα: hex → 32 bytes Κ. Με λάθος λέξεις πετάει σφάλμα, δεν δίνει σκουπίδια.
+async function kmUnwrapK(kek, wrappedHex) {
+  if (!/^[0-9a-f]{120}$/.test(wrappedHex || "")) throw new Error("Η κλειδαριά έχει λάθος μορφή.");
+  var b = new Uint8Array(60);
+  for (var i = 0; i < 60; i++) b[i] = parseInt(wrappedHex.substr(i * 2, 2), 16);
+  var k = await kmOpen(kek, b);
+  if (k.length !== 32) throw new Error("Η κλειδαριά άνοιξε αλλά δεν περιείχε κλειδί.");
+  return k;
+}
