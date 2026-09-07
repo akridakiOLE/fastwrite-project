@@ -235,3 +235,58 @@ test('Λ5 · PRO: η ίδια συσκευή ΔΙΑΒΑΖΕΙ — ο κώδικ�
   await expect(A.p.locator('#s-menu')).toBeVisible({ timeout: 8000 });
   await A.ctx.close(); await B.ctx.close();
 });
+
+/* v51 · 7/9/2026, εισήγηση Stavros από πραγματικό κινητό: η οθόνη «εκτός
+   λειτουργίας» ζητούσε τις 12 λέξεις ΧΩΡΙΣ να λέει πώς γράφονται. Η οδηγία
+   υπήρχε ήδη — αλλά μόνο στην οθόνη σύνδεσης. Ίδια λέξη, ίδια θέση, και στις
+   δύο. Ο μετρητής «0 από 12» λέει ΑΝ το πέτυχες· η γραμμή λέει ΠΩΣ. */
+test('Λ6 · η οθόνη «εκτός λειτουργίας» λέει ΠΩΣ γράφονται οι 12 λέξεις — με κενό', async ({ browser }) => {
+  const e = mail('l6-');
+  const A = await device(browser);
+  const w = await onboard(A.p, e);
+  const B = await device(browser);
+  await signIn(B.p, e, w);
+  await A.p.reload();
+  await A.p.waitForFunction(() => typeof kmNewWords === 'function');
+  await showRo(A.p);
+
+  const box = A.p.locator('#ro-wbox');
+  await expect(box).toBeVisible();
+  await expect(box).toContainText('κενό');
+  await expect(box).toContainText('με τη σειρά');
+  /* Και είναι ΟΡΑΤΗ μαζί με το πεδίο, όχι κρυμμένη κάπου αλλού. */
+  await expect(box.locator('p.note')).toBeVisible();
+  await A.ctx.close(); await B.ctx.close();
+});
+
+/* 🔴 v51 · 7/9/2026 — ΤΟ ΚΛΕΙΔΩΜΕΝΟ ΚΙΝΗΤΟ ΔΕΝ ΔΕΙΧΝΕΙ ΤΙΣ 12 ΛΕΞΕΙΣ.
+   Εύρημα Stavros: οι 12 λέξεις δεν είναι «τα δεδομένα αυτού του κινητού» —
+   είναι το κλειδί ΟΛΟΚΛΗΡΟΥ του λογαριασμού, για πάντα. Συσκευή που ο
+   ιδιοκτήτης έβγαλε εκτός λειτουργίας (κλοπή) δεν επιτρέπεται να τις δείχνει:
+   θα έδινε στον κλέφτη μόνιμη πρόσβαση, ακόμα κι αφού ο ιδιοκτήτης πάρει πίσω
+   τη σκυτάλη. Ο δρόμος του ιδιοκτήτη είναι το πορτοφόλι: ενεργοποιεί με τις
+   12 λέξεις, ΚΑΙ ΜΕΤΑ έχει ρυθμίσεις. Αυτός ο φρουρός υπάρχει για να μη
+   «διορθώσει» κανείς τη διαδρομή ανοίγοντας το μενού. */
+test('Λ7 · κλειδωμένη συσκευή: καμία διαδρομή προς Ρυθμίσεις — άρα καμία προς τις 12 λέξεις', async ({ browser }) => {
+  const e = mail('l7-');
+  const A = await device(browser);
+  const w = await onboard(A.p, e);
+  const B = await device(browser);
+  await signIn(B.p, e, w);
+  await A.p.reload();
+  await A.p.waitForFunction(() => typeof kmNewWords === 'function');
+  await showRo(A.p);
+
+  /* Ό,τι πατάει ο άνθρωπος: το ☰ της κεφαλίδας. */
+  await A.p.locator('#btn-menu').dispatchEvent('click');
+  await A.p.waitForTimeout(600);
+  await expect(A.p.locator('#s-menu')).toBeHidden();
+  await expect(A.p.locator('#s-settings')).toBeHidden();
+  await expect(A.p.locator('#s-mywords')).toBeHidden();
+
+  /* Και η ίδια η γραμμή «Ρυθμίσεις» δεν είναι προσιτή: ζει μέσα στο μενού
+     που μόλις αποδείχθηκε ότι δεν ανοίγει. */
+  await expect(A.p.locator('[data-go="s-settings"]')).toBeHidden();
+  await expect(A.p.locator('#ro')).toBeVisible();
+  await A.ctx.close(); await B.ctx.close();
+});
