@@ -66,6 +66,10 @@
        κλήση ως header, ώστε ΝΕΑ συσκευή να ρωτάει τον SERVER — ποτέ το παλιό
        κινητό, που μπορεί να είναι σπασμένο ή κλεμμένο (Α320, 6/9). */
     unsy:     'km_unsynced',
+    /* v49 — το πρόγραμμα, όπως το λέει ο server. NULL/κενό = ΔΩΡΕΑΝ.
+       Στο ΔΩΡΕΑΝ ισχύει «πορτοφόλι»: μία συσκευή, η παλιά ΕΚΤΟΣ ΛΕΙΤΟΥΡΓΙΑΣ.
+       Ο κώδικας ανάγνωσης (v33–v46) μένει ολόκληρος και ξυπνάει στο PRO. */
+    plan:     'km_plan',
     /* 🔴 ΤΟ Κ ΚΛΕΙΔΩΜΕΝΟ ΜΕ ΤΙΣ ΛΕΞΕΙΣ, ΩΣΠΟΥ ΝΑ ΦΤΑΣΕΙ ΣΤΟΝ SERVER.
        Βρέθηκε 6/9 από το τεστ 8 (εγγραφή χωρίς δίκτυο): αν μένει σε
        μεταβλητή της σελίδας, χάνεται στο κλείσιμο — και η εκκρεμής εγγραφή
@@ -268,7 +272,17 @@
     if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
     SCREENS.forEach(function (s) { el(s).hidden = (s !== id); });
   }
-  function goto(id) { nav.push(id); render(id); show(id); }
+  /* 🔴 v49 — Ο ΦΡΑΓΜΟΣ ΤΟΥ ΚΛΕΙΔΩΜΑΤΟΣ, ΣΕ ΕΝΑ ΣΗΜΕΙΟ.
+     Κάθε οθόνη που δείχνει δεδομένα περνάει από εδώ. Αν ο φραγμός έμπαινε
+     στα κουμπιά, θα ξεχνιόταν ένα — και «εκτός λειτουργίας» που δείχνει
+     τιμολόγια από μια πλάγια διαδρομή δεν είναι εκτός λειτουργίας.
+     Οι οθόνες ρυθμίσεων μένουν ανοιχτές επίτηδες: εκεί ζουν οι «12 λέξεις
+     μου» και ο μηδενισμός, δηλαδή οι μόνες διέξοδοι του χρήστη. */
+  var LOCKED_OUT = { 's-menu': 1, 's-pend': 1, 's-sup': 1, 's-shot': 1, 's-who': 1 };
+  function goto(id) {
+    if (isLocked() && LOCKED_OUT[id]) { startCam(); return; }
+    nav.push(id); render(id); show(id);
+  }
   function back() {
     freeUrls();
     nav.pop();
@@ -1547,7 +1561,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v48';
+  var APP_VER = 'φέτα 3 · v50';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -1778,7 +1792,24 @@
   }
 
   /* ── Κάμερα ── */
+  /* 🔴 v50 — Η ΑΠΑΝΤΗΣΗ ΤΗΣ ΚΑΜΕΡΑΣ ΦΤΑΝΕΙ ΣΕ ΚΟΣΜΟ ΠΟΥ ΜΠΟΡΕΙ ΝΑ ΑΛΛΑΞΕ.
+     Μετρήθηκε 7/9/2026: η συσκευή ανοίγει με km_active=1 (παλιά τοπική τιμή),
+     το startCam ζητάει κάμερα, και ~240 ms μετά ο server απαντάει
+     «κλειδωμένη». Η οθόνη «εκτός λειτουργίας» ανεβαίνει σωστά — αλλά η
+     απάντηση της κάμερας έρχεται ΜΕΤΑ και κανείς δεν ξαναρωτάει:
+       · απέτυχε → το cam-err (absolute, z-index 5) σκεπάζει ΟΛΗ την οθόνη,
+         και το κουμπί των 12 λέξεων δεν πατιέται ποτέ (έπεσε το Λ3)·
+       · πέτυχε → η κάμερα ΑΝΑΒΕΙ και μένει αναμμένη πίσω από το κλείδωμα.
+     Ποιος προλαβαίνει είναι κούρσα: στο κινητό η κάμερα αργεί 300-1000 ms
+     και ο server απαντάει σε ~200 — δηλαδή εκεί η λάθος σειρά είναι ο
+     ΚΑΝΟΝΑΣ, όχι η εξαίρεση. Ο μετρητής γενιάς λέει «αυτή η απάντηση
+     ανήκει σε κόσμο που δεν υπάρχει πια» και την πετάει. ⚠ Καμία αναμονή
+     δεν προστίθεται σε καμία διαδρομή: η ενεργή συσκευή ανοίγει κάμερα
+     ακριβώς όπως πριν. */
+  var camGen = 0;
+  function camStale(gen) { return gen !== camGen || isReader(); }
   function stopCam() {
+    camGen++;
     if (stream) { stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} }); }
     stream = null;
     el('vid').srcObject = null;
@@ -1821,16 +1852,24 @@
       }
       stopCam();
     }
+    var gen = ++camGen;
     navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } },
       audio: false
     }).then(function (s) {
+      /* v50 — άλλαξε ο κόσμος όσο περιμέναμε: σβήνουμε ό,τι μας δόθηκε.
+         Χωρίς αυτό η κάμερα μένει αναμμένη πίσω από το «εκτός λειτουργίας». */
+      if (camStale(gen)) { s.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} }); return; }
       stream = s;
       var v = el('vid');
       v.srcObject = s;
       /* v19 — ρητό play(): το autoplay δεν είναι εγγύηση σε κινητό */
       v.play().catch(function () {});
     }).catch(function (err) {
+      /* v50 — σφάλμα κάμερας που ανήκει σε προηγούμενη γενιά ΔΕΝ γίνεται
+         οθόνη: θα σκέπαζε το κλείδωμα με μήνυμα άσχετο με ό,τι βλέπει ο
+         χρήστης τώρα. */
+      if (camStale(gen)) { return; }
       var m = 'Σφάλμα: ' + (err && err.name ? err.name : 'άγνωστο');
       if (err && err.name === 'NotAllowedError') { m = 'Δεν δόθηκε άδεια κάμερας. Άνοιξε τις ρυθμίσεις του browser για αυτή τη σελίδα και επίτρεψε την κάμερα.'; }
       if (err && err.name === 'NotFoundError') { m = 'Δεν βρέθηκε κάμερα σε αυτή τη συσκευή.'; }
@@ -2048,7 +2087,11 @@
      δευτερόλεπτα αντί για δώδεκα λέξεις από χαρτί στην πόρτα.
      ⚠ ΤΙ ΔΕΝ ΑΛΛΑΖΕΙ: η σύνδεση σε ΝΕΑ συσκευή θέλει ΠΑΝΤΑ τις 12 λέξεις.
      Εκεί δεν υπάρχει τίποτα αποθηκευμένο — οι λέξεις ΕΙΝΑΙ το κλειδί. */
-  var ACTIVATE_NEEDS_WORDS = false;
+  /* v49 — ΑΝΑΒΕΙ. Στο ΔΩΡΕΑΝ = πορτοφόλι δεν υπάρχει «επανενεργοποίηση με
+     επιβεβαίωση»: μόνο με τις 12 λέξεις. Αλλιώς όποιος κρατήσει το κλεμμένο
+     κινητό ξαναπαίρνει τη σκυτάλη με ένα πάτημα — το κενό κλοπής που έπιασε
+     ο Stavros στις 5/9 και αναθεώρησε την απόφαση της 4/9. */
+  var ACTIVATE_NEEDS_WORDS = true;
 
   function hasAccount() {
     return !!localStorage.getItem(LS.folder) && !!localStorage.getItem(LS.wordsOk);
@@ -2059,6 +2102,16 @@
   function isReader() {
     return hasAccount() && localStorage.getItem(LS.active) === '0';
   }
+  /* ══ v49 · FREE = ΠΟΡΤΟΦΟΛΙ (κλειστό θέμα 6/9/2026, απόφαση Stavros) ══
+     «Λειτουργεί όπως όλα τα πορτοφόλια»: 12 λέξεις στο χαρτί, ενεργοποιείς
+     όποια συσκευή θες με τις λέξεις, και η προηγούμενη βγαίνει ΕΚΤΟΣ
+     ΛΕΙΤΟΥΡΓΙΑΣ — ούτε επεξεργασία, ούτε ανάγνωση. Συνειδητό τίμημα: όποιος
+     κρατάει τις λέξεις κρατάει τα δεδομένα.
+     Η κατάσταση «ανάγνωση» ΔΕΝ σβήνεται: είναι όλος ο κώδικας v33–v46 και
+     είναι αυτό που θα χρειαστεί το PRO (Boss/admin διαβάζουν). Απλώς στο
+     ΔΩΡΕΑΝ δεν εμφανίζεται ποτέ. */
+  function isPro() { return localStorage.getItem(LS.plan) === 'pro'; }
+  function isLocked() { return isReader() && !isPro(); }
   function setActiveState(on, since) {
     var was = localStorage.getItem(LS.active);
     localStorage.setItem(LS.active, on ? '1' : '0');
@@ -2078,6 +2131,12 @@
     if (!hasAccount()) { return Promise.resolve(null); }
     return kmStatus().then(function (st) {
       if (!st) { return null; }
+      /* Το πρόγραμμα το λέει ο server, ποτέ η συσκευή: αλλιώς θα αρκούσε ένα
+         πείραγμα του localStorage για να ξεκλειδώσει κανείς την ανάγνωση. */
+      if (st.state) {
+        if (st.state.plan) { localStorage.setItem(LS.plan, String(st.state.plan)); }
+        else { localStorage.removeItem(LS.plan); }
+      }
       setActiveState(st.this_device_active !== false,
                      st.state && st.state.active_since);
       return st;
@@ -2093,16 +2152,36 @@
      ο αριθμός των μη-ανεβασμένων να λένε την ΤΩΡΙΝΗ αλήθεια. */
   function roRender() {
     var w = whenStr(localStorage.getItem(LS.activeAt));
+    var locked = isLocked();
+    /* v49 — ΔΥΟ ΠΡΟΣΩΠΑ, ΙΔΙΑ ΟΘΟΝΗ.
+       ΔΩΡΕΑΝ: εκτός λειτουργίας — δεν διαβάζεις τίποτα από εδώ.
+       PRO:    ανάγνωση — βλέπεις τα πάντα, δεν φωτογραφίζεις. */
+    el('ro-title').textContent = locked
+      ? 'Αυτή η συσκευή είναι εκτός λειτουργίας.'
+      : 'Η επεξεργασία είναι σε άλλη συσκευή.';
     el('ro-when').textContent = w
-      ? ('Η επεξεργασία μεταφέρθηκε σε άλλη συσκευή στις ' + w + '.')
-      : 'Η επεξεργασία έχει μεταφερθεί σε άλλη συσκευή.';
-    var n = pullInfo.notUp || 0;
+      ? ((locked ? 'Ενεργοποιήθηκε άλλη συσκευή στις ' : 'Η επεξεργασία μεταφέρθηκε σε άλλη συσκευή στις ') + w + '.')
+      : (locked ? 'Ενεργοποιήθηκε άλλη συσκευή.' : 'Η επεξεργασία έχει μεταφερθεί σε άλλη συσκευή.');
+    el('ro-info').textContent = locked
+      ? 'Το Kostometro δουλεύει σε μία συσκευή τη φορά, όπως ένα πορτοφόλι. Τα τιμολόγιά σου είναι ασφαλή και τα βλέπεις από την ενεργή συσκευή. Για να δουλέψεις από εδώ, γράψε τις 12 λέξεις σου — η άλλη συσκευή βγαίνει εκτός λειτουργίας.'
+      : 'Εδώ βλέπεις κανονικά όλα τα τιμολόγια και τους προμηθευτές σου. Για να φωτογραφίσεις από αυτή τη συσκευή, κάν᾽ την ενεργή — η άλλη περνάει σε ανάγνωση.';
+    /* Στο ΔΩΡΕΑΝ δεν υπάρχει διαδρομή προς τα τιμολόγια από εδώ. */
+    el('ro-menu').hidden = locked;
+
+    var n = locked ? unsyncedGet() : (pullInfo.notUp || 0);
     var pe = el('ro-pend');
     if (n > 0) {
       pe.hidden = false;
-      pe.textContent = n === 1
-        ? '1 τιμολόγιο από αυτή τη συσκευή δεν έχει ανέβει. Θα ανέβει μόλις την ξανακάνεις ενεργή — δεν χάνεται.'
-        : n + ' τιμολόγια από αυτή τη συσκευή δεν έχουν ανέβει. Θα ανέβουν μόλις την ξανακάνεις ενεργή — δεν χάνονται.';
+      if (locked) {
+        /* Το ξεφόρτωμα τρέχει μόνο του· εδώ λέμε την αλήθεια για το πού
+           βρίσκεται η δουλειά, χωρίς να υποσχεθούμε ότι έφυγε ήδη. */
+        pe.textContent = (n === 1 ? '1 τιμολόγιο από αυτή τη συσκευή' : n + ' τιμολόγια από αυτή τη συσκευή')
+          + ' δεν είχαν ανέβει. Στέλνονται στην ενεργή συσκευή μόλις υπάρξει δίκτυο — δεν χάνονται.';
+      } else {
+        pe.textContent = n === 1
+          ? '1 τιμολόγιο από αυτή τη συσκευή δεν έχει ανέβει. Θα ανέβει μόλις την ξανακάνεις ενεργή — δεν χάνεται.'
+          : n + ' τιμολόγια από αυτή τη συσκευή δεν έχουν ανέβει. Θα ανέβουν μόλις την ξανακάνεις ενεργή — δεν χάνονται.';
+      }
     } else { pe.hidden = true; }
     el('ro-wbox').hidden = !ACTIVATE_NEEDS_WORDS;
   }
@@ -2637,6 +2716,127 @@
     return step(0);
   }
 
+  /* ══ v49 · ΤΟ ΞΕΦΟΡΤΩΜΑ — ΤΟ ΚΟΜΜΑΤΙ ΠΟΥ ΚΑΝΕΙ ΤΟ ΚΛΕΙΔΩΜΑ ΑΣΦΑΛΕΣ ══
+     Απόφαση Stavros 6/9: «inbox + προσθήκη». Η συσκευή που έπαψε να είναι
+     ενεργή ΔΕΝ γράφει το folder.bin — θα πατούσε ό,τι έγραψε στο μεταξύ η
+     νέα. Αφήνει τα δικά της σε <φάκελος>/inbox/<συσκευή>.bin, σφραγισμένα με
+     το ίδιο Κ, και ανεβάζει κανονικά τις φωτογραφίες της (αμετάβλητες ανά id,
+     άρα ακίνδυνες). Η ενεργή τα παίρνει στο επόμενο κατέβασμα και τα
+     ΠΡΟΣΘΕΤΕΙ.
+     🔴 ΧΩΡΙΣ ΑΥΤΟ ΤΟ ΚΟΜΜΑΤΙ ΤΟ ΚΛΕΙΔΩΜΑ ΘΑ ΕΘΑΒΕ ΔΟΥΛΕΙΑ: σήμερα η μη
+     ενεργή συσκευή κρατάει τοπικά ό,τι δεν πρόλαβε να ανεβάσει και το
+     στέλνει όταν ξαναγίνει ενεργή. Μόλις μπει «εκτός λειτουργίας», αυτή η
+     διαδρομή παύει να υπάρχει — άρα το ξεφόρτωμα ΠΡΟΗΓΕΙΤΑΙ του κλειδώματος. */
+  var flushBusy = false;
+
+  function flushToInbox() {
+    if (!hasAccount() || flushBusy) { return Promise.resolve(false); }
+    flushBusy = true;
+    var key, rows;
+    return kmKeyReady().then(function (k) { key = k; return all(); })
+      .then(function (rs) {
+        rows = rs;
+        if (!rows.length) { return false; }
+        var payload = new TextEncoder().encode(JSON.stringify({
+          v: 1, from: localStorage.getItem(LS.id) || '', at: new Date().toISOString(),
+          shots: rows.map(metaOf)
+        }));
+        return kmSeal(key, payload).then(function (sealed) {
+          var h = kmHead();
+          h['Content-Type'] = 'application/octet-stream';
+          return fetch(KM_API + 'inbox', { method: 'PUT', headers: h, body: sealed });
+        }).then(function (res) {
+          if (!res.ok) { throw new Error('inbox ' + res.status); }
+          /* Και οι φωτογραφίες: επιτρέπονται από μη ενεργή συσκευή ακριβώς
+             επειδή μια φωτογραφία δεν αλλάζει ποτέ περιεχόμενο. */
+          return fetch(KM_API + 'photos', { headers: kmHead() })
+            .then(function (r) { return r.ok ? r.json() : { photos: [] }; })
+            .then(function (j) {
+              var ids = (j.photos || []).map(function (x) { return x.id; });
+              return pushPhotos(rows, key, ids);
+            });
+        }).then(function () {
+          unsyncedClear();      // ό,τι χρωστούσε αυτή η συσκευή, το έδωσε
+          return true;
+        });
+      })
+      .catch(function (e) {
+        /* Αποτυχία εδώ ΔΕΝ μηδενίζει τον μετρητή: η επόμενη φορά ξαναδοκιμάζει
+           και ο αριθμός συνεχίζει να λέει την αλήθεια σε όποιον ρωτήσει. */
+        diag('ξεφόρτωμα: ' + (e && e.message ? e.message : e));
+        return false;
+      })
+      .then(function (ok) { flushBusy = false; return ok; });
+  }
+
+  /* Τρέχει όταν η συσκευή μάθει ότι δεν είναι πια η ενεργή και χρωστάει
+     δουλειά. Χωρίς δίκτυο δεν κάνει τίποτα και ξαναδοκιμάζει. */
+  function maybeFlush() {
+    if (!hasAccount() || unsyncedGet() <= 0) { return Promise.resolve(false); }
+    /* 🔴 ΡΩΤΑΕΙ ΤΟΝ SERVER, ΟΧΙ ΤΗΝ ΤΟΠΙΚΗ ΣΗΜΑΙΑ. Το km_active γεμίζει
+       ασύγχρονα από το refreshActive· αν κρινόμασταν από αυτό, το ξεφόρτωμα
+       θα γινόταν ή όχι ανάλογα με το ποια κλήση δικτύου πρόλαβε — δηλαδή
+       τυχαία. Η ερώτηση κοστίζει μία κλήση, και μόνο όταν χρωστάμε δουλειά. */
+    return kmStatus().then(function (st) {
+      if (!st) { return false; }
+      if (st.this_device_active !== false) { return false; }   // είμαστε η ενεργή: ανεβάζει ο κανονικός συγχρονισμός
+      setActiveState(false, st.state && st.state.active_since);
+      return flushToInbox();
+    }).catch(function () { return false; });
+  }
+
+  /* Η ΕΝΕΡΓΗ πλευρά: παίρνει ό,τι άφησαν οι άλλες και το προσθέτει.
+     🔴 ΜΟΝΟ ΠΡΟΣΘΗΚΗ. Ποτέ πάτημα υπάρχοντος, ποτέ διαγραφή — και οι
+     ταφόπετρες του inbox αγνοούνται επίτηδες: συσκευή εκτός λειτουργίας δεν
+     επιτρέπεται να σβήσει τιμολόγιο στην ενεργή. Το χειρότερο που μπορεί να
+     κάνει αυτός ο κώδικας είναι να μη φέρει κάτι. */
+  function pullInbox(key) {
+    return fetch(KM_API + 'inbox', { headers: kmHead() })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var items = (j && j.inbox) || [];
+        if (!items.length) { return 0; }
+        var i = 0, added = 0;
+        var step = function () {
+          if (i >= items.length) { return Promise.resolve(added); }
+          var dev = items[i++].device;
+          return fetch(KM_API + 'inbox?id=' + encodeURIComponent(dev), { headers: kmHead() })
+            .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
+            .then(function (buf) { return buf ? kmOpenAny(key, buf) : null; })
+            .then(function (plain) {
+              if (!plain) { return null; }
+              var data = JSON.parse(new TextDecoder().decode(plain));
+              var shots = (data && data.shots) || [];
+              var dead = goneMap();
+              return all().then(function (rows) {
+                var have = {};
+                rows.forEach(function (r) { have[r.id] = 1; });
+                var news = shots.filter(function (m) { return m && m.id && !have[m.id] && !dead[m.id]; });
+                var k = 0;
+                var one = function () {
+                  if (k >= news.length) { return Promise.resolve(); }
+                  var m = news[k++];
+                  return put({ id: m.id, ts: m.ts, supplier: m.supplier, invDate: m.invDate,
+                               net: m.net, vat: m.vat, total: m.total,
+                               pages: [], srvPages: m.pages || 1 })
+                    .then(function () { added++; return one(); });
+                };
+                return one();
+              });
+            })
+            /* Σβήνεται ΜΟΝΟ αφού διαβαστεί και γραφτεί. Αν σπάσει κάτι στη
+               μέση, το μπλοκ μένει και ξαναδιαβάζεται την επόμενη φορά. */
+            .then(function () {
+              return fetch(KM_API + 'inbox?id=' + encodeURIComponent(dev), { method: 'DELETE', headers: kmHead() });
+            })
+            .catch(function () { return null; })
+            .then(step);
+        };
+        return step();
+      })
+      .catch(function () { return 0; });
+  }
+
   function syncNow() {
     if (!localStorage.getItem(LS.folder) || !localStorage.getItem(LS.wordsOk)) { return Promise.resolve(); }
     /* 🔴 Ο ΠΙΟ ΕΠΙΚΙΝΔΥΝΟΣ ΕΛΕΓΧΟΣ ΟΛΟΥ ΤΟΥ ΣΥΓΧΡΟΝΙΣΜΟΥ.
@@ -2661,6 +2861,10 @@
         if (st.this_device_active === false) {
           setActiveState(false, st.state && st.state.active_since);
           syncInfo.msg = 'δεν είναι η ενεργή συσκευή';
+          /* v49 — εδώ ακριβώς μαθαίνουμε ότι χάσαμε τη σκυτάλη, και το
+             ξέρουμε ΑΠΟ ΤΟΝ SERVER. Ό,τι χρωστάμε φεύγει ΤΩΡΑ στο inbox,
+             όσο υπάρχει δίκτυο — χωρίς δεύτερη ερώτηση. */
+          if (unsyncedGet() > 0) { flushToInbox(); }
           return null;
         }
         setActiveState(true, st.state && st.state.active_since);
@@ -2919,12 +3123,41 @@
     });
   }
 
+  /* 🔴 v50 — Η ΣΗΜΑΙΑ «ΕΚΚΡΕΜΕΙ ΚΑΤΕΒΑΣΜΑ» ΑΠΟΚΤΑ ΤΑΥΤΟΤΗΤΑ.
+     Μετρήθηκε 7/9/2026 (6 γύροι στο v48, 2 άδειασαν τον φάκελο: 567 → 56
+     bytes): η σημαία ήταν σκέτο '1', ίδια για όλους. Ένα κατέβασμα που είχε
+     ξεκινήσει ΝΩΡΙΤΕΡΑ τελείωνε και την έσβηνε — ακόμα κι όταν η σημαία είχε
+     σηκωθεί ΜΕΤΑ, για άλλον λόγο, και το δικό της κατέβασμα δεν είχε τρέξει
+     ποτέ. Ο φρουρός «ποτέ ανέβασμα πριν το κατέβασμα» (3/9) άνοιγε, και
+     ανέβαινε ΑΔΕΙΟΣ φάκελος πάνω στα τιμολόγια του χρήστη.
+     Ίδια οικογένεια με το «περίμενε να τελειώσει ≠ βεβαιώσου ότι έγινε με τα
+     τωρινά δεδομένα» (4/9) και με τον μετρητή γενιάς της κάμερας (ίδια μέρα):
+     απάντηση που ανήκει σε παλιό κόσμο, δεκτή σαν τωρινή.
+     ⚠ Συμβατό προς τα πίσω: κάθε έλεγχος ρωτάει «υπάρχει;», ποτέ «ισούται με
+     1;» — άρα συσκευή που έχει ήδη '1' αποθηκευμένο δεν παθαίνει τίποτα. */
+  function needPullRaise() {
+    localStorage.setItem(LS.needPull, 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
+  }
   function pullNow() {
     if (!localStorage.getItem(LS.folder) || !localStorage.getItem(LS.wordsOk)) { return Promise.resolve(); }
     if (pulling) { return Promise.resolve(); }
     pulling = true; pullInfo.msg = null; pullInfo.added = 0;
+    /* Το διακριτικό ΤΗΣ ΣΤΙΓΜΗΣ ΠΟΥ ΞΕΚΙΝΑΜΕ. Ό,τι σηκωθεί από εδώ και πέρα
+       ζητάει ΑΛΛΟ κατέβασμα, όχι αυτό. */
+    var needTok = localStorage.getItem(LS.needPull);
     var key;
-    return kmKeyReady().then(function (k) { key = k; return pullMeta(k); })
+    return kmKeyReady().then(function (k) {
+        key = k;
+        /* v49 — ΠΡΩΤΑ το inbox, ΜΕΤΑ ο φάκελος. Ό,τι άφησε πίσω της μια
+           συσκευή που βγήκε εκτός λειτουργίας μπαίνει στην τοπική βάση πριν
+           χτιστεί η εικόνα, ώστε ο επόμενος συγχρονισμός να το ανεβάσει στον
+           φάκελο και να γίνει μόνιμο. Μόνο η ενεργή το διαβάζει (ο server
+           απαντάει 409 στις άλλες). */
+        return (isReader() ? Promise.resolve(0) : pullInbox(key)).then(function (n) {
+          if (n) { scheduleSync(1200); }
+          return pullMeta(key);
+        });
+      })
       .then(function (folder) {
         if (!folder) { return null; }
         var shots = folder.shots;
@@ -2990,8 +3223,13 @@
         pullInfo.at = new Date();
         /* Το σήμα φεύγει ΜΟΝΟ αν το κατέβασμα πέτυχε. Σφάλμα ή χωρίς δίκτυο
            σημαίνει ότι η συσκευή μένει σε «μόνο κατέβασμα» — και δεν
-           μπορεί να πατήσει τον φάκελο με τα δικά της μισά δεδομένα. */
-        if (!pullInfo.msg) { localStorage.removeItem(LS.needPull); }
+           μπορεί να πατήσει τον φάκελο με τα δικά της μισά δεδομένα.
+           v50 — ΚΑΙ ΜΟΝΟ αν είναι Η ΔΙΚΗ ΜΑΣ ανάγκη. Διαφορετικό διακριτικό
+           σημαίνει ότι σηκώθηκε νέα ανάγκη ΟΣΟ κατεβάζαμε: αυτή δεν την
+           εξυπηρετήσαμε, και η σημαία μένει για το επόμενο κατέβασμα. */
+        if (!pullInfo.msg && localStorage.getItem(LS.needPull) === needTok) {
+          localStorage.removeItem(LS.needPull);
+        }
         pulling = false;
         refreshCount();
         /* Ό,τι μόλις ήρθε φαίνεται ΤΩΡΑ. Χωρίς αυτό, ο χρήστης που στέκεται
@@ -3182,7 +3420,8 @@
        αλλά ο χρήστης κοιτάει έως 30″ μια εικόνα που λέει ψέματα. Ένα δεύτερο
        κατέβασμα, ΜΟΝΟ όταν όντως αποκτήθηκε κλειδί, το κλείνει. */
     pullNow().then(function () { return ensureLock(); })
-             .then(function (changed) { if (changed) { return pullNow(); } });
+             .then(function (changed) { if (changed) { return pullNow(); } })
+             .then(function () { return maybeFlush(); });
     scheduleSync(4000);   // v31 — …και μετά ό,τι έμεινε πίσω από εδώ
     if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
     if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
@@ -3264,7 +3503,7 @@
                 lockStore(L);
                 localStorage.removeItem(LS.mig);
                 localStorage.setItem(LS.wordsOk, '1');
-                localStorage.setItem(LS.needPull, '1');   // v33 — πρώτα κατεβάζει, μετά ανεβάζει
+                needPullRaise();                          // v33 — πρώτα κατεβάζει, μετά ανεβάζει
                 unsyncedClear();                          // καθαρή συσκευή, δεν χρωστάει τίποτα
                 return kmRegister().then(function () {
                   pullNow();
@@ -3297,7 +3536,7 @@
               localStorage.removeItem(LS.mig);
               kmKey = null; kmOld = null;
               localStorage.setItem(LS.wordsOk, '1');
-              localStorage.setItem(LS.needPull, '1');
+              needPullRaise();
               unsyncedClear();
               return kmRegister().then(function () {
                 pullNow();
@@ -3367,9 +3606,41 @@
       b.disabled = false; b.textContent = 'Κάνε αυτή τη συσκευή ενεργή';
       e.textContent = msg; e.hidden = false;
     };
+    /* ══ v49 · ΟΙ ΤΡΕΙΣ ΚΛΑΔΟΙ ΠΡΙΝ ΠΑΡΕΙ ΤΗ ΣΚΥΤΑΛΗ ΑΥΤΗ Η ΣΥΣΚΕΥΗ ══
+       Απόφαση Stavros 6/9: ρωτάει τον SERVER, ποτέ το παλιό κινητό — μπορεί
+       να είναι σπασμένο ή κλεμμένο. Ν = πόσα δεν πρόλαβε να ανεβάσει η
+       ενεργή. Ν=0 προχωρά · Ν>0 και ζωντανή πρόσφατα → «άνοιξέ την μία φορά
+       με δίκτυο» · Ν>0 και αγνοείται → προχωρά με προειδοποίηση. */
+    var FRESH_MS = 48 * 3600 * 1000;
+    var askAbout = function (a) {
+      var n = (a && a.unsynced) || 0;
+      if (n <= 0) { return true; }
+      var seen = a && a.last_seen ? Date.parse(a.last_seen) : 0;
+      var fresh = seen && (Date.now() - seen) < FRESH_MS;
+      var what = (n === 1 ? '1 τιμολόγιο' : n + ' τιμολόγια');
+      if (fresh) {
+        return confirm('Η άλλη συσκευή έχει ' + what + ' που δεν έχουν ανέβει ακόμα.\n\n'
+          + 'Άνοιξέ την ΜΙΑ φορά με δίκτυο για να τα στείλει, και ξαναδοκίμασε εδώ — έτσι δεν περιμένεις τίποτα.\n\n'
+          + 'Αν δεν την έχεις πια στα χέρια σου, μπορείς να συνεχίσεις: τα ' + what + ' θα έρθουν μόλις εκείνη ξαναδεί δίκτυο.\n\n'
+          + 'Να συνεχίσω;');
+      }
+      return confirm('Η άλλη συσκευή έχει ' + what + ' που δεν έχουν ανέβει, και δεν έχει φανεί εδώ και μέρες.\n\n'
+        + 'Προχωράμε: τα ' + what + ' θα έρθουν αυτόματα μόλις εκείνη ξαναδεί δίκτυο. Δεν χάνονται.\n\n'
+        + 'Να συνεχίσω;');
+    };
+
     var run = function () {
+      b.disabled = true; b.textContent = 'Έλεγχος άλλης συσκευής…';
+      return kmStatus().then(function (st) {
+        if (!st) { stop('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); return null; }
+        if (!askAbout(st.active)) { stop(''); el('ro-err').hidden = true; return null; }
+        return run2();
+      });
+    };
+
+    var run2 = function () {
       b.disabled = true; b.textContent = 'Κατεβάζει…';
-      localStorage.setItem(LS.needPull, '1');
+      needPullRaise();
       return pullSettled().then(function () {
         if (pullInfo.msg) { stop('Δεν κατέβηκαν τα τιμολόγια της άλλης συσκευής: ' + pullInfo.msg + ' Δοκίμασε ξανά με δίκτυο.'); return; }
         b.textContent = 'Ενεργοποιεί…';
@@ -3391,12 +3662,29 @@
     b.disabled = true; b.textContent = 'Έλεγχος…';
     kmCheckWords(el('ro-words').value).then(function (c) {
       if (!c.ok) { stop(c.error); return; }
-      return kmDerive(c.words).then(function (d) {
-        /* Σύγκριση με τον ΔΙΚΟ ΜΑΣ φάκελο: λάθος (αλλά έγκυρες) λέξεις
-           δείχνουν άλλον λογαριασμό — δεν στέλνουμε τίποτα στον server. */
-        if (d.folderId !== localStorage.getItem(LS.folder)) {
+      /* 🔴 v49 — Η ΣΥΓΚΡΙΣΗ ΓΙΝΕΤΑΙ ΜΕ ΤΗΝ ΚΛΕΙΔΑΡΙΑ, ΟΧΙ ΜΕ ΤΟΝ ΦΑΚΕΛΟ.
+         Ως τη v46 ο φάκελος έβγαινε από τις λέξεις, οπότε η σύγκριση
+         `folderId` έστεκε. Από τη v47 ο φάκελος είναι ΤΥΧΑΙΟΣ (Η.13) — η
+         παλιά σύγκριση θα απέρριπτε τις ΣΩΣΤΕΣ λέξεις, για πάντα, και θα
+         κλείδωνε τον χρήστη έξω από τη δική του συσκευή. Βρέθηκε 6/9
+         διαβάζοντας τον κώδικα πριν ανάψει η σημαία, όχι από τεστ. */
+      return kmDeriveLock(c.words).then(function (L) {
+        var mine = localStorage.getItem(LS.lock);
+        if (mine && L.lockId !== mine) {
           stop('Αυτές οι 12 λέξεις ανοίγουν άλλον λογαριασμό, όχι αυτόν. Έλεγξε τη σειρά τους.');
           return;
+        }
+        if (!mine) {
+          /* Λογαριασμός που δεν έχει μεταναστεύσει ακόμα: πέφτουμε στον
+             παλιό έλεγχο, αλλιώς η επιστροφή θα ήταν αδύνατη ως τη
+             μετανάστευση. */
+          return kmDerive(c.words).then(function (d) {
+            if (d.folderId !== localStorage.getItem(LS.folder)) {
+              stop('Αυτές οι 12 λέξεις ανοίγουν άλλον λογαριασμό, όχι αυτόν. Έλεγξε τη σειρά τους.');
+              return;
+            }
+            return run();
+          });
         }
         return run();
       });
@@ -3412,6 +3700,10 @@
 
   /* Το μενού άνοιξε: κανονική οθόνη, ΟΧΙ καταστροφική ενέργεια με ένα πάτημα.
      Κάθεται ΑΡΙΣΤΕΡΑ — μακριά από το ⋮ του browser. */
+  /* v49 — ΚΑΝΕΝΑΣ ΔΕΥΤΕΡΟΣ ΦΡΑΓΜΟΣ ΕΔΩ, ΕΠΙΤΗΔΕΣ. Ο έλεγχος ζει ΜΟΝΟ στο
+     goto(). Δύο φραγμοί για το ίδιο πράγμα σημαίνουν ότι κανένας από τους
+     δύο δεν μπορεί να αποδειχθεί: βγάζεις τον έναν, το τεστ μένει πράσινο
+     επειδή κρατάει ο άλλος (μετρήθηκε 6/9 με μετάλλαξη). */
   el('btn-menu').onclick = function () { goto('s-menu'); };
 
   Array.prototype.forEach.call(document.querySelectorAll('[data-back]'), function (b) {

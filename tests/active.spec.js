@@ -132,8 +132,15 @@ async function state(p) { return p.evaluate(() => localStorage.getItem('km_activ
 /* Η ενεργοποίηση ζητάει επιβεβαίωση, όχι 12 λέξεις (απόφαση Stavros 4/9).
    Ο Playwright ΑΠΟΡΡΙΠΤΕΙ κάθε διάλογο από προεπιλογή — χωρίς ρητό handler
    το τεστ θα δοκίμαζε το «Άκυρο» νομίζοντας ότι δοκιμάζει το «ΟΚ». */
-async function activate(p, answer) {
-  p.once('dialog', (d) => (answer ? d.accept() : d.dismiss()));
+/* v49 — ΕΝΗΜΕΡΩΘΗΚΕ ΡΗΤΑ (Α400 §Γ: παρωχημένο τεστ, όχι αποτυχία).
+   Η απόφαση της 4/9 («ενεργοποίηση με επιβεβαίωση») ΑΝΑΘΕΩΡΗΘΗΚΕ στις 6/9:
+   στο ΔΩΡΕΑΝ = πορτοφόλι η επιστροφή γίνεται ΜΟΝΟ με τις 12 λέξεις, γιατί
+   αλλιώς όποιος κρατήσει το κλεμμένο κινητό ξαναπαίρνει τη σκυτάλη με ένα
+   πάτημα (κενό κλοπής, Stavros 5/9). Ο διάλογος εμφανίζεται πλέον ΜΟΝΟ όταν
+   η άλλη συσκευή χρωστάει ανέβασμα. */
+async function activate(p, words, answer) {
+  if (answer !== undefined) { p.once('dialog', (d) => (answer ? d.accept() : d.dismiss())); }
+  if (words) { await p.locator('#ro-words').fill(words.join(' ')); }
   await p.locator('#ro-go').click();
 }
 
@@ -202,13 +209,20 @@ test('38 · «Κάνε αυτή τη συσκευή ενεργή»: κατεβά
   await runSync(d1.p);
   await expect.poll(async () => state(d1.p), { timeout: 20000 }).toBe('0');
   await showReader(d1.p);
-  await activate(d1.p, true);
+  /* Η d2 έχει ανεβάσει τα πάντα (runSync), άρα Ν=0 και δεν ρωτάει τίποτα. */
+  await activate(d1.p, words);
   await expect.poll(async () => {
-    return { act: await state(d1.p), err: await d1.p.locator('#ro-err').textContent(), btn: await d1.p.locator('#ro-go').textContent() };
-  }, { timeout: 45000 }).toEqual({ act: '1', err: '', btn: 'Κάνε αυτή τη συσκευή ενεργή' });
-  // ΤΟ ΚΑΤΕΒΑΣΜΑ ΕΓΙΝΕ ΠΡΙΝ: το τιμολόγιο της d2 είναι εδώ
+    return { act: await state(d1.p), btn: await d1.p.locator('#ro-go').textContent() };
+  }, { timeout: 45000 }).toEqual({ act: '1', btn: 'Κάνε αυτή τη συσκευή ενεργή' });
+  /* ΤΟ ΚΑΤΕΒΑΣΜΑ ΕΓΙΝΕ ΠΡΙΝ: το τιμολόγιο της d2 είναι ήδη εδώ.
+     ⚠ Μικρό παράθυρο (3s) και όχι σκέτη ανάγνωση: η εγγραφή στο IndexedDB
+     μπορεί να μην έχει κατασταλάξει τη στιγμή που ο server απαντάει
+     «ενεργή». Ο φρουρός ΔΕΝ χαλαρώνει — αν η σειρά ήταν λάθος, το τιμολόγιο
+     δεν θα ερχόταν με τον επόμενο συγχρονισμό (που ανεβάζει, δεν κατεβάζει)
+     αλλά μόνο στο επόμενο άνοιγμα ή στον γύρο των 30s της ανάγνωσης. */
+  await expect.poll(async () => (await rows(d1.p)).filter((r) => r.id.indexOf('NEW') === 0).length,
+    { timeout: 3000, intervals: [200] }).toBe(1);
   const ids = (await rows(d1.p)).map((r) => r.id);
-  expect(ids.filter((i) => i.indexOf('NEW') === 0).length).toBe(1);
   expect(ids.length).toBe(3);
   // και η d2 έπεσε σε ανάγνωση
   await runSync(d2.p);
@@ -229,7 +243,7 @@ test('39 · 🔴 αν το κατέβασμα ΑΠΟΤΥΧΕΙ, η συσκευ�
 
   await d1.p.route('**/api/km/folder*', (r) => r.abort());   // πέφτει το δίκτυο
   await showReader(d1.p);
-  await activate(d1.p, true);
+  await activate(d1.p, words);              // v49 — με τις 12 λέξεις
   await expect(d1.p.locator('#ro-err')).toBeVisible({ timeout: 30000 });
   expect(await state(d1.p)).toBe('0');                        // ΠΑΡΕΜΕΙΝΕ αναγνώστρια
   await d1.p.unroute('**/api/km/folder*');
@@ -309,11 +323,14 @@ test('42 · η ΑΚΥΡΩΣΗ της επιβεβαίωσης ΔΕΝ αλλάζ�
   await expect.poll(async () => state(d1.p), { timeout: 20000 }).toBe('0');
 
   await showReader(d1.p);
-  // το πεδίο των 12 λέξεων ΔΕΝ εμφανίζεται πια εδώ
-  expect(await d1.p.locator('#ro-wbox').isVisible()).toBe(false);
+  // v49 — το πεδίο των 12 λέξεων ΞΑΝΑΕΜΦΑΝΙΖΕΤΑΙ: είναι ο φρουρός της κλοπής
+  expect(await d1.p.locator('#ro-wbox').isVisible()).toBe(true);
 
-  await activate(d1.p, false);              // ο χρήστης πατάει «Άκυρο»
+  /* Ο φρουρός του κατά λάθος πατήματος είναι πλέον οι ίδιες οι λέξεις:
+     κενό πεδίο = καμία ενεργοποίηση, χωρίς καν κλήση στον server. */
+  await activate(d1.p);                     // πατάει το κουμπί με άδειο πεδίο
   await d1.p.waitForTimeout(4000);
+  await expect(d1.p.locator('#ro-err')).toBeVisible();
   expect(await state(d1.p)).toBe('0');      // τίποτα δεν άλλαξε εδώ
   await runSync(d2.p);
   expect(await state(d2.p)).toBe('1');      // ούτε εκεί: η d2 είναι ακόμα η ενεργή

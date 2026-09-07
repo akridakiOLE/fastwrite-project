@@ -1,6 +1,15 @@
 const { test, expect } = require('@playwright/test');
 const APP = 'http://127.0.0.1:8788/kostometro/';
 
+
+/* ⚠ ΤΟ ΟΡΙΟ ΤΟΥ ΑΡΧΕΙΟΥ, ΟΧΙ ΤΟΥ ΕΛΕΓΧΟΥ. Το playwright.config.js δίνει 45s
+   ανά τεστ. Κάθε τεστ εδώ στήνει ΔΥΟ ολόκληρες συσκευές (εγγραφή, 12 λέξεις,
+   ανέβασμα, σύνδεση, κατέβασμα) — και από τη v49 το κατέβασμα κάνει και μία
+   κλήση inbox. Μετρήθηκε 6/9: το τεστ 33 περνούσε μόνο του σε 10,8s και
+   πέθαινε στα 44,6s μέσα στη σουίτα, δηλαδή το όριο μετρούσε τον ΦΟΡΤΟ ΤΟΥ
+   ΜΗΧΑΝΗΜΑΤΟΣ και όχι τον φρουρό. Τα βαριά specs (active.spec) το ανεβάζουν
+   ήδη· αυτό είχε μείνει πίσω. */
+test.describe.configure({ timeout: 150000 });
 async function fresh(context) {
   const p = await context.newPage();
   await p.goto(APP);
@@ -166,7 +175,14 @@ test('33 · 🔴 καθαρή συσκευή ΔΕΝ σβήνει τον φάκε
   // Η ΑΠΟΔΕΙΞΗ: τρίτη καθαρή συσκευή πρέπει να βρει και τα 4 στον φάκελο.
   const p3 = await fresh(context);
   await signIn(p3, email, words);
-  await expect.poll(async () => (await localRows(p3)).length, { timeout: 45000 }).toBe(4);
+  /* v49 — το όριο ανέβηκε από 45s: το κατέβασμα κάνει πλέον και μία κλήση
+     inbox (ό,τι άφησε πίσω της συσκευή που βγήκε εκτός λειτουργίας). Στην
+     παραγωγή είναι δεκάδες ms· εδώ τρέχουν δεκάδες contexts σε έναν worker
+     και το παλιό όριο μετρούσε το ΠΕΡΙΒΑΛΛΟΝ, όχι τον φρουρό — έπεσε μία
+     φορά στη σουίτα και περνούσε μόνο του σε 10,8s (μετρήθηκε 6/9).
+     ⬜ Καταγράφεται βελτίωση: ο server να επιστρέφει το πλήθος του inbox ως
+     header στο ίδιο το /folder, ώστε να μη χρειάζεται δεύτερη κλήση. */
+  await expect.poll(async () => (await localRows(p3)).length, { timeout: 90000 }).toBe(4);
   await p3.close();
 });
 
@@ -183,6 +199,18 @@ test('34 · το κατέβασμα ΠΟΤΕ δεν σβήνει και ΠΟΤΕ
   await expect.poll(async () => (await localRows(p2)).length, { timeout: 45000 }).toBe(2);
   // αυτή η συσκευή έχει ΚΑΙ δικά της, που ο server δεν ξέρει
   const own = await seedShots(p2, 2, 0, 'L');
+  /* ⚠ ΠΕΡΙΜΕΝΕ ΝΑ ΗΣΥΧΑΣΕΙ ΠΡΙΝ ΦΩΤΟΓΡΑΦΙΣΕΙΣ ΤΗΝ ΚΑΤΑΣΤΑΣΗ (κανόνας 3/9).
+     Το v40 κατεβάζει αυτόματα το τελευταίο τιμολόγιο ανά προμηθευτή· αν το
+     στιγμιότυπο τραβηχτεί ενώ κατεβαίνει ακόμα, το τεστ συγκρίνει μια μισή
+     εικόνα με μια ολοκληρωμένη και πέφτει τυχαία. Δύο ίδιες συνεχόμενες
+     μετρήσεις = ησυχία. Μετρήθηκε 6/9: έπεφτε στο blob του S0. */
+  let snap = null;
+  for (let i = 0; i < 40; i++) {
+    const now = JSON.stringify((await localRows(p2)).sort((a, b) => a.id.localeCompare(b.id)));
+    if (now === snap) { break; }
+    snap = now;
+    await p2.waitForTimeout(700);
+  }
   const before = (await localRows(p2)).sort((a, b) => a.id.localeCompare(b.id));
   // το κατέβασμα ξαναρχίζει με το άνοιγμα της εφαρμογής, όπως στον χρήστη
   await p2.goto(APP, { waitUntil: 'domcontentloaded' }).catch(() => {});
