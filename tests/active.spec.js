@@ -107,8 +107,22 @@ async function settled(p) {
   }
   return last;
 }
+/* 🔴 7/9/2026 — ΤΟ «ΣΥΓΧΡΟΝΙΣΜΟΣ ΤΩΡΑ» ΔΕΝ ΑΝΕΒΑΖΕΙ ΟΣΟ ΕΚΚΡΕΜΕΙ ΚΑΤΕΒΑΣΜΑ.
+   Κατεβάζει, και το λέει καθαρά στη γραμμή («περιμένει κατέβασμα») — η
+   εφαρμογή είναι ειλικρινής. Το τεστ όμως κοίταζε ΜΟΝΟ αν ξαναενεργοποιήθηκε
+   το κουμπί και προχωρούσε νομίζοντας ότι ανέβασε. Αποτέλεσμα: τα τεστ 38 και
+   40 έπεφταν τυχαία (μετρημένο 2/6 και 1/6), με τον φάκελο στον server να
+   έχει 311 bytes αντί για 443 — δηλαδή το τιμολόγιο δεν είχε φύγει ΠΟΤΕ.
+   Ήταν σφάλμα ΤΟΥ ΤΕΣΤ, όχι της εφαρμογής.
+   Η διόρθωση δεν διαβάζει κείμενο οθόνης: περιμένει να σβήσει η σημαία που
+   κρατάει το φρένο, και μετά πατάει. */
+async function waitPullDone(p) {
+  await expect.poll(async () => p.evaluate(() => localStorage.getItem('km_need_pull')),
+    { timeout: 45000, intervals: [300] }).toBeNull();
+}
 async function runSync(p) {
   await settings(p);
+  await waitPullDone(p);
   await p.evaluate(() => new Promise((res) => {
     document.getElementById('st-sync-now').click();
     const t = setInterval(() => { if (!document.getElementById('st-sync-now').disabled) { clearInterval(t); res(); } }, 200);

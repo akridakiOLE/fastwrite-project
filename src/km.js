@@ -381,10 +381,23 @@ async function addLock(request, env) {
   const wrapped = (clean(b.wrapped_k, 130) || "").toLowerCase();
   const kind = clean(b.kind, 16) || "words";
   const replace = b.replace ? String(b.replace).toLowerCase() : null;
+  // v52 · ΑΛΛΑΓΗ ΛΕΞΕΩΝ — ΚΛΕΙΝΕΙ ΚΑΙ Ο ΠΑΛΙΟΣ ΚΩΔΙΚΟΣ ΤΟΥ ΛΟΓΑΡΙΑΣΜΟΥ.
+  // Το km_accounts.auth_hash είναι η ΕΝΑΛΛΑΚΤΙΚΗ ταυτότητα (v46, πριν τις
+  // κλειδαριές): βγαίνει από τις λέξεις με το παλιό kmDerive. Χωρίς αυτό,
+  // μετά την αλλαγή λέξεων οι ΠΑΛΙΕΣ λέξεις εξακολουθούσαν να ΓΡΑΦΟΥΝ στον
+  // φάκελο — δεν διάβαζαν δεδομένα (το Κ είναι τυχαίο) αλλά έγραφαν, και το
+  // «οι παλιές δεν ισχύουν πια» που λέει η οθόνη θα ήταν ψέμα.
+  // Καταγεγραμμένο ανοιχτό από 6/9 (Α300 §1). Κλείνει ΜΟΝΟ μαζί με την
+  // αντικατάσταση κλειδαριάς λέξεων, στην ΙΔΙΑ πράξη batch.
+  const accountAuth = (clean(b.account_auth, 64) || "").toLowerCase();
   if (!HEX64.test(lockId) || !HEX64.test(auth)) return json({ ok: false, error: "bad_lock" }, 400);
   if (!HEX120.test(wrapped)) return json({ ok: false, error: "bad_wrapped_k" }, 400);
   if (LOCK_KINDS.indexOf(kind) < 0) return json({ ok: false, error: "bad_kind" }, 400);
   if (replace && !HEX64.test(replace)) return json({ ok: false, error: "bad_replace" }, 400);
+  if (accountAuth && !HEX64.test(accountAuth)) return json({ ok: false, error: "bad_account_auth" }, 400);
+  if (accountAuth && !(kind === "words" && replace)) {
+    return json({ ok: false, error: "account_auth_needs_words_replace" }, 400);
+  }
 
   const taken = await env.DB.prepare("SELECT folder_id FROM km_locks WHERE lock_id = ?").bind(lockId).first();
   if (taken) return json({ ok: false, error: "lock_exists" }, 409);
@@ -402,9 +415,15 @@ async function addLock(request, env) {
     `INSERT INTO km_locks (lock_id, folder_id, kind, auth_hash, wrapped_k, created, created_by, label)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(lockId, a.id.folder, kind, await sha256hex(auth), wrapped, ts, a.id.device, clean(b.label, 40)));
+  if (accountAuth) {
+    stmts.push(env.DB.prepare("UPDATE km_accounts SET auth_hash = ? WHERE folder_id = ?")
+      .bind(await sha256hex(accountAuth), a.id.folder));
+  }
   await env.DB.batch(stmts);
   await touchDevice(env, request, a.id, null);
-  return json({ ok: true, lock_id: lockId, kind: kind, replaced: replace, locks: await lockSummary(env, a.id.folder) });
+  return json({ ok: true, lock_id: lockId, kind: kind, replaced: replace,
+                account_auth_closed: !!accountAuth,
+                locks: await lockSummary(env, a.id.folder) });
 }
 
 async function status(request, env) {

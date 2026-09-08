@@ -42,7 +42,7 @@
 
   go.onclick = async function(){
     go.disabled=true; log.textContent=''; wbox.style.display='none'; pass=0; fail=0; notes=[]; sum.style.display='none';
-    var kdfMs='-', sealMs='-', upMs='-', downMs='-';
+    var kdfMs='-', pwMs='-', sealMs='-', upMs='-', downMs='-';
     try{
       line('server: '+BASE,'dim');
 
@@ -156,12 +156,53 @@
       // 21 — οι λέξεις ΜΟΝΕΣ τους (παλιό σχήμα) δεν ανοίγουν πια δεδομένα του Κ
       var oldOpens=null; try{ await kmOpen(d1.key,sealedK); oldOpens=true; }catch(e){ oldOpens=false; }
       (oldOpens===false && /^[0-9a-f]{64}$/.test(kmNewFolderId())) ? ok('21 Η.13: το παλιό κλειδί-από-λέξεις δεν ανοίγει δεδομένα του Κ · folder_id τυχαίο 64 hex') : bad('21 το παλιό κλειδί άνοιξε δεδομένα του Κ — ΣΟΒΑΡΟ');
+      // ── v53 · ΤΟ BACKUP ΑΝΑΚΤΗΣΗΣ — ΤΟ ΚΛΕΙΔΙ ΣΤΑ ΔΥΟ (7/9/2026) ──
+      // 22 — έλεγχος κωδικού: κόβει το κοντό και το μονότονο, δέχεται το κανονικό
+      var pcShort=kmPasswordCheck('abc123'), pcMono=kmPasswordCheck('aaaaaaaaaa'), pcOk=kmPasswordCheck('parathyro-84-Molyvi');
+      (!pcShort.ok && !pcMono.ok && pcOk.ok && pcOk.score>=3)
+        ? ok('22 κωδικός: <10 χαρακτήρες ✗ · 10 ίδιοι χαρακτήρες ✗ · κανονικός ✓ ('+pcOk.label+')')
+        : bad('22 έλεγχος κωδικού: short='+pcShort.ok+' mono='+pcMono.ok+' ok='+pcOk.ok+'/'+pcOk.score);
+
+      // 23 — ίδιος κωδικός + ίδιο salt → ίδιο R2. Άλλο salt → εντελώς άλλο.
+      var salt1=kmRandomHex(16), salt2=kmRandomHex(16), PW='parathyro-84-Molyvi';
+      var t22=Date.now();
+      var r2a=await kmDeriveR2(PW,salt1); pwMs=Date.now()-t22;
+      var r2b=await kmDeriveR2(PW,salt1);
+      var r2c=await kmDeriveR2(PW,salt2);
+      (hexOf(r2a)===hexOf(r2b) && hexOf(r2a)!==hexOf(r2c) && r2a.length===32)
+        ? ok('23 ο ίδιος κωδικός δίνει ΠΑΝΤΑ το ίδιο μισό ('+pwMs+' ms) — και σε άλλον λογαριασμό εντελώς άλλο')
+        : bad('23 R2 ασταθές ή κοινό ανάμεσα σε λογαριασμούς — ΣΟΒΑΡΟ');
+
+      // 24 🔴 Ο ΠΥΡΗΝΑΣ ΤΗΣ ΥΠΟΣΧΕΣΗΣ: κανένα μισό ΜΟΝΟ του δεν ανοίγει τίποτα.
+      var R1=kmNewR1();
+      var kekR=await kmRecoveryKek(R1,r2a);
+      var WR=await kmWrapK(kekR,K);                       // το ΙΔΙΟ Κ, δεύτερη κλειδαριά
+      var onlyR1=null, onlyR2=null, wrongPw=null;
+      try{ onlyR1=await kmUnwrapK(await kmRecoveryKek(R1, await kmDeriveR2('allos-kodikos-99',salt1)), WR); }catch(e){}
+      try{ onlyR2=await kmUnwrapK(await kmRecoveryKek(kmNewR1(), r2a), WR); }catch(e){}
+      try{ wrongPw=await kmUnwrapK(await kmRecoveryKek(R1, await kmDeriveR2(PW+'!',salt1)), WR); }catch(e){}
+      (onlyR1===null && onlyR2===null && wrongPw===null)
+        ? ok('24 🔴 ΜΕ ΤΟ ΔΙΚΟ ΜΑΣ ΜΙΣΟ ΜΟΝΟ: δεν ανοίγει. Με του χρήστη μόνο: δεν ανοίγει. Λάθος κωδικός: δεν ανοίγει.')
+        : bad('24 ΣΟΒΑΡΟΤΑΤΟ — ένα μισό άνοιξε το backup: R1='+(onlyR1!==null)+' R2='+(onlyR2!==null)+' λάθοςΚωδ='+(wrongPw!==null));
+
+      // 25 — με ΚΑΙ ΤΑ ΔΥΟ μισά βγαίνει το ΙΔΙΟ Κ, και ανοίγει τα ίδια δεδομένα
+      var Kr=await kmUnwrapK(await kmRecoveryKek(R1,await kmDeriveR2(PW,salt1)), WR);
+      var openedR=await kmOpen(await kmImportK(Kr), sealedK);
+      (hexOf(Kr)===hexOf(K) && openedR.length===data.length)
+        ? ok('25 με τα ΔΥΟ μισά μαζί: ίδιο Κ, και τα δεδομένα ανοίγουν — καμία ξανακρυπτογράφηση')
+        : bad('25 τα δύο μισά δεν έδωσαν το αρχικό Κ — ΣΟΒΑΡΟ');
+
+      // 26 — δύο πόρτες, ένα δωμάτιο: λέξεις ΚΑΙ ανάκτηση δείχνουν στο ίδιο Κ,
+      //      χωρίς η μία κλειδαριά να προδίδει την άλλη
+      (WR!==WK && WR.length===120 && hexOf(await kmUnwrapK(L1.kek,WK))===hexOf(Kr))
+        ? ok('26 δύο κλειδαριές πάνω στο ίδιο Κ (λέξεις + ανάκτηση), διαφορετικά bytes η καθεμία')
+        : bad('26 οι δύο κλειδαριές δεν είναι ανεξάρτητες — ΣΟΒΑΡΟ');
     }catch(e){
       bad('εξαίρεση: '+(e&&e.message||e));
     }
 
     var s='KM-H2a+H13 '+(fail===0?'✅ ΟΛΑ ΠΕΡΑΣΑΝ':'❌ ΑΠΕΤΥΧΑΝ '+fail)+' · '+pass+'/'+(pass+fail)
-      +' · kdf '+kdfMs+'ms · seal '+sealMs+'ms · up '+upMs+'ms · down '+downMs+'ms · '+BASE
+      +' · kdf '+kdfMs+'ms · pw '+pwMs+'ms · seal '+sealMs+'ms · up '+upMs+'ms · down '+downMs+'ms · '+BASE
       +(notes.length?(' · '+notes.slice(0,2).join(' | ')):'');
     sum.textContent=s; sum.style.display='block'; sum.style.borderColor = fail===0 ? '#00E5A0' : '#ff6b6b';
     copy.disabled=false; go.disabled=false;

@@ -207,3 +207,83 @@ function kmHexToBytes(hex) {
   for (var i = 0; i < out.length; i++) out[i] = parseInt(s.substr(i * 2, 2), 16);
   return out;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v53 · ΤΟ BACKUP ΑΝΑΚΤΗΣΗΣ — ΤΟ ΚΛΕΙΔΙ ΚΟΜΜΕΝΟ ΣΤΑ ΔΥΟ
+// (κλειστό θέμα 6/9/2026 · Α320 · αποφάσεις Stavros 7/9/2026)
+//
+// Το ίδιο Κ κλειδώνεται ΔΕΥΤΕΡΗ φορά, με κλειδί ανάκτησης R που δεν υπάρχει
+// ολόκληρο πουθενά:
+//
+//   R1 — το μισό ΜΑΣ. Ζει στον server.
+//   R2 — το μισό ΤΟΥ ΧΡΗΣΤΗ. Βγαίνει από τον κωδικό του, ΜΕΣΑ στη συσκευή,
+//        και ΔΕΝ φεύγει ποτέ από εκεί. Ο server δεν το είδε ποτέ και δεν
+//        μπορεί να ελέγξει αν είναι σωστός ο κωδικός.
+//
+//   R = HKDF(R1 || R2)  →  κανένα από τα δύο μόνο του δεν ανοίγει τίποτα.
+//
+// 🔴 ΓΙΑΤΙ ΠΟΛΥ ΠΕΡΙΣΣΟΤΕΡΕΣ ΕΠΑΝΑΛΗΨΕΙΣ ΑΠΟ ΤΙΣ ΛΕΞΕΙΣ:
+// Οι 12 λέξεις κουβαλάνε 128 bits τυχαιότητας — δεν μαντεύονται ποτέ, όσο
+// γρήγορο κι αν είναι το KDF. Ένας ανθρώπινος κωδικός κουβαλάει πολύ
+// λιγότερα, και είναι το ΜΟΝΟ που μένει όρθιο αν κάποτε διαρρεύσει το R1.
+// Εκεί το μόνο που αγοράζει χρόνο είναι η αργή παραγωγή. Γι' αυτό ξεχωριστή,
+// πολύ μεγαλύτερη τιμή — και γι' αυτό ελάχιστο μήκος 10 (απόφαση Stavros 7/9).
+var KM_PW_ITER = 600000;
+var KM_PW_MIN  = 10;
+
+// Το μισό μας. Τυχαίο, 32 bytes. Στην παραγωγή θα το παράγει ο server.
+function kmNewR1() { return kmRandomHex(32); }
+
+// Έλεγχος κωδικού πριν καν ξεκινήσει η αργή παραγωγή. Δεν «βαθμολογεί
+// πολυπλοκότητα» με κανόνες τύπου «ένα κεφαλαίο, ένα σύμβολο» — αυτοί
+// παράγουν «Kostometro1!» και τίποτα άλλο. Μετράει ΜΗΚΟΣ και ΠΟΙΚΙΛΙΑ.
+function kmPasswordCheck(pw) {
+  var s = String(pw == null ? "" : pw);
+  if (s.length < KM_PW_MIN) {
+    return { ok: false, score: 0, error: "Χρειάζονται τουλάχιστον " + KM_PW_MIN + " χαρακτήρες." };
+  }
+  var kinds = 0;
+  if (/[a-zα-ω]/.test(s)) kinds++;
+  if (/[A-ZΑ-Ω]/.test(s)) kinds++;
+  if (/[0-9]/.test(s)) kinds++;
+  if (/[^A-Za-zΑ-Ωα-ω0-9]/.test(s)) kinds++;
+  var uniq = {}, n = 0, i;
+  for (i = 0; i < s.length; i++) { if (!uniq[s[i]]) { uniq[s[i]] = 1; n++; } }
+  /* Τρία σήματα, όχι κανόνες: μήκος, είδη χαρακτήρων, πόσοι ΔΙΑΦΟΡΕΤΙΚΟΙ.
+     Το «αααααααααα» έχει 10 χαρακτήρες και έναν μόνο διαφορετικό. */
+  var score = 0;
+  if (s.length >= 10) score++;
+  if (s.length >= 14) score++;
+  if (kinds >= 2) score++;
+  if (n >= 8) score++;
+  if (n < 4) { return { ok: false, score: 0, error: "Πολύ λίγοι διαφορετικοί χαρακτήρες." }; }
+  return { ok: true, score: score, label: ["αδύναμος", "μέτριος", "καλός", "δυνατός", "πολύ δυνατός"][score] };
+}
+
+// Ο κωδικός → R2. Το salt είναι δημόσιο και ΔΙΑΦΟΡΕΤΙΚΟ ανά λογαριασμό:
+// χωρίς αυτό, δύο χρήστες με τον ίδιο κωδικό θα είχαν το ίδιο R2, και μία
+// διαρροή θα τους έπαιρνε και τους δύο μαζί.
+async function kmDeriveR2(password, saltHex) {
+  if (!/^[0-9a-f]{32,64}$/.test(saltHex || "")) throw new Error("Λάθος salt ανάκτησης.");
+  var base = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(password)), "PBKDF2", false, ["deriveBits"]);
+  var bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: new TextEncoder().encode("kostometro/recovery/" + saltHex), iterations: KM_PW_ITER, hash: "SHA-256" },
+    base, 256
+  );
+  return new Uint8Array(bits);
+}
+
+// Τα δύο μισά μαζί → το κλειδί που ανοίγει την κλειδαριά ανάκτησης.
+// ⚠ Και τα δύο μπαίνουν στο ΙΔΙΟ HKDF: αλλαγή σε οποιοδήποτε από τα δύο
+// δίνει εντελώς άλλο κλειδί. Δεν υπάρχει «μισό αποτέλεσμα».
+async function kmRecoveryKek(r1Hex, r2) {
+  var r1 = kmHexToBytes(String(r1Hex || "").toLowerCase());
+  if (r1.length !== 32) throw new Error("Λάθος R1.");
+  if (!(r2 instanceof Uint8Array) || r2.length !== 32) throw new Error("Λάθος R2.");
+  var both = new Uint8Array(64);
+  both.set(r1, 0);
+  both.set(r2, 32);
+  var seedKey = await crypto.subtle.importKey("raw", both, "HKDF", false, ["deriveBits"]);
+  var kekBits = await kmHkdf(seedKey, "recovery-kek", 256);
+  return crypto.subtle.importKey("raw", kekBits, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
