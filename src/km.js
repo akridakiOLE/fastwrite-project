@@ -355,6 +355,8 @@ async function unlock(request, env) {
     folder_id: acc.folder_id,
     kind: lock.kind,
     wrapped_k: lock.wrapped_k,
+    params: lock.params || null,        // v54 — πώς φτιάχτηκε ΑΥΤΗ η κλειδαριά
+
     state: pub(acc),
     this_device_active: acc.active_device_id === device,
     active: active,
@@ -395,6 +397,12 @@ async function addLock(request, env) {
   if (LOCK_KINDS.indexOf(kind) < 0) return json({ ok: false, error: "bad_kind" }, 400);
   if (replace && !HEX64.test(replace)) return json({ ok: false, error: "bad_replace" }, 400);
   if (accountAuth && !HEX64.test(accountAuth)) return json({ ok: false, error: "bad_account_auth" }, 400);
+  // v54 — ΟΙ ΠΑΡΑΜΕΤΡΟΙ ΤΗΣ ΚΛΕΙΔΑΡΙΑΣ. Μικρό κείμενο χωρίς μυστικά, που λέει
+  // ΠΩΣ φτιάχτηκε (kdf, πόσα βήματα). Ο server ΔΕΝ το ερμηνεύει — το φυλάει
+  // και το επιστρέφει, ώστε μια μελλοντική αύξηση βημάτων να μη σπάει τα
+  // παλιά backup ανάκτησης. Ό,τι ξεπερνά τα 200 σημεία δεν είναι παράμετροι.
+  const params = clean(b.params, 200) || null;
+  if (params && !/^\{[\x20-\x7e]*\}$/.test(params)) return json({ ok: false, error: "bad_params" }, 400);
   if (accountAuth && !(kind === "words" && replace)) {
     return json({ ok: false, error: "account_auth_needs_words_replace" }, 400);
   }
@@ -412,9 +420,9 @@ async function addLock(request, env) {
   const stmts = [];
   if (replace) stmts.push(env.DB.prepare("DELETE FROM km_locks WHERE lock_id = ? AND folder_id = ?").bind(replace, a.id.folder));
   stmts.push(env.DB.prepare(
-    `INSERT INTO km_locks (lock_id, folder_id, kind, auth_hash, wrapped_k, created, created_by, label)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(lockId, a.id.folder, kind, await sha256hex(auth), wrapped, ts, a.id.device, clean(b.label, 40)));
+    `INSERT INTO km_locks (lock_id, folder_id, kind, auth_hash, wrapped_k, created, created_by, label, params)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(lockId, a.id.folder, kind, await sha256hex(auth), wrapped, ts, a.id.device, clean(b.label, 40), params));
   if (accountAuth) {
     stmts.push(env.DB.prepare("UPDATE km_accounts SET auth_hash = ? WHERE folder_id = ?")
       .bind(await sha256hex(accountAuth), a.id.folder));

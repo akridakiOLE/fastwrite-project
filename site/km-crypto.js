@@ -228,8 +228,34 @@ function kmHexToBytes(hex) {
 // λιγότερα, και είναι το ΜΟΝΟ που μένει όρθιο αν κάποτε διαρρεύσει το R1.
 // Εκεί το μόνο που αγοράζει χρόνο είναι η αργή παραγωγή. Γι' αυτό ξεχωριστή,
 // πολύ μεγαλύτερη τιμή — και γι' αυτό ελάχιστο μήκος 10 (απόφαση Stavros 7/9).
-var KM_PW_ITER = 600000;
+// 🔴 ΜΕΤΡΗΘΗΚΕ 7/9/2026 ΣΤΟ ΚΙΝΗΤΟ ΤΟΥ STAVROS, ΣΤΗΝ ΠΑΡΑΓΩΓΗ:
+// 600.000 βήματα σε 146 ms — και οι 12 λέξεις 210.000 σε 61 ms. Δύο
+// ανεξάρτητοι αριθμοί που συμφωνούν: ~4 εκατομμύρια βήματα/δευτερόλεπτο.
+// Οι σύγχρονοι ARM έχουν SHA-256 σε υλικό και τα τρώνε. Ο κανόνας είναι να
+// κοστίζει ΠΕΡΙΠΟΥ ΕΝΑ ΔΕΥΤΕΡΟΛΕΠΤΟ στον νόμιμο χρήστη — στα 146 ms
+// χαρίζαμε παράγοντα 5 σε όποιον δοκιμάζει κωδικούς.
+var KM_PW_ITER = 2000000;
 var KM_PW_MIN  = 10;
+
+// 🔴 Ο ΑΡΙΘΜΟΣ ΤΑΞΙΔΕΥΕΙ ΜΑΖΙ ΜΕ ΤΗΝ ΚΛΕΙΔΑΡΙΑ — ΑΛΛΙΩΣ ΕΙΝΑΙ ΜΟΝΟΔΡΟΜΟΣ.
+// Κάθε κλειδαριά ανάκτησης θυμάται με πόσα βήματα φτιάχτηκε. Χωρίς αυτό,
+// η επόμενη αύξηση (και θα υπάρξει — τα κινητά γίνονται ταχύτερα) θα έκανε
+// τα ΠΑΛΙΑ backup να μην ανοίγουν ποτέ ξανά. Με αυτό, ο καθένας ανοίγει με
+// τους δικούς του όρους και η αύξηση δεν σπάει κανέναν.
+function kmRecoveryParams() {
+  return { kdf: "pbkdf2-sha256", iter: KM_PW_ITER, v: 1 };
+}
+// Διάβασμα αποθηκευμένων παραμέτρων, με φρουρό: ό,τι δεν καταλαβαίνουμε ή
+// είναι ύποπτα χαμηλό ΔΕΝ γίνεται δεκτό σιωπηλά. Κλειδαριά που ισχυρίζεται
+// «1000 βήματα» είναι είτε χαλασμένη είτε πειραγμένη.
+function kmReadRecoveryParams(raw) {
+  var o = raw;
+  if (typeof raw === "string") { try { o = JSON.parse(raw); } catch (e) { o = null; } }
+  if (!o || o.kdf !== "pbkdf2-sha256") { throw new Error("Άγνωστη μορφή κλειδαριάς ανάκτησης."); }
+  var n = Number(o.iter);
+  if (!Number.isInteger(n) || n < 100000 || n > 20000000) { throw new Error("Μη αποδεκτός αριθμός βημάτων."); }
+  return { kdf: o.kdf, iter: n, v: Number(o.v) || 1 };
+}
 
 // Το μισό μας. Τυχαίο, 32 bytes. Στην παραγωγή θα το παράγει ο server.
 function kmNewR1() { return kmRandomHex(32); }
@@ -263,11 +289,14 @@ function kmPasswordCheck(pw) {
 // Ο κωδικός → R2. Το salt είναι δημόσιο και ΔΙΑΦΟΡΕΤΙΚΟ ανά λογαριασμό:
 // χωρίς αυτό, δύο χρήστες με τον ίδιο κωδικό θα είχαν το ίδιο R2, και μία
 // διαρροή θα τους έπαιρνε και τους δύο μαζί.
-async function kmDeriveR2(password, saltHex) {
+// ⚠ Το `iter` δίνεται ΡΗΤΑ όταν ανοίγουμε υπάρχουσα κλειδαριά (από τις
+// αποθηκευμένες παραμέτρους της). Παραλείπεται μόνο όταν ΦΤΙΑΧΝΟΥΜΕ νέα.
+async function kmDeriveR2(password, saltHex, iter) {
   if (!/^[0-9a-f]{32,64}$/.test(saltHex || "")) throw new Error("Λάθος salt ανάκτησης.");
+  var n = (iter === undefined || iter === null) ? KM_PW_ITER : kmReadRecoveryParams({ kdf: "pbkdf2-sha256", iter: iter }).iter;
   var base = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(password)), "PBKDF2", false, ["deriveBits"]);
   var bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: new TextEncoder().encode("kostometro/recovery/" + saltHex), iterations: KM_PW_ITER, hash: "SHA-256" },
+    { name: "PBKDF2", salt: new TextEncoder().encode("kostometro/recovery/" + saltHex), iterations: n, hash: "SHA-256" },
     base, 256
   );
   return new Uint8Array(bits);
