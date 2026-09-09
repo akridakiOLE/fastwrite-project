@@ -29,6 +29,11 @@
        ανεβαίνει ΤΙΠΟΤΑ. Χωρίς αυτό, μια καθαρή συσκευή που μόλις συνδέθηκε
        θα ανέβαζε άδεια στοιχεία και θα έσβηνε τον φάκελο στον server. */
     needPull: 'km_need_pull',
+    /* v56 · Η.11 — «ο λογαριασμός ΔΕΝ υπάρχει πια στον server». Μπαίνει μόνο
+       από απάντηση 410 και ΔΕΝ σβήνει τίποτα: τα τιμολόγια στη συσκευή είναι
+       του χρήστη (απόφαση Stavros 9/9). Σταματάει τον συγχρονισμό και δείχνει
+       την οθόνη s-gone μία φορά. */
+    acctGone: 'km_acct_gone',
     /* v35 · Η.3 — Η ΤΕΛΕΥΤΑΙΑ ΓΝΩΣΤΗ ΑΠΑΝΤΗΣΗ ΤΟΥ SERVER στο «είμαι εγώ η
        ενεργή;». Κρατιέται τοπικά ΕΠΙΤΗΔΕΣ: χωρίς δίκτυο στην πόρτα, η
        εφαρμογή πρέπει να ξέρει τι είναι — και «δεν μπόρεσα να ρωτήσω» ΔΕΝ
@@ -107,6 +112,23 @@
       r.onerror = function () { rej(r.error); };
     });
   }
+  /* v56 · Η.11 — άδειασμα της τοπικής βάσης. Χρησιμοποιείται ΜΟΝΟ όταν ο
+     χρήστης το ζητήσει ρητά (διαγραφή λογαριασμού από αυτή τη συσκευή, ή
+     «Ξεκίνα καθαρά»). ⛔ Το όνομα της βάσης δεν αλλάζει ποτέ (§2, 1/9) —
+     γι' αυτό αδειάζει το store αντί να διαγραφεί η βάση: το deleteDatabase
+     κρεμάει σιωπηλά όσο υπάρχει ανοιχτή σύνδεση, και εδώ ΥΠΑΡΧΕΙ. */
+  function wipeDB() {
+    return new Promise(function (res) {
+      if (!db) { return res(); }
+      try {
+        var t = db.transaction('shots', 'readwrite');
+        t.objectStore('shots').clear();
+        t.oncomplete = function () { res(); };
+        t.onerror = function () { res(); };   // η επαναφόρτωση προχωράει έτσι κι αλλιώς
+      } catch (e) { res(); }
+    });
+  }
+
   function put(rec) {
     return new Promise(function (res, rej) {
       var t = db.transaction('shots', 'readwrite');
@@ -266,7 +288,8 @@
      αόρατη για πάντα, σιωπηλά, χωρίς κανένα σφάλμα. (Το έπιασε το τεστ α1
      στις 5/9· με ανάγνωση δεν φαινόταν.) */
   var SCREENS = ['s-acc','s-email','s-words','s-signin','s-key','s-perm','s-cam','s-who',
-                 's-menu','s-pend','s-sup','s-ref','s-settings','s-shot','s-mywords'];
+                 's-menu','s-pend','s-sup','s-ref','s-settings','s-shot','s-mywords',
+                 's-del','s-gone'];
   function show(id) {
     var pv = el('preview');
     if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
@@ -1574,7 +1597,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v54';
+  var APP_VER = 'φέτα 3 · v56';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2216,6 +2239,38 @@
   var KM_API = '/api/km/';
   var pendingWords = null;   // οι λέξεις που μόλις φτιάχτηκαν, πριν τσεκαριστούν
 
+  /* ══ v56 · Η.11 — Ο ΑΝΙΧΝΕΥΤΗΣ ΤΟΥ ΝΕΚΡΟΥ ΛΟΓΑΡΙΑΣΜΟΥ ═══════════════
+     🔴 ΕΝΑ ΣΗΜΕΙΟ, ΚΑΙ ΓΙ' ΑΥΤΟ ΥΠΑΡΧΕΙ. Ο server απαντάει 410 σε ΚΑΘΕ
+     διαδρομή μόλις ο λογαριασμός διαγραφεί (km.js: authed / unlock /
+     register). Ως τη v55 η εφαρμογή ΔΕΝ ήξερε τι σημαίνει το 410: 23 σημεία
+     μιλούσαν στον server και κανένα δεν το έπιανε — η γραμμή συγχρονισμού
+     έγραφε «σφάλμα 410» για πάντα και ο χρήστης δεν μάθαινε ποτέ γιατί
+     σταμάτησαν όλα (μετρήθηκε 9/9/2026).
+     Αν ο έλεγχος έμπαινε στα κουμπιά ή στις 23 κλήσεις μία-μία, θα ξεχνιόταν
+     μία — και μία διαδρομή που δεν το πιάνει είναι ίδια με καμία. Γι' αυτό
+     ΟΛΕΣ οι κλήσεις περνούν από εδώ. */
+  function kmFetch(path, opts) {
+    return fetch(KM_API + path, opts).then(function (r) {
+      if (r.status === 410) { onAccountGone(); }
+      return r;
+    });
+  }
+
+  function acctGone() { return !!localStorage.getItem(LS.acctGone); }
+
+  /* ⚠ ΔΕΝ ΣΒΗΝΕΙ ΤΙΠΟΤΑ. Απόφαση Stavros 9/9: τα τιμολόγια στη συσκευή είναι
+     του χρήστη· εμείς σβήνουμε μόνο τα δικά μας αντίγραφα. Η συσκευή τα
+     κρατάει μέχρι ο ίδιος να πατήσει «Ξεκίνα καθαρά».
+     Καλείται από πολλές κλήσεις ταυτόχρονα — γι' αυτό η οθόνη δείχνεται
+     ΜΙΑ φορά (η σημαία μπαίνει πριν το goto). */
+  function onAccountGone() {
+    if (acctGone()) { return; }
+    try { localStorage.setItem(LS.acctGone, new Date().toISOString()); } catch (e) {}
+    try { localStorage.removeItem(LS.needPull); } catch (e) {}
+    syncInfo.msg = 'ο λογαριασμός διαγράφηκε';
+    goto('s-gone');
+  }
+
   /* v47 · Η.13 — Η ΤΑΥΤΟΤΗΤΑ ΕΧΕΙ ΔΥΟ ΜΟΡΦΕΣ, ΚΑΙ ΟΙ ΔΥΟ ΔΕΚΤΕΣ ΑΠΟ ΤΟΝ SERVER.
      Με κλειδαριά (μετά τη μετανάστευση): X-Km-Lock + ο κωδικός της.
      Χωρίς (v46, και ΚΑΤΑ τη διάρκεια της μετανάστευσης): ο παλιός κωδικός
@@ -2284,7 +2339,7 @@
     if (!email || !localStorage.getItem(LS.folder)) { return Promise.resolve(false); }
     var src = localStorage.getItem(LS.src) || 'link';
     var ref = /^ref:(.+)$/.exec(src);
-    return fetch(KM_API + 'register', {
+    return kmFetch('register', {
       method: 'POST',
       headers: kmHead(),
       body: JSON.stringify({
@@ -2337,7 +2392,7 @@
     var w = localStorage.getItem(LS.words);
     if (!w) { return Promise.resolve(false); }
     return kmDeriveLock(w.split(' ')).then(function (L) {
-      return fetch(KM_API + 'unlock', {
+      return kmFetch('unlock', {
         method: 'POST',
         headers: { 'X-Km-Lock': L.lockId, 'X-Km-Auth': L.authToken, 'X-Km-Device': localStorage.getItem(LS.id) || '' }
       }).then(function (r) {
@@ -2383,7 +2438,7 @@
          περασμένη· αλλιώς ανοίγει με το παλιό και ξανανεβαίνει με το Κ,
          στο ΙΔΙΟ id. Το ίδιο id σημαίνει ότι δεύτερο ανέβασμα είναι απλή
          επανάληψη, ποτέ σύγκρουση (ο server το λέει ρητά στο putPhoto). */
-      return fetch(KM_API + 'photos', { headers: kmHead() })
+      return kmFetch('photos', { headers: kmHead() })
         .then(function (r) { return r.ok ? r.json() : null; });
     }).then(function (j) {
       if (!j) { throw new Error('δεν διάβασα τη λίστα φωτογραφιών'); }
@@ -2392,7 +2447,7 @@
       var step = function () {
         if (i >= ids.length) { return Promise.resolve(); }
         var id = ids[i++];
-        return fetch(KM_API + 'photo?id=' + encodeURIComponent(id), { headers: kmHead() })
+        return kmFetch('photo?id=' + encodeURIComponent(id), { headers: kmHead() })
           .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
           .then(function (buf) {
             if (!buf) { return null; }
@@ -2406,7 +2461,7 @@
             return kmSeal(key, plain).then(function (sealed) {
               var h = kmHead();
               h['Content-Type'] = 'application/octet-stream';
-              return fetch(KM_API + 'photo?id=' + encodeURIComponent(id), { method: 'PUT', headers: h, body: sealed })
+              return kmFetch('photo?id=' + encodeURIComponent(id), { method: 'PUT', headers: h, body: sealed })
                 .then(function (res) {
                   if (!res.ok) { throw new Error('φωτογραφία ' + id + ': ' + res.status); }
                 });
@@ -2431,7 +2486,7 @@
       /* ΒΗΜΑ 4 — η κλειδαριά, ΤΕΛΕΥΤΑΙΑ. Από εδώ ο φάκελος ανοίγει από
          οποιαδήποτε συσκευή με τις 12 λέξεις, χωρίς το παλιό κλειδί. */
       return kmWrapK(L.kek, kmHexToBytes(localStorage.getItem(LS.kkey))).then(function (wrapped) {
-        return fetch(KM_API + 'lock', {
+        return kmFetch('lock', {
           method: 'POST', headers: kmHead(),
           body: JSON.stringify({ lock_id: L.lockId, auth_token: L.authToken, wrapped_k: wrapped, kind: 'words' })
         }).then(function (r) {
@@ -2610,7 +2665,7 @@
     Promise.all([kmDeriveLock(words), kmDerive(words)]).then(function (dl) {
       var L = dl[0], d = dl[1];
       return kmWrapK(L.kek, rawK).then(function (wrapped) {
-        return fetch(KM_API + 'lock', {
+        return kmFetch('lock', {
           method: 'POST',
           headers: kmHead(),
           body: JSON.stringify({
@@ -2666,7 +2721,7 @@
      κουμπί κλειδώνει μόνο του αντί να καταστρέψει σιωπηλά το αρχείο.
      ⚠ Χωρίς δίκτυο ΔΕΝ προχωράει: «δεν μπόρεσα να ελέγξω» δεν είναι «καθαρό». */
   function folderState() {
-    return fetch(KM_API + 'status', { headers: kmHead() }).then(function (r) {
+    return kmFetch('status', { headers: kmHead() }).then(function (r) {
       if (r.status === 404) { return { empty: true }; }   // δεν υπάρχει καν λογαριασμός
       if (!r.ok) { return { unknown: true }; }
       return r.json().then(function (j) {
@@ -2744,7 +2799,7 @@
   }
 
   function kmStatus() {
-    return fetch(KM_API + 'status', { headers: kmHead() }).then(function (r) {
+    return kmFetch('status', { headers: kmHead() }).then(function (r) {
       if (!r.ok) { return null; }
       return r.json();
     }).catch(function () { return null; });
@@ -2758,7 +2813,7 @@
       var h = kmHead();
       h['Content-Type'] = 'application/octet-stream';
       if (baseVer !== null && baseVer !== undefined) { h['X-Km-Base-Version'] = String(baseVer); }
-      return fetch(KM_API + 'folder', { method: 'PUT', headers: h, body: sealed });
+      return kmFetch('folder', { method: 'PUT', headers: h, body: sealed });
     });
   }
 
@@ -2771,7 +2826,7 @@
     if (!out.length) { return Promise.resolve(); }
     var step = function (i) {
       if (i >= out.length) { return Promise.resolve(); }
-      return fetch(KM_API + 'photo?id=' + encodeURIComponent(out[i]), { method: 'DELETE', headers: kmHead() })
+      return kmFetch('photo?id=' + encodeURIComponent(out[i]), { method: 'DELETE', headers: kmHead() })
         .catch(function () {})
         .then(function () { return step(i + 1); });
     };
@@ -2805,7 +2860,7 @@
         .then(function (sealed) {
           var h = kmHead();
           h['Content-Type'] = 'application/octet-stream';
-          return fetch(KM_API + 'photo?id=' + encodeURIComponent(jobs[i].id), { method: 'PUT', headers: h, body: sealed });
+          return kmFetch('photo?id=' + encodeURIComponent(jobs[i].id), { method: 'PUT', headers: h, body: sealed });
         })
         .then(function (res) {
           if (res.ok) { syncInfo.photos++; syncInfo.onSrv++; return step(i + 1); }
@@ -2845,12 +2900,12 @@
         return kmSeal(key, payload).then(function (sealed) {
           var h = kmHead();
           h['Content-Type'] = 'application/octet-stream';
-          return fetch(KM_API + 'inbox', { method: 'PUT', headers: h, body: sealed });
+          return kmFetch('inbox', { method: 'PUT', headers: h, body: sealed });
         }).then(function (res) {
           if (!res.ok) { throw new Error('inbox ' + res.status); }
           /* Και οι φωτογραφίες: επιτρέπονται από μη ενεργή συσκευή ακριβώς
              επειδή μια φωτογραφία δεν αλλάζει ποτέ περιεχόμενο. */
-          return fetch(KM_API + 'photos', { headers: kmHead() })
+          return kmFetch('photos', { headers: kmHead() })
             .then(function (r) { return r.ok ? r.json() : { photos: [] }; })
             .then(function (j) {
               var ids = (j.photos || []).map(function (x) { return x.id; });
@@ -2892,7 +2947,7 @@
      επιτρέπεται να σβήσει τιμολόγιο στην ενεργή. Το χειρότερο που μπορεί να
      κάνει αυτός ο κώδικας είναι να μη φέρει κάτι. */
   function pullInbox(key) {
-    return fetch(KM_API + 'inbox', { headers: kmHead() })
+    return kmFetch('inbox', { headers: kmHead() })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
         var items = (j && j.inbox) || [];
@@ -2901,7 +2956,7 @@
         var step = function () {
           if (i >= items.length) { return Promise.resolve(added); }
           var dev = items[i++].device;
-          return fetch(KM_API + 'inbox?id=' + encodeURIComponent(dev), { headers: kmHead() })
+          return kmFetch('inbox?id=' + encodeURIComponent(dev), { headers: kmHead() })
             .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
             .then(function (buf) { return buf ? kmOpenAny(key, buf) : null; })
             .then(function (plain) {
@@ -2928,7 +2983,7 @@
             /* Σβήνεται ΜΟΝΟ αφού διαβαστεί και γραφτεί. Αν σπάσει κάτι στη
                μέση, το μπλοκ μένει και ξαναδιαβάζεται την επόμενη φορά. */
             .then(function () {
-              return fetch(KM_API + 'inbox?id=' + encodeURIComponent(dev), { method: 'DELETE', headers: kmHead() });
+              return kmFetch('inbox?id=' + encodeURIComponent(dev), { method: 'DELETE', headers: kmHead() });
             })
             .catch(function () { return null; })
             .then(step);
@@ -2976,7 +3031,7 @@
           return null;
         }).then(function () {
           if (syncInfo.msg) { return null; }
-          return fetch(KM_API + 'photos', { headers: kmHead() })
+          return kmFetch('photos', { headers: kmHead() })
             .then(function (r) { return r.ok ? r.json() : { photos: [] }; })
             .then(function (j) {
               var ids = (j.photos || []).map(function (p) { return p.id; });
@@ -3023,7 +3078,7 @@
   }
 
   function pullMeta(key) {
-    return fetch(KM_API + 'folder', { headers: kmHead() }).then(function (r) {
+    return kmFetch('folder', { headers: kmHead() }).then(function (r) {
       if (r.status === 404) { return null; }                 // άδειος φάκελος
       if (!r.ok) { pullInfo.msg = 'σφάλμα ' + r.status; return null; }
       return r.arrayBuffer().then(function (buf) { return kmOpenAny(key, buf); });
@@ -3177,7 +3232,7 @@
   function fetchPhoto(recId, slot) {
     var pid = pidOf(recId, slot);
     return kmKeyReady().then(function (key) {
-      return fetch(KM_API + 'photo?id=' + encodeURIComponent(pid), { headers: kmHead() })
+      return kmFetch('photo?id=' + encodeURIComponent(pid), { headers: kmHead() })
         .then(function (res) { if (!res.ok) { throw new Error('η φωτογραφία δεν βρέθηκε στον server'); } return res.arrayBuffer(); })
         .then(function (buf) { return kmOpenAny(key, buf); })
         .then(function (plain) {
@@ -3372,7 +3427,9 @@
   var PULL_GAP = 30000;
   var lastPull = 0;
   function maybePull() {
-    if (document.hidden || !hasAccount()) { return; }
+    /* v56 · Η.11 — νεκρός λογαριασμός δεν συγχρονίζεται. Χωρίς αυτό, κάθε 30"
+       θα ξαναχτυπούσε τον server για να πάρει πάλι 410. */
+    if (document.hidden || !hasAccount() || acctGone()) { return; }
     if (Date.now() - lastPull < PULL_GAP) { return; }
     lastPull = Date.now();
     refreshActive();
@@ -3390,6 +3447,11 @@
      σιωπηλή αυτόματη εργασία δεν είναι ελεγχόμενη — «έτρεξε και όλα καλά»
      και «δεν έτρεξε ποτέ» μοιάζουν ολόιδια. */
   function syncLine() {
+    /* v56 · Η.11 — μόνιμη αλήθεια, όχι στιγμιαία. Η οθόνη s-gone δείχνεται μία
+       φορά· αν ο χρήστης πατήσει «Συνέχισε», αυτή η γραμμή είναι το μόνο που
+       του θυμίζει γιατί δεν ανεβαίνει τίποτα. Κανόνας Α400 §Γ 3/9: το
+       διαγνωστικό απαντάει στην ερώτηση του ΧΡΗΣΤΗ. */
+    if (acctGone()) { return 'ο λογαριασμός διαγράφηκε — τίποτα δεν ανεβαίνει'; }
     if (!localStorage.getItem(LS.folder)) { return 'χωρίς λογαριασμό'; }
     if (syncBusy) {
       return syncInfo.total ? ('ανεβαίνει… ' + syncInfo.photos + '/' + syncInfo.total) : 'σε εξέλιξη…';
@@ -3588,7 +3650,7 @@
          δουλεύει όσο το κινητό δεν έχει τρέξει ακόμα τη μετανάστευση. */
       return kmDeriveLock(c.words).then(function (L) {
         var lh = { 'X-Km-Lock': L.lockId, 'X-Km-Auth': L.authToken, 'X-Km-Device': localStorage.getItem(LS.id) || '' };
-        return fetch(KM_API + 'unlock', { method: 'POST', headers: lh }).then(function (r) {
+        return kmFetch('unlock', { method: 'POST', headers: lh }).then(function (r) {
           if (r.status === 403 || r.status === 404) { return legacySignin(); }
           if (!r.ok) { fail('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); return; }
           return r.json().then(function (j) {
@@ -3625,7 +3687,7 @@
               'X-Km-Auth':   d.authToken,
               'X-Km-Device': localStorage.getItem(LS.id) || ''
             };
-            return fetch(KM_API + 'status', { headers: h }).then(function (r2) {
+            return kmFetch('status', { headers: h }).then(function (r2) {
               if (r2.status === 404) { fail('Δεν βρέθηκε λογαριασμός με αυτές τις 12 λέξεις. Έλεγξε τη σειρά τους.'); return; }
               if (r2.status === 403) { fail('Οι λέξεις δεν ταιριάζουν με αυτόν τον λογαριασμό.'); return; }
               if (!r2.ok)            { fail('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); return; }
@@ -3745,7 +3807,7 @@
       return pullSettled().then(function () {
         if (pullInfo.msg) { stop('Δεν κατέβηκαν τα τιμολόγια της άλλης συσκευής: ' + pullInfo.msg + ' Δοκίμασε ξανά με δίκτυο.'); return; }
         b.textContent = 'Ενεργοποιεί…';
-        return fetch(KM_API + 'activate', { method: 'POST', headers: kmHead() }).then(function (r) {
+        return kmFetch('activate', { method: 'POST', headers: kmHead() }).then(function (r) {
           if (!r.ok) { stop('Δεν έγινε η ενεργοποίηση (σφάλμα ' + r.status + '). Δοκίμασε ξανά.'); return; }
           return r.json().then(function (j) {
             setActiveState(true, j.active_since);
@@ -3979,6 +4041,99 @@
     localStorage.removeItem(LS.wordsOk);
     localStorage.removeItem(LS.reg);
     location.reload();
+  };
+
+  /* ══ v56 · Η.11 — ΟΡΙΣΤΙΚΗ ΔΙΑΓΡΑΦΗ ΛΟΓΑΡΙΑΣΜΟΥ ═══════════════════
+     Πόρτα Α του Brief Η.11. Δύο φρουροί, και ο δεύτερος ζει στον SERVER:
+       1. εδώ  — το κλείδωμα της συσκευής + η λέξη ΔΙΑΓΡΑΦΗ
+       2. εκεί — ΜΟΝΟ η ενεργή συσκευή (km.js deleteAccount)
+     Ο δεύτερος είναι ο ουσιαστικός: το UI παρακάμπτεται με curl, ο server όχι.
+     ⚠ Η οθόνη s-del ζει ΜΕΣΑ στο s-menu (Ρυθμίσεις), που είναι ήδη στη λίστα
+     LOCKED_OUT — γι' αυτό ΔΕΝ ξαναμπαίνει εκεί: δύο φρουροί για το ίδιο
+     πράγμα σημαίνει ότι κανένας από τους δύο δεν αποδεικνύεται (Α400 §Γ 6/9). */
+  var DEL_WORD = 'ΔΙΑΓΡΑΦΗ';
+
+  el('st-delacc').onclick = function () {
+    var b = el('st-delacc'), e = el('da-err');
+    e.hidden = true;
+    if (!hasAccount()) { e.textContent = 'Αυτή η συσκευή δεν έχει λογαριασμό.'; e.hidden = false; return; }
+    b.disabled = true; b.textContent = 'Επιβεβαίωση…';
+    function done() { b.disabled = false; b.textContent = 'Διαγραφή λογαριασμού'; }
+    function stop(msg) { done(); e.textContent = msg; e.hidden = false; }
+    lockAvailable().then(function (ok) {
+      if (!ok) {
+        stop('Για να διαγράψεις τον λογαριασμό, η συσκευή σου πρέπει να έχει κλείδωμα (δακτυλικό, πρόσωπο ή PIN). Βάλ᾽ το από τις Ρυθμίσεις της συσκευής και ξαναδοκίμασε.');
+        return;
+      }
+      lockVerify().then(function () {
+        done();
+        el('dl-word').value = '';
+        el('dl-err').hidden = true;
+        goto('s-del');
+      }).catch(function () {
+        stop('Δεν επιβεβαιώθηκε το κλείδωμα της συσκευής. Δοκίμασε ξανά.');
+      });
+    });
+  };
+
+  el('dl-go').onclick = function () {
+    var b = el('dl-go'), e = el('dl-err');
+    e.hidden = true;
+    /* Η λέξη ελέγχεται ΚΑΙ εδώ ΚΑΙ στον server. Δεν είναι διπλός φρουρός για
+       το ίδιο πράγμα: εδώ γλιτώνει μια περιττή κλήση, εκεί είναι η υποχρέωση —
+       μια οθόνη μπορεί να αλλάξει, ο κανόνας όχι. */
+    if ((el('dl-word').value || '').trim() !== DEL_WORD) {
+      e.textContent = 'Γράψε ακριβώς τη λέξη ΔΙΑΓΡΑΦΗ, με κεφαλαία.';
+      e.hidden = false;
+      return;
+    }
+    b.disabled = true; b.textContent = 'Διαγράφεται…';
+    kmFetch('delete', { method: 'POST', headers: kmHead(), body: JSON.stringify({ confirm: DEL_WORD }) })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) { return { r: r, j: j }; });
+      })
+      .then(function (x) {
+        if (x.r.status === 409) {
+          throw new Error('Αυτή η συσκευή δεν είναι πια η ενεργή, άρα δεν μπορεί να διαγράψει τον λογαριασμό. Ενεργοποίησέ την πρώτα με τις 12 λέξεις.');
+        }
+        if (x.r.status === 410) {
+          /* Ο λογαριασμός είχε ήδη σβηστεί από άλλη συσκευή. Το kmFetch το
+             έπιασε ήδη· εδώ απλώς δεν το λέμε σφάλμα — το αποτέλεσμα είναι
+             αυτό που ζήτησε ο χρήστης. */
+          return null;
+        }
+        if (!x.r.ok || !x.j.ok) {
+          throw new Error('Ο διακομιστής δεν ολοκλήρωσε τη διαγραφή (σφάλμα ' + x.r.status + '). Τίποτα δεν σβήστηκε από τη συσκευή σου.');
+        }
+        return x.j;
+      })
+      .then(function () { wipeThisDevice(); })
+      .catch(function (err) {
+        b.disabled = false; b.textContent = 'Διαγραφή οριστικά';
+        e.textContent = (err && err.message) ? err.message : 'Δεν ολοκληρώθηκε η διαγραφή. Δοκίμασε ξανά.';
+        e.hidden = false;
+      });
+  };
+
+  /* Σβήνει ΟΛΑ τα τοπικά και ξαναφορτώνει. Χρησιμοποιείται από δύο σημεία:
+     τη διαγραφή (η συσκευή που τη ζήτησε) και το «Ξεκίνα καθαρά» (άλλη
+     συσκευή που έμαθε ότι ο λογαριασμός πέθανε). Ενα σημείο, ώστε να μη
+     ξεχαστεί κλειδί σε μία από τις δύο διαδρομές. */
+  function wipeThisDevice() {
+    var keep = localStorage.getItem(LS.id);   // το install_id μένει: είναι η ταυτότητα ΤΗΣ ΣΥΣΚΕΥΗΣ, όχι του λογαριασμού
+    try {
+      Object.keys(LS).forEach(function (k) { localStorage.removeItem(LS[k]); });
+      if (keep) { localStorage.setItem(LS.id, keep); }
+    } catch (e) {}
+    var fin = function () { location.reload(); };
+    try { wipeDB().then(fin, fin); } catch (e) { fin(); }
+  }
+
+  el('gn-keep').onclick = function () { back(); };
+
+  el('gn-fresh').onclick = function () {
+    if (!confirm('Να σβηστούν ΟΛΑ από αυτή τη συσκευή;\n\nΤιμολόγια, φωτογραφίες και λογαριασμός. Δεν επιστρέφονται.')) { return; }
+    wipeThisDevice();
   };
 
   /* Το κουμπί «πίσω» του κινητού κλείνει την τρέχουσα σελίδα, δεν βγάζει από την εφαρμογή */
