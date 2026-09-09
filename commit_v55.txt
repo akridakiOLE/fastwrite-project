@@ -1,0 +1,36 @@
+Η.11 v55: οριστική διαγραφή λογαριασμού + καθαρισμός μητρώου (server)
+
+Brief Η.11, αποφάσεις Stavros 9/9/2026. Καμία επαναφορά: οι ίδιες 12 λέξεις
+είναι νεκρές για πάντα. Σβήνουμε ΤΑ ΔΙΚΑ ΜΑΣ αντίγραφα· τα τιμολόγια στη
+συσκευή του χρήστη μένουν δικά του.
+
+wipeFolder(): σφραγίδα deleted -> R2 (όλο το prefix, όχι λίστα) -> D1
+(km_locks, km_device_links, km_devices) -> ταφόπετρα χωρίς πρόσωπο. Idempotent:
+αν κοπεί στη μέση, ο λογαριασμός είναι ήδη νεκρός και η ίδια κλήση ξανατρέχει.
+
+Η ταφόπετρα κρατάει created/country/source/ref/deleted (απόφαση Stavros:
+"δικά μας στατιστικά") και μηδενίζει email/auth_hash/active_device/bytes.
+
+Routes:
+  POST /api/km/delete          Πόρτα Α - ΜΟΝΟ η ενεργή συσκευή + λέξη ΔΙΑΓΡΑΦΗ
+  POST /api/km/admin/delete    Πόρτα Β - αίτημα GDPR με email στο support
+  POST /api/km/admin/purge     καθαρισμός σκουπιδιών, dry_run εξ ορισμού
+  POST /api/km/admin/inspect   read-only όργανο μέτρησης
+
+Ο φραγμός του purge είναι ΜΗΧΑΝΙΚΟΣ: σε λειτουργία email_like σβήνει μόνο
+folder_bytes=0 AND folder_version=0 AND καμία κλειδαριά. Οι δύο άδειοι
+λογαριασμοί έχουν ΤΟ ΙΔΙΟ email με τον ζωντανό - ένα φίλτρο email θα τους
+έσβηνε και τους τρεις.
+
+Server-side φρουρός ενεργής συσκευής: το UI (LOCKED_OUT/Λ7) δεν είναι φραγμός,
+η κλήση φτάνει και με curl. Κλεμμένο κινητό δεν σβήνει λογαριασμό.
+
+tests/h11.spec.js: 9 τεστ, και οι 11 φρουροί αποδείχθηκαν με μετάλλαξη.
+Δύο διορθώσεις που βρήκε η μετάλλαξη: (1) διπλός φρουρός στη σφραγίδα
+(JS + SQL) - έμεινε το SQL, που πιάνει και ταυτόχρονες κλήσεις (κανόνας 6/9)·
+(2) το τεστ idempotency συνέκρινε δύο ΑΝΑΦΟΡΕΣ - τώρα διαβάζει τη ΒΑΣΗ.
+
+Καμία μετάβαση βάσης: η στήλη deleted υπάρχει από 2/9.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DNoC6pLcmHFYQgQWyWiMWN

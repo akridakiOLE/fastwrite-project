@@ -1,3 +1,4 @@
+// KM-SERVER-V55-H11  ← σημάδι έκδοσης· το ψάχνει το deploy_km_v55.bat
 // Kostometro — μητρώο + σφραγισμένος φάκελος (Brief Α, Α350 §9.8 Η.1)
 // ---------------------------------------------------------------------------
 // Routes (όλα κάτω από /api/km/ — run_worker_first = ["/api/*"]):
@@ -13,6 +14,11 @@
 //   GET    /api/km/photo?id=        -> μία κρυπτογραφημένη φωτογραφία
 //   PUT    /api/km/photo?id=        -> ανέβασμα μιας φωτογραφίας (όποια έχει auth — Η.13)
 //   DELETE /api/km/photo?id=        -> σβήσιμο μιας φωτογραφίας (ΜΟΝΟ η ενεργή)
+//
+//   POST   /api/km/delete           -> Η.11: ΟΡΙΣΤΙΚΗ διαγραφή λογαριασμού (ΜΟΝΟ η ενεργή)
+//   POST   /api/km/admin/delete     -> Η.11: η ίδια πράξη από τον Stavros (αίτημα με email)
+//   POST   /api/km/admin/purge      -> Η.11: καθαρισμός σκουπιδιών μητρώου (dry_run εξ ορισμού)
+//   POST   /api/km/admin/inspect    -> Η.11: ΤΟ ΟΡΓΑΝΟ ΜΕΤΡΗΣΗΣ — τι ζει πραγματικά (read-only)
 //
 //   POST   /api/km/unlock           -> Η.13: από την κλειδαριά στον φάκελο (βλ. κάτω)
 //   POST   /api/km/lock             -> Η.13: νέα κλειδαριά / αλλαγή λέξεων
@@ -86,6 +92,11 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/folder" && method === "GET") return getFolder(request, env);
   if (path === "/api/km/folder" && method === "PUT") return putFolder(request, env);
   if (path === "/api/km/activate" && method === "POST") return activate(request, env);
+
+  if (path === "/api/km/delete" && method === "POST") return deleteAccount(request, env);
+  if (path === "/api/km/admin/delete" && method === "POST") return adminDelete(request, env);
+  if (path === "/api/km/admin/purge" && method === "POST") return adminPurge(request, env);
+  if (path === "/api/km/admin/inspect" && method === "POST") return adminInspect(request, env);
 
   if (path === "/api/km/unlock" && method === "POST") return unlock(request, env);
   if (path === "/api/km/lock" && method === "POST") return addLock(request, env);
@@ -665,4 +676,319 @@ async function delPhoto(request, env) {
   if (!key) return json({ ok: false, error: "bad_id" }, 400);
   await env.FOLDERS.delete(key);
   return json({ ok: true, id: id });
+}
+
+// ── Η.11 · ΟΡΙΣΤΙΚΗ ΔΙΑΓΡΑΦΗ ΛΟΓΑΡΙΑΣΜΟΥ (Brief Η.11, 9/9/2026) ────────────
+// Απόφαση Stavros 9/9: ο χρήστης φεύγει ΟΡΙΣΤΙΚΑ. ΚΑΜΙΑ επαναφορά, ποτέ — και
+// οι ίδιες 12 λέξεις είναι νεκρές για πάντα (το authed()/unlock()/register()
+// απαντούν 410 σε φάκελο με deleted, από 2/9). Δεν κρατάμε δεδομένα ανθρώπου
+// που δεν είναι πια πελάτης.
+//
+// ΤΙ ΔΕΝ ΣΒΗΝΕΙ Η ΠΡΑΞΗ ΑΥΤΗ: τα τιμολόγια στη ΣΥΣΚΕΥΗ του. Είναι δικά του.
+// Η συσκευή τα σβήνει μόνη της αν ο ίδιος πατήσει «Ξεκίνα καθαρά» (απόφαση
+// Stavros 9/9). Εμείς σβήνουμε ΤΑ ΔΙΚΑ ΜΑΣ αντίγραφα.
+//
+// Η ΣΕΙΡΑ ΕΙΝΑΙ ΤΟ ΖΗΤΟΥΜΕΝΟ — και είναι ο λόγος που η πράξη είναι ασφαλής
+// ακόμα κι αν κοπεί στη μέση:
+//   (α) πρώτα η σφραγίδα deleted  -> από εδώ και πέρα ΚΑΜΙΑ συσκευή δεν γράφει
+//   (β) μετά το R2                -> ό,τι ζει κάτω από <folder>/, χωρίς λίστα
+//   (γ) μετά η D1                 -> locks, device_links, devices
+//   (δ) τέλος η ταφόπετρα         -> η γραμμή μένει ΧΩΡΙΣ πρόσωπο
+// Αν σπάσει στο (β), ο λογαριασμός είναι ήδη νεκρός και η ίδια κλήση
+// ξανατρέχει αθώα (idempotent) — δεν μένουν ορφανά μπλοκ που πληρώνονται για
+// πάντα. Το αντίστροφο (R2 πρώτα) θα άφηνε ζωντανό λογαριασμό με άδειο φάκελο.
+//
+// ΓΙΑΤΙ Η ΓΡΑΜΜΗ ΜΕΝΕΙ (απόφαση Stavros 9/9: «είναι δικά μας στατιστικά»):
+// μετά το (δ) η γραμμή δεν έχει email, ούτε κωδικό, ούτε μέγεθος — κρατάει
+// created/country/source/ref/deleted. Κανείς δεν μπορεί να τη συνδέσει με
+// άνθρωπο· είναι «ήρθε ένας από το Play στις 3/9, έφυγε στις 9/9». Χωρίς
+// αυτήν ο Πίνακας Ελέγχου (Brief Β) δεν μαθαίνει ποτέ πόσοι έφυγαν, και ο
+// κανόνας Α400 §Δ «η προέλευση δεν ανακτάται αναδρομικά» γίνεται κενό γράμμα.
+
+// Ένα R2 delete παίρνει ως 1000 κλειδιά. Πάνω από αυτό σπάει σε παρτίδες.
+const R2_DELETE_BATCH = 1000;
+
+// Σβήνει ΟΛΟΚΛΗΡΟ τον χώρο R2 του φακέλου. ΔΕΝ κυνηγάει τις τρεις γνωστές
+// κατηγορίες μία-μία: σαρώνει το prefix «<folder_id>/» και σβήνει ό,τι βρει.
+// Το folder_id είναι 64 hex, άρα το prefix δεν αγγίζει ποτέ άλλον λογαριασμό.
+// Ετσι ό,τι προστεθεί στο μέλλον (νέο είδος αντικειμένου) σβήνεται από μόνο
+// του — μια λίστα που ξεχνά ένα prefix είναι ακριβώς το σφάλμα που πληρώνεται
+// σιωπηλά για πάντα.
+async function wipeR2(env, folderId) {
+  const prefix = folderId + "/";
+  const counts = { folder: 0, photos: 0, inbox: 0, other: 0 };
+  let objects = 0, bytes = 0, cursor;
+  do {
+    const page = await env.FOLDERS.list({ prefix, cursor, limit: 1000 });
+    const keys = [];
+    for (const o of page.objects) {
+      keys.push(o.key);
+      objects += 1;
+      bytes += o.size || 0;
+      const rest = o.key.slice(prefix.length);
+      if (rest === "folder.bin") counts.folder += 1;
+      else if (rest.indexOf("p/") === 0) counts.photos += 1;
+      else if (rest.indexOf("inbox/") === 0) counts.inbox += 1;
+      else counts.other += 1;
+    }
+    for (let i = 0; i < keys.length; i += R2_DELETE_BATCH) {
+      await env.FOLDERS.delete(keys.slice(i, i + R2_DELETE_BATCH));
+    }
+    cursor = page.truncated ? page.cursor : null;
+  } while (cursor);
+  return { objects, bytes, counts };
+}
+
+// Η πράξη, ολόκληρη. Καλείται και από τον χρήστη (POST /api/km/delete) και από
+// τον Stavros (admin). Επιστρέφει ΝΟΥΜΕΡΑ, όχι «ok» — κανόνας Α400 §Γ 4/9:
+// κάθε αυτόματος έλεγχος που απαντάει «βρέθηκε» τυπώνει ΚΑΙ τι βρήκε.
+async function wipeFolder(env, folderId) {
+  const acc = await env.DB.prepare("SELECT * FROM km_accounts WHERE folder_id = ?").bind(folderId).first();
+  if (!acc) return null;
+  const ts = now();
+
+  // (α) Η ΣΦΡΑΓΙΔΑ ΠΡΩΤΗ.
+  // ⚠ Ο ΦΡΑΓΜΟΣ ΕΙΝΑΙ ΣΕ ΕΝΑ ΣΗΜΕΙΟ: το «AND deleted IS NULL» μέσα στο SQL.
+  // Η πρώτη γραφή έλεγχε ΚΑΙ στη JavaScript, με τη μεταβλητή already — δύο
+  // φρουροί για το ίδιο πράγμα, και η μετάλλαξη το απέδειξε: βγάζοντας το
+  // SQL φίλτρο, το τεστ Η11-6 έμενε ΠΡΑΣΙΝΟ, γιατί το κάλυπτε ο δεύτερος.
+  // ⚠ Το κείμενο του παλιού ελέγχου ΔΕΝ γράφεται εδώ αυτούσιο: το deploy .bat
+  // ψάχνει ακριβώς αυτό ως «σημάδι που ΠΡΕΠΕΙ να λείπει», και ένα σχόλιο που
+  // το περιέχει θα κοκκίνιζε το deploy για πάντα (μετρήθηκε 9/9).
+  // Κανόνας Α400 §Γ (6/9): «αν δύο φρουροί φυλάνε το ίδιο, κανένας δεν
+  // αποδεικνύεται». Εμεινε το SQL, που προστατεύει ΚΑΙ από δύο ταυτόχρονες
+  // κλήσεις — η JavaScript δεν μπορεί.
+  const already = !!acc.deleted;
+  await env.DB.prepare("UPDATE km_accounts SET deleted = ? WHERE folder_id = ? AND deleted IS NULL")
+    .bind(ts, folderId).run();
+
+  // (β) R2
+  const r2 = await wipeR2(env, folderId);
+
+  // (γ) D1 — οι τρεις πίνακες που κρατούν πρόσωπο ή κλειδί.
+  const locks = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_locks WHERE folder_id = ?").bind(folderId).first();
+  const links = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_device_links WHERE folder_id = ?").bind(folderId).first();
+  const devs  = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_devices WHERE folder_id = ?").bind(folderId).first();
+
+  // (δ) Η ταφόπετρα. Το auth_hash γίνεται κενό: το sha256hex() βγάζει ΠΑΝΤΑ 64
+  // hex, άρα κενή τιμή δεν μπορεί να ταιριάξει με τίποτα — ούτε κατά λάθος,
+  // ούτε επίτηδες. Το email γίνεται κενό: το normEmail() απορρίπτει το κενό,
+  // άρα ούτε το /lookup μπορεί να το ξαναβρεί.
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM km_locks WHERE folder_id = ?").bind(folderId),
+    env.DB.prepare("DELETE FROM km_device_links WHERE folder_id = ?").bind(folderId),
+    env.DB.prepare("DELETE FROM km_devices WHERE folder_id = ?").bind(folderId),
+    env.DB.prepare(
+      `UPDATE km_accounts SET email = '', auth_hash = '', active_device_id = NULL,
+              active_since = NULL, folder_bytes = 0, folder_version = 0, last_sync = NULL,
+              has_key = 0, plan = NULL
+       WHERE folder_id = ?`
+    ).bind(folderId),
+  ]);
+
+  return {
+    folder_id: folderId,
+    deleted_at: already ? acc.deleted : ts,
+    was_already_deleted: already,
+    r2: r2,
+    rows: {
+      locks: (locks && locks.n) || 0,
+      device_links: (links && links.n) || 0,
+      devices: (devs && devs.n) || 0,
+      account: "tombstoned",
+    },
+    kept: { created: acc.created, country: acc.country, source: acc.source, ref: acc.ref },
+  };
+}
+
+// ΠΟΡΤΑ Α — από την εφαρμογή. Σώμα: { confirm: "ΔΙΑΓΡΑΦΗ" }.
+//
+// 🔴 ΔΥΟ ΦΡΟΥΡΟΙ, ΚΑΙ Ο ΔΕΥΤΕΡΟΣ ΕΙΝΑΙ Ο ΟΥΣΙΑΣΤΙΚΟΣ:
+//  1. auth — έχει τις 12 λέξεις (ή την κλειδαριά).
+//  2. ΜΟΝΟ Η ΕΝΕΡΓΗ ΣΥΣΚΕΥΗ. Χωρίς αυτό, κλεμμένο κινητό που βγήκε εκτός
+//     λειτουργίας θα μπορούσε να σβήσει ολόκληρο τον λογαριασμό του ιδιοκτήτη.
+//     Στο UI το ίδιο το φράζει η λίστα LOCKED_OUT (app.js: το s-menu, άρα και
+//     οι Ρυθμίσεις, δεν ανοίγουν σε συσκευή εκτός λειτουργίας — φρουρός Λ7,
+//     8/9). ΑΛΛΑ ΤΟ UI ΔΕΝ ΕΙΝΑΙ ΦΡΑΓΜΟΣ: η κλήση φτάνει και με curl. Ο
+//     φραγμός ζει ΕΔΩ. Ιδια οικογένεια με το «κλειδωμένη συσκευή δεν παραδίδει
+//     τις 12 λέξεις» (Α320, 8/9) — μία απόφαση, δύο σημεία που την τηρούν.
+const DELETE_CONFIRM = "ΔΙΑΓΡΑΦΗ";
+
+async function deleteAccount(request, env) {
+  const a = await authed(request, env);
+  if (a.err) return a.err;
+  if (a.acc.active_device_id !== a.id.device) {
+    return json({ ok: false, error: "not_active_device", state: pub(a.acc) }, 409);
+  }
+  const b = (await safeJson(request)) || {};
+  // Η λέξη είναι το «είσαι σίγουρος» που δεν πατιέται κατά λάθος. Ο έλεγχος
+  // ζει και στον server: μια οθόνη μπορεί να αλλάξει, η υποχρέωση όχι.
+  if (clean(b.confirm, 40) !== DELETE_CONFIRM) {
+    return json({ ok: false, error: "confirm_required", expected: DELETE_CONFIRM }, 400);
+  }
+  const res = await wipeFolder(env, a.id.folder);
+  if (!res) return json({ ok: false, error: "no_account" }, 404);
+  return json({ ok: true, deleted: res });
+}
+
+// ── ΠΟΡΤΑ Β + ΚΑΘΑΡΙΣΜΟΣ ΜΗΤΡΩΟΥ — μόνο ο Stavros ─────────────────────────
+// Ο GDPR δεν επιτρέπει «διαγραφή μόνο αν έχεις την εφαρμογή»: το αίτημα με
+// email στο support ΠΡΕΠΕΙ να μπορεί να εκτελεστεί. Ιδιο μοτίβο με το
+// /api/gnomi/apotelesmata: χωρίς μυστικό η διαδρομή ΔΕΝ ΥΠΑΡΧΕΙ (404, όχι
+// 403 — δεν μαθαίνει κανείς ότι υπάρχει). Αν το μυστικό δεν έχει οριστεί
+// καθόλου στο Cloudflare, κλειδώνει τα πάντα: ασφαλής προεπιλογή.
+function adminOk(request, env) {
+  const k = new URL(request.url).searchParams.get("k") || request.headers.get("X-Km-Admin") || "";
+  return !!env.KM_ADMIN_KEY && k === env.KM_ADMIN_KEY;
+}
+
+async function adminDelete(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const folderId = (clean(b.folder_id, 64) || "").toLowerCase();
+  if (!HEX64.test(folderId)) return json({ ok: false, error: "bad_folder_id" }, 400);
+  const res = await wipeFolder(env, folderId);
+  if (!res) return json({ ok: false, error: "no_account" }, 404);
+  return json({ ok: true, deleted: res });
+}
+
+// ΚΑΘΑΡΙΣΜΟΣ ΜΗΤΡΩΟΥ (§3 βήμα 2) — ο ΙΔΙΟΣ μηχανισμός, καμία δεύτερη διαδρομή.
+// Ετσι η wipeFolder δοκιμάζεται πάνω σε σκουπίδια ΠΡΙΝ αγγίξει ποτέ πραγματικό
+// λογαριασμό.
+//
+// 🔴 Ο ΦΡΑΓΜΟΣ ΠΟΥ ΠΡΟΣΤΑΤΕΥΕΙ ΤΟΝ ΠΡΑΓΜΑΤΙΚΟ ΛΟΓΑΡΙΑΣΜΟ ΕΙΝΑΙ ΜΗΧΑΝΙΚΟΣ,
+// ΟΧΙ «ΠΡΟΣΟΧΗ»: οι δύο άδειοι λογαριασμοί του Stavros έχουν ΤΟ ΙΔΙΟ email με
+// τον ζωντανό του (akrisway@gmail.com — καταγεγραμμένο Α300 §1). Ενα φίλτρο
+// email θα τους έσβηνε και τους τρεις. Γι' αυτό:
+//   - λειτουργία email_like: σβήνει ΜΟΝΟ ό,τι είναι ΑΠΟΔΕΔΕΙΓΜΕΝΑ άδειο —
+//     folder_bytes = 0 ΚΑΙ folder_version = 0 ΚΑΙ καμία κλειδαριά. Αυτός
+//     είναι ο ορισμός του σκουπιδιού, και ο ζωντανός λογαριασμός δεν τον
+//     πληροί ποτέ.
+//   - λειτουργία folder_ids: ρητή λίστα, σβήνει ό,τι δοθεί (η Πόρτα Β χύμα).
+// Και dry_run ΕΞ ΟΡΙΣΜΟΥ: πρώτα βλέπεις τι θα σβήσει, μετά το ζητάς.
+const PURGE_MAX = 200;
+
+async function adminPurge(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const dryRun = b.dry_run === false ? false : true;   // ⚠ default: ΔΕΝ σβήνει
+  const ids = Array.isArray(b.folder_ids) ? b.folder_ids : null;
+  const like = clean(b.email_like, 120);
+
+  let targets = [];
+  if (ids) {
+    for (const raw of ids.slice(0, PURGE_MAX)) {
+      const f = (clean(raw, 64) || "").toLowerCase();
+      if (!HEX64.test(f)) return json({ ok: false, error: "bad_folder_id", value: raw }, 400);
+      const row = await env.DB.prepare(
+        "SELECT folder_id, email, created, source, folder_bytes, folder_version, deleted FROM km_accounts WHERE folder_id = ?"
+      ).bind(f).first();
+      if (row) targets.push(row);
+    }
+  } else if (like) {
+    // Σκέτο «%» θα σάρωνε ΤΑ ΠΑΝΤΑ. Απαιτούνται 4 πραγματικοί χαρακτήρες.
+    if (like.replace(/%/g, "").length < 4) return json({ ok: false, error: "email_like_too_broad" }, 400);
+    const r = await env.DB.prepare(
+      `SELECT a.folder_id, a.email, a.created, a.source, a.folder_bytes, a.folder_version, a.deleted
+         FROM km_accounts a
+        WHERE a.email LIKE ?
+          AND a.folder_bytes = 0
+          AND a.folder_version = 0
+          AND NOT EXISTS (SELECT 1 FROM km_locks l WHERE l.folder_id = a.folder_id)
+        ORDER BY a.created
+        LIMIT ?`
+    ).bind(like, PURGE_MAX).all();
+    targets = r.results || [];
+  } else {
+    return json({ ok: false, error: "need_folder_ids_or_email_like" }, 400);
+  }
+
+  // Τι ζει πραγματικά στο R2 για καθέναν — το μέγεθος στη D1 μπορεί να λέει 0
+  // ενώ το μπλοκ υπάρχει (ακριβώς η περίπτωση των δοκιμαστικών).
+  const plan = [];
+  for (const t of targets) {
+    let objects = 0, bytes = 0, cursor;
+    do {
+      const page = await env.FOLDERS.list({ prefix: t.folder_id + "/", cursor, limit: 1000 });
+      for (const o of page.objects) { objects += 1; bytes += o.size || 0; }
+      cursor = page.truncated ? page.cursor : null;
+    } while (cursor);
+    plan.push({
+      folder_id: t.folder_id, email: t.email, created: t.created, source: t.source,
+      db_bytes: t.folder_bytes, db_version: t.folder_version,
+      already_deleted: !!t.deleted, r2_objects: objects, r2_bytes: bytes,
+    });
+  }
+
+  if (dryRun) {
+    return json({
+      ok: true, dry_run: true, mode: ids ? "folder_ids" : "email_like",
+      found: plan.length,
+      r2_objects: plan.reduce((n, p) => n + p.r2_objects, 0),
+      r2_bytes: plan.reduce((n, p) => n + p.r2_bytes, 0),
+      plan: plan,
+      note: "Τίποτα ΔΕΝ σβήστηκε. Ξανακάλεσε με dry_run:false για να εκτελεστεί.",
+    });
+  }
+
+  const done = [];
+  for (const p of plan) done.push(await wipeFolder(env, p.folder_id));
+  return json({
+    ok: true, dry_run: false, mode: ids ? "folder_ids" : "email_like",
+    purged: done.length,
+    r2_objects: done.reduce((n, d) => n + (d ? d.r2.objects : 0), 0),
+    r2_bytes: done.reduce((n, d) => n + (d ? d.r2.bytes : 0), 0),
+    deleted: done,
+  });
+}
+
+// ΤΟ ΟΡΓΑΝΟ ΜΕΤΡΗΣΗΣ — read-only, δεν αλλάζει τίποτα.
+// Κανόνας Α400 §Γ (14/8): «μην χτίζεις συλλογή δεδομένων χωρίς τρόπο
+// ανάγνωσης». Χωρίς αυτό, ο μόνος τρόπος να δει κανείς ΑΝ η διαγραφή έκανε
+// αυτό που λέει θα ήταν... η ίδια η απάντηση της διαγραφής. Δηλαδή δήλωση,
+// όχι τεκμήριο (κανόνας 29/8). Εδώ μετριέται η ΒΑΣΗ και το R2, όχι η αναφορά.
+async function adminInspect(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const folderId = (clean(b.folder_id, 64) || "").toLowerCase();
+  if (!HEX64.test(folderId)) return json({ ok: false, error: "bad_folder_id" }, 400);
+
+  const acc = await env.DB.prepare("SELECT * FROM km_accounts WHERE folder_id = ?").bind(folderId).first();
+  const n = async (sql) => {
+    const r = await env.DB.prepare(sql).bind(folderId).first();
+    return (r && r.n) || 0;
+  };
+  const r2 = { folder: 0, photos: 0, inbox: 0, other: 0, objects: 0, bytes: 0 };
+  let cursor;
+  do {
+    const page = await env.FOLDERS.list({ prefix: folderId + "/", cursor, limit: 1000 });
+    for (const o of page.objects) {
+      r2.objects += 1; r2.bytes += o.size || 0;
+      const rest = o.key.slice(folderId.length + 1);
+      if (rest === "folder.bin") r2.folder += 1;
+      else if (rest.indexOf("p/") === 0) r2.photos += 1;
+      else if (rest.indexOf("inbox/") === 0) r2.inbox += 1;
+      else r2.other += 1;
+    }
+    cursor = page.truncated ? page.cursor : null;
+  } while (cursor);
+
+  return json({
+    ok: true,
+    exists: !!acc,
+    account: acc ? {
+      email: acc.email, email_empty: acc.email === "" || acc.email === null,
+      auth_hash_empty: acc.auth_hash === "" || acc.auth_hash === null,
+      deleted: acc.deleted || null,
+      created: acc.created, country: acc.country, source: acc.source, ref: acc.ref,
+      folder_version: acc.folder_version, folder_bytes: acc.folder_bytes,
+      active_device_id: acc.active_device_id, plan: acc.plan || null, has_key: acc.has_key,
+    } : null,
+    rows: {
+      locks: await n("SELECT COUNT(*) AS n FROM km_locks WHERE folder_id = ?"),
+      device_links: await n("SELECT COUNT(*) AS n FROM km_device_links WHERE folder_id = ?"),
+      devices: await n("SELECT COUNT(*) AS n FROM km_devices WHERE folder_id = ?"),
+    },
+    r2: r2,
+  });
 }
