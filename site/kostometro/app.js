@@ -423,7 +423,7 @@
       var n = document.createElement('span');
       n.className = 'sup-n'; n.textContent = s.n + ' τιμ.';
       b.appendChild(n);
-      b.onclick = function () { assign(s.name); };
+      b.onclick = function () { assign(s.name); };   /* v57: fromList — δες assign() */
       box.appendChild(b);
     });
     el('who-empty').hidden = whoNames.length > 0;
@@ -610,37 +610,18 @@
       renderPending(); refreshCount();
     });
   }
-  function pendCard(r) {
-    var c = document.createElement('div');
-    c.className = 'card';
-
-    var head = document.createElement('div');
-    head.className = 'card-head';
-    var img = cropImg(r.blob, cropOf(r, 0), 'thumb-in');
-    img.onclick = function () { openShot(r.id); };
-    var meta = document.createElement('div');
-    meta.className = 'card-meta';
-    meta.innerHTML = '<div class="card-sup"></div><div class="card-date"></div>';
-    meta.querySelector('.card-sup').textContent = r.supplier;
-    meta.querySelector('.card-date').textContent = dstr(dateOf(r));
-    var thumb = document.createElement('span');
-    thumb.className = 'thumb';
-    thumb.appendChild(img);
-    addPgBadge(thumb, r);
-    /* v23 — κουτάκι επιλογής, ίδια λογική με τη λίστα προμηθευτών (§5 30/8) */
-    var cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.className = 'pend-cb';
-    cb.hidden = isReader();          // v35 — χωρίς μαζική διαγραφή, χωρίς επιλογή
-    cb.checked = !!pendPick[r.id];
-    cb.setAttribute('aria-label', 'Επίλεξε τιμολόγιο ' + r.supplier);
-    cb.onchange = function () {
-      if (cb.checked) { pendPick[r.id] = true; } else { delete pendPick[r.id]; }
-      syncPendBar();
-    };
-    head.appendChild(cb);
-    head.appendChild(thumb); head.appendChild(meta);
-
+  /* ══ Ο ΠΥΡΗΝΑΣ ΤΩΝ ΤΡΙΩΝ ΠΟΣΩΝ — v57 ═══════════════════════════════
+     Ως τη v56 ζούσε ΜΕΣΑ στην pendCard, δηλαδή μόνο όσο το τιμολόγιο ήταν
+     «εκκρεμές». Μόλις έμπαινε το Σύνολο, το τιμολόγιο έφευγε από τη λίστα
+     και μαζί του η ΜΟΝΗ οθόνη που το επεξεργαζόταν — γι' αυτό το τιμολόγιο
+     της 10/04 έμεινε καταχωρημένο 01/09 (ανοιχτό από 28/8/2026).
+     🔴 ΜΙΑ υλοποίηση, ΔΥΟ πόρτες: τα «Εκκρεμή» και η οθόνη τιμολογίου.
+     Αντιγραφή του recalc σε δεύτερο σημείο θα σήμαινε δύο φρουρούς για το
+     ίδιο πράγμα — κανένας από τους δύο δεν αποδεικνύεται (Α400 §Γ 6/9).
+     Ο καλών δίνει το `after`: τι ξαναζωγραφίζεται μετά από γραφή στη βάση. */
+  function amountsBlock(r, opts) {
+    opts = opts || {};
+    var after = opts.after || function () {};
     var amts = document.createElement('div');
     amts.className = 'amts';
     /* v10 — ΤΑ ΤΡΙΑ ΠΟΣΑ. Το «Υπόλοιπο» αποσύρθηκε (30/8): σήμαινε δύο
@@ -805,7 +786,7 @@
       db.textContent = 'Διόρθωσέ το';
       db.onclick = function () {
         r.invDate = sug.date;
-        put(r).then(function () { renderPending(); });
+        put(r).then(function () { after(); });
       };
       ds.appendChild(dt); ds.appendChild(db);
       amts.appendChild(ds);
@@ -824,6 +805,48 @@
       ron.className = 'ro-note';
       ron.textContent = 'Μόνο ανάγνωση — η επεξεργασία γίνεται στην ενεργή συσκευή.';
       amts.appendChild(ron);
+    }
+
+    return { node: amts, inputs: inputs, readOnly: isReader() };
+  }
+
+  function pendCard(r) {
+    var c = document.createElement('div');
+    c.className = 'card';
+
+    var head = document.createElement('div');
+    head.className = 'card-head';
+    var img = cropImg(r.blob, cropOf(r, 0), 'thumb-in');
+    img.onclick = function () { openShot(r.id); };
+    var meta = document.createElement('div');
+    meta.className = 'card-meta';
+    meta.innerHTML = '<div class="card-sup"></div><div class="card-date"></div>';
+    meta.querySelector('.card-sup').textContent = r.supplier;
+    meta.querySelector('.card-date').textContent = dstr(dateOf(r));
+    var thumb = document.createElement('span');
+    thumb.className = 'thumb';
+    thumb.appendChild(img);
+    addPgBadge(thumb, r);
+    /* v23 — κουτάκι επιλογής, ίδια λογική με τη λίστα προμηθευτών (§5 30/8) */
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'pend-cb';
+    cb.hidden = isReader();          // v35 — χωρίς μαζική διαγραφή, χωρίς επιλογή
+    cb.checked = !!pendPick[r.id];
+    cb.setAttribute('aria-label', 'Επίλεξε τιμολόγιο ' + r.supplier);
+    cb.onchange = function () {
+      if (cb.checked) { pendPick[r.id] = true; } else { delete pendPick[r.id]; }
+      syncPendBar();
+    };
+    head.appendChild(cb);
+    head.appendChild(thumb); head.appendChild(meta);
+
+    /* v57 — τα ποσά έρχονται από τον κοινό πυρήνα. Η αναγνώστρια συσκευή
+       γυρίζει εδώ ακριβώς όπως πριν: πεδία ορατά, κλειστά, με τη γραμμή που
+       εξηγεί γιατί (v35 · Η.3). */
+    var ab = amountsBlock(r, { after: function () { renderPending(); } });
+    var amts = ab.node, inputs = ab.inputs;
+    if (ab.readOnly) {
       c.appendChild(head); c.appendChild(amts);
       return c;
     }
@@ -1000,6 +1023,99 @@
      λίστα από την αρχή. Τώρα η επιλογή κρατιέται (supView) — και κρατιέται
      ΟΛΟΚΛΗΡΗ, δηλαδή και το «Δες μαζί (Α/Β/Γ)», όχι μόνο ένα όνομα. */
   var supView = null;
+
+  /* ══ v57 · Brief Γ — ΜΕΤΟΝΟΜΑΣΙΑ ΠΡΟΜΗΘΕΥΤΗ ═══════════════════════════
+     🔴 Η ΜΟΝΗ διαδρομή που αλλάζει πολλά τιμολόγια μαζί. Ζει ΕΔΩ και όχι
+     στην οθόνη τιμολογίου, γιατί εδώ η πρόθεση «όλος αυτός ο προμηθευτής»
+     είναι δεδομένη από το πού στέκεσαι — δεν χρειάζεται να τη μαντέψει
+     κανείς από το τι πληκτρολόγησες (απόφαση Stavros 10/9/2026).
+     Ξαναχρησιμοποιεί την ΟΘΟΝΗ ΕΠΙΛΟΓΗΣ της λήψης: ίδια αναζήτηση, ίδιες
+     δύο καρτέλες. Έτσι η ΣΥΓΧΩΝΕΥΣΗ δεν είναι ειδική περίπτωση — διαλέγεις
+     υπάρχον όνομα από τη λίστα και οι δύο κάρτες γίνονται μία. */
+  var renameBin = null, renameTimer = null;
+
+  function renameSupplier(old) {
+    whoEdit = { kind: 'rename', old: old };
+    renderSuppliers().then(function () {
+      nav.push('s-who'); show('s-who');
+    }, function () {
+      whoMode('new'); nav.push('s-who'); show('s-who');
+    });
+  }
+
+  function supRenameApply(old, name) {
+    if (!name || name === old) { nav.pop(); return; }
+    all().then(function (rows) {
+      var mine   = rows.filter(function (r) { return r.supplier === old; });
+      var target = rows.filter(function (r) { return r.supplier === name; });
+      if (!mine.length) { nav.pop(); return null; }
+      /* Η επιβεβαίωση λέει ΤΙ ΘΑ ΓΙΝΕΙ ΜΕ ΝΟΥΜΕΡΑ, όχι «είσαι σίγουρος;».
+         Και ονομάζει ρητά τη συγχώνευση όταν συμβαίνει: ο χρήστης πρέπει να
+         ξέρει ότι δύο κάρτες γίνονται μία ΠΡΙΝ, όχι να το ανακαλύψει μετά. */
+      var msg = 'Μετονομασία προμηθευτή\n\n«' + old + '» → «' + name + '»\n\n' +
+                'Αλλάζουν ' + mine.length +
+                (mine.length === 1 ? ' τιμολόγιο.' : ' τιμολόγια.');
+      if (target.length) {
+        msg += '\n\n⚠ Ο «' + name + '» υπάρχει ήδη με ' + target.length +
+               (target.length === 1 ? ' τιμολόγιο' : ' τιμολόγια') +
+               '.\nΘα ενωθούν σε έναν προμηθευτή με ' + (mine.length + target.length) + '.';
+      }
+      msg += '\n\nΘα έχεις 10 δευτερόλεπτα για αναίρεση.';
+      if (!confirm(msg)) { nav.pop(); return null; }
+
+      /* Κρατιέται το ΠΑΛΙΟ όνομα ανά id — όχι ολόκληρη η εγγραφή: η αναίρεση
+         πρέπει να γυρίσει ΜΟΝΟ τον προμηθευτή, χωρίς να πατήσει ό,τι άλλο
+         άλλαξε στο μεταξύ (π.χ. ποσό που μπήκε από τον συγχρονισμό). */
+      renameBin = mine.map(function (r) { return { id: r.id, supplier: old }; });
+      if (renameTimer) { clearTimeout(renameTimer); }
+      renameTimer = setTimeout(function () {
+        renameBin = null; renameTimer = null;
+        if (!el('s-sup').hidden) { renderSupPage(); }
+      }, UNDO_MS);
+
+      return Promise.all(mine.map(function (r) {
+        r.supplier = name;
+        return put(r);
+      })).then(function () {
+        /* 🔴 nav.pop() ΒΓΑΖΕΙ ΑΠΟ ΤΗ ΣΤΟΙΒΑ, ΔΕΝ ΔΕΙΧΝΕΙ ΟΘΟΝΗ.
+           Χωρίς το show() έμενε ορατή η οθόνη επιλογής και η μπάρα αναίρεσης
+           ζωγραφιζόταν σε οθόνη που κανείς δεν έβλεπε — δηλαδή η αναίρεση
+           υπήρχε στο DOM και ήταν απρόσιτη για τα 10 δευτερόλεπτα που ζει.
+           Το έπιασε το τεστ 66, όχι η ανάγνωση. */
+        nav.pop();                 // s-who
+        show('s-sup');
+        return all().then(function (rs) { openSupplier(name, rs); });
+      });
+    }).catch(function (e) { alert('Δεν αποθηκεύτηκε: ' + e); });
+  }
+
+  function renameUndoRow() {
+    var u = document.createElement('div');
+    u.className = 'undo-row';
+    var t = document.createElement('span');
+    t.textContent = 'Μετονομάστηκαν ' + renameBin.length +
+                    (renameBin.length === 1 ? ' τιμολόγιο' : ' τιμολόγια');
+    var b = document.createElement('button');
+    b.className = 'btn ghost';
+    b.id = 'sup-rename-undo';
+    b.textContent = '↩ Αναίρεση';
+    b.onclick = function () {
+      var back = renameBin; renameBin = null;
+      if (renameTimer) { clearTimeout(renameTimer); renameTimer = null; }
+      Promise.all(back.map(function (o) {
+        return get(o.id).then(function (r) {
+          if (!r) { return null; }
+          r.supplier = o.supplier;
+          return put(r);
+        });
+      })).then(function () {
+        return all().then(function (rs) { openSupplier(back[0].supplier, rs); });
+      });
+    };
+    u.appendChild(t); u.appendChild(b);
+    return u;
+  }
+
   function openSupplier(name, rows) {
     var body = el('sup-body');
     /* v21 — δέχεται όνομα Ή πίνακα ονομάτων. Μία διαδρομή, όχι δύο. */
@@ -1027,6 +1143,21 @@
       var h = document.createElement('h2');
       h.textContent = titlos;
       body.appendChild(h);
+      /* v57 · Brief Γ — Η ΜΟΝΗ ΔΙΑΔΡΟΜΗ ΠΟΥ ΑΓΓΙΖΕΙ ΠΟΛΛΑ ΤΙΜΟΛΟΓΙΑ.
+         Ρητή πράξη, σε ρητό μέρος: είσαι ΜΕΣΑ στον προμηθευτή, άρα η πρόθεση
+         «αυτός ο προμηθευτής» είναι δεδομένη — δεν τη μαντεύει κανείς.
+         Μόνο για ΕΝΑΝ προμηθευτή: στο «Δες μαζί (Α/Β/Γ)» δεν υπάρχει «αυτός». */
+      if (!polloi && !isReader()) {
+        var rn = document.createElement('button');
+        rn.className = 'btn ghost';
+        rn.id = 'sup-rename';
+        rn.textContent = '✎ Μετονομασία προμηθευτή';
+        rn.onclick = function () { renameSupplier(names[0]); };
+        body.appendChild(rn);
+      }
+      /* Η αναίρεση ζει ΜΕΣΑ στην κάρτα, εκεί που μόλις έγινε η αλλαγή —
+         όχι σε άλλη οθόνη που ο χρήστης δεν θα ανοίξει μέσα σε 10″. */
+      if (renameBin) { body.appendChild(renameUndoRow()); }
       if (polloi) {
         var who = document.createElement('p');
         who.className = 'multi-who';
@@ -1514,16 +1645,130 @@
         }
         body.appendChild(block);
       });
-      [['Ημερομηνία τιμολογίου', dstr(dateOf(r))],
-       ['Καταγράφηκε', dstr(r.ts)], ['Σύνολο', eur(r.total)],
-       ['ΦΠΑ', eur(r.vat)], ['Καθαρό ποσό', eur(r.net)]].forEach(function (p) {
-        var kv = document.createElement('div');
-        kv.className = 'kv';
-        kv.innerHTML = '<span></span><b></b>';
-        kv.querySelector('span').textContent = p[0];
-        kv.querySelector('b').textContent = p[1];
-        body.appendChild(kv);
-      });
+      /* v57 · Brief Γ — ΤΑ ΣΤΟΙΧΕΙΑ ΔΙΟΡΘΩΝΟΝΤΑΙ ΚΑΙ ΜΕΤΑ ΤΗΝ ΑΠΟΘΗΚΕΥΣΗ.
+         Ως τη v56 η μόνη οθόνη που επεξεργαζόταν τιμολόγιο ήταν τα «Εκκρεμή»
+         — και το τιμολόγιο έφευγε από εκεί μόλις έμπαινε το Σύνολο. Γι' αυτό
+         το τιμολόγιο της 10/04 έμεινε καταχωρημένο 01/09 (ανοιχτό από 28/8).
+         Η ανάγνωση μένει ανάγνωση: η φόρμα ανοίγει ΜΟΝΟ με ρητό πάτημα, ώστε
+         κανείς να μη σβήσει ποσό ενώ απλώς κοιτάει το τιμολόγιο. */
+      var shotEdit = false;
+      var kvBox = document.createElement('div');
+      body.appendChild(kvBox);
+
+      function drawKv() {
+        kvBox.innerHTML = '';
+        [['Προμηθευτής', r.supplier],
+         ['Ημερομηνία τιμολογίου', dstr(dateOf(r))],
+         ['Καταγράφηκε', dstr(r.ts)], ['Σύνολο', eur(r.total)],
+         ['ΦΠΑ', eur(r.vat)], ['Καθαρό ποσό', eur(r.net)]].forEach(function (p) {
+          var kv = document.createElement('div');
+          kv.className = 'kv';
+          kv.innerHTML = '<span></span><b></b>';
+          kv.querySelector('span').textContent = p[0];
+          kv.querySelector('b').textContent = p[1];
+          kvBox.appendChild(kv);
+        });
+        if (isReader()) { return; }
+        var eb = document.createElement('button');
+        eb.className = 'btn ghost wide';
+        eb.id = 'shot-edit';
+        eb.textContent = '✎ Επεξεργασία στοιχείων';
+        eb.onclick = function () { shotEdit = true; drawEdit(); };
+        kvBox.appendChild(eb);
+      }
+
+      function drawEdit() {
+        kvBox.innerHTML = '';
+
+        /* Ο προμηθευτής ΔΕΝ γράφεται εδώ με το χέρι: ανοίγει η ίδια οθόνη
+           επιλογής της λήψης (s-who), με την ίδια αναζήτηση και τις ίδιες
+           δύο καρτέλες. Μία υλοποίηση, δύο πόρτες. */
+        var sup = document.createElement('div');
+        sup.className = 'kv kv-edit';
+        sup.innerHTML = '<span></span><b></b>';
+        sup.querySelector('span').textContent = 'Προμηθευτής';
+        sup.querySelector('b').textContent = r.supplier;
+        var sb = document.createElement('button');
+        sb.className = 'btn ghost';
+        sb.id = 'shot-sup-edit';
+        sb.textContent = 'Αλλαγή';
+        sb.onclick = function () {
+          whoEdit = { kind: 'shot', id: r.id };
+          renderSuppliers().then(function () {
+            nav.push('s-who'); show('s-who');
+          }, function () {
+            whoMode('new'); nav.push('s-who'); show('s-who');
+          });
+        };
+        sup.appendChild(sb);
+        kvBox.appendChild(sup);
+
+        /* Η ημερομηνία ξαναχρησιμοποιεί τον ίδιο επιλογέα της λήψης, μαζί με
+           το max = σήμερα: τιμολόγιο με ημερομηνία στο μέλλον δεν υπάρχει. */
+        var dt = document.createElement('div');
+        dt.className = 'kv kv-edit';
+        dt.innerHTML = '<span></span><b></b>';
+        dt.querySelector('span').textContent = 'Ημερομηνία τιμολογίου';
+        var dval = dt.querySelector('b');
+        var newDate = dateOf(r);
+        dval.textContent = dstr(newDate);
+        var di = document.createElement('input');
+        di.type = 'date';
+        di.id = 'shot-date-inp';
+        di.hidden = true;
+        di.max = ymd(Date.now());
+        var db = document.createElement('button');
+        db.className = 'btn ghost';
+        db.id = 'shot-date-edit';
+        db.textContent = 'Αλλαγή';
+        db.onclick = function () {
+          di.value = ymd(newDate);
+          di.hidden = false;
+          if (di.showPicker) { try { di.showPicker(); } catch (e) {} }
+          else { di.focus(); }
+        };
+        di.onchange = function () {
+          var t = fromYmd(di.value);
+          if (t !== null) { newDate = t; dval.textContent = dstr(newDate); }
+          di.hidden = true;
+        };
+        dt.appendChild(db); dt.appendChild(di);
+        kvBox.appendChild(dt);
+
+        /* Τα τρία ποσά έρχονται από τον ΚΟΙΝΟ πυρήνα (v57 amountsBlock):
+           ίδιος αυτόματος υπολογισμός του τρίτου, ίδιος έλεγχος «δεν
+           κλείνουν». Αντιγραφή του σε δεύτερο σημείο θα σήμαινε δύο φρουρούς
+           για το ίδιο πράγμα — κανένας δεν αποδεικνύεται (Α400 §Γ 6/9). */
+        var ab = amountsBlock(r, { after: function () { freeUrls(); nav.pop(); openShot(r.id); } });
+        kvBox.appendChild(ab.node);
+
+        var acts = document.createElement('div');
+        acts.className = 'acts';
+        var sv = document.createElement('button');
+        sv.className = 'btn primary';
+        sv.id = 'shot-save';
+        sv.textContent = 'Αποθήκευση';
+        sv.onclick = function () {
+          r.invDate = newDate;
+          r.total = parseNum(ab.inputs.total.value);
+          r.vat   = parseNum(ab.inputs.vat.value);
+          r.net   = parseNum(ab.inputs.net.value);
+          put(r).then(function () {
+            shotEdit = false;
+            drawKv();
+            refreshCount();
+          });
+        };
+        var cn = document.createElement('button');
+        cn.className = 'btn ghost';
+        cn.id = 'shot-cancel';
+        cn.textContent = 'Άκυρο';
+        cn.onclick = function () { shotEdit = false; drawKv(); };
+        acts.appendChild(sv); acts.appendChild(cn);
+        kvBox.appendChild(acts);
+      }
+
+      drawKv();
       var dl = document.createElement('button');
       dl.className = 'btn ghost del wide';
       dl.hidden = isReader();
@@ -1597,7 +1842,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v56';
+  var APP_VER = 'φέτα 3 · v57';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2067,8 +2312,40 @@
   }
 
   /* ── Καταχώρηση ── */
+  /* v57 · Brief Γ — ΠΟΙΟ ΤΙΜΟΛΟΓΙΟ ΔΙΟΡΘΩΝΟΥΜΕ.
+     null = κανονική ροή λήψης (η assign φτιάχνει ΝΕΑ εγγραφή).
+     <id> = ήρθαμε από την οθόνη τιμολογίου για διόρθωση προμηθευτή. */
+  var whoEdit = null;      // {kind:'shot', id} ή {kind:'rename', old}
+
+  /* 🔴 ΑΛΛΑΖΕΙ ΜΟΝΟ ΑΥΤΟ ΤΟ ΤΙΜΟΛΟΓΙΟ. ΠΑΝΤΑ. ΚΑΜΙΑ ΕΡΩΤΗΣΗ.
+     Απόφαση Stavros 10/9/2026: η εφαρμογή ΔΕΝ έχει απόδειξη ότι δύο ονόματα
+     είναι ο ίδιος προμηθευτής — άρα δεν ρωτάει «να αλλάξω και τα άλλα 7;».
+     Ερώτηση που θα έβγαινε σε κάθε αλλαγή θα μάθαινε τον χρήστη να την
+     προσπερνά (ίδια οικογένεια με τον κανόνα της 30/8 για τις προειδοποιήσεις).
+     Η μαζική μετονομασία ζει ΜΟΝΟ στην κάρτα προμηθευτή, ως ρητή πράξη. */
+  function assignEdit(name) {
+    var w = whoEdit;
+    whoEdit = null;
+    if (!w) { return; }
+    if (w.kind === 'rename') { return supRenameApply(w.old, name); }
+    var id = w.id;
+    get(id).then(function (r) {
+      if (!r || r.supplier === name) { return null; }
+      r.supplier = name;
+      return put(r);
+    }).then(function () {
+      freeUrls();
+      nav.pop();            // s-who
+      nav.pop();            // s-shot (το ξαναχτίζει η openShot)
+      openShot(id);
+      refreshCount();
+    }).catch(function (e) { alert('Δεν αποθηκεύτηκε: ' + e); });
+  }
+
   function assign(name) {
-    if (!name || !pendingBlob) { return; }
+    if (!name) { return; }
+    if (whoEdit) { return assignEdit(name); }
+    if (!pendingBlob) { return; }
     /* Σελίδα 1 = η ΠΡΩΤΗ που τραβήχτηκε. Το pendingBlob είναι η τελευταία. */
     var seq = pendingPages.concat([pendingBlob]);
     var rec = {

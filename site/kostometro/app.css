@@ -519,3 +519,11 @@ input:focus{outline:none;border-color:var(--accent)}
   background:rgba(255,138,76,.10);border-left:3px solid #ff8a4c;
   color:#f2d9c9;padding:10px 12px;border-radius:6px;font-size:13px;margin-top:10px;
 }
+
+/* v57 · Brief Γ — η γραμμή στοιχείων σε λειτουργία επεξεργασίας.
+   Ίδια όψη με την .kv της ανάγνωσης· αλλάζει μόνο ότι κουμπώνει κουμπί
+   δεξιά. Χωρίς αυτό το κουμπί έπεφτε κάτω από την τιμή και η γραμμή
+   διπλασίαζε ύψος — σε κινητό έβγαζε τα ποσά εκτός οθόνης. */
+.kv-edit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kv-edit b { flex: 1 1 auto; }
+.kv-edit .btn { flex: 0 0 auto; padding: 4px 10px; font-size: .85rem; }
