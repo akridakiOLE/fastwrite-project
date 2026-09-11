@@ -1035,12 +1035,7 @@
   var renameBin = null, renameTimer = null;
 
   function renameSupplier(old) {
-    whoEdit = { kind: 'rename', old: old };
-    renderSuppliers().then(function () {
-      nav.push('s-who'); show('s-who');
-    }, function () {
-      whoMode('new'); nav.push('s-who'); show('s-who');
-    });
+    openWhoEdit({ kind: 'rename', old: old });
   }
 
   function supRenameApply(old, name) {
@@ -1693,12 +1688,7 @@
         sb.id = 'shot-sup-edit';
         sb.textContent = 'Αλλαγή';
         sb.onclick = function () {
-          whoEdit = { kind: 'shot', id: r.id };
-          renderSuppliers().then(function () {
-            nav.push('s-who'); show('s-who');
-          }, function () {
-            whoMode('new'); nav.push('s-who'); show('s-who');
-          });
+          openWhoEdit({ kind: 'shot', id: r.id });
         };
         sup.appendChild(sb);
         kvBox.appendChild(sup);
@@ -1842,7 +1832,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v57';
+  var APP_VER = 'φέτα 3 · v58';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2297,6 +2287,17 @@
 
   function previewOk() {
     if (!pendingBlob) { return; }
+    /* 🔴 v58 · Η ΛΗΨΗ ΞΕΚΙΝΑΕΙ ΠΑΝΤΑ ΚΑΘΑΡΗ — Ο ΦΡΟΥΡΟΣ ΣΕ ΕΝΑ ΣΗΜΕΙΟ.
+       Η s-who σε διόρθωση δεν έχει «Επιστροφή»· φεύγεις με το «πίσω» του
+       κινητού, που ως τη v57 ΔΕΝ καθάριζε το whoEdit. Η επόμενη λήψη έπεφτε
+       σε διόρθωση: η νέα φωτογραφία ΔΕΝ αποθηκευόταν και άλλαζε ο
+       προμηθευτής ΠΑΛΙΟΥ τιμολογίου (σιωπηλά) ή ερχόταν ερώτηση
+       μετονομασίας όλων. Μετρήθηκε 11/9 (τεστ 68/69, κόκκινα στη v57).
+       Εδώ και όχι στο «πίσω»: όποιος δρόμος κι αν έβγαλε τον χρήστη από τη
+       διόρθωση (πίσω, 410, κλείδωμα, κλείσιμο εφαρμογής), η λήψη είναι
+       ΠΑΝΤΑ νέο τιμολόγιο. */
+    whoEdit = null;
+    whoChrome(true);
     hidePreview();
     var n = pendingPages.length + 1;
     var wb = el('who-pages');
@@ -2316,6 +2317,27 @@
      null = κανονική ροή λήψης (η assign φτιάχνει ΝΕΑ εγγραφή).
      <id> = ήρθαμε από την οθόνη τιμολογίου για διόρθωση προμηθευτή. */
   var whoEdit = null;      // {kind:'shot', id} ή {kind:'rename', old}
+
+  /* v58 · Η ΜΙΑ ΠΟΡΤΑ ΤΗΣ ΔΙΟΡΘΩΣΗΣ (εύρημα Stavros 11/9/2026, στιγμιότυπα
+     από την πρώτη δοκιμή της v57 σε κινητό). Η s-who είναι η οθόνη της
+     ΛΗΨΗΣ· σε διόρθωση κρύβεται ό,τι ανήκει μόνο στη λήψη: η ημερομηνία
+     (έδειχνε 01/01/1970 και μια αλλαγή εκεί χανόταν σιωπηλά) και η
+     μικρογραφία (άδειο τετράγωνο — δεν υπάρχει νέα φωτογραφία). */
+  function whoChrome(on) {
+    var d = document.querySelector('#s-who .who-date');
+    var t = document.querySelector('#s-who .thumb-wrap');
+    if (d) { d.hidden = !on; }
+    if (t) { t.hidden = !on; }
+  }
+  function openWhoEdit(w) {
+    whoEdit = w;
+    whoChrome(false);
+    renderSuppliers().then(function () {
+      nav.push('s-who'); show('s-who');
+    }, function () {
+      whoMode('new'); nav.push('s-who'); show('s-who');
+    });
+  }
 
   /* 🔴 ΑΛΛΑΖΕΙ ΜΟΝΟ ΑΥΤΟ ΤΟ ΤΙΜΟΛΟΓΙΟ. ΠΑΝΤΑ. ΚΑΜΙΑ ΕΡΩΤΗΣΗ.
      Απόφαση Stavros 10/9/2026: η εφαρμογή ΔΕΝ έχει απόδειξη ότι δύο ονόματα
