@@ -93,13 +93,13 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/folder" && method === "PUT") return putFolder(request, env);
   if (path === "/api/km/activate" && method === "POST") return activate(request, env);
 
-  if (path === "/api/km/delete" && method === "POST") return deleteAccount(request, env);
+  if (path === "/api/km/delete" && method === "POST") return deleteAccount(request, env, ctx);
   if (path === "/api/km/admin/delete" && method === "POST") return adminDelete(request, env);
   if (path === "/api/km/admin/purge" && method === "POST") return adminPurge(request, env);
   if (path === "/api/km/admin/inspect" && method === "POST") return adminInspect(request, env);
 
   if (path === "/api/km/unlock" && method === "POST") return unlock(request, env);
-  if (path === "/api/km/lock" && method === "POST") return addLock(request, env);
+  if (path === "/api/km/lock" && method === "POST") return addLock(request, env, ctx);
   if (path === "/api/km/inbox") {
     if (method === "GET")    return getInbox(request, env);
     if (method === "PUT")    return putInbox(request, env);
@@ -111,6 +111,7 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/feedback" && method === "POST") return feedback(request, env);
   if (path === "/api/km/admin/feedback" && method === "GET") return adminFeedback(request, env);
   // Χρόνοι τήρησης (Πολιτική v2.0 §5). GET = ΜΟΝΟ δείχνει, POST = σβήνει.
+  if (path === "/api/km/admin/mail" && method === "GET") return adminMail(request, env);
   if (path === "/api/km/admin/cleanup") {
     if (method === "GET")  return adminCleanup(request, env, false);
     if (method === "POST") return adminCleanup(request, env, true);
@@ -392,7 +393,7 @@ async function unlock(request, env) {
 //  - ΜΟΝΟ η ενεργή συσκευή. Στο Free = πορτοφόλι δεν αλλάζει λέξεις κανείς άλλος.
 // Ο server ΔΕΝ μπορεί να ελέγξει ότι το wrapped_k κλειδώνει το ίδιο Κ —
 // αυτό το αποδεικνύει η συσκευή (και ο έλεγχος στο /km-crypto-test).
-async function addLock(request, env) {
+async function addLock(request, env, ctx) {
   const a = await authed(request, env);
   if (a.err) return a.err;
   if (a.acc.active_device_id !== a.id.device) {
@@ -450,6 +451,15 @@ async function addLock(request, env) {
   }
   await env.DB.batch(stmts);
   await touchDevice(env, request, a.id, null);
+
+  // Brief Ε §6 — δεύτερο γεγονός: ΑΛΛΑΓΗ ΤΩΝ 12 ΛΕΞΕΩΝ, «μόλις γραφτεί η νέα
+  // κλειδαριά». Ειδοποιούμε ΜΟΝΟ όταν κλειδαριά λέξεων ΑΝΤΙΚΑΘΙΣΤΑ άλλη —
+  // η πρώτη κλειδαριά ενός νέου λογαριασμού δεν είναι «αλλαγή» και δεν
+  // στέλνει τίποτα. Η πράξη έχει ήδη γίνει· το email δεν την ακυρώνει.
+  if (kind === "words" && replace) {
+    fireMail(env, ctx, "words", a.acc && a.acc.email ? String(a.acc.email) : null);
+  }
+
   return json({ ok: true, lock_id: lockId, kind: kind, replaced: replace,
                 account_auth_closed: !!accountAuth,
                 locks: await lockSummary(env, a.id.folder) });
@@ -824,7 +834,7 @@ async function wipeFolder(env, folderId) {
 //     τις 12 λέξεις» (Α320, 8/9) — μία απόφαση, δύο σημεία που την τηρούν.
 const DELETE_CONFIRM = "ΔΙΑΓΡΑΦΗ";
 
-async function deleteAccount(request, env) {
+async function deleteAccount(request, env, ctx) {
   const a = await authed(request, env);
   if (a.err) return a.err;
   if (a.acc.active_device_id !== a.id.device) {
@@ -836,8 +846,18 @@ async function deleteAccount(request, env) {
   if (clean(b.confirm, 40) !== DELETE_CONFIRM) {
     return json({ ok: false, error: "confirm_required", expected: DELETE_CONFIRM }, 400);
   }
+  // 🔴 Η ΔΙΕΥΘΥΝΣΗ ΔΙΑΒΑΖΕΤΑΙ ΠΡΙΝ ΤΟ ΣΒΗΣΙΜΟ. Το wipeFolder αδειάζει το
+  // km_accounts.email στο βήμα (δ)· μετά από αυτό δεν υπάρχει πού να σταλεί
+  // η ειδοποίηση. Brief Ε §6: «πριν σβηστεί το email από τη βάση».
+  const to = a.acc && a.acc.email ? String(a.acc.email) : null;
+
   const res = await wipeFolder(env, a.id.folder);
   if (!res) return json({ ok: false, error: "no_account" }, 404);
+
+  // Ειδοποίηση, ΟΧΙ επιβεβαίωση: η διαγραφή έχει ήδη γίνει και δεν ακυρώνεται
+  // αν το email αποτύχει. Η αποτυχία καταγράφεται και φαίνεται στο
+  // /api/km/admin/mail.
+  fireMail(env, ctx, "deleted", to);
   return json({ ok: true, deleted: res });
 }
 
@@ -1204,4 +1224,132 @@ async function adminCleanup(request, env, doIt) {
   const before = await cleanupCounts(env, nowIso);
   const deleted = await kmCleanup(env, nowIso);
   return json({ ok: true, mode: "deleted", before: before, deleted: deleted });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ΕΙΔΟΠΟΙΗΣΕΙΣ ΜΕ EMAIL — Brief Ε §6 (εγκρίθηκε 11/9/2026, γράφτηκε 14/9/2026)
+//
+// Δύο γεγονότα, κανένα άλλο: διαγραφή λογαριασμού · αλλαγή των 12 λέξεων.
+//
+// 🔴 Ο ΚΑΝΟΝΑΣ ΠΟΥ ΔΙΕΠΕΙ ΤΑ ΠΑΝΤΑ ΕΔΩ: «ΕΙΔΟΠΟΙΗΣΗ, ΟΧΙ ΕΠΙΒΕΒΑΙΩΣΗ».
+//    Η πράξη γίνεται ούτως ή άλλως. Ενα email που δεν έφυγε ΔΕΝ επιτρέπεται
+//    να κρατήσει όμηρη τη διαγραφή ενός λογαριασμού. Γι' αυτό τίποτα εδώ δεν
+//    πετάει ποτέ σφάλμα προς τα έξω.
+//
+// 🔴 ΤΟ ΚΕΙΜΕΝΟ ΔΕΝ ΠΕΡΙΕΧΕΙ ΠΟΤΕ λέξεις, κλειδιά ή συνδέσμους ενέργειας.
+//    Μόνο πληροφορία και η διεύθυνση υποστήριξης (Brief Ε §6, κλειστό 8/9).
+//
+// ⚠ ΑΠΟΣΤΟΛΕΑΣ: `noreply@notify.fastwrite.tech`, ΟΧΙ το apex. Απόφαση 14/9,
+//    διόρθωση του Brief Ε §6: το Email Sending προσθέτει MX/SPF/DKIM/DMARC,
+//    και στο apex θα συγκρούονταν με το Google Workspace του support@.
+//    Στον υποτομέα δεν αγγίζει τίποτα.
+//
+// ⚠ ΤΟ Reply-To ΔΕΝ ΜΠΑΙΝΕΙ ΑΚΟΜΑ. Το τεκμηριωμένο παράδειγμα της Cloudflare
+//    δέχεται { to, from, subject, html, text } και ΔΕΝ αναφέρει πεδίο
+//    απάντησης. Δεν στέλνω άγνωστο πεδίο σε πρώτη αποστολή. Η διεύθυνση
+//    υποστήριξης υπάρχει ΜΕΣΑ στο κείμενο, οπότε ο χρήστης δεν μένει χωρίς
+//    δρόμο. Κλείνει μόλις επαληθευτεί η πρώτη πραγματική αποστολή.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const MAIL_FROM = "FastWrite <noreply@notify.fastwrite.tech>";
+const MAIL_SUPPORT = "support@fastwrite.tech";
+
+function mailWhen() {
+  try {
+    return new Intl.DateTimeFormat("el-GR", {
+      timeZone: "Asia/Nicosia", dateStyle: "short", timeStyle: "short",
+    }).format(new Date());
+  } catch (e) {
+    // Αν το Intl δεν έχει ζώνες, καλύτερα ώρα UTC παρά λάθος ώρα Κύπρου.
+    return now().replace("T", " ").slice(0, 16) + " UTC";
+  }
+}
+
+function mailBody(kind) {
+  const when = mailWhen();
+  if (kind === "deleted") {
+    return {
+      subject: "Ο λογαριασμός σου στο Kostometro διαγράφηκε · Your Kostometro account was deleted",
+      el: "Ο λογαριασμός σου στο Kostometro διαγράφηκε στις " + when + "." +
+          " Αν δεν ήσουν εσύ, κάποιος είχε πρόσβαση στο κινητό σου ή στις 12 λέξεις σου.",
+      en: "Your Kostometro account was deleted on " + when + " (Cyprus time)." +
+          " If this was not you, someone had access to your phone or to your 12 words.",
+    };
+  }
+  return {
+    subject: "Οι 12 λέξεις σου άλλαξαν · Your 12 words were changed",
+    el: "Οι 12 λέξεις του λογαριασμού σου άλλαξαν στις " + when + "." +
+        " Αν δεν ήσουν εσύ, γράψε αμέσως στο " + MAIL_SUPPORT + ".",
+    en: "The 12 words of your account were changed on " + when + " (Cyprus time)." +
+        " If this was not you, write to " + MAIL_SUPPORT + " immediately.",
+  };
+}
+
+// Η ΜΟΝΗ συνάρτηση που μιλάει με τη Cloudflare. Δεν πετάει ποτέ.
+export async function mailSend(env, kind, to) {
+  const t = now();
+  const log = async (ok, err, msgId) => {
+    try {
+      await env.DB.prepare(
+        "INSERT INTO km_mail_log (kind, ok, err, msg_id, at) VALUES (?, ?, ?, ?, ?)"
+      ).bind(kind, ok ? 1 : 0, err || null, msgId || null, t).run();
+    } catch (e) { /* ούτε η καταγραφή επιτρέπεται να ρίξει την πράξη */ }
+  };
+
+  const dest = normEmail(to);
+  if (!dest) return log(false, "no_address");
+  if (!env.EMAIL || typeof env.EMAIL.send !== "function") return log(false, "no_binding");
+
+  const b = mailBody(kind);
+  try {
+    const r = await env.EMAIL.send({
+      to: dest,
+      from: MAIL_FROM,
+      subject: b.subject,
+      text: b.el + "\n\n---\n\n" + b.en,
+      html: "<p>" + escHtml(b.el) + "</p><hr><p>" + escHtml(b.en) + "</p>",
+    });
+    return log(true, null, r && r.messageId ? String(r.messageId) : null);
+  } catch (e) {
+    return log(false, String((e && e.message) || e).slice(0, 300));
+  }
+}
+
+// Στην παραγωγή δεν καθυστερεί την απάντηση· στα τεστ τρέχει συγχρονισμένα.
+function fireMail(env, ctx, kind, to) {
+  const p = mailSend(env, kind, to);
+  if (ctx && typeof ctx.waitUntil === "function") { ctx.waitUntil(p); return null; }
+  return p;
+}
+
+// ΑΝΑΓΝΩΣΗ — κανόνας 14/8: δεν μαζεύουμε ό,τι δεν μπορούμε να διαβάσουμε.
+async function adminMail(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const rows = (await env.DB.prepare(
+    "SELECT id, kind, ok, err, msg_id, at FROM km_mail_log ORDER BY id DESC LIMIT 300"
+  ).all()).results || [];
+  const bad = rows.filter((r) => !r.ok).length;
+  const body = rows.map((r) => (
+    "<tr><td>" + r.id + "</td><td>" + escHtml(r.at) + "</td><td>" + escHtml(r.kind) +
+    "</td><td>" + (r.ok ? "✅" : "🔴") + "</td><td>" + escHtml(r.err || "") +
+    "</td><td>" + escHtml(r.msg_id || "") + "</td></tr>"
+  )).join("");
+  const html =
+    "<!doctype html><html lang=\"el\"><head><meta charset=\"utf-8\">" +
+    "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+    "<title>Ειδοποιήσεις — Kostometro</title><style>" +
+    "body{background:#0f1115;color:#e6e6e6;font:15px/1.5 system-ui,sans-serif;margin:0;padding:24px}" +
+    "h1{font-size:20px;margin:0 0 4px}p.sum{color:#9aa;margin:0 0 20px}" +
+    "table{border-collapse:collapse;width:100%;max-width:1000px}" +
+    "th,td{border-bottom:1px solid #262a33;padding:8px 10px;text-align:left}" +
+    "th{color:#9aa;font-weight:600;white-space:nowrap}" +
+    "</style></head><body><h1>Ειδοποιήσεις</h1><p class=\"sum\">" +
+    rows.length + " αποστολές · <strong>" + bad + " απέτυχαν</strong> · " +
+    "καμία διεύθυνση παραλήπτη δεν αποθηκεύεται</p>" +
+    "<table><tr><th>#</th><th>Πότε</th><th>Τι</th><th>Ok</th><th>Σφάλμα</th><th>messageId</th></tr>" +
+    body + "</table></body></html>";
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+  });
 }

@@ -66,3 +66,20 @@ jurisdiction = "eu"
 # αναμονής στη D1 δεν μετράει ως CPU. ΔΕΝ χρειάζεται Workers Paid.
 [triggers]
 crons = ["0 3 * * *"]
+
+# 📧 EMAIL SENDING (Brief Ε §6) — προστέθηκε 14/9/2026.
+# Στέλνει τις δύο ειδοποιήσεις: διαγραφή λογαριασμού · αλλαγή 12 λέξεων.
+# Αποστολέας: noreply@notify.fastwrite.tech — ΥΠΟΤΟΜΕΑΣ, όχι το apex.
+# ⚠ Ο λόγος είναι κρίσιμος: το onboarding του Email Sending προσθέτει MX, SPF,
+# DKIM και DMARC. Στο apex θα συγκρούονταν με το Google Workspace που δέχεται
+# το support@ (ένα μόνο SPF επιτρέπεται ανά domain). Στο notify.fastwrite.tech
+# μπήκαν όλα κάτω από cf-bounce.notify.* και το apex έμεινε ανέπαφο.
+# Απαιτεί Workers Paid, ενεργοποιήθηκε 14/9/2026.
+[[send_email]]
+name = "EMAIL"
+
+# 🔍 Τα Workers Logs ανάφθηκαν χειροκίνητα 14/9. Γραμμένα ΚΑΙ εδώ ώστε μια
+# μελλοντική ανάπτυξη να μην τα σβήσει σιωπηλά — χωρίς logs, μια αποτυχημένη
+# προγραμματισμένη εκτέλεση δεν γίνεται αντιληπτή από κανέναν.
+[observability]
+enabled = true
