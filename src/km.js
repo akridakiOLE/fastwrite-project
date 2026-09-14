@@ -106,6 +106,11 @@ export async function handleKm(request, env, ctx, path) {
     if (method === "DELETE") return delInbox(request, env);
   }
 
+  // «Η γνώμη σου» (Brief E §3). Δεν θέλει ταυτότητα λογαριασμού: η γνώμη
+  // ΔΕΝ συνδέεται με φάκελο. Το admin/feedback θέλει KM_ADMIN_KEY.
+  if (path === "/api/km/feedback" && method === "POST") return feedback(request, env);
+  if (path === "/api/km/admin/feedback" && method === "GET") return adminFeedback(request, env);
+
   if (path === "/api/km/photos" && method === "GET") return listPhotos(request, env);
   if (path === "/api/km/photo") {
     if (method === "GET")    return getPhoto(request, env);
@@ -990,5 +995,120 @@ async function adminInspect(request, env) {
       devices: await n("SELECT COUNT(*) AS n FROM km_devices WHERE folder_id = ?"),
     },
     r2: r2,
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// «Η ΓΝΩΜΗ ΣΟΥ» — Brief Ε §3 (εγκρίθηκε 11/9/2026, γράφτηκε 14/9/2026)
+//
+// 🔴 ΤΟ install_id ΕΡΧΕΤΑΙ ΑΛΛΑ ΔΕΝ ΑΠΟΘΗΚΕΥΕΤΑΙ ΠΟΤΕ. Χρησιμεύει μόνο για
+//    να βγει το sha256(install_id + ":" + ημερομηνία) του φρένου, που αλλάζει
+//    κάθε μέρα και δεν συνδέει τη μια μέρα με την άλλη.
+// 🔴 ΚΑΜΙΑ ΩΡΑ, ΚΑΜΙΑ ΗΜΕΡΑ στη γνώμη — μόνο ο μήνας. Δύο γνώμες του ίδιου
+//    μήνα δεν μπορούν να μπουν σε σειρά.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const FEEDBACK_MAX_PER_DAY = 5;
+
+function dayMinus(dayStr, n) {
+  const d = new Date(dayStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+function escHtml(v) {
+  return String(v === null || v === undefined ? "" : v)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+async function feedback(request, env) {
+  const b = (await safeJson(request)) || {};
+
+  const install = clean(b.install_id, 64);
+  if (!install) return json({ ok: false, error: "bad_install" }, 400);
+
+  // Βαθμολογία: 1-5 ή τίποτα. Οτιδήποτε άλλο γίνεται τίποτα, δεν ρίχνει την κλήση.
+  let stars = parseInt(b.stars, 10);
+  if (!(stars >= 1 && stars <= 5)) stars = null;
+
+  const text = (clean(b.text, 2000) || "").trim();
+  if (stars === null && !text) return json({ ok: false, error: "empty" }, 400);
+
+  // Email ΜΟΝΟ αν τσεκάρισε «Θέλω απάντηση». Αλλιώς δεν το κοιτάμε καν.
+  const wantsReply = b.reply === true || b.reply === 1 || b.reply === "1";
+  const email = wantsReply ? normEmail(b.email) : null;
+  if (wantsReply && !email) return json({ ok: false, error: "bad_email" }, 400);
+
+  const day = now().slice(0, 10);
+  const dh = await sha256hex(install + ":" + day);
+
+  // Ο πίνακας του φρένου καθαρίζεται μόνος του: τίποτα παλαιότερο από 2 μέρες.
+  await env.DB.prepare("DELETE FROM km_feedback_rate WHERE day < ?").bind(dayMinus(day, 2)).run();
+
+  const seen = await env.DB.prepare("SELECT n FROM km_feedback_rate WHERE day_hash = ?").bind(dh).first();
+  if (seen && seen.n >= FEEDBACK_MAX_PER_DAY) return json({ ok: false, error: "too_many" }, 429);
+
+  await env.DB.prepare(
+    "INSERT INTO km_feedback (stars, text, ver, month, country, email) VALUES (?, ?, ?, ?, ?, ?)"
+  ).bind(
+    stars,
+    text || null,
+    clean(b.ver, 20),
+    day.slice(0, 7),
+    (request.cf && request.cf.country) || null,
+    email
+  ).run();
+
+  await env.DB.prepare(
+    "INSERT INTO km_feedback_rate (day_hash, day, n) VALUES (?, ?, 1) " +
+    "ON CONFLICT(day_hash) DO UPDATE SET n = n + 1"
+  ).bind(dh, day).run();
+
+  return json({ ok: true });
+}
+
+// ΑΝΑΓΝΩΣΗ — κανόνας 14/8/2026: δεν μαζεύουμε δεδομένα που δεν μπορούμε να
+// διαβάσουμε. Ιδιο μοτίβο με το /api/gnomi/apotelesmata: χωρίς το μυστικό η
+// διαδρομή ΔΕΝ ΥΠΑΡΧΕΙ (404, όχι 403).
+async function adminFeedback(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+
+  const rows = (await env.DB.prepare(
+    "SELECT id, stars, text, ver, month, country, email FROM km_feedback ORDER BY id DESC LIMIT 500"
+  ).all()).results || [];
+
+  const total = rows.length;
+  const rated = rows.filter((r) => r.stars !== null && r.stars !== undefined);
+  const avg = rated.length ? (rated.reduce((a, r) => a + r.stars, 0) / rated.length).toFixed(2) : "—";
+  const waiting = rows.filter((r) => r.email).length;
+
+  const body = rows.map((r) => (
+    "<tr><td>" + r.id +
+    "</td><td>" + (r.stars ? "★".repeat(r.stars) : "—") +
+    "</td><td>" + escHtml(r.month) +
+    "</td><td>" + escHtml(r.country || "—") +
+    "</td><td>" + escHtml(r.ver || "—") +
+    "</td><td>" + escHtml(r.email || "") +
+    "</td><td>" + escHtml(r.text || "") + "</td></tr>"
+  )).join("");
+
+  const html =
+    "<!doctype html><html lang=\"el\"><head><meta charset=\"utf-8\">" +
+    "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+    "<title>Η γνώμη σου — Kostometro</title><style>" +
+    "body{background:#0f1115;color:#e6e6e6;font:15px/1.5 system-ui,sans-serif;margin:0;padding:24px}" +
+    "h1{font-size:20px;margin:0 0 4px}p.sum{color:#9aa;margin:0 0 20px}" +
+    "table{border-collapse:collapse;width:100%;max-width:1100px}" +
+    "th,td{border-bottom:1px solid #262a33;padding:8px 10px;text-align:left;vertical-align:top}" +
+    "th{color:#9aa;font-weight:600;white-space:nowrap}td:last-child{white-space:pre-wrap}" +
+    "</style></head><body><h1>Η γνώμη σου</h1><p class=\"sum\">" +
+    total + " μηνύματα · μέση βαθμολογία " + avg + " · " + waiting + " περιμένουν απάντηση</p>" +
+    "<table><tr><th>#</th><th>Βαθμός</th><th>Μήνας</th><th>Χώρα</th><th>Έκδοση</th><th>Email</th><th>Κείμενο</th></tr>" +
+    body + "</table></body></html>";
+
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   });
 }
