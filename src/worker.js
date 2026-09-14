@@ -20,11 +20,21 @@
 // GDPR: δεν αποθηκεύεται IP. Μόνο χώρα (Cloudflare) και user-agent.
 // ---------------------------------------------------------------------------
 
-import { handleKm } from "./km.js";
+import { handleKm, kmCleanup } from "./km.js";
 
 const V = 3; // έκδοση ερωτηματολογίου
 
 export default {
+  // ΧΡΟΝΟΙ ΤΗΡΗΣΗΣ (Πολιτική v2.0 §5). Τρέχει από Cron Trigger, μία φορά
+  // την ημέρα. Στο δωρεάν πλάνο η προγραμματισμένη εκτέλεση έχει 10 ms CPU:
+  // η αναμονή στη βάση ΔΕΝ μετράει ως CPU, τα τέσσερα DELETE χωράνε.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(kmCleanup(env).then(
+      (r) => console.log("km cleanup:", JSON.stringify(r)),
+      (e) => console.error("km cleanup failed:", e)
+    ));
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";

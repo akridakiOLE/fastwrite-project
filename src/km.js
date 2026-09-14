@@ -110,6 +110,11 @@ export async function handleKm(request, env, ctx, path) {
   // ΔΕΝ συνδέεται με φάκελο. Το admin/feedback θέλει KM_ADMIN_KEY.
   if (path === "/api/km/feedback" && method === "POST") return feedback(request, env);
   if (path === "/api/km/admin/feedback" && method === "GET") return adminFeedback(request, env);
+  // Χρόνοι τήρησης (Πολιτική v2.0 §5). GET = ΜΟΝΟ δείχνει, POST = σβήνει.
+  if (path === "/api/km/admin/cleanup") {
+    if (method === "GET")  return adminCleanup(request, env, false);
+    if (method === "POST") return adminCleanup(request, env, true);
+  }
 
   if (path === "/api/km/photos" && method === "GET") return listPhotos(request, env);
   if (path === "/api/km/photo") {
@@ -1111,4 +1116,92 @@ async function adminFeedback(request, env) {
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ΧΡΟΝΟΙ ΤΗΡΗΣΗΣ — αυτόματη διαγραφή (Πολιτική Απορρήτου v2.0 §5)
+// Γράφτηκε 14/9/2026. Εγκεκριμένοι χρόνοι, αυτούσιοι από την πολιτική:
+//
+//   • Γραμμή στατιστικών μετά τη διαγραφή (η ταφόπετρα) ... 36 μήνες
+//   • «Η γνώμη σου» ................................... 24 μήνες
+//   • Απαντήσεις ερωτηματολογίου /gnomi ............... 24 μήνες
+//   • Συμβάντα χωνιού /gnomi .......................... 24 μήνες (ίδιο ρολόι)
+//
+// ⚠ ΔΕΝ καλύπτονται εδώ, ΕΠΙΤΗΔΕΣ:
+//   • Τηλεμετρία και σχόλια FastWrite Desktop (12 μήνες) — ΔΕΝ ζουν σε αυτή
+//     τη βάση. Ζουν στον server Hetzner και θέλουν δική τους δουλειά.
+//   • Στοιχεία φόρμας Facebook (12 μήνες) — ζουν στο Meta, όχι εδώ.
+//   • Email υποστήριξης (24 μήνες) — ζουν στο Gmail, όχι σε κώδικα.
+//
+// 🔴 ΤΟ ΟΡΙΟ ΑΝΑ ΕΚΤΕΛΕΣΗ ΔΕΝ ΕΙΝΑΙ ΔΙΑΚΟΣΜΗΤΙΚΟ. Στο δωρεάν πλάνο η
+//    προγραμματισμένη εκτέλεση έχει 10 ms CPU. Με όριο, μια μεγάλη ουρά
+//    καθαρίζεται σε πολλές μέρες αντί να κόβεται στη μέση.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const RETENTION = {
+  tombstone_months: 36,
+  feedback_months: 24,
+  gnomi_months: 24,
+};
+const CLEANUP_BATCH = 500;
+
+function monthsAgo(n, from) {
+  const d = from ? new Date(from) : new Date();
+  d.setUTCMonth(d.getUTCMonth() - n);
+  return d.toISOString();
+}
+
+// Τι ΘΑ σβηνόταν τώρα — μέτρηση, χωρίς καμία διαγραφή.
+async function cleanupCounts(env, nowIso) {
+  const tomb  = monthsAgo(RETENTION.tombstone_months, nowIso);
+  const fb    = monthsAgo(RETENTION.feedback_months, nowIso).slice(0, 7);
+  const gn    = monthsAgo(RETENTION.gnomi_months, nowIso);
+  const one = async (sql, arg) => ((await env.DB.prepare(sql).bind(arg).first()) || {}).n || 0;
+  return {
+    cutoffs: { tombstone: tomb, feedback_month: fb, gnomi: gn },
+    tombstones: await one("SELECT COUNT(*) AS n FROM km_accounts WHERE deleted IS NOT NULL AND deleted < ?", tomb),
+    feedback:   await one("SELECT COUNT(*) AS n FROM km_feedback WHERE month < ?", fb),
+    gnomi_responses: await one("SELECT COUNT(*) AS n FROM gnomi_responses WHERE ts < ?", gn),
+    gnomi_events:    await one("SELECT COUNT(*) AS n FROM gnomi_events WHERE ts < ?", gn),
+  };
+}
+
+// Η ΔΙΑΓΡΑΦΗ. Κάθε πίνακας χωριστά, με όριο γραμμών.
+// Το "rowid IN (SELECT ... LIMIT ?)" χρησιμοποιείται επειδή το DELETE ... LIMIT
+// ΔΕΝ υπάρχει σε κάθε build της sqlite — αυτό δουλεύει παντού.
+export async function kmCleanup(env, nowIso) {
+  const tomb = monthsAgo(RETENTION.tombstone_months, nowIso);
+  const fb   = monthsAgo(RETENTION.feedback_months, nowIso).slice(0, 7);
+  const gn   = monthsAgo(RETENTION.gnomi_months, nowIso);
+
+  const wipe = async (table, where, arg) => {
+    const r = await env.DB.prepare(
+      "DELETE FROM " + table + " WHERE rowid IN (SELECT rowid FROM " + table +
+      " WHERE " + where + " LIMIT ?)"
+    ).bind(arg, CLEANUP_BATCH).run();
+    return (r && r.meta && r.meta.changes) || 0;
+  };
+
+  const done = {
+    tombstones:      await wipe("km_accounts", "deleted IS NOT NULL AND deleted < ?", tomb),
+    feedback:        await wipe("km_feedback", "month < ?", fb),
+    gnomi_responses: await wipe("gnomi_responses", "ts < ?", gn),
+    gnomi_events:    await wipe("gnomi_events", "ts < ?", gn),
+  };
+  done.batch_limit = CLEANUP_BATCH;
+  done.more = Object.keys(done).some((k) => k !== "batch_limit" && done[k] === CLEANUP_BATCH);
+  return done;
+}
+
+// GET  = δείχνει τι θα σβηνόταν, ΔΕΝ σβήνει. POST = σβήνει.
+// Ο λόγος που υπάρχει το GET: δεν εμπιστεύεσαι αυτόματη διαγραφή που δεν
+// μπορείς να δεις πρώτα.
+async function adminCleanup(request, env, doIt) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const nowIso = new URL(request.url).searchParams.get("now") || undefined;
+  if (!doIt) return json({ ok: true, mode: "dry-run", would_delete: await cleanupCounts(env, nowIso) });
+  const before = await cleanupCounts(env, nowIso);
+  const deleted = await kmCleanup(env, nowIso);
+  return json({ ok: true, mode: "deleted", before: before, deleted: deleted });
 }
