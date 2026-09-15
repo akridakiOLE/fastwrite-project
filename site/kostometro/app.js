@@ -289,7 +289,7 @@
      στις 5/9· με ανάγνωση δεν φαινόταν.) */
   var SCREENS = ['s-acc','s-email','s-words','s-signin','s-key','s-perm','s-cam','s-who',
                  's-menu','s-pend','s-sup','s-ref','s-settings','s-shot','s-mywords',
-                 's-del','s-gone'];
+                 's-del','s-gone','s-dpend'];
   function show(id) {
     var pv = el('preview');
     if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
@@ -348,6 +348,7 @@
       else { renderSupPage(); }
     }
     if (id === 's-ref')      { renderRef(); }
+    if (id === 's-dpend')    { dpStart(); } else { dpStop(); }
     if (id === 's-settings') { renderSettings(); }
   }
 
@@ -1832,7 +1833,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v59';
+  var APP_VER = 'φέτα 3 · v60';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2561,12 +2562,55 @@
      Αν ο έλεγχος έμπαινε στα κουμπιά ή στις 23 κλήσεις μία-μία, θα ξεχνιόταν
      μία — και μία διαδρομή που δεν το πιάνει είναι ίδια με καμία. Γι' αυτό
      ΟΛΕΣ οι κλήσεις περνούν από εδώ. */
+  /* Η.11β (15/9/2026): ΔΕΥΤΕΡΟΣ ΑΝΙΧΝΕΥΤΗΣ, ΣΤΟ ΙΔΙΟ ΣΗΜΕΙΟ.
+     410 = ο λογαριασμός ΕΦΥΓΕ · 423 = ζητήθηκε διαγραφή και ο λογαριασμός
+     είναι παγωμένος. Και τα δύο ζουν εδώ γιατί από εδώ περνούν και οι 23
+     κλήσεις προς τον server (v56): έλεγχος ανά κλήση θα ξεχνιόταν στην
+     επόμενη που θα γραφτεί — και μια συσκευή που δεν μαθαίνει ποτέ ότι
+     εκκρεμεί διαγραφή είναι ακριβώς ο χρήστης που δεν προλαβαίνει να
+     αντιδράσει. */
   function kmFetch(path, opts) {
     return fetch(KM_API + path, opts).then(function (r) {
       if (r.status === 410) { onAccountGone(); }
+      if (r.status === 423) {
+        /* Το σώμα κρατάει το due_at. Διαβάζεται από ΑΝΤΙΓΡΑΦΟ: το r.json()
+           καταναλώνει το σώμα, και ο καλών μπορεί να το θέλει κι αυτός. */
+        try {
+          r.clone().json().then(function (j) { onDeletePending(j && j.due_at); },
+                                function () { onDeletePending(null); });
+        } catch (e) { onDeletePending(null); }
+      }
       return r;
     });
   }
+
+  /* ══ Η.11β — Η ΟΘΟΝΗ ΤΗΣ ΕΚΚΡΕΜΟΥΣ ΔΙΑΓΡΑΦΗΣ ══════════════════════
+     ⚠ ΔΕΝ είναι στη λίστα LOCKED_OUT, ΕΠΙΤΗΔΕΣ. Ολες οι άλλες οθόνες
+     δεδομένων φράζονται σε συσκευή εκτός λειτουργίας — αυτή όχι, γιατί
+     ακριβώς εκεί τη χρειάζεται ο ιδιοκτήτης: το κλεμμένο κινητό είναι η
+     ενεργή συσκευή, η δική του είναι η φραγμένη. Αν τη φράζαμε, θα
+     μπορούσε να ακυρώσει μόνο ο κλέφτης. */
+  var dpDue = null, dpTimer = null;
+
+  function onDeletePending(due) {
+    if (due) { dpDue = due; }
+    if (dpTimer) { return; }              // η οθόνη δείχνεται ΜΙΑ φορά
+    goto('s-dpend');
+  }
+
+  function dpTick() {
+    var left = dpDue ? (Date.parse(dpDue) - Date.now()) : 0;
+    if (!dpDue || isNaN(left)) { el('dp-left').textContent = 'σε λίγες ώρες'; el('dp-when').textContent = ''; return; }
+    if (left <= 0) { el('dp-left').textContent = 'ολοκληρώνεται τώρα'; el('dp-when').textContent = ''; return; }
+    var h = Math.floor(left / 3600000), m = Math.floor((left % 3600000) / 60000);
+    el('dp-left').textContent = 'απομένουν ' + h + (h === 1 ? ' ώρα ' : ' ώρες ') + m + (m === 1 ? ' λεπτό' : ' λεπτά');
+    el('dp-when').textContent = 'Οριστική διαγραφή: ' + new Date(dpDue).toLocaleString('el-GR');
+  }
+  function dpStart() {
+    dpTick();
+    if (!dpTimer) { dpTimer = setInterval(dpTick, 30000); }
+  }
+  function dpStop() { if (dpTimer) { clearInterval(dpTimer); dpTimer = null; } }
 
   function acctGone() { return !!localStorage.getItem(LS.acctGone); }
 
@@ -4399,7 +4443,7 @@
       e.hidden = false;
       return;
     }
-    b.disabled = true; b.textContent = 'Διαγράφεται…';
+    b.disabled = true; b.textContent = 'Στέλνεται…';
     kmFetch('delete', { method: 'POST', headers: kmHead(), body: JSON.stringify({ confirm: DEL_WORD }) })
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) { return { r: r, j: j }; });
@@ -4419,9 +4463,20 @@
         }
         return x.j;
       })
-      .then(function () { wipeThisDevice(); })
+      /* Η.11β: Η ΣΥΣΚΕΥΗ ΔΕΝ ΚΑΘΑΡΙΖΕΙ ΠΙΑ ΕΔΩ. Ως τη v59 το επόμενο βήμα
+         ήταν wipeThisDevice() — σωστό όσο η διαγραφή ήταν ακαριαία. Τώρα
+         τίποτα δεν έχει σβηστεί ακόμα, και η συσκευή πρέπει να μείνει
+         ζωντανή: είναι ο πιο πιθανός τόπος από όπου θα γίνει η ακύρωση.
+         Ο καθαρισμός γίνεται όταν ο server απαντήσει 410, δηλαδή αφού
+         περάσουν οι 72 ώρες (onAccountGone → s-gone → «Ξεκίνα καθαρά»). */
+      .then(function (j) {
+        if (j && j.pending && j.pending.due_at) { dpDue = j.pending.due_at; }
+        else if (j && j.due_at) { dpDue = j.due_at; }
+        b.disabled = false; b.textContent = 'Ζήτησε διαγραφή';
+        goto('s-dpend');
+      })
       .catch(function (err) {
-        b.disabled = false; b.textContent = 'Διαγραφή οριστικά';
+        b.disabled = false; b.textContent = 'Ζήτησε διαγραφή';
         e.textContent = (err && err.message) ? err.message : 'Δεν ολοκληρώθηκε η διαγραφή. Δοκίμασε ξανά.';
         e.hidden = false;
       });
@@ -4440,6 +4495,40 @@
     var fin = function () { location.reload(); };
     try { wipeDB().then(fin, fin); } catch (e) { fin(); }
   }
+
+  /* Η.11β — ΑΚΥΡΩΣΗ ΑΠΟ ΤΗΝ ΙΔΙΑ ΤΗ ΣΥΣΚΕΥΗ.
+     Εδώ ΔΕΝ ξαναζητούνται οι 12 λέξεις: η συσκευή τις έχει ήδη (το auth ζει
+     στο localStorage της) και η ακύρωση είναι η ΑΣΦΑΛΗΣ κατεύθυνση — δεν
+     καταστρέφει τίποτα, σταματάει καταστροφή. Οποιος μπορεί να ανοίξει αυτή
+     την οθόνη μπορεί ούτως ή άλλως να κάνει τα πάντα στον λογαριασμό.
+     Η σελίδα fastwrite.tech/kostometro/akyrosi είναι η άλλη πόρτα, για
+     όποιον ΔΕΝ έχει τη συσκευή — εκεί οι 12 λέξεις είναι απαραίτητες. */
+  el('dp-cancel').onclick = function () {
+    var b = el('dp-cancel'), e = el('dp-err');
+    e.hidden = true;
+    b.disabled = true; b.textContent = 'Ακυρώνεται…';
+    function stop(msg) {
+      b.disabled = false; b.textContent = 'Σταμάτησε τη διαγραφή';
+      e.textContent = msg; e.hidden = false;
+    }
+    kmFetch('delete/cancel', { method: 'POST', headers: kmHead(), body: JSON.stringify({ device_name: devName() }) })
+      .then(function (r) {
+        if (r.status === 409) { stop('Δεν υπάρχει εκκρεμής διαγραφή — μπορεί να ακυρώθηκε ήδη από άλλη συσκευή.'); return null; }
+        if (r.status === 403) { stop('Ο κωδικός αυτής της συσκευής δεν ισχύει πια. Ακύρωσε από τη σελίδα fastwrite.tech/kostometro/akyrosi με τις 12 λέξεις σου.'); return null; }
+        if (!r.ok) { stop('Ο διακομιστής δεν ολοκλήρωσε την ακύρωση (σφάλμα ' + r.status + '). Δοκίμασε ξανά.'); return null; }
+        return r.json().catch(function () { return {}; });
+      })
+      .then(function (j) {
+        if (!j) { return; }
+        dpDue = null; dpStop();
+        /* Η οθόνη είχε δειχθεί «μία φορά»· μετά την ακύρωση ο μετρητής
+           ξαναοπλίζεται, ώστε μια ΝΕΑ προσπάθεια του κλέφτη να ξαναφανεί. */
+        location.reload();
+      })
+      .catch(function () { stop('Δεν υπήρξε σύνδεση. Δοκίμασε ξανά.'); });
+  };
+
+  el('dp-close').onclick = function () { dpStop(); back(); };
 
   el('gn-keep').onclick = function () { back(); };
 

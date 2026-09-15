@@ -141,7 +141,13 @@ test('Η11ui-4 · λάθος λέξη ΔΕΝ στέλνει τίποτα στο�
 
 /* ── 4. Η ΠΡΑΞΗ, ΑΚΡΗ ΣΕ ΑΚΡΗ ──────────────────────────────────── */
 
-test('Η11ui-5 · σωστή λέξη: ο λογαριασμός σβήνει στον server ΚΑΙ η συσκευή καθαρίζει', async ({ browser }) => {
+/* 🔴 ΑΛΛΑΞΕ ΟΛΟΚΛΗΡΟ ΣΤΙΣ 15/9/2026 (Η.11β). Ως τη v59 το τεστ περίμενε ότι
+   η σωστή λέξη σβήνει τον λογαριασμό και καθαρίζει τη συσκευή. Τώρα η σωστή
+   λέξη ΖΗΤΑΕΙ διαγραφή: τίποτα δεν σβήνεται, η συσκευή ΜΕΝΕΙ ζωντανή (είναι
+   ο πιθανότερος τόπος της ακύρωσης) και ανοίγει η οθόνη της αναστολής.
+   Το παλιό τεστ δεν διαγράφηκε ως «ξεπερασμένο» — αντικαταστάθηκε από το
+   ίδιο σενάριο με τη νέα αλήθεια, ώστε να μη μείνει η διαδρομή αφύλαχτη. */
+test('Η11ui-5 · σωστή λέξη: ΑΙΤΗΜΑ, όχι σβήσιμο — η συσκευή ΜΕΝΕΙ και ανοίγει η οθόνη της αναστολής', async ({ browser }) => {
   const { ctx, p } = await device(browser);
   await addAuthenticator(ctx, p);
   await onboard(p, mail('h11d-'));
@@ -154,28 +160,67 @@ test('Η11ui-5 · σωστή λέξη: ο λογαριασμός σβήνει σ
   await p.locator('#dl-word').fill('ΔΙΑΓΡΑΦΗ');
   await p.locator('#dl-go').click();
 
-  /* Η συσκευή ξαναφορτώνει και γυρίζει στην ΠΡΩΤΗ οθόνη. */
-  await expect(p.locator('#s-acc')).toBeVisible({ timeout: 30000 });
+  await expect(p.locator('#s-dpend')).toBeVisible({ timeout: 30000 });
+  /* Ο μετρητής δείχνει πραγματικό υπόλοιπο, όχι παύλα. */
+  await expect(p.locator('#dp-left')).toContainText('απομένουν', { timeout: 5000 });
+
+  /* 🔴 Η ΣΥΣΚΕΥΗ ΔΕΝ ΚΑΘΑΡΙΣΕ. Αν καθάριζε, ο ιδιοκτήτης θα έχανε τον
+     ευκολότερο δρόμο προς την ακύρωση. */
   const after = await p.evaluate(() => ({
     folder: localStorage.getItem('km_folder'),
     words: localStorage.getItem('km_words'),
-    email: localStorage.getItem('km_email'),
     id: localStorage.getItem('km_install_id')
   }));
-  expect(after.folder, 'έμεινε ο φάκελος').toBeNull();
-  expect(after.words, 'έμειναν οι 12 λέξεις').toBeNull();
-  expect(after.email, 'έμεινε το email').toBeNull();
-  /* Το install_id ΜΕΝΕΙ: είναι η ταυτότητα της συσκευής, όχι του λογαριασμού. */
-  expect(after.id, 'χάθηκε το install_id').toBeTruthy();
+  expect(after.folder, 'ο φάκελος σβήστηκε από τη συσκευή').toBe(folder);
+  expect(after.words, 'σβήστηκαν οι 12 λέξεις από τη συσκευή').toBeTruthy();
+  expect(after.id).toBeTruthy();
 
-  /* ΑΠΟΔΕΙΞΗ ΑΠΟ ΤΟΝ SERVER, όχι από την οθόνη: οι ίδιες 12 λέξεις είναι νεκρές. */
-  const res = await p.evaluate(async (f) => {
+  /* ΑΠΟΔΕΙΞΗ ΑΠΟ ΤΟΝ SERVER: παγωμένος (423), ΟΧΙ νεκρός (410). */
+  const res = await p.evaluate(async () => {
     const r = await fetch('/api/km/status', {
-      headers: { 'X-Km-Folder': f, 'X-Km-Auth': '0'.repeat(64), 'X-Km-Device': 'km_probe' }
+      headers: {
+        'X-Km-Folder': localStorage.getItem('km_folder'),
+        'X-Km-Auth': localStorage.getItem('km_lock_auth') || localStorage.getItem('km_auth'),
+        'X-Km-Lock': localStorage.getItem('km_lock') || '',
+        'X-Km-Device': localStorage.getItem('km_install_id')
+      }
+    });
+    return { status: r.status, body: await r.json().catch(() => ({})) };
+  });
+  expect(res.status, 'ο λογαριασμός δεν πάγωσε').toBe(423);
+  expect(res.body.error).toBe('pending_delete');
+  expect(res.body.due_at, 'δεν ήρθε η ώρα λήξης').toBeTruthy();
+  await ctx.close();
+});
+
+test('Η11ui-5β · 🔴 Η ΑΚΥΡΩΣΗ ΑΠΟ ΤΗΝ ΙΔΙΑ ΤΗ ΣΥΣΚΕΥΗ ΞΕΠΑΓΩΝΕΙ ΤΟΝ ΛΟΓΑΡΙΑΣΜΟ', async ({ browser }) => {
+  const { ctx, p } = await device(browser);
+  await addAuthenticator(ctx, p);
+  await onboard(p, mail('h11d2-'));
+
+  await openSettings(p);
+  await p.locator('#st-delacc').click();
+  await expect(p.locator('#s-del')).toBeVisible({ timeout: 20000 });
+  await p.locator('#dl-word').fill('ΔΙΑΓΡΑΦΗ');
+  await p.locator('#dl-go').click();
+  await expect(p.locator('#s-dpend')).toBeVisible({ timeout: 30000 });
+
+  await p.locator('#dp-cancel').click();
+  /* Η σελίδα ξαναφορτώνει και ΔΕΝ ξαναδείχνει την οθόνη της αναστολής. */
+  await expect(p.locator('#s-dpend')).toBeHidden({ timeout: 30000 });
+
+  const res = await p.evaluate(async () => {
+    const r = await fetch('/api/km/status', {
+      headers: {
+        'X-Km-Folder': localStorage.getItem('km_folder'),
+        'X-Km-Auth': localStorage.getItem('km_lock_auth') || localStorage.getItem('km_auth'),
+        'X-Km-Lock': localStorage.getItem('km_lock') || '',
+        'X-Km-Device': localStorage.getItem('km_install_id')
+      }
     });
     return r.status;
-  }, folder);
-  expect([403, 410]).toContain(res);
+  });
+  expect(res, 'ο λογαριασμός έμεινε παγωμένος μετά την ακύρωση').toBe(200);
   await ctx.close();
 });
 

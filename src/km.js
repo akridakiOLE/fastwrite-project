@@ -1,4 +1,4 @@
-// KM-SERVER-V55-H11  ← σημάδι έκδοσης· το ψάχνει το deploy_km_v55.bat
+// KM-SERVER-V60-H11B  ← σημάδι έκδοσης· το ψάχνει το deploy_km_h11b.bat
 // Kostometro — μητρώο + σφραγισμένος φάκελος (Brief Α, Α350 §9.8 Η.1)
 // ---------------------------------------------------------------------------
 // Routes (όλα κάτω από /api/km/ — run_worker_first = ["/api/*"]):
@@ -15,9 +15,11 @@
 //   PUT    /api/km/photo?id=        -> ανέβασμα μιας φωτογραφίας (όποια έχει auth — Η.13)
 //   DELETE /api/km/photo?id=        -> σβήσιμο μιας φωτογραφίας (ΜΟΝΟ η ενεργή)
 //
-//   POST   /api/km/delete           -> Η.11: ΟΡΙΣΤΙΚΗ διαγραφή λογαριασμού (ΜΟΝΟ η ενεργή)
+//   POST   /api/km/delete           -> Η.11β: ΑΙΤΗΜΑ διαγραφής, ωριμάζει σε 72 ώρες (ΜΟΝΟ η ενεργή)
+//   POST   /api/km/delete/cancel    -> Η.11β: ΑΚΥΡΩΣΗ με τις 12 λέξεις (ΟΠΟΙΑΔΗΠΟΤΕ συσκευή)
 //   POST   /api/km/admin/delete     -> Η.11: η ίδια πράξη από τον Stavros (αίτημα με email)
 //   POST   /api/km/admin/purge      -> Η.11: καθαρισμός σκουπιδιών μητρώου (dry_run εξ ορισμού)
+//   GET/POST /api/km/admin/due      -> Η.11β: ποιοι έληξαν (GET) · σβήσε τους (POST)
 //   POST   /api/km/admin/inspect    -> Η.11: ΤΟ ΟΡΓΑΝΟ ΜΕΤΡΗΣΗΣ — τι ζει πραγματικά (read-only)
 //
 //   POST   /api/km/unlock           -> Η.13: από την κλειδαριά στον φάκελο (βλ. κάτω)
@@ -63,6 +65,15 @@ const DEVICE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const HEX120 = /^[0-9a-f]{120}$/;
 const LOCK_KINDS = ["words", "recovery", "invite"];
 
+// ── Η.11β · ΑΝΑΣΤΟΛΗ ΔΙΑΓΡΑΦΗΣ (15/9/2026, εντολή Stavros) ─────────────────
+// 72 ώρες, σταθερά. Ο αριθμός ΓΡΑΦΕΤΑΙ στη βάση τη στιγμή του αιτήματος και
+// δεν ξαναυπολογίζεται ποτέ — βλ. schema/km_h11b.sql για το γιατί.
+const DELETE_GRACE_HOURS = 72;
+// Πόσοι ληγμένοι σβήνονται ανά εκτέλεση του ωριαίου cron. Με 24 εκτελέσεις
+// την ημέρα, 200 ανά εκτέλεση είναι 4.800/μέρα — πολύ πάνω από κάθε ρεαλιστικό
+// ρυθμό, και ταυτόχρονα φράγμα αν κάτι πάει στραβά.
+const DUE_BATCH = 200;
+
 // ── Η.13 · Η ΝΕΑ ΒΑΣΗ Κ (Brief Γ, Α350 §9.8 Η.13, 6/9/2026) ────────────────
 // Ως τη v46 οι 12 λέξεις έδιναν folder_id + auth + ΚΑΙ το κλειδί δεδομένων.
 // Από εδώ το κλειδί δεδομένων Κ είναι τυχαίο και ζει στον server ΚΛΕΙΔΩΜΕΝΟ
@@ -93,7 +104,8 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/folder" && method === "PUT") return putFolder(request, env);
   if (path === "/api/km/activate" && method === "POST") return activate(request, env);
 
-  if (path === "/api/km/delete" && method === "POST") return deleteAccount(request, env, ctx);
+  if (path === "/api/km/delete" && method === "POST") return requestDelete(request, env, ctx);
+  if (path === "/api/km/delete/cancel" && method === "POST") return cancelDelete(request, env, ctx);
   if (path === "/api/km/admin/delete" && method === "POST") return adminDelete(request, env);
   if (path === "/api/km/admin/purge" && method === "POST") return adminPurge(request, env);
   if (path === "/api/km/admin/inspect" && method === "POST") return adminInspect(request, env);
@@ -112,6 +124,14 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/admin/feedback" && method === "GET") return adminFeedback(request, env);
   // Χρόνοι τήρησης (Πολιτική v2.0 §5). GET = ΜΟΝΟ δείχνει, POST = σβήνει.
   if (path === "/api/km/admin/mail" && method === "GET") return adminMail(request, env);
+  // Η.11β: GET = ποιοι ΘΑ σβήνονταν τώρα · POST = σβήνει. Ιδιο μοτίβο με το
+  // admin/cleanup, και για τον ίδιο λόγο: δεν εμπιστεύεσαι αυτόματη διαγραφή
+  // που δεν μπορείς να δεις πρώτα. Το ?now= επιτρέπει στα τεστ να «γεράσουν»
+  // τον χρόνο χωρίς να περιμένουν 72 ώρες.
+  if (path === "/api/km/admin/due") {
+    if (method === "GET") return adminDue(request, env, false);
+    if (method === "POST") return adminDue(request, env, true);
+  }
   if (path === "/api/km/admin/cleanup") {
     if (method === "GET")  return adminCleanup(request, env, false);
     if (method === "POST") return adminCleanup(request, env, true);
@@ -181,12 +201,20 @@ function unsyncedOf(request) {
 
 // Φορτώνει τον λογαριασμό και ελέγχει το αποτύπωμα. Επιστρέφει {acc, id, lock} ή Response σφάλματος.
 // Με X-Km-Lock: ο κωδικός ανήκει στην κλειδαριά (km_locks). Χωρίς: στον λογαριασμό (v46).
-async function authed(request, env) {
+// Η.11β: opts.allowPending = true ΜΟΝΟ για την ακύρωση. Παντού αλλού, όσο
+// εκκρεμεί διαγραφή, ο λογαριασμός είναι ΠΑΓΩΜΕΝΟΣ (423 Locked): καμία
+// ανάγνωση, κανένα ανέβασμα, καμία ενεργοποίηση. Ο φραγμός ζει ΕΔΩ, σε ένα
+// σημείο, γιατί από εδώ περνούν όλες οι διαδρομές που αγγίζουν δεδομένα —
+// ένας έλεγχος ανά route θα ξεχνιόταν στο επόμενο route που θα γραφτεί.
+async function authed(request, env, opts) {
   const id = ident(request);
   if (!id) return { err: json({ ok: false, error: "bad_identity" }, 400) };
   const acc = await env.DB.prepare("SELECT * FROM km_accounts WHERE folder_id = ?").bind(id.folder).first();
   if (!acc) return { err: json({ ok: false, error: "no_account" }, 404) };
   if (acc.deleted) return { err: json({ ok: false, error: "deleted" }, 410) };
+  if (acc.delete_due_at && !(opts && opts.allowPending)) {
+    return { err: json({ ok: false, error: "pending_delete", due_at: acc.delete_due_at }, 423) };
+  }
   const h = await sha256hex(id.auth);
   let lock = null;
   if (id.lock) {
@@ -267,6 +295,9 @@ function pub(acc) {
     active_since: acc.active_since,
     created: acc.created,
     plan: acc.plan || null,
+    // Η.11β: η εφαρμογή χρειάζεται το πότε λήγει για να δείξει το υπόλοιπο.
+    // NULL όταν δεν εκκρεμεί τίποτα — η οθόνη s-pending δεν ανοίγει καν.
+    delete_due_at: acc.delete_due_at || null,
   };
 }
 
@@ -801,7 +832,8 @@ async function wipeFolder(env, folderId) {
     env.DB.prepare(
       `UPDATE km_accounts SET email = '', auth_hash = '', active_device_id = NULL,
               active_since = NULL, folder_bytes = 0, folder_version = 0, last_sync = NULL,
-              has_key = 0, plan = NULL
+              has_key = 0, plan = NULL,
+              delete_requested_at = NULL, delete_due_at = NULL
        WHERE folder_id = ?`
     ).bind(folderId),
   ]);
@@ -834,7 +866,17 @@ async function wipeFolder(env, folderId) {
 //     τις 12 λέξεις» (Α320, 8/9) — μία απόφαση, δύο σημεία που την τηρούν.
 const DELETE_CONFIRM = "ΔΙΑΓΡΑΦΗ";
 
-async function deleteAccount(request, env, ctx) {
+// Η.11β — ΤΟ ΑΙΤΗΜΑ. ΔΕΝ ΣΒΗΝΕΙ ΤΙΠΟΤΑ.
+// Γράφει δύο ημερομηνίες και παγώνει τον λογαριασμό. Η πράξη γίνεται 72 ώρες
+// αργότερα, από το ωριαίο cron (kmDeleteDue).
+//
+// ⚠ Ο ΦΡΑΓΜΟΣ ΤΗΣ ΔΙΠΛΗΣ ΚΛΗΣΗΣ ΕΙΝΑΙ ΣΕ ΕΝΑ ΣΗΜΕΙΟ: το
+// «AND delete_requested_at IS NULL» μέσα στο SQL. Ιδιος κανόνας με το
+// wipeFolder (Α400 §Γ, 6/9): αν δύο φρουροί φυλάνε το ίδιο, κανένας δεν
+// αποδεικνύεται. Χωρίς αυτό, δύο ταυτόχρονες κλήσεις θα μετακινούσαν τη λήξη
+// προς τα εμπρός — ο κλέφτης θα πατούσε «διαγραφή» κάθε ώρα και το παράθυρο
+// δεν θα έκλεινε ποτέ.
+async function requestDelete(request, env, ctx) {
   const a = await authed(request, env);
   if (a.err) return a.err;
   if (a.acc.active_device_id !== a.id.device) {
@@ -846,19 +888,95 @@ async function deleteAccount(request, env, ctx) {
   if (clean(b.confirm, 40) !== DELETE_CONFIRM) {
     return json({ ok: false, error: "confirm_required", expected: DELETE_CONFIRM }, 400);
   }
-  // 🔴 Η ΔΙΕΥΘΥΝΣΗ ΔΙΑΒΑΖΕΤΑΙ ΠΡΙΝ ΤΟ ΣΒΗΣΙΜΟ. Το wipeFolder αδειάζει το
-  // km_accounts.email στο βήμα (δ)· μετά από αυτό δεν υπάρχει πού να σταλεί
-  // η ειδοποίηση. Brief Ε §6: «πριν σβηστεί το email από τη βάση».
-  const to = a.acc && a.acc.email ? String(a.acc.email) : null;
 
-  const res = await wipeFolder(env, a.id.folder);
-  if (!res) return json({ ok: false, error: "no_account" }, 404);
+  const ts = now();
+  const due = new Date(Date.parse(ts) + DELETE_GRACE_HOURS * 3600 * 1000).toISOString();
+  const r = await env.DB.prepare(
+    `UPDATE km_accounts SET delete_requested_at = ?, delete_due_at = ?
+     WHERE folder_id = ? AND delete_requested_at IS NULL AND deleted IS NULL`
+  ).bind(ts, due, a.id.folder).run();
+  const changed = (r && r.meta && r.meta.changes) || 0;
+  if (!changed) {
+    // Υπήρχε ήδη αίτημα. Η λήξη ΔΕΝ μετακινείται· επιστρέφεται η αρχική.
+    const cur = await env.DB.prepare("SELECT delete_due_at FROM km_accounts WHERE folder_id = ?")
+      .bind(a.id.folder).first();
+    return json({ ok: true, already: true, due_at: (cur && cur.delete_due_at) || null });
+  }
 
-  // Ειδοποίηση, ΟΧΙ επιβεβαίωση: η διαγραφή έχει ήδη γίνει και δεν ακυρώνεται
-  // αν το email αποτύχει. Η αποτυχία καταγράφεται και φαίνεται στο
-  // /api/km/admin/mail.
-  fireMail(env, ctx, "deleted", to);
-  return json({ ok: true, deleted: res });
+  // Το email ΔΕΝ σβήνεται εδώ — χρειάζεται σε 72 ώρες για την ειδοποίηση
+  // ολοκλήρωσης. Δηλώνεται ρητά στην Πολιτική v2.0 §5.
+  fireMail(env, ctx, "delete_requested", a.acc.email, { due: due });
+  return json({
+    ok: true,
+    pending: { requested_at: ts, due_at: due, grace_hours: DELETE_GRACE_HOURS },
+  });
+}
+
+// Η.11β — Η ΑΚΥΡΩΣΗ. Η ΜΟΝΗ ΔΙΑΔΡΟΜΗ ΠΟΥ ΔΕΧΕΤΑΙ ΠΑΓΩΜΕΝΟ ΛΟΓΑΡΙΑΣΜΟ.
+//
+// 🔴 ΔΕΝ ΑΠΑΙΤΕΙ ΕΝΕΡΓΗ ΣΥΣΚΕΥΗ. Αυτό σπάει επίτηδες τον κανόνα του 409 που
+//    φυλάει το /delete, και είναι ΟΛΟΚΛΗΡΟ το νόημα του Η.11β: αν απαιτούσε
+//    ενεργή συσκευή, θα μπορούσε να ακυρώσει ΜΟΝΟ το κλεμμένο κινητό — δηλαδή
+//    μόνο ο κλέφτης. Ο άνθρωπος που έχασε τη συσκευή του δεν έχει άλλη πόρτα.
+//
+// ⚠ ΤΙ ΔΕΝ ΚΑΝΕΙ, ΚΑΙ ΠΡΕΠΕΙ ΝΑ ΕΙΝΑΙ ΓΡΑΜΜΕΝΟ: δεν διώχνει τον κλέφτη για
+//    πάντα. Το κλεμμένο κινητό κρατάει το ίδιο auth — για τον server είναι
+//    πανομοιότυπο με τον ιδιοκτήτη. Εδώ η συσκευή που ακύρωσε γίνεται η
+//    ενεργή, άρα ο κλέφτης χάνει το δικαίωμα του /delete (409) — αλλά μπορεί
+//    να ξανα-ενεργοποιηθεί. Η ΜΟΝΗ οριστική πράξη είναι η ΑΛΛΑΓΗ ΤΩΝ 12
+//    ΛΕΞΕΩΝ (POST /api/km/lock με replace), που σκοτώνει την κλειδαριά του.
+//    Γι' αυτό το email ακύρωσης το λέει ρητά και η οθόνη το σπρώχνει.
+async function cancelDelete(request, env, ctx) {
+  const a = await authed(request, env, { allowPending: true });
+  if (a.err) return a.err;
+  if (!a.acc.delete_due_at) {
+    return json({ ok: false, error: "no_pending" }, 409);
+  }
+  const ts = now();
+  const r = await env.DB.prepare(
+    `UPDATE km_accounts SET delete_requested_at = NULL, delete_due_at = NULL,
+            active_device_id = ?, active_since = ?
+     WHERE folder_id = ? AND delete_due_at IS NOT NULL`
+  ).bind(a.id.device, ts, a.id.folder).run();
+  const changed = (r && r.meta && r.meta.changes) || 0;
+  if (!changed) return json({ ok: false, error: "no_pending" }, 409);
+
+  await touchDevice(env, request, a.id, clean((await safeJson(request) || {}).device_name, 80));
+  fireMail(env, ctx, "delete_cancelled", a.acc.email);
+  return json({
+    ok: true,
+    cancelled_at: ts,
+    active_device_id: a.id.device,
+    // Η εφαρμογή/σελίδα το διαβάζει και σπρώχνει αμέσως στην αλλαγή λέξεων.
+    next: "change_words",
+  });
+}
+
+// Η.11β — Η ΕΚΤΕΛΕΣΗ, ΑΠΟ ΤΟ ΩΡΙΑΙΟ CRON.
+//
+// 🔴 ΓΙΑΤΙ ΩΡΙΑΙΟ ΚΑΙ ΟΧΙ ΤΟ ΥΠΑΡΧΟΝ ΗΜΕΡΗΣΙΟ: το ημερήσιο τρέχει 03:00 UTC.
+//    Αίτημα στις 04:00 θα ωρίμαζε σε 72 ώρες αλλά θα εκτελούνταν 23 ώρες
+//    αργότερα — δηλαδή 95, όχι 72. Το email λέει ακριβή ώρα λήξης· ένα cron
+//    που την προσπερνά κατά μία μέρα κάνει το κείμενο ψέμα.
+export async function kmDeleteDue(env, nowIso) {
+  const t = nowIso || now();
+  const rows = (await env.DB.prepare(
+    `SELECT folder_id, email FROM km_accounts
+     WHERE delete_due_at IS NOT NULL AND delete_due_at <= ? AND deleted IS NULL
+     LIMIT ?`
+  ).bind(t, DUE_BATCH).all()).results || [];
+
+  const done = [];
+  for (const row of rows) {
+    // Η ΔΙΕΥΘΥΝΣΗ ΔΙΑΒΑΖΕΤΑΙ ΠΡΙΝ ΤΟ ΣΒΗΣΙΜΟ — το wipeFolder αδειάζει το
+    // email στο βήμα (δ). Ιδιος κανόνας με την πόρτα Α πριν το Η.11β.
+    const to = row.email ? String(row.email) : null;
+    const res = await wipeFolder(env, row.folder_id);
+    // Ειδοποίηση, ΟΧΙ επιβεβαίωση: αν το email αποτύχει, η διαγραφή στέκει.
+    await mailSend(env, "deleted", to);
+    done.push({ folder_id: row.folder_id, wiped: !!res });
+  }
+  return { due: rows.length, wiped: done.length, batch_limit: DUE_BATCH, more: rows.length === DUE_BATCH };
 }
 
 // ── ΠΟΡΤΑ Β + ΚΑΘΑΡΙΣΜΟΣ ΜΗΤΡΩΟΥ — μόνο ο Stavros ─────────────────────────
@@ -1227,6 +1345,27 @@ async function adminCleanup(request, env, doIt) {
 }
 
 
+async function adminDue(request, env, doIt) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const t = new URL(request.url).searchParams.get("now") || now();
+  if (!doIt) {
+    const rows = (await env.DB.prepare(
+      `SELECT folder_id, delete_requested_at, delete_due_at FROM km_accounts
+       WHERE delete_due_at IS NOT NULL AND deleted IS NULL ORDER BY delete_due_at LIMIT 300`
+    ).all()).results || [];
+    return json({
+      ok: true, mode: "dry-run", now: t,
+      // Καμία διεύθυνση email εδώ — ο κανόνας της 14/9 ισχύει και στις σελίδες
+      // διαχείρισης, όχι μόνο στο αρχείο καταγραφής.
+      pending: rows.map((r) => ({
+        folder_id: r.folder_id, requested_at: r.delete_requested_at,
+        due_at: r.delete_due_at, overdue: r.delete_due_at <= t,
+      })),
+    });
+  }
+  return json({ ok: true, mode: "deleted", now: t, result: await kmDeleteDue(env, t) });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ΕΙΔΟΠΟΙΗΣΕΙΣ ΜΕ EMAIL — Brief Ε §6 (εγκρίθηκε 11/9/2026, γράφτηκε 14/9/2026)
 //
@@ -1254,29 +1393,81 @@ async function adminCleanup(request, env, doIt) {
 
 const MAIL_FROM = "FastWrite <noreply@notify.fastwrite.tech>";
 const MAIL_SUPPORT = "support@fastwrite.tech";
+// Η.11β: η σελίδα ακύρωσης. ΔΕΝ είναι σύνδεσμος ενέργειας — δεν κουβαλάει
+// κλειδί, δεν αναγνωρίζει τον χρήστη. Ζητάει τις 12 λέξεις, που ο κλέφτης
+// δεν έχει. Γι\u0027 αυτό επιτρέπεται να υπάρχει μέσα στο email.
+const CANCEL_PAGE = "fastwrite.tech/kostometro/akyrosi";
 
-function mailWhen() {
+// Η.11β: δέχεται ISO για μελλοντική ώρα (η λήξη των 72 ωρών). Χωρίς όρισμα
+// = τώρα, όπως πριν.
+function mailWhen(iso) {
+  const d = iso ? new Date(iso) : new Date();
   try {
     return new Intl.DateTimeFormat("el-GR", {
       timeZone: "Asia/Nicosia", dateStyle: "short", timeStyle: "short",
-    }).format(new Date());
+    }).format(d);
   } catch (e) {
     // Αν το Intl δεν έχει ζώνες, καλύτερα ώρα UTC παρά λάθος ώρα Κύπρου.
-    return now().replace("T", " ").slice(0, 16) + " UTC";
+    return d.toISOString().replace("T", " ").slice(0, 16) + " UTC";
   }
 }
 
-function mailBody(kind) {
+function mailBody(kind, extra) {
   const when = mailWhen();
+  const x = extra || {};
+
+  // Η.11β — ΖΗΤΗΘΗΚΕ. Το μόνο email με ΠΡΑΞΗ μέσα του, και η πράξη ΔΕΝ είναι
+  // σύνδεσμος: είναι διεύθυνση σελίδας + οι 12 λέξεις. Ο λόγος, γραμμένος
+  // ώστε να μην «απλοποιηθεί» ποτέ σε κουμπί: ο σύνδεσμος ζει ΜΕΣΑ στο email,
+  // και το email ζει μέσα στο ίδιο κινητό που κρατάει ο κλέφτης. Οι 12 λέξεις
+  // είναι το μόνο πράγμα που ο κλέφτης δεν έχει.
+  if (kind === "delete_requested") {
+    const due = mailWhen(x.due);
+    return {
+      subject: "Ζητήθηκε διαγραφή του λογαριασμού σου στο Kostometro · Kostometro account deletion requested",
+      el: "Ζητήθηκε η διαγραφή του λογαριασμού σου στο Kostometro στις " + when + "." +
+          " Ο λογαριασμός είναι ήδη παγωμένος και θα διαγραφεί οριστικά στις " + due + " (ώρα Κύπρου)." +
+          " ΑΝ ΔΕΝ ΗΣΟΥΝ ΕΣΥ, κάποιος έχει πρόσβαση στο κινητό σου. Μπορείς να το σταματήσεις:" +
+          " άνοιξε τη σελίδα " + CANCEL_PAGE + " από οποιαδήποτε συσκευή και βάλε τις 12 λέξεις σου." +
+          " Χρειάζεσαι βοήθεια; " + MAIL_SUPPORT,
+      en: "Deletion of your Kostometro account was requested on " + when + "." +
+          " The account is already frozen and will be permanently deleted on " + due + " (Cyprus time)." +
+          " IF THIS WAS NOT YOU, someone has access to your phone. You can stop it:" +
+          " open " + CANCEL_PAGE + " on any device and enter your 12 words." +
+          " Need help? " + MAIL_SUPPORT,
+    };
+  }
+
+  // Η.11β — ΑΚΥΡΩΘΗΚΕ. Λέει ρητά την επόμενη πράξη, γιατί η ακύρωση από μόνη
+  // της ΔΕΝ διώχνει τον κλέφτη: κρατάει το ίδιο auth στο κλεμμένο κινητό.
+  if (kind === "delete_cancelled") {
+    return {
+      subject: "Η διαγραφή του λογαριασμού σου ακυρώθηκε · Account deletion cancelled",
+      el: "Η διαγραφή του λογαριασμού σου στο Kostometro ακυρώθηκε στις " + when + " με τις 12 λέξεις σου." +
+          " Ο λογαριασμός λειτουργεί κανονικά και ενεργή είναι μόνο η συσκευή από την οποία έγινε η ακύρωση." +
+          " ΑΝ Η ΠΡΟΗΓΟΥΜΕΝΗ ΣΥΣΚΕΥΗ ΣΟΥ ΕΧΕΙ ΧΑΘΕΙ Ή ΚΛΑΠΕΙ, άλλαξε ΤΩΡΑ τις 12 λέξεις σου" +
+          " από τις Ρυθμίσεις — μέχρι τότε εκείνη η συσκευή μπορεί να ξαναπροσπαθήσει." +
+          " Χρειάζεσαι βοήθεια; " + MAIL_SUPPORT,
+      en: "Deletion of your Kostometro account was cancelled on " + when + " using your 12 words." +
+          " The account works normally and only the device that cancelled is active." +
+          " IF YOUR PREVIOUS DEVICE IS LOST OR STOLEN, change your 12 words NOW in Settings —" +
+          " until then that device can try again." +
+          " Need help? " + MAIL_SUPPORT,
+    };
+  }
+
   if (kind === "deleted") {
     return {
       subject: "Ο λογαριασμός σου στο Kostometro διαγράφηκε · Your Kostometro account was deleted",
-      el: "Ο λογαριασμός σου στο Kostometro διαγράφηκε στις " + when + "." +
-          " Αν δεν ήσουν εσύ, κάποιος είχε πρόσβαση στο κινητό σου ή στις 12 λέξεις σου.",
-      en: "Your Kostometro account was deleted on " + when + " (Cyprus time)." +
-          " If this was not you, someone had access to your phone or to your 12 words.",
+      el: "Ο λογαριασμός σου στο Kostometro διαγράφηκε οριστικά στις " + when + "." +
+          " Τα δεδομένα στον server σβήστηκαν και δεν ανακτώνται. Οι 12 λέξεις σου δεν ξαναδουλεύουν." +
+          " Αν δεν το ζήτησες εσύ και δεν πρόλαβες να το σταματήσεις, γράψε στο " + MAIL_SUPPORT + ".",
+      en: "Your Kostometro account was permanently deleted on " + when + " (Cyprus time)." +
+          " The data on the server is erased and cannot be recovered. Your 12 words no longer work." +
+          " If you did not request this and could not stop it in time, write to " + MAIL_SUPPORT + ".",
     };
   }
+
   return {
     subject: "Οι 12 λέξεις σου άλλαξαν · Your 12 words were changed",
     el: "Οι 12 λέξεις του λογαριασμού σου άλλαξαν στις " + when + "." +
@@ -1287,7 +1478,7 @@ function mailBody(kind) {
 }
 
 // Η ΜΟΝΗ συνάρτηση που μιλάει με τη Cloudflare. Δεν πετάει ποτέ.
-export async function mailSend(env, kind, to) {
+export async function mailSend(env, kind, to, extra) {
   const t = now();
   const log = async (ok, err, msgId) => {
     try {
@@ -1301,7 +1492,7 @@ export async function mailSend(env, kind, to) {
   if (!dest) return log(false, "no_address");
   if (!env.EMAIL || typeof env.EMAIL.send !== "function") return log(false, "no_binding");
 
-  const b = mailBody(kind);
+  const b = mailBody(kind, extra);
   try {
     const r = await env.EMAIL.send({
       to: dest,
@@ -1317,8 +1508,8 @@ export async function mailSend(env, kind, to) {
 }
 
 // Στην παραγωγή δεν καθυστερεί την απάντηση· στα τεστ τρέχει συγχρονισμένα.
-function fireMail(env, ctx, kind, to) {
-  const p = mailSend(env, kind, to);
+function fireMail(env, ctx, kind, to, extra) {
+  const p = mailSend(env, kind, to, extra);
   if (ctx && typeof ctx.waitUntil === "function") { ctx.waitUntil(p); return null; }
   return p;
 }

@@ -48,6 +48,21 @@ async function fullAccount(api, extra) {
   return id;
 }
 
+// Η.11β (15/9/2026): η /api/km/delete ΔΕΝ σβήνει πια — γράφει αίτημα με λήξη
+// σε 72 ώρες. Τα τεστ αυτού του αρχείου ελέγχουν την ΠΡΑΞΗ της διαγραφής, όχι
+// την αναστολή (αυτή ζει στο tests/h11b.test.mjs), οπότε εδώ γερνάει το ρολόι:
+// αίτημα → /admin/due με ?now= πέρα από τη λήξη → το cron εκτελεί.
+// ⚠ Το ?now= υπάρχει ΜΟΝΟ για αυτό. Δεν αλλάζει τίποτα στην παραγωγή: χωρίς
+// αυτό, το endpoint χρησιμοποιεί την πραγματική ώρα.
+async function deleteNow(api, id) {
+  const r = await api.post(B + '/api/km/delete', { headers: Object.assign({}, J, id.H), data: { confirm: 'ΔΙΑΓΡΑΦΗ' } });
+  if (r.status() !== 200) return r;
+  const due = new Date(Date.now() + 73 * 3600 * 1000).toISOString();
+  const d = await api.post(B + '/api/km/admin/due?k=' + ADMIN + '&now=' + encodeURIComponent(due), { headers: J, data: {} });
+  expect(d.status(), await d.text()).toBe(200);
+  return r;
+}
+
 async function inspect(api, folder) {
   const r = await api.post(B + '/api/km/admin/inspect?k=' + ADMIN, { headers: J, data: { folder_id: folder } });
   expect(r.status(), await r.text()).toBe(200);
@@ -66,10 +81,11 @@ test('Η11-1 · η διαγραφή αφήνει ΜΗΔΕΝ στο R2 — και
   expect(before.rows.device_links).toBe(2);
   expect(before.rows.devices).toBeGreaterThan(0);
 
-  const del = await api.post(B + '/api/km/delete', { headers: Object.assign({}, J, id.H), data: { confirm: 'ΔΙΑΓΡΑΦΗ' } });
+  const del = await deleteNow(api, id);
   expect(del.status(), await del.text()).toBe(200);
-  const dj = await del.json();
-  expect(dj.deleted.r2.objects).toBe(4);
+  // Το αίτημα απαντάει με τη ΛΗΞΗ, όχι με μέτρηση σβησίματος — η πράξη γίνεται
+  // αργότερα, από το cron. Η απόδειξη είναι το inspect από κάτω.
+  expect((await del.json()).pending.grace_hours).toBe(72);
 
   const after = await inspect(api, id.folder);
   expect(after.r2.objects).toBe(0);
@@ -84,7 +100,7 @@ test('Η11-1 · η διαγραφή αφήνει ΜΗΔΕΝ στο R2 — και
 test('Η11-2 · η ταφόπετρα ΚΡΑΤΑΕΙ στατιστικά (source/ref/country/created) και ΔΕΝ κρατάει πρόσωπο', async () => {
   const api = await pwRequest.newContext();
   const id = await fullAccount(api);
-  await api.post(B + '/api/km/delete', { headers: Object.assign({}, J, id.H), data: { confirm: 'ΔΙΑΓΡΑΦΗ' } });
+  await deleteNow(api, id);
 
   const a = (await inspect(api, id.folder)).account;
   expect(a).not.toBeNull();                 // η γραμμή ΜΕΝΕΙ (απόφαση Stavros 9/9)
@@ -131,7 +147,7 @@ test('Η11-4 · χωρίς τη λέξη ΔΙΑΓΡΑΦΗ δεν σβήνει τ
 test('Η11-5 · μετά τη διαγραφή ΚΑΘΕ πόρτα είναι κλειστή — και οι ίδιες 12 λέξεις είναι νεκρές για πάντα', async () => {
   const api = await pwRequest.newContext();
   const id = await fullAccount(api);
-  await api.post(B + '/api/km/delete', { headers: Object.assign({}, J, id.H), data: { confirm: 'ΔΙΑΓΡΑΦΗ' } });
+  await deleteNow(api, id);
 
   expect((await api.get(B + '/api/km/status', { headers: id.H })).status()).toBe(410);
   expect((await api.get(B + '/api/km/folder', { headers: id.H })).status()).toBe(410);
@@ -154,7 +170,7 @@ test('Η11-5 · μετά τη διαγραφή ΚΑΘΕ πόρτα είναι κ
 test('Η11-6 · η πράξη είναι idempotent: δεύτερη κλήση δεν σπάει και ΔΕΝ ξαναγράφει το πότε έφυγε', async () => {
   const api = await pwRequest.newContext();
   const id = await fullAccount(api);
-  await api.post(B + '/api/km/delete', { headers: Object.assign({}, J, id.H), data: { confirm: 'ΔΙΑΓΡΑΦΗ' } });
+  await deleteNow(api, id);
   // ⚠ Η ΩΡΑ ΔΙΑΒΑΖΕΤΑΙ ΑΠΟ ΤΗ ΒΑΣΗ, ΟΧΙ ΑΠΟ ΤΗΝ ΑΠΑΝΤΗΣΗ ΤΗΣ ΔΙΑΓΡΑΦΗΣ.
   // Η πρώτη γραφή του τεστ σύγκρινε δύο ΑΝΑΦΟΡΕΣ μεταξύ τους — και έμενε
   // πράσινη ακόμα κι όταν η βάση ξαναγραφόταν, γιατί η αναφορά κρατούσε την

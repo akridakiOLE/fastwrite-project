@@ -15,10 +15,15 @@
    ⚠ Και το /km-crypto.js μπήκε στο πεδίο: ζει ΕΞΩ από το /kostometro/, άρα
    μέχρι τώρα δεν το έπιανε καθόλου ο worker — χωρίς δίκτυο η οθόνη των 12
    λέξεων θα έσπαγε. */
-var CACHE = 'km-v59';
+var CACHE = 'km-v60';
 var SHELL = [
   '/kostometro/',
   '/kostometro/index.html',
+  /* Η.11β (15/9/2026): η σελίδα ακύρωσης ΜΠΑΙΝΕΙ στο shell. Ο άνθρωπος που
+     τη χρειάζεται μπορεί να είναι σε κακό δίκτυο και βιάζεται — και το
+     /km-crypto.js που της χρειάζεται είναι ήδη εδώ από κάτω. */
+  '/kostometro/akyrosi/',
+  '/kostometro/akyrosi/index.html',
   '/kostometro/app.css',
   '/kostometro/app.js',
   '/km-crypto.js',

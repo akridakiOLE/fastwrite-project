@@ -20,18 +20,39 @@
 // GDPR: δεν αποθηκεύεται IP. Μόνο χώρα (Cloudflare) και user-agent.
 // ---------------------------------------------------------------------------
 
-import { handleKm, kmCleanup } from "./km.js";
+import { handleKm, kmCleanup, kmDeleteDue } from "./km.js";
 
 const V = 3; // έκδοση ερωτηματολογίου
 
 export default {
-  // ΧΡΟΝΟΙ ΤΗΡΗΣΗΣ (Πολιτική v2.0 §5). Τρέχει από Cron Trigger, μία φορά
-  // την ημέρα. Στο δωρεάν πλάνο η προγραμματισμένη εκτέλεση έχει 10 ms CPU:
-  // η αναμονή στη βάση ΔΕΝ μετράει ως CPU, τα τέσσερα DELETE χωράνε.
+  // ΔΥΟ ΧΡΟΝΟΔΙΑΓΡΑΜΜΑΤΑ, ΟΧΙ ΕΝΑ (Η.11β, 15/9/2026):
+  //
+  //   "0 3 * * *"  ημερήσιο  -> ΧΡΟΝΟΙ ΤΗΡΗΣΗΣ (Πολιτική v2.0 §5): ταφόπετρες
+  //                             36 μηνών, γνώμες 24, ερωτηματολόγιο 24.
+  //   "0 * * * *"  ωριαίο    -> Η.11β: σβήνει τους λογαριασμούς των οποίων η
+  //                             αναστολή 72 ωρών έληξε.
+  //
+  // 🔴 ΓΙΑΤΙ ΔΕΝ ΜΠΗΚΕ Η ΔΙΑΓΡΑΦΗ ΣΤΟ ΗΜΕΡΗΣΙΟ: το email του αιτήματος λέει
+  //    ΑΚΡΙΒΗ ώρα λήξης. Με μία εκτέλεση την ημέρα, αίτημα στις 04:00 θα
+  //    εκτελούνταν 95 ώρες αργότερα αντί για 72 — δηλαδή το κείμενο θα έλεγε
+  //    ψέματα σε κάθε χρήστη εκτός από όσους πατούσαν διαγραφή στις 03:00.
+  //
+  // ⚠ Το event.cron λέει ΠΟΙΟ χρονοδιάγραμμα ξύπνησε. Το ωριαίο είναι η
+  //   προεπιλογή: αν ποτέ προστεθεί τρίτο cron και ξεχαστεί εδώ, θα τρέξει τη
+  //   διαγραφή ληγμένων — ακίνδυνο — αντί για τους χρόνους τήρησης, που θα
+  //   έσβηναν πράγματα πριν την ώρα τους.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(kmCleanup(env).then(
-      (r) => console.log("km cleanup:", JSON.stringify(r)),
-      (e) => console.error("km cleanup failed:", e)
+    const cron = (event && event.cron) || "";
+    if (cron === "0 3 * * *") {
+      ctx.waitUntil(kmCleanup(env).then(
+        (r) => console.log("km cleanup:", JSON.stringify(r)),
+        (e) => console.error("km cleanup failed:", e)
+      ));
+      return;
+    }
+    ctx.waitUntil(kmDeleteDue(env).then(
+      (r) => console.log("km delete-due:", JSON.stringify(r)),
+      (e) => console.error("km delete-due failed:", e)
     ));
   },
 
