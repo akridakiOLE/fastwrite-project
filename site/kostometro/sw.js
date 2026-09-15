@@ -15,15 +15,10 @@
    ⚠ Και το /km-crypto.js μπήκε στο πεδίο: ζει ΕΞΩ από το /kostometro/, άρα
    μέχρι τώρα δεν το έπιανε καθόλου ο worker — χωρίς δίκτυο η οθόνη των 12
    λέξεων θα έσπαγε. */
-var CACHE = 'km-v60';
+var CACHE = 'km-v61';
 var SHELL = [
   '/kostometro/',
   '/kostometro/index.html',
-  /* Η.11β (15/9/2026): η σελίδα ακύρωσης ΜΠΑΙΝΕΙ στο shell. Ο άνθρωπος που
-     τη χρειάζεται μπορεί να είναι σε κακό δίκτυο και βιάζεται — και το
-     /km-crypto.js που της χρειάζεται είναι ήδη εδώ από κάτω. */
-  '/kostometro/akyrosi/',
-  '/kostometro/akyrosi/index.html',
   '/kostometro/app.css',
   '/kostometro/app.js',
   '/km-crypto.js',
@@ -92,6 +87,16 @@ self.addEventListener('fetch', function (e) {
      Είναι το μόνο αρχείο που ΠΡΕΠΕΙ να λέει την αλήθεια του server, αλλιώς
      η εφαρμογή ρωτάει τη μνήμη της αν η μνήμη της είναι παλιά. */
   if (u.pathname === '/kostometro/version.json') { return; }
+  /* 🔴 Η.11β (15/9/2026) — Η ΠΟΡΤΑ ΕΚΤΑΚΤΗΣ ΑΝΑΓΚΗΣ ΔΕΝ ΠΕΡΝΑΕΙ ΠΟΤΕ ΑΠΟ ΕΔΩ.
+     Ιδιος κανόνας με το version.json, και για τον ίδιο λόγο: πρέπει να λέει
+     την αλήθεια του server, όχι τη μνήμη μας. Η σελίδα ακύρωσης ζει πλέον
+     στο /akyrosi/ (ΕΞΩ από το scope), αλλά η παλιά διεύθυνση υπάρχει μέσα σε
+     email που ΕΧΟΥΝ ΗΔΗ ΣΤΑΛΕΙ — και οδηγεί σε ανακατεύθυνση που ΔΕΝ
+     επιτρέπεται να την καταπιεί το cacheFirst.
+     Αιτία (μετρήθηκε 15/9): το fromCache() σε πλοήγηση που δεν βρίσκει στη
+     μνήμη επιστρέφει το /kostometro/index.html — δηλαδή σέρβιρε ΤΗΝ ΕΦΑΡΜΟΓΗ
+     αντί για τη σελίδα ακύρωσης, χωρίς να ρωτήσει ποτέ το δίκτυο. */
+  if (u.pathname.indexOf('/kostometro/akyrosi') === 0) { return; }
   var mine = u.pathname.indexOf('/kostometro/') === 0 || u.pathname === '/km-crypto.js';
   if (!mine) { return; }
   e.respondWith(FRESH.indexOf(u.pathname) >= 0 ? netFirst(e.request) : cacheFirst(e.request));

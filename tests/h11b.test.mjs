@@ -7,7 +7,7 @@
 //    (κανόνας 29/8: ο έλεγχος στο τεκμήριο).
 
 import { DatabaseSync } from "node:sqlite";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { webcrypto } from "node:crypto";
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
@@ -263,6 +263,37 @@ await check("Η11β-13 · /admin/due: χωρίς κλειδί 404, με κλει
   const j = await r.json();
   if (!j.pending.some((p) => p.folder_id === id.folder)) throw new Error("δεν φαίνεται ο εκκρεμής");
   if (JSON.stringify(j).includes("@example.com")) throw new Error("η σελίδα δείχνει διευθύνσεις");
+});
+
+// ── Ο ΦΡΟΥΡΟΣ ΠΟΥ ΕΛΕΙΠΕ ─────────────────────────────────────────────────────
+// 🔴 ΓΡΑΦΤΗΚΕ ΕΠΕΙΔΗ ΤΟ ΣΥΝΟΛΟ ΗΤΑΝ ΠΡΑΣΙΝΟ ΕΝΩ Η ΣΕΛΙΔΑ ΗΤΑΝ ΑΧΡΗΣΤΗ.
+// 15/9/2026: η σελίδα ακύρωσης ζούσε στο /kostometro/akyrosi/, μέσα στο scope
+// του service worker. Ο sw έπιανε την πλοήγηση, δεν την έβρισκε στη μνήμη, και
+// σέρβιρε το /kostometro/index.html — την ΕΦΑΡΜΟΓΗ — χωρίς να ρωτήσει το
+// δίκτυο. Ολα τα τεστ του server περνούσαν· η μοναδική πόρτα διάσωσης ήταν
+// φραγμένη ακριβώς για όσους την χρειάζονται. Το βρήκε ο Stavros στον
+// υπολογιστή του, όχι το τεστ (κανόνας 5/9: όταν ο Stavros βλέπει πρόβλημα
+// και το τεστ είναι πράσινο, ΤΟ ΤΕΣΤ είναι λάθος).
+await check("Η11β-14 · 🔴 Η ΠΟΡΤΑ ΑΚΥΡΩΣΗΣ ΖΕΙ ΕΞΩ ΑΠΟ ΤΟ SCOPE ΤΟΥ SERVICE WORKER", async () => {
+  const page = "/" + (src.match(/const CANCEL_PAGE = "fastwrite\.tech([^"]*)"/) || [])[1].replace(/^\//, "");
+  if (page.indexOf("/kostometro/") === 0) {
+    throw new Error("η σελίδα ακύρωσης δείχνει στο " + page + " — ΜΕΣΑ στο scope του sw, ο sw θα τη φάει");
+  }
+  const file = "site" + (page.endsWith("/") ? page : page + "/") + "index.html";
+  if (!existsSync(file)) throw new Error("το CANCEL_PAGE δείχνει στο " + page + " αλλά δεν υπάρχει " + file);
+  const html = readFileSync(file, "utf8");
+  if (!/kmCheckWords/.test(html) || !/delete\/cancel/.test(html)) {
+    throw new Error("το " + file + " δεν είναι η σελίδα ακύρωσης — λείπει ο έλεγχος λέξεων ή η κλήση");
+  }
+  // Και η παλιά διεύθυνση, που ζει μέσα σε ήδη σταλμένα email, πρέπει να
+  // εξαιρείται ΡΗΤΑ μέσα στον ίδιο τον sw.
+  const sw = readFileSync("site/kostometro/sw.js", "utf8");
+  if (!/indexOf\('\/kostometro\/akyrosi'\) === 0\) \{ return; \}/.test(sw)) {
+    throw new Error("ο sw δεν εξαιρεί ρητά την παλιά διεύθυνση /kostometro/akyrosi");
+  }
+  if (/'\/kostometro\/akyrosi/.test(sw.slice(sw.indexOf("var SHELL"), sw.indexOf("var FRESH")))) {
+    throw new Error("η σελίδα ακύρωσης ξαναμπήκε στο SHELL — θα σερβίρεται από μνήμη");
+  }
 });
 
 console.log(failed ? "\nΚΟΚΚΙΝΟ: " + failed + " φρουροί έπεσαν" : "\nΠΡΑΣΙΝΟ: όλοι οι φρουροί πέρασαν");

@@ -2,143 +2,34 @@
 <html lang="el">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0a0e14">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Ακύρωση διαγραφής · Kostometro</title>
-<link rel="icon" href="/kostometro/icons/icon-192.png">
-<link rel="stylesheet" href="/kostometro/app.css">
+<meta http-equiv="refresh" content="0; url=/akyrosi/">
+<link rel="canonical" href="/akyrosi/">
 <!--
-  Η.11β · Η ΔΗΜΟΣΙΑ ΠΟΡΤΑ ΑΚΥΡΩΣΗΣ — 15/9/2026
+  Η.11β · ΑΥΤΗ Η ΣΕΛΙΔΑ ΕΙΝΑΙ ΜΟΝΟ ΤΑΜΠΕΛΑ — 15/9/2026, ίδια μέρα με τη γέννησή της.
   ---------------------------------------------------------------------------
-  🔴 ΓΙΑΤΙ ΞΕΧΩΡΙΣΤΗ ΣΕΛΙΔΑ ΚΑΙ ΟΧΙ ΣΥΝΔΕΣΜΟΣ ΣΤΟ EMAIL:
-     Ο σύνδεσμος ενέργειας ζει μέσα στο email, και το email ζει μέσα στο ίδιο
-     κινητό που μπορεί να έχει κλαπεί — ο κλέφτης θα τον πατούσε, θα τον
-     έσβηνε, ή θα ξαναζητούσε διαγραφή. Οι 12 λέξεις είναι το ΜΟΝΟ πράγμα
-     που ο κλέφτης δεν έχει, γιατί ζουν σε χαρτί.
-
-  🔴 ΓΙΑΤΙ ΔΕΝ ΕΙΝΑΙ ΜΕΣΑ ΣΤΗΝ ΕΦΑΡΜΟΓΗ:
-     Ο άνθρωπος που έχασε το κινητό του δεν έχει εφαρμογή. Αυτή η σελίδα
-     ανοίγει σε οποιονδήποτε browser, σε δανεικό υπολογιστή, χωρίς
-     εγκατάσταση και χωρίς λογαριασμό.
-
-  ⚠ ΤΙΠΟΤΑ ΔΕΝ ΑΠΟΘΗΚΕΥΕΤΑΙ ΕΔΩ. Οι λέξεις ζουν μόνο στη μνήμη της σελίδας,
-    όσο κρατάει ο υπολογισμός. Το μόνο που γράφεται είναι ένα τυχαίο
-    αναγνωριστικό συσκευής, που ο server ζητάει σε κάθε κλήση.
+  🔴 ΓΙΑΤΙ ΜΕΤΑΚΟΜΙΣΕ Η ΣΕΛΙΔΑ ΑΚΥΡΩΣΗΣ ΣΤΟ /akyrosi/:
+     Ζούσε στο /kostometro/akyrosi/ — δηλαδή ΜΕΣΑ στο scope του service
+     worker της εφαρμογής. Ο sw πιάνει κάθε διαδρομή που αρχίζει από
+     "/kostometro/", και για ό,τι δεν είναι στη λίστα FRESH τρέχει
+     cacheFirst. Το fromCache(), σε πλοήγηση που δεν βρίσκει στη μνήμη,
+     επιστρέφει το /kostometro/index.html — ΤΗΝ ΕΦΑΡΜΟΓΗ. Χωρίς να ρωτήσει
+     ποτέ το δίκτυο.
+     Αποτέλεσμα: κάθε χρήστης που είχε ανοίξει ποτέ το Kostometro έβλεπε την
+     εφαρμογή αντί για τη σελίδα ακύρωσης. Δηλαδή η μοναδική πόρτα διάσωσης
+     ήταν φραγμένη ΑΚΡΙΒΩΣ για όσους τη χρειάζονται. Μετρήθηκε 15/9/2026 στον
+     υπολογιστή του Stavros (δούλευε μόνο σε Incognito, όπου δεν τρέχει sw).
+     Δεν αρκούσε να διορθωθεί ο ΝΕΟΣ sw: ο ΠΑΛΙΟΣ ζει ήδη στους browsers και
+     κλέβει την πρώτη φόρτωση. Εξω από το scope, κανένας sw δεν την αγγίζει.
+  ⚠ ΜΗΝ ΞΑΝΑΒΑΛΕΙΣ ΣΕΛΙΔΑ ΕΚΤΑΚΤΗΣ ΑΝΑΓΚΗΣ ΚΑΤΩ ΑΠΟ /kostometro/.
 -->
-<style>
-  .ak { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
-  .ak h1 { font-size: 22px; margin: 0 0 4px; }
-  .ak textarea { width: 100%; min-height: 108px; box-sizing: border-box; }
-  .ak .ok { color: #7ee2a8; }
-</style>
+<style>body{background:#0a0e14;color:#e6e6e6;font:16px/1.6 system-ui,sans-serif;margin:0;padding:40px 20px;text-align:center}a{color:#7ee2a8}</style>
 </head>
 <body>
-<div class="ak">
-  <h1>Ακύρωση διαγραφής</h1>
-  <p class="fine hint">Kostometro</p>
-
-  <div id="ak-form">
-    <p class="fine">Αν ζητήθηκε διαγραφή του λογαριασμού σου και <b>δεν την έκανες εσύ</b>, γράψε εδώ τις <b>12 λέξεις</b> σου. Η διαγραφή σταματάει αμέσως.</p>
-    <p class="fine hint">Με κενά ανάμεσα, με τη σειρά που τις έχεις γραμμένες. Κεφαλαία ή μικρά δεν έχει σημασία.</p>
-    <textarea id="ak-words" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="λέξη1 λέξη2 λέξη3 …"></textarea>
-    <p class="err" id="ak-err" hidden></p>
-    <button class="btn" id="ak-go">Σταμάτησε τη διαγραφή</button>
-    <p class="fine hint">Οι 12 λέξεις σου <b>δεν φεύγουν από αυτή τη σελίδα</b>. Στον διακομιστή πηγαίνει μόνο ένας κωδικός που βγαίνει από αυτές και δεν γυρίζει πίσω σε λέξεις.</p>
-  </div>
-
-  <div id="ak-done" hidden>
-    <p class="fine ok"><b>Η διαγραφή σταμάτησε.</b> Ο λογαριασμός λειτουργεί κανονικά.</p>
-    <p class="fine warn"><b>Αν το κινητό σου χάθηκε ή κλάπηκε, δεν τελείωσες.</b> Εκείνη η συσκευή κρατάει ακόμα τις 12 λέξεις σου και μπορεί να ξαναζητήσει διαγραφή. Άνοιξε το Kostometro σε συσκευή που ελέγχεις εσύ και <b>άλλαξε τις 12 λέξεις σου</b> από τις Ρυθμίσεις. Τότε μόνο πεθαίνει η κλειδαριά της.</p>
-    <p class="fine hint">Βοήθεια: support@fastwrite.tech</p>
-  </div>
-</div>
-
-<script src="/km-crypto.js"></script>
-<script>
-(function () {
-  var API = '/api/km/';
-  function el(id) { return document.getElementById(id); }
-
-  /* Ο server ζητάει X-Km-Device σε κάθε κλήση. Εδώ δεν υπάρχει «συσκευή» με
-     την έννοια της εφαρμογής — φτιάχνουμε ένα σταθερό τυχαίο για αυτόν τον
-     browser, ώστε μια δεύτερη προσπάθεια να μη μοιάζει με άλλη συσκευή. */
-  function deviceId() {
-    var k = 'km_akyrosi_id';
-    try {
-      var v = localStorage.getItem(k);
-      if (!v) { v = 'km_' + kmRandomHex(6); localStorage.setItem(k, v); }
-      return v;
-    } catch (e) { return 'km_' + kmRandomHex(6); }
-  }
-
-  function fail(msg) {
-    var e = el('ak-err');
-    e.textContent = msg; e.hidden = false;
-    var b = el('ak-go');
-    b.disabled = false; b.textContent = 'Σταμάτησε τη διαγραφή';
-  }
-
-  el('ak-go').onclick = function () {
-    var b = el('ak-go');
-    el('ak-err').hidden = true;
-    var raw = el('ak-words').value || '';
-
-    kmCheckWords(raw).then(function (c) {
-      if (!c.ok) { fail(c.error); return; }
-      b.disabled = true; b.textContent = 'Ελέγχεται…';   // το PBKDF2 θέλει 1-2 δευτερόλεπτα
-      var dev = deviceId();
-
-      /* ΔΥΟ ΜΟΡΦΕΣ ΤΑΥΤΟΤΗΤΑΣ, ΟΠΩΣ ΚΑΙ ΣΤΗΝ ΕΦΑΡΜΟΓΗ (v47 · Η.13):
-         (α) κλειδαριά — το κανονικό από τη v47 και μετά. Το /unlock δίνει το
-             folder_id, που το /delete/cancel χρειάζεται.
-         (β) παλιά ταυτότητα v46 — λογαριασμός που δεν μετανάστευσε ποτέ.
-         Δοκιμάζονται με αυτή τη σειρά. Αν πέσει η (α), η (β) δεν κοστίζει
-         τίποτα παραπάνω: το αργό PBKDF2 έχει ήδη τρέξει. */
-      return kmDeriveLock(c.words).then(function (L) {
-        return fetch(API + 'unlock', {
-          method: 'POST',
-          headers: { 'X-Km-Lock': L.lockId, 'X-Km-Auth': L.authToken, 'X-Km-Device': dev }
-        }).then(function (r) {
-          if (r.status === 410) { fail('Ο λογαριασμός έχει ήδη διαγραφεί οριστικά. Δεν υπάρχει τίποτα να ακυρωθεί.'); return null; }
-          if (!r.ok) { return null; }        // δοκιμάζουμε την παλιά μορφή
-          return r.json().then(function (j) {
-            return { folder: j.folder_id, auth: L.authToken, lock: L.lockId };
-          });
-        });
-      }).then(function (idA) {
-        if (idA) { return idA; }
-        return kmDerive(c.words).then(function (d) {
-          return { folder: d.folderId, auth: d.authToken, lock: null };
-        });
-      }).then(function (id) {
-        if (!id) { return; }
-        var h = { 'Content-Type': 'application/json', 'X-Km-Folder': id.folder, 'X-Km-Auth': id.auth, 'X-Km-Device': dev };
-        if (id.lock) { h['X-Km-Lock'] = id.lock; }
-        return fetch(API + 'delete/cancel', { method: 'POST', headers: h, body: JSON.stringify({}) })
-          .then(function (r) {
-            if (r.status === 200) {
-              el('ak-form').hidden = true;
-              el('ak-done').hidden = false;
-              return;
-            }
-            if (r.status === 409) { fail('Δεν εκκρεμεί διαγραφή σε αυτόν τον λογαριασμό. Ή δεν ζητήθηκε ποτέ, ή ακυρώθηκε ήδη.'); return; }
-            if (r.status === 410) { fail('Ο λογαριασμός έχει ήδη διαγραφεί οριστικά. Δεν υπάρχει τίποτα να ακυρωθεί.'); return; }
-            if (r.status === 404 || r.status === 403) {
-              /* Ιδια απάντηση για «δεν υπάρχει» και «λάθος λέξεις»: δεν
-                 μαθαίνει κανείς αν κάποιες 12 λέξεις αντιστοιχούν σε
-                 λογαριασμό δοκιμάζοντάς τες (ίδιος κανόνας με το /unlock). */
-              fail('Αυτές οι 12 λέξεις δεν ανοίγουν κανέναν λογαριασμό. Έλεγξε τη σειρά και την ορθογραφία.');
-              return;
-            }
-            fail('Ο διακομιστής δεν ολοκλήρωσε την ακύρωση (σφάλμα ' + r.status + '). Δοκίμασε ξανά σε λίγο.');
-          });
-      });
-    }).catch(function () {
-      fail('Κάτι πήγε στραβά. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.');
-    });
-  };
-})();
-</script>
+<p>Η σελίδα ακύρωσης μετακόμισε.</p>
+<p><a href="/akyrosi/"><b>fastwrite.tech/akyrosi</b></a></p>
+<script>location.replace('/akyrosi/');</script>
 </body>
 </html>

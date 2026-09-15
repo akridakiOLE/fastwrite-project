@@ -1394,9 +1394,11 @@ async function adminDue(request, env, doIt) {
 const MAIL_FROM = "FastWrite <noreply@notify.fastwrite.tech>";
 const MAIL_SUPPORT = "support@fastwrite.tech";
 // Η.11β: η σελίδα ακύρωσης. ΔΕΝ είναι σύνδεσμος ενέργειας — δεν κουβαλάει
+// 🔴 ΕΞΩ από το /kostometro/ ΕΠΙΤΗΔΕΣ (15/9/2026): μέσα εκεί την έκλεβε ο
+// service worker της εφαρμογής και σέρβιρε την εφαρμογή στη θέση της.
 // κλειδί, δεν αναγνωρίζει τον χρήστη. Ζητάει τις 12 λέξεις, που ο κλέφτης
 // δεν έχει. Γι\u0027 αυτό επιτρέπεται να υπάρχει μέσα στο email.
-const CANCEL_PAGE = "fastwrite.tech/kostometro/akyrosi";
+const CANCEL_PAGE = "fastwrite.tech/akyrosi";
 
 // Η.11β: δέχεται ISO για μελλοντική ώρα (η λήξη των 72 ωρών). Χωρίς όρισμα
 // = τώρα, όπως πριν.
