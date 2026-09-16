@@ -89,6 +89,38 @@ test('Μ62-2 · Ερωτήσεις & απαντήσεις: 16 ερωτήσεις
   await ctx.close();
 });
 
+/* v63 · Stavros, 16/9: «κάθε φορά που ανοίγει μια νέα ερώτηση, η προηγούμενη
+   πρέπει να κλείνει». Σε οθόνη τηλεφώνου δύο ανοιχτές απαντήσεις σπρώχνουν τη
+   δεύτερη εκτός οθόνης. Το τεστ πατάει ό,τι πατάει ο άνθρωπος: summary. */
+test('Μ62-7 · Ερωτήσεις: ανοίγει μία τη φορά — η προηγούμενη κλείνει μόνη της', async ({ browser }) => {
+  const { ctx, p } = await device(browser);
+  await onboard(p, mail('m62g-'));
+  await toMenu(p);
+  await p.locator('[data-go="s-faq"]').click();
+  await expect(p.locator('#s-faq')).toBeVisible({ timeout: 5000 });
+
+  const d = p.locator('details.faq');
+  const n = await d.count();
+  expect(n).toBeGreaterThan(3);
+
+  await d.nth(0).locator('summary').click();
+  await expect(d.nth(0)).toHaveAttribute('open', '');
+
+  await d.nth(1).locator('summary').click();
+  await expect(d.nth(1)).toHaveAttribute('open', '');
+  await expect(d.nth(0), 'η πρώτη ερώτηση ΔΕΝ έκλεισε').not.toHaveAttribute('open', '');
+
+  await d.nth(2).locator('summary').click();
+  await expect(d.nth(2)).toHaveAttribute('open', '');
+  const open = await p.locator('#faq-body details.faq[open]').count();
+  expect(open, 'παραπάνω από μία ανοιχτή').toBe(1);
+
+  // το κλείσιμο της ανοιχτής δεν ανοίγει καμία άλλη — μένουν όλες κλειστές
+  await d.nth(2).locator('summary').click();
+  expect(await p.locator('#faq-body details.faq[open]').count()).toBe(0);
+  await ctx.close();
+});
+
 test('Μ62-3 · Υποστήριξη: αριθμός εισιτηρίου KM-XXXX, το mailto έχει θέμα, έκδοση και συσκευή — τίποτα στον server', async ({ browser }) => {
   const { ctx, p } = await device(browser);
   await onboard(p, mail('m62c-'));

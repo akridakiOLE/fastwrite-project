@@ -1,0 +1,23 @@
+Kostometro v63: one question open at a time in Questions & answers
+
+Stavros, 16/9 with a screenshot from the phone: "every time a new question
+opens, the previous one must close". Two open answers push the second one off
+a phone screen, so tapping it looks like nothing happened.
+
+renderFaq now attaches a toggle listener to each <details>; when one opens, the
+others close. Two things worth writing down:
+- the `toggle` event does NOT bubble, so a single listener on #faq-body would
+  never fire. It goes on each element.
+- the browser-native exclusive accordion (name="" on <details>) is deliberately
+  NOT used: it is recent and not every phone that will run this app has it.
+Closing the open one still leaves everything closed - it is an accordion, not a
+radio group.
+
+APP_VER -> v63, sw cache km-v63, version.json v63.
+
+TEST: tests/menu62.spec.js M62-7 in real Chromium at phone size, pressing
+summary the way a finger does: open #1, open #2 and assert #1 closed, open #3
+and assert exactly one open element in the whole list, then close it and assert
+zero. Whole suite re-run: 7/7 green.
+
+NOT TESTED: nothing new on the server - this is one screen of the app.
