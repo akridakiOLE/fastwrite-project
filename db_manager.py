@@ -313,6 +313,35 @@ class DatabaseManager:
                     image_path  TEXT    NOT NULL DEFAULT ''
                 )
             """)
+
+            # ── Indexes (16/9/2026) ────────────────────────────────────────
+            # Ο Πίνακας Ελέγχου φιλτράρει με ημερομηνία, email, πλάνο και
+            # μετράει έγγραφα ανά χρήστη. Χωρίς αυτά κάθε άνοιγμα του πίνακα
+            # σαρώνει ΟΛΟΚΛΗΡΟΥΣ τους πίνακες μία φορά ΑΝΑ ΧΡΗΣΤΗ.
+            # Σχεδιάζουμε για 1000+ πελάτες, όχι για τους σημερινούς.
+            # IF NOT EXISTS: τρέχει και σε υπάρχουσα βάση, δεν χαλάει τίποτα.
+            for _ix in (
+                "CREATE INDEX IF NOT EXISTS idx_documents_user    ON documents(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_documents_created ON documents(created_at)",
+                "CREATE INDEX IF NOT EXISTS idx_documents_status  ON documents(status)",
+                "CREATE INDEX IF NOT EXISTS idx_templates_user    ON templates(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_activity_user     ON activity_log(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_users_created     ON users(created_at)",
+                "CREATE INDEX IF NOT EXISTS idx_users_email       ON users(email)",
+                "CREATE INDEX IF NOT EXISTS idx_installs_user     ON installs(username)",
+                "CREATE INDEX IF NOT EXISTS idx_installs_email    ON installs(email)",
+                "CREATE INDEX IF NOT EXISTS idx_installs_seen     ON installs(last_seen)",
+                "CREATE INDEX IF NOT EXISTS idx_installs_ver      ON installs(app_version)",
+                "CREATE INDEX IF NOT EXISTS idx_subs_user         ON subscriptions(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_subs_status       ON subscriptions(status)",
+                "CREATE INDEX IF NOT EXISTS idx_subs_plan         ON subscriptions(plan_id)",
+                "CREATE INDEX IF NOT EXISTS idx_usage_user        ON usage_events(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_feedback_created  ON feedback(created_at)",
+            ):
+                try:
+                    self.conn.execute(_ix)
+                except Exception:
+                    pass  # λείπει στήλη σε πολύ παλιά βάση - δεν μπλοκάρει την εκκίνηση
             self.conn.commit()
 
             # Migration: assign orphan data (user_id IS NULL) to first admin user

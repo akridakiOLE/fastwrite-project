@@ -7,6 +7,51 @@
   var el = function (id) { return document.getElementById(id); };
   var KEY = 'pk_admin_key';
   var API = '/api/km/admin/pinakas';
+  var PAGE = 100;
+
+  /* 🔴 ΚΑΝΟΝΑΣ (Stavros, 16/9): σχεδιάζουμε για το ΜΕΓΑΛΟ. Τα φίλτρα και οι
+     σελίδες ζητούνται από τον server. Ο μετρητής λέει ΠΑΝΤΑ «δείχνω X από Y»
+     — ποτέ δεν παριστάνει ότι τα Y είναι X. */
+  var st = { kmShown: 0, kmTotal: 0, fwShown: 0, fwTotal: 0 };
+
+  var KM_F = { 'f-from': 'from', 'f-to': 'to', 'f-q': 'q', 'f-src': 'src', 'f-ref': 'ref', 'f-cty': 'cty', 'f-st': 'st' };
+  var FW_F = { 'g-from': 'ffrom', 'g-to': 'fto', 'g-q': 'fq', 'g-plan': 'fplan', 'g-st': 'fst' };
+
+  function val(id) { var e = el(id); return e ? String(e.value || '').trim() : ''; }
+  function qsFrom(map) {
+    var p = new URLSearchParams();
+    for (var id in map) { if (val(id)) p.set(map[id], val(id)); }
+    return p;
+  }
+  function countOn(map) { var k = 0; for (var id in map) { if (val(id)) k++; } return k; }
+  function badge(id, map) { el(id).textContent = countOn(map) ? '(' + countOn(map) + ')' : ''; }
+  function fmtN(n) { return String(Number(n) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  function counter(host, btn, shown, total) {
+    el(host).innerHTML = total === 0 ? '<span class="muted">κανένας</span>'
+      : (shown >= total ? 'όλοι οι <b>' + fmtN(total) + '</b>'
+                        : 'δείχνω <b>' + fmtN(shown) + '</b> από <b>' + fmtN(total) + '</b>');
+    el(btn).hidden = shown >= total;
+  }
+  function api(p) {
+    var k = key();
+    p.set('nc', Date.now());
+    return fetch(API + '?' + p.toString(), { headers: { 'X-Km-Admin': k }, cache: 'no-store' })
+      .then(function (r) {
+        if (r.status === 404) { throw { key: true }; }
+        if (!r.ok) { throw new Error('Ο server απάντησε ' + r.status); }
+        return r.json();
+      });
+  }
+  function fillSel(id, values, allLabel) {
+    var e = el(id), cur = e.value;
+    var opts = ['<option value="">' + allLabel + '</option>'];
+    (values || []).forEach(function (v) {
+      if (v === null || v === undefined || v === '') return;
+      opts.push('<option value="' + esc(v) + '">' + esc(v) + '</option>');
+    });
+    e.innerHTML = opts.join('');
+    if (cur) { e.value = cur; if (e.value !== cur) { e.insertAdjacentHTML('beforeend', '<option value="' + esc(cur) + '">' + esc(cur) + '</option>'); e.value = cur; } }
+  }
 
   function key() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
   function fmtBytes(b) {
@@ -110,22 +155,38 @@
     /* ── ΖΩΝΗ 3: FastWrite Desktop ── */
     renderFastWrite(j.fastwrite);
 
+    var o = j.options || {};
+    fillSel('f-src', o.sources, 'όλες');
+    fillSel('f-ref', o.refs, 'όλες');
+    fillSel('f-cty', o.countries, 'όλες');
+    renderKmAcc(j, false);
+  }
+
+  function kmRow(r) {
+    var tags = '';
+    if (r.delete_due_at) tags += ' <span class="tag dng">διαγραφή ' + fmtDate(r.delete_due_at) + '</span>';
+    if (r.plan) tags += ' <span class="tag acc">' + esc(r.plan) + '</span>';
+    return '<div class="row">' +
+      '<div class="em">' + esc(r.email) + tags + '</div>' +
+      '<div class="meta">' +
+        '<span>από <b>' + esc(r.source || '?') + '</b>' + (r.country ? ' · ' + esc(r.country) : '') + '</span>' +
+        '<span>σύσταση ' + (r.ref ? '<b class="tag acc">' + esc(r.ref) + '</b>' : '<span class="muted">—</span>') + '</span>' +
+        '<span>εγγραφή <b>' + fmtDate(r.created) + '</b></span>' +
+        '<span>sync <b>' + ago(r.last_sync) + '</b>' + (r.folder_version ? ' <span class="muted">v' + r.folder_version + '</span>' : '') + '</span>' +
+        '<span>συσκευές <b>' + (r.devices || 0) + '</b></span>' +
+      '</div></div>';
+  }
+
+  function renderKmAcc(j, append) {
     var a = j.accounts || [];
-    el('n-acc').textContent = '(' + a.length + ')';
-    el('acc').innerHTML = a.length ? a.map(function (r) {
-      var tags = '';
-      if (r.delete_due_at) tags += ' <span class="tag dng">διαγραφή ' + fmtDate(r.delete_due_at) + '</span>';
-      if (r.plan) tags += ' <span class="tag acc">' + esc(r.plan) + '</span>';
-      return '<div class="row">' +
-        '<div class="em">' + esc(r.email) + tags + '</div>' +
-        '<div class="meta">' +
-          '<span>από <b>' + esc(r.source || '?') + '</b>' + (r.country ? ' · ' + esc(r.country) : '') + '</span>' +
-          '<span>σύσταση ' + (r.ref ? '<b class="tag acc">' + esc(r.ref) + '</b>' : '<span class="muted">—</span>') + '</span>' +
-          '<span>εγγραφή <b>' + fmtDate(r.created) + '</b></span>' +
-          '<span>sync <b>' + ago(r.last_sync) + '</b>' + (r.folder_version ? ' <span class="muted">v' + r.folder_version + '</span>' : '') + '</span>' +
-          '<span>συσκευές <b>' + r.devices + '</b></span>' +
-        '</div></div>';
-    }).join('') : '<p class="fine muted">κανένας λογαριασμός ακόμα</p>';
+    st.kmTotal = Number(j.accounts_total) || 0;
+    st.kmShown = append ? st.kmShown + a.length : a.length;
+    var html = a.map(kmRow).join('');
+    if (append) { el('acc').insertAdjacentHTML('beforeend', html); }
+    else { el('acc').innerHTML = html || '<p class="fine muted">κανένας λογαριασμός με αυτά τα φίλτρα</p>'; }
+    el('n-acc').textContent = '(' + fmtN(st.kmTotal) + ')';
+    counter('acc-cnt', 'acc-more', st.kmShown, st.kmTotal);
+    badge('km-flt-on', KM_F);
   }
 
   function renderFastWrite(f) {
@@ -169,53 +230,101 @@
     var vers = (i.by_version || []).map(function (r) { return { lab: r.v || '(χωρίς έκδοση)', n: r.n }; });
     bars(el('f-vers'), vers, 'lab');
 
+    fillSel('g-plan', (f.options || {}).plans, 'όλα');
+    renderFwAcc(f, false);
+  }
+
+  function fwRow(r) {
+    var tags = '';
+    if (r.role === 'admin') tags += ' <span class="tag">admin</span>';
+    if (!r.is_active) tags += ' <span class="tag dng">ανενεργός</span>';
+    if (r.plan) tags += ' <span class="tag acc">' + esc(r.plan) + (r.sub_status && r.sub_status !== 'active' ? ' · ' + esc(r.sub_status) : '') + '</span>';
+    return '<div class="row">' +
+      '<div class="em">' + esc(r.username) + (r.email ? ' <span class="muted" style="font-weight:400">' + esc(r.email) + '</span>' : '') + tags + '</div>' +
+      '<div class="meta">' +
+        '<span>εγγραφή <b>' + fmtDate(r.created_at) + '</b></span>' +
+        '<span>είδαμε <b>' + ago(r.last_seen) + '</b></span>' +
+        '<span>έγγραφα <b>' + (r.docs || 0) + '</b></span>' +
+        '<span>συσκευές <b>' + (r.devices || 0) + '</b></span>' +
+      '</div></div>';
+  }
+
+  function renderFwAcc(f, append) {
     var a = f.accounts || [];
-    el('f-nacc').textContent = '(' + a.length + ')';
-    el('f-acc').innerHTML = a.length ? a.map(function (r) {
-      var tags = '';
-      if (r.role === 'admin') tags += ' <span class="tag">admin</span>';
-      if (!r.is_active) tags += ' <span class="tag dng">ανενεργός</span>';
-      if (r.plan) tags += ' <span class="tag acc">' + esc(r.plan) + (r.sub_status && r.sub_status !== 'active' ? ' · ' + esc(r.sub_status) : '') + '</span>';
-      return '<div class="row">' +
-        '<div class="em">' + esc(r.username) + (r.email ? ' <span class="muted" style="font-weight:400">' + esc(r.email) + '</span>' : '') + tags + '</div>' +
-        '<div class="meta">' +
-          '<span>εγγραφή <b>' + fmtDate(r.created_at) + '</b></span>' +
-          '<span>είδαμε <b>' + ago(r.last_seen) + '</b></span>' +
-          '<span>έγγραφα <b>' + (r.docs || 0) + '</b></span>' +
-        '</div></div>';
-    }).join('') : '<p class="fine muted">κανένας λογαριασμός ακόμα</p>';
+    st.fwTotal = Number(f.accounts_total) || 0;
+    st.fwShown = append ? st.fwShown + a.length : a.length;
+    var html = a.map(fwRow).join('');
+    if (append) { el('f-acc').insertAdjacentHTML('beforeend', html); }
+    else { el('f-acc').innerHTML = html || '<p class="fine muted">κανένας λογαριασμός με αυτά τα φίλτρα</p>'; }
+    el('f-nacc').textContent = '(' + fmtN(st.fwTotal) + ')';
+    counter('f-acc-cnt', 'f-acc-more', st.fwShown, st.fwTotal);
+    badge('fw-flt-on', FW_F);
   }
 
   var busy = false;
+  function fail(e) {
+    if (e && e.key) {
+      /* 404 = λάθος κλειδί (ή κανένα). Ο server δεν ξεχωρίζει επίτηδες. */
+      try { localStorage.removeItem(KEY); } catch (x) {}
+      showKeyScreen('Το κλειδί δεν έγινε δεκτό. Ο server απαντά ότι η διαδρομή δεν υπάρχει — έτσι κάνει σε κάθε λάθος κλειδί.');
+      return;
+    }
+    el('s-data').hidden = false;
+    el('err').hidden = false;
+    el('err').textContent = (e && e.message) ? e.message
+      : 'Χωρίς σύνδεση. Τα νούμερα ΔΕΝ ανανεώθηκαν — δεν δείχνουμε παλιά νούμερα σαν σημερινά.';
+  }
+  function done() { busy = false; el('b-refresh').disabled = false; el('b-refresh').textContent = 'Ανανέωση'; }
+
+  /* Πλήρης φόρτωση: σύνολα + πρώτη σελίδα και των δύο λιστών, μία κλήση. */
   function load() {
-    var k = key();
-    if (!k) { showKeyScreen(); return; }
+    if (!key()) { showKeyScreen(); return; }
     if (busy) return; busy = true;
     el('b-refresh').disabled = true; el('b-refresh').textContent = '…';
     el('err').hidden = true;
-    fetch(API + '?n=' + Date.now(), { headers: { 'X-Km-Admin': k }, cache: 'no-store' })
-      .then(function (r) {
-        if (r.status === 404) { throw { key: true }; }
-        if (!r.ok) { throw new Error('Ο server απάντησε ' + r.status); }
-        return r.json();
-      })
-      .then(function (j) {
-        el('s-key').hidden = true; el('s-data').hidden = false;
-        render(j);
-      })
-      .catch(function (e) {
-        if (e && e.key) {
-          /* 404 = λάθος κλειδί (ή κανένα). Ο server δεν ξεχωρίζει επίτηδες. */
-          try { localStorage.removeItem(KEY); } catch (x) {}
-          showKeyScreen('Το κλειδί δεν έγινε δεκτό. Ο server απαντά ότι η διαδρομή δεν υπάρχει — έτσι κάνει σε κάθε λάθος κλειδί.');
-          return;
-        }
-        el('s-data').hidden = false;
-        el('err').hidden = false;
-        el('err').textContent = (e && e.message) ? e.message : 'Χωρίς σύνδεση. Τα νούμερα δεν ανανεώθηκαν — δεν δείχνουμε παλιά νούμερα σαν σημερινά.';
-      })
-      .then(function () { busy = false; el('b-refresh').disabled = false; el('b-refresh').textContent = 'Ανανέωση'; });
+    var p = qsFrom(KM_F);
+    qsFrom(FW_F).forEach(function (v, k) { p.set(k, v); });
+    p.set('n', PAGE); p.set('fn', PAGE);
+    api(p).then(function (j) {
+      el('s-key').hidden = true; el('s-data').hidden = false;
+      render(j);
+    }).catch(fail).then(done);
   }
+
+  /* Μόνο η λίστα του Kostometro: αλλαγή φίλτρου ή «κι άλλους».
+     ΔΕΝ ξαναϋπολογίζει σύνολα, ΔΕΝ ξαναρωτάει τον Hetzner. */
+  function loadKm(append) {
+    if (!key() || busy) return; busy = true;
+    var b = el('acc-more'); b.disabled = true;
+    var p = qsFrom(KM_F);
+    p.set('only', 'km'); p.set('n', PAGE); p.set('off', append ? st.kmShown : 0);
+    api(p).then(function (j) { renderKmAcc(j, append); })
+      .catch(fail).then(function () { busy = false; b.disabled = false; done(); });
+  }
+
+  /* Μόνο η λίστα του FastWrite. */
+  function loadFw(append) {
+    if (!key() || busy) return; busy = true;
+    var b = el('f-acc-more'); b.disabled = true;
+    var p = qsFrom(FW_F);
+    p.set('only', 'fw'); p.set('fn', PAGE); p.set('foff', append ? st.fwShown : 0);
+    api(p).then(function (j) {
+      var f = j.fastwrite || {};
+      if (f.ok !== true) { renderFastWrite(f); return; }
+      renderFwAcc(f, append);
+    }).catch(fail).then(function () { busy = false; b.disabled = false; done(); });
+  }
+
+  function clearF(map) { for (var id in map) { el(id).value = ''; } }
+
+  el('f-go').onclick = function () { loadKm(false); };
+  el('f-clr').onclick = function () { clearF(KM_F); loadKm(false); };
+  el('acc-more').onclick = function () { loadKm(true); };
+  el('g-go').onclick = function () { loadFw(false); };
+  el('g-clr').onclick = function () { clearF(FW_F); loadFw(false); };
+  el('f-acc-more').onclick = function () { loadFw(true); };
+  el('f-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); loadKm(false); } });
+  el('g-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); loadFw(false); } });
 
   el('b-save').onclick = function () {
     var v = (el('key').value || '').trim();

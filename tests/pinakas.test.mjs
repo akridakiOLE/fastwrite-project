@@ -15,8 +15,8 @@ const MUTATE = process.argv.includes("--mutate");
 let src = readFileSync("src/km.js", "utf8");
 const MUTATIONS = [
   // 1. Οι ταφόπετρες μπαίνουν στη λίστα → διαρρέει το «κάποτε υπήρχε» με folder.
-  ["FROM km_accounts a WHERE a.deleted IS NULL ORDER BY a.created DESC LIMIT 500",
-   "FROM km_accounts a ORDER BY a.created DESC LIMIT 500"],
+  //    (16/9: ο φρουρός μετακόμισε στο pkFilters μαζί με τα φίλτρα.)
+  ['const w = ["a.deleted IS NULL"], args = [];', 'const w = ["1=1"], args = [];'],
   // 2. Το κλειδί σταματάει να ελέγχεται → ο πίνακας γίνεται δημόσιος.
   ['async function adminPinakas(request, env) {\n  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });',
    'async function adminPinakas(request, env) {'],
@@ -26,6 +26,11 @@ const MUTATIONS = [
   // 4. Ο Worker παύει να στέλνει το κλειδί στον Hetzner → ο Hetzner λέει 404 → η ζώνη FastWrite πέφτει.
   ['headers: { "X-Km-Admin": key, "Accept": "application/json" },',
    'headers: { "Accept": "application/json" },'],
+  // 5. 🔴 ΤΟ ΣΙΩΠΗΛΟ ΨΕΜΑ: το σύνολο γίνεται «όσοι στάλθηκαν» αντί «όσοι ταιριάζουν».
+  ["accounts_total: list.total,", "accounts_total: list.rows.length,"],
+  // 6. Η σελιδοποίηση αγνοεί το off → το «κι άλλους» ξαναδίνει την ίδια σελίδα.
+  ["ORDER BY a.created DESC LIMIT ? OFFSET ?`,\n    ...f.args, n, off);",
+   "ORDER BY a.created DESC LIMIT ? OFFSET ?`,\n    ...f.args, n, 0);"],
 ];
 if (MUTATE) for (const [a, b] of MUTATIONS) {
   if (!src.includes(a)) { console.log("Η ΜΕΤΑΛΛΑΞΗ ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ:\n" + a.slice(0, 90)); process.exit(1); }
@@ -199,6 +204,70 @@ await check("Π-12 · 🔴 ο Hetzner ΔΕΝ στέλνει ποτέ hash/secret
   hetzner.mode = "ok";
   const dump = JSON.stringify(await pinakas());
   if (/password_hash|totp_secret|stripe_customer_id/.test(dump)) throw new Error("απόρρητο πεδίο στο JSON");
+});
+
+await check("Π-13 · 🔴 accounts_total = πόσοι ΤΑΙΡΙΑΖΟΥΝ, όχι πόσοι στάλθηκαν", async () => {
+  const r = await call("/api/km/admin/pinakas?k=s3cret&n=2", {});
+  const j = await r.json();
+  eq(j.accounts.length, 2, "στάλθηκαν:");
+  eq(j.accounts_total, 6, "σύνολο:");          // 6 ζωντανοί, 2 στη σελίδα
+  eq(j.n, 2, "n:"); eq(j.off, 0, "off:");
+});
+
+await check("Π-14 · η σελίδα 2 φέρνει ΑΛΛΟΥΣ — το «κι άλλους» δεν ξαναδίνει τα ίδια", async () => {
+  const p1 = await (await call("/api/km/admin/pinakas?k=s3cret&n=2&off=0", {})).json();
+  const p2 = await (await call("/api/km/admin/pinakas?k=s3cret&n=2&off=2", {})).json();
+  eq(p2.off, 2, "off:");
+  const a = p1.accounts.map((r) => r.email), b = p2.accounts.map((r) => r.email);
+  if (a.some((e) => b.includes(e))) throw new Error("η σελίδα 2 επαναλαμβάνει τη σελίδα 1");
+  // και οι δύο σελίδες μαζί δεν ξεπερνούν το σύνολο
+  if (a.length + b.length > p1.accounts_total) throw new Error("περισσότερες γραμμές από το σύνολο");
+});
+
+await check("Π-15 · τα φίλτρα δουλεύουν ΣΤΗ ΒΑΣΗ και μειώνουν ΚΑΙ το σύνολο", async () => {
+  const src = await (await call("/api/km/admin/pinakas?k=s3cret&src=link", {})).json();
+  eq(src.accounts_total, 2, "από link:");
+  if (src.accounts.some((r) => r.source !== "link")) throw new Error("ξένη πηγή στη λίστα");
+  const ref = await (await call("/api/km/admin/pinakas?k=s3cret&ref=MARIA", {})).json();
+  eq(ref.accounts_total, 2, "σύσταση MARIA:");
+  const q = await (await call("/api/km/admin/pinakas?k=s3cret&q=" + a1.email.slice(0, 6), {})).json();
+  eq(q.accounts_total, 1, "αναζήτηση email:");
+  const dat = await (await call("/api/km/admin/pinakas?k=s3cret&st=data", {})).json();
+  eq(dat.accounts_total, 1, "με δεδομένα:");
+  const pen = await (await call("/api/km/admin/pinakas?k=s3cret&st=pending", {})).json();
+  eq(pen.accounts_total, 1, "σε διαγραφή:");
+  const fut = await (await call("/api/km/admin/pinakas?k=s3cret&from=2099-01-01", {})).json();
+  eq(fut.accounts_total, 0, "από το 2099:");
+  eq(fut.accounts.length, 0, "γραμμές:");
+});
+
+await check("Π-16 · «κι άλλους» (only=km) ΔΕΝ ενοχλεί τον Hetzner ούτε ξαναμετράει σύνολα", async () => {
+  hetzner.mode = "ok"; hetzner.calls.length = 0;
+  const j = await (await call("/api/km/admin/pinakas?k=s3cret&only=km&n=2&off=2", {})).json();
+  eq(hetzner.calls.length, 0, "κλήσεις προς Hetzner:");
+  eq(j.accounts.length, 2, "γραμμές:");
+  eq(j.accounts_total, 6, "σύνολο:");
+  if (j.totals) throw new Error("ξαναϋπολόγισε σύνολα χωρίς λόγο");
+});
+
+await check("Π-17 · τα φίλτρα του FastWrite ταξιδεύουν στον Hetzner με καθαρά ονόματα", async () => {
+  hetzner.mode = "ok"; hetzner.calls.length = 0;
+  await call("/api/km/admin/pinakas?k=s3cret&only=fw&fq=maria&ffrom=2026-01-01&fplan=Pro&foff=100&fn=50", {});
+  eq(hetzner.calls.length, 1, "κλήσεις:");
+  const u = new URL(hetzner.calls[0].url);
+  eq(u.searchParams.get("q"), "maria", "q:");
+  eq(u.searchParams.get("from"), "2026-01-01", "from:");
+  eq(u.searchParams.get("plan"), "Pro", "plan:");
+  eq(u.searchParams.get("off"), "100", "off:");
+  eq(u.searchParams.get("only"), "accounts", "only:");
+  if (u.searchParams.get("k")) throw new Error("ΤΟ ΚΛΕΙΔΙ ΜΠΗΚΕ ΣΤΟ URL");
+});
+
+await check("Π-18 · παράλογη σελίδα δεν ρίχνει τον πίνακα (n=99999, off=-5)", async () => {
+  const j = await (await call("/api/km/admin/pinakas?k=s3cret&n=99999&off=-5", {})).json();
+  if (j.n > 500) throw new Error("n χωρίς ταβάνι: " + j.n);
+  if (j.off < 0) throw new Error("αρνητικό off: " + j.off);
+  eq(j.accounts_total, 6, "σύνολο:");
 });
 
 console.log(failed ? "\nΚΟΚΚΙΝΟ: " + failed + " φρουροί έπεσαν" : "\nΠΡΑΣΙΝΟ: όλοι οι φρουροί πέρασαν");

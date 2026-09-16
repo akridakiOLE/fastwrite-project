@@ -3369,13 +3369,38 @@ def _km_admin_ok(req) -> bool:
 
 @app.get("/api/admin/pinakas")
 def admin_pinakas():
-    """Συγκεντρωτικά FastWrite Desktop για τον Πίνακα Ελέγχου. Κλειδί KM_ADMIN_KEY, όχι cookie."""
+    """Συγκεντρωτικά FastWrite Desktop για τον Πίνακα Ελέγχου. Κλειδί KM_ADMIN_KEY, όχι cookie.
+
+    🔴 ΣΧΕΔΙΑΣΜΕΝΟ ΓΙΑ ΤΟ ΜΕΓΑΛΟ (κανόνας Stavros, 16/9/2026): τα φίλτρα και η
+       σελιδοποίηση γίνονται ΕΔΩ, στη βάση. Φίλτρο στην οθόνη πάνω σε 100
+       κατεβασμένες γραμμές από 1.240 είναι ψέμα με ήρεμο πρόσωπο.
+    🔴 ΠΑΝΤΑ ΓΥΡΙΖΕΙ accounts_total: πόσοι ΤΑΙΡΙΑΖΟΥΝ, όχι πόσοι στάλθηκαν.
+       Χωρίς αυτό ο πίνακας κόβει σιωπηλά και ο Stavros βλέπει λάθος αριθμό.
+    Παράμετροι: from, to (YYYY-MM-DD) · q (username/email) · plan · st
+                (active|inactive|paying) · off, n (σελίδα) · only=accounts
+    """
     if not _km_admin_ok(request):
         return jsonify({"error": "not found"}), 404
     c = db.conn
     one = lambda sql, *a: (c.execute(sql, a).fetchone() or [0])[0]
     def rows(sql, *a):
         return [dict(r) for r in c.execute(sql, a).fetchall()]
+
+    a = request.args
+    def iarg(name, dflt, lo, hi):
+        try:
+            return max(lo, min(hi, int(a.get(name) or dflt)))
+        except (TypeError, ValueError):
+            return dflt
+    frm  = (a.get("from") or "").strip()[:10]
+    to   = (a.get("to") or "").strip()[:10]
+    q    = (a.get("q") or "").strip()[:80]
+    plan = (a.get("plan") or "").strip()[:60]
+    st   = (a.get("st") or "").strip()[:12]
+    only = (a.get("only") or "").strip()[:12]
+    off  = iarg("off", 0, 0, 1000000)
+    n    = iarg("n", 100, 1, 500)
+
     # Οι στήλες created_at/last_seen είναι ISO με 'T' (datetime.utcnow().isoformat()).
     # Το datetime('now') δίνει κενό αντί για 'T' → λάθος σύγκριση. Μορφοποιούμε ίδια.
     iso = lambda mod: c.execute("SELECT strftime('%Y-%m-%dT%H:%M:%S','now',?)", (mod,)).fetchone()[0]
@@ -3383,6 +3408,49 @@ def admin_pinakas():
     d1  = iso('-1 day')
     d7  = iso('-7 days')
     d30 = iso('-30 days')
+
+    # ── Η ΜΙΑ ΠΗΓΗ ΑΛΗΘΕΙΑΣ ΓΙΑ ΤΗ ΛΙΣΤΑ ────────────────────────────────
+    # Ενα πέρασμα ανά βοηθητικό πίνακα, ΟΧΙ ένα ερώτημα ανά χρήστη.
+    # Οι εγκαταστάσεις δένονται με username· όσες δεν έχουν username
+    # δένονται με email — χωρίς διπλομέτρηση (username='' στο δεύτερο).
+    FROM_SQL = """
+        FROM users u
+        LEFT JOIN subscriptions s ON s.user_id = u.id AND s.status IN ('active','trialing','past_due')
+        LEFT JOIN plans p ON p.id = s.plan_id
+        LEFT JOIN (SELECT user_id, COUNT(*) AS n FROM documents GROUP BY user_id) d ON d.user_id = u.id
+        LEFT JOIN (SELECT username, COUNT(*) AS n, MAX(last_seen) AS ls FROM installs
+                   WHERE username <> '' GROUP BY username) iu ON iu.username = u.username
+        LEFT JOIN (SELECT email, COUNT(*) AS n, MAX(last_seen) AS ls FROM installs
+                   WHERE username = '' AND email <> '' GROUP BY email) ie ON ie.email = u.email
+    """
+    where, prm = ["1=1"], []
+    if frm:  where.append("u.created_at >= ?"); prm.append(frm + "T00:00:00")
+    if to:   where.append("u.created_at <= ?"); prm.append(to + "T23:59:59")
+    if q:    where.append("(u.username LIKE ? OR u.email LIKE ?)"); prm += ["%" + q + "%"] * 2
+    if plan: where.append("p.display_name = ?"); prm.append(plan)
+    if st == "active":    where.append("u.is_active = 1")
+    elif st == "inactive": where.append("u.is_active = 0")
+    elif st == "paying":   where.append("s.status = 'active' AND p.price_cents > 0")
+    W = " WHERE " + " AND ".join(where)
+
+    accounts_total = one("SELECT COUNT(*) " + FROM_SQL + W, *prm)
+    accounts = rows("""
+        SELECT u.username, u.email, u.created_at, u.role, u.is_active,
+               p.display_name AS plan, s.status AS sub_status,
+               COALESCE(d.n, 0) AS docs,
+               COALESCE(iu.n, 0) + COALESCE(ie.n, 0) AS devices,
+               CASE WHEN iu.ls IS NULL THEN ie.ls
+                    WHEN ie.ls IS NULL THEN iu.ls
+                    WHEN iu.ls > ie.ls THEN iu.ls ELSE ie.ls END AS last_seen
+        """ + FROM_SQL + W + " ORDER BY u.created_at DESC LIMIT ? OFFSET ?",
+        *(prm + [n, off]))
+
+    page = {"accounts": accounts, "accounts_total": accounts_total,
+            "off": off, "n": n,
+            "filters": {"from": frm, "to": to, "q": q, "plan": plan, "st": st}}
+    if only == "accounts":
+        page["ok"] = True
+        return jsonify(page)
 
     users = {
         "total":     one("SELECT COUNT(*) FROM users"),
@@ -3408,30 +3476,27 @@ def admin_pinakas():
         "docs_total": one("SELECT COALESCE(SUM(docs_total),0) FROM installs"),
         "by_version": rows("SELECT app_version AS v, COUNT(*) AS n FROM installs GROUP BY app_version ORDER BY n DESC LIMIT 10"),
     }
-    docs = {
-        "total":  one("SELECT COUNT(*) FROM documents"),
-        "d30":    one("SELECT COUNT(*) FROM documents WHERE created_at >= ?", d30) if "created_at" in [r[1] for r in c.execute("PRAGMA table_info(documents)").fetchall()] else None,
+    docs_cols = [r[1] for r in c.execute("PRAGMA table_info(documents)").fetchall()]
+    documents = {
+        "total": one("SELECT COUNT(*) FROM documents"),
+        "d30":   one("SELECT COUNT(*) FROM documents WHERE created_at >= ?", d30) if "created_at" in docs_cols else None,
     }
     feedback = {
         "total": one("SELECT COUNT(*) FROM feedback"),
         "d30":   one("SELECT COUNT(*) FROM feedback WHERE created_at >= ?", d30),
     }
-    # Η ΛΙΣΤΑ — ποιος, πότε, πλάνο, πόσα έγγραφα. Χωρίς hash, χωρίς secret.
-    accounts = rows("""
-        SELECT u.username, u.email, u.created_at, u.role, u.is_active,
-               p.display_name AS plan, s.status AS sub_status,
-               (SELECT COUNT(*) FROM documents d WHERE d.user_id = u.id) AS docs,
-               (SELECT MAX(i.last_seen) FROM installs i WHERE i.username = u.username OR (i.email <> '' AND i.email = u.email)) AS last_seen
-        FROM users u
-        LEFT JOIN subscriptions s ON s.user_id = u.id AND s.status IN ('active','trialing','past_due')
-        LEFT JOIN plans p ON p.id = s.plan_id
-        ORDER BY u.created_at DESC LIMIT 300
-    """)
-    return jsonify({
+    # Οι επιλογές των φίλτρων βγαίνουν από τα ΔΕΔΟΜΕΝΑ, όχι από σταθερή λίστα:
+    # ό,τι πλάνο υπάρχει στη βάση εμφανίζεται, χωρίς να το θυμηθεί κανείς.
+    plans_all = [r["plan"] for r in rows(
+        "SELECT DISTINCT p.display_name AS plan FROM plans p WHERE p.display_name <> '' ORDER BY p.sort_order, p.display_name")]
+
+    page.update({
         "ok": True, "at": now, "product": "FastWrite Desktop",
         "users": users, "subscriptions": subs, "installs": installs,
-        "documents": docs, "feedback": feedback, "accounts": accounts,
+        "documents": documents, "feedback": feedback,
+        "options": {"plans": plans_all},
     })
+    return jsonify(page)
 
 
 # ── Login Page ────────────────────────────────────────────────────────────────

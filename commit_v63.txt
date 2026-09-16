@@ -1,0 +1,80 @@
+v63: Control Panel at scale - filters, paging, honest totals, indexes on both databases
+
+THE RULE THIS COMMIT OBEYS (Stavros, 16/9/2026): "we design for BIG. Not having
+1000 customers today does not change the design." The panel shipped in v62 was
+correct for a few hundred accounts and quietly wrong above that. Fixed at the
+root, not patched at the edge.
+
+WHAT WAS WRONG (measured, not suspected)
+- The account lists were cut at 500 (Kostometro) and 300 (FastWrite) and said
+  nothing about it. At 1.240 accounts the panel printed "(500)" and Stavros
+  would have read that as the total. A control panel that lies calmly is worse
+  than no control panel.
+- The FastWrite account query counted documents and found last_seen with one
+  correlated subquery PER USER, and the FastWrite database had ZERO indexes
+  (counted: no CREATE INDEX anywhere in db_manager.py). Measured on a generated
+  database of 1.240 users / 1.860 documents: 372 ms, growing with the product
+  of users x documents.
+- last_seen used "username = ? OR email = ?", which no index can serve.
+
+WHAT CHANGED
+Server (both):
+- Every list is filtered and paged IN THE DATABASE and always returns
+  accounts_total = how many MATCH, never how many were sent. Guarded by test,
+  and the "silent lie" is one of the mutations.
+- Kostometro (src/km.js): pkFilters() builds the WHERE from from/to, q (email),
+  src, ref, cty and st (data|key|pending|paid|quiet); kmAccounts() pages with
+  LIMIT/OFFSET (n<=500, default 100). only=km returns just the next page -
+  no totals recomputed, no call to Hetzner. only=fw pages the FastWrite list.
+  FastWrite filters travel with an f prefix (ffrom, fto, fq, fplan, fst, foff,
+  fn) so the two zones never collide in one call.
+- FastWrite (main_api.py): the per-user subqueries became three grouped joins
+  (documents by user; installs by username; installs by email where username is
+  empty - so devices are never double counted, and last_seen takes the newer of
+  the two). Same filters, same paging, same accounts_total. Filter options
+  (plans) come from the data, not a hard-coded list.
+
+Indexes:
+- db_manager.py: 16 CREATE INDEX IF NOT EXISTS - documents(user_id, created_at,
+  status), templates/activity/usage(user_id), users(created_at, email),
+  installs(username, email, last_seen, app_version), subscriptions(user_id,
+  status, plan_id), feedback(created_at). Runs on an existing database without
+  touching data, and the desktop build gets them too.
+- schema/km_pinakas.sql: composite idx_km_accounts_live_created (deleted,
+  created) - the backbone of almost every panel query - plus source, ref,
+  country, plan, last_sync and km_device_links(last_seen). Never a DROP.
+
+Measured after: same 1.240-user database, new query 13 ms and flat in document
+count; a 500-row page 20 ms; old query with indexes 6 ms (so the indexes, not
+the rewrite, were the big win - the rewrite is what stops it degrading).
+
+Screen (site/pinakas):
+- A collapsed "Filters" block per zone: date from/to, email or name search,
+  source, referrer, country, status (Kostometro); date, search, plan, status
+  (FastWrite). The summary carries a badge with how many filters are active.
+- Under each list: "showing 100 of 1.240" and a "More" button that APPENDS.
+  When everything is shown it says "all 1.240" and the button disappears.
+- Fixed on the way: the refresh call sent "?n=" + Date.now() as a cache-buster,
+  which is now the page-size parameter. Cache-busting moved to nc.
+
+TESTS: tests/pinakas.test.mjs 18/18. New guards - accounts_total is the match
+count not the page length (P-13); page 2 returns different rows (P-14); every
+filter narrows the total as well as the list, including an empty result (P-15);
+"More" never touches Hetzner and never recomputes totals (P-16); FastWrite
+filters arrive at Hetzner under clean names and the key never enters a URL
+(P-17); absurd paging (n=99999, off=-5) is clamped instead of breaking (P-18).
+6 mutations -> 9 guards red. The tombstone mutation moved into pkFilters with
+the code it guards.
+Browser: the panel driven in real Chromium at 390px against 1.240 mock accounts
+- counter, append without duplicates, per-filter totals, clear, and no
+horizontal scroll: 10/10, no page errors.
+
+DEPLOY: the D1 migration runs BEFORE the push (deploy_v63.bat step 4). The
+Hetzner side is deploy_hetzner.bat -> hetzner_pinakas.sh, which now pulls at the
+CORRECT repository root (/app/projects, discovered 16/9 - the earlier script
+did cd into an untracked subfolder and asked git to fetch its own self), checks
+the markers, restarts, counts the indexes in the live database and calls the
+route with and without the key.
+
+NOT TESTED: the real Hetzner under 1000 users - the timings above come from a
+generated database on identical schema, not from production.

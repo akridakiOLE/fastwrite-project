@@ -1396,12 +1396,56 @@ function daysAgo(n, from) {
   return d.toISOString();
 }
 
+// ── ΦΙΛΤΡΑ ΤΟΥ ΠΙΝΑΚΑ (16/9/2026) ────────────────────────────────────────
+// 🔴 ΚΑΝΟΝΑΣ (Stavros, 16/9): ΣΧΕΔΙΑΖΟΥΜΕ ΓΙΑ ΤΟ ΜΕΓΑΛΟ. Το φιλτράρισμα και
+//    η σελιδοποίηση γίνονται ΕΔΩ, στη βάση — ποτέ στην οθόνη. Φίλτρο πάνω σε
+//    100 κατεβασμένες γραμμές από 1.240 δείχνει λάθος αριθμό με σιγουριά.
+// 🔴 Ο πίνακας γυρίζει ΠΑΝΤΑ accounts_total: πόσοι ΤΑΙΡΙΑΖΟΥΝ στο φίλτρο,
+//    όχι πόσοι στάλθηκαν. Χωρίς αυτό η λίστα κόβει σιωπηλά.
+function pkNum(v, dflt, lo, hi) {
+  const n = parseInt(v, 10);
+  if (!isFinite(n)) return dflt;
+  return Math.max(lo, Math.min(hi, n));
+}
+function pkFilters(p) {
+  const g = (k, max) => (p.get(k) || "").trim().slice(0, max || 60);
+  const from = g("from", 10), to = g("to", 10), q = g("q", 80);
+  const src = g("src"), ref = g("ref"), cty = g("cty", 8), st = g("st", 10);
+  const w = ["a.deleted IS NULL"], args = [];
+  if (from) { w.push("a.created >= ?"); args.push(from + "T00:00:00.000Z"); }
+  if (to)   { w.push("a.created <= ?"); args.push(to + "T23:59:59.999Z"); }
+  if (q)    { w.push("a.email LIKE ?"); args.push("%" + q + "%"); }
+  if (src)  { w.push("a.source = ?"); args.push(src); }
+  if (ref)  { w.push("a.ref = ?"); args.push(ref); }
+  if (cty)  { w.push("a.country = ?"); args.push(cty); }
+  if (st === "data")    w.push("a.folder_version > 0");
+  else if (st === "pending") w.push("a.delete_due_at IS NOT NULL");
+  else if (st === "paid")    w.push("a.plan IS NOT NULL");
+  else if (st === "key")     w.push("a.has_key = 1");
+  else if (st === "quiet")   w.push("a.last_sync IS NULL");
+  return { where: " WHERE " + w.join(" AND "), args, echo: { from, to, q, src, ref, cty, st } };
+}
+
 async function adminPinakas(request, env) {
   if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
-  const nowIso = new URL(request.url).searchParams.get("now") || now();
+  const params = new URL(request.url).searchParams;
+  const only = (params.get("only") || "").slice(0, 4);
+  const nowIso = params.get("now") || now();
   const d7 = daysAgo(7, nowIso), d30 = daysAgo(30, nowIso), d1 = daysAgo(1, nowIso);
   const one = async (sql, ...args) => ((await env.DB.prepare(sql).bind(...args).first()) || {});
   const all = async (sql, ...args) => (await env.DB.prepare(sql).bind(...args).all()).results || [];
+
+  // ── Γρήγορες έξοδοι: «δείξε μου κι άλλους» ───────────────────────────
+  // Το κουμπί «κι άλλους» ΔΕΝ ξαναϋπολογίζει σύνολα και ΔΕΝ ξαναρωτάει τον
+  // Hetzner. Στα 1000+ μέλη αυτή η διαφορά είναι μισό δευτερόλεπτο ανά πάτημα.
+  if (only === "km") {
+    const pg = await kmAccounts(all, one, params);
+    return json({ ok: true, at: nowIso, accounts: pg.rows, accounts_total: pg.total,
+                  off: pg.off, n: pg.n, filters: pg.filters });
+  }
+  if (only === "fw") {
+    return json({ ok: true, at: nowIso, fastwrite: await fetchFastWrite(env, params, true) });
+  }
 
   // ── Σύνολα ────────────────────────────────────────────────────────────
   const tot = await one(
@@ -1466,18 +1510,13 @@ async function adminPinakas(request, env) {
   // ── (α) Η ΛΙΣΤΑ — ποιος, από πού, πότε, τελευταία δραστηριότητα ───────
   // Το email ΕΙΝΑΙ δεδομένο συνεργασίας (Brief Β (α)): ο Stavros πρέπει να
   // βλέπει ποιος γράφτηκε. Οι ταφόπετρες έχουν κενό email και δεν μπαίνουν.
-  const list = await all(
-    `SELECT a.email, a.created, a.country, a.source, a.ref, a.last_sync,
-            a.folder_version, a.folder_bytes, a.has_key, a.plan,
-            a.delete_due_at, substr(a.folder_id, 1, 8) AS folder,
-            (SELECT COUNT(*) FROM km_device_links l WHERE l.folder_id = a.folder_id) AS devices
-     FROM km_accounts a WHERE a.deleted IS NULL ORDER BY a.created DESC LIMIT 500`);
+  const list = await kmAccounts(all, one, params);
 
   // ── FastWrite Desktop (Hetzner) — ο Worker ρωτά ο ίδιος τον server ──────
   // Το κλειδί ΔΕΝ φεύγει ποτέ προς τον browser σε νέο σημείο: ο Worker το
   // στέλνει server-to-server στο /api/admin/pinakas του Flask (main_api.py).
   // Αν ο Hetzner δεν απαντήσει, ο πίνακας ΔΕΝ πέφτει — γυρίζει error string.
-  const fastwrite = await fetchFastWrite(env);
+  const fastwrite = await fetchFastWrite(env, params);
 
   return json({
     ok: true,
@@ -1495,21 +1534,58 @@ async function adminPinakas(request, env) {
     pending_deletions: pending,
     mail_30d: { sent: mail.sent || 0, ok: mail.ok || 0, failed: mail.failed || 0 },
     feedback: { n: fb.n || 0, avg_stars: fb.avg_stars ? Number(fb.avg_stars).toFixed(2) : null, want_reply: fb.want_reply || 0 },
-    accounts: list,
+    accounts: list.rows,
+    accounts_total: list.total,
+    off: list.off, n: list.n, filters: list.filters,
+    options: {
+      sources: bySource.map((r) => r.source),
+      refs: byRef.map((r) => r.ref),
+      countries: byCountry.map((r) => r.country),
+    },
     // (β) και (δ): θέσεις κρατημένες, τίποτα ακόμα — λέγεται ρητά, όχι σιωπηλά
     rewards: { status: "pending_parallel_session", note: "Πρόγραμμα επιβράβευσης — παράλληλη συνεδρία σε εξέλιξη (16/9)" },
     subscriptions: { status: "later", paid: tot.paid || 0 },
   });
 }
 
+// Η λίστα λογαριασμών: φιλτραρισμένη, σελιδοποιημένη, με ΑΛΗΘΙΝΟ σύνολο.
+async function kmAccounts(all, one, params) {
+  const f = pkFilters(params);
+  const off = pkNum(params.get("off"), 0, 0, 1000000);
+  const n = pkNum(params.get("n"), 100, 1, 500);
+  const t = await one(`SELECT COUNT(*) AS n FROM km_accounts a${f.where}`, ...f.args);
+  const rows = await all(
+    `SELECT a.email, a.created, a.country, a.source, a.ref, a.last_sync,
+            a.folder_version, a.folder_bytes, a.has_key, a.plan,
+            a.delete_due_at, substr(a.folder_id, 1, 8) AS folder,
+            (SELECT COUNT(*) FROM km_device_links l WHERE l.folder_id = a.folder_id) AS devices
+     FROM km_accounts a${f.where} ORDER BY a.created DESC LIMIT ? OFFSET ?`,
+    ...f.args, n, off);
+  return { rows, total: (t && t.n) || 0, off, n, filters: f.echo };
+}
+
 const FW_PINAKAS_URL = "https://api.fastwrite.tech/api/admin/pinakas";
 const FW_TIMEOUT_MS = 4000;
 
-async function fetchFastWrite(env) {
+// Τα φίλτρα του FastWrite ταξιδεύουν με πρόθεμα f (ffrom, fto, fq, fplan,
+// fst, foff, fn) ώστε να μην μπλέκονται με του Kostometro στην ίδια κλήση.
+function fwQuery(params, only) {
+  const out = new URLSearchParams();
+  const map = { ffrom: "from", fto: "to", fq: "q", fplan: "plan", fst: "st", foff: "off", fn: "n" };
+  for (const k in map) {
+    const v = (params && params.get(k)) || "";
+    if (v) out.set(map[k], String(v).slice(0, 80));
+  }
+  if (only) out.set("only", "accounts");
+  const s = out.toString();
+  return s ? "?" + s : "";
+}
+
+async function fetchFastWrite(env, params, onlyAccounts) {
   const key = env.KM_ADMIN_KEY || "";
   if (!key) return { ok: false, error: "no_key" };
   try {
-    const r = await fetch(FW_PINAKAS_URL, {
+    const r = await fetch(FW_PINAKAS_URL + fwQuery(params, onlyAccounts), {
       headers: { "X-Km-Admin": key, "Accept": "application/json" },
       signal: AbortSignal.timeout(FW_TIMEOUT_MS),
     });
