@@ -20,6 +20,7 @@
 //   POST   /api/km/admin/delete     -> Η.11: η ίδια πράξη από τον Stavros (αίτημα με email)
 //   POST   /api/km/admin/purge      -> Η.11: καθαρισμός σκουπιδιών μητρώου (dry_run εξ ορισμού)
 //   GET/POST /api/km/admin/due      -> Η.11β: ποιοι έληξαν (GET) · σβήσε τους (POST)
+//   GET    /api/km/admin/pinakas    -> Brief Β: ο Πίνακας Ελέγχου (JSON για το /pinakas/)
 //   POST   /api/km/admin/inspect    -> Η.11: ΤΟ ΟΡΓΑΝΟ ΜΕΤΡΗΣΗΣ — τι ζει πραγματικά (read-only)
 //
 //   POST   /api/km/unlock           -> Η.13: από την κλειδαριά στον φάκελο (βλ. κάτω)
@@ -124,6 +125,9 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/admin/feedback" && method === "GET") return adminFeedback(request, env);
   // Χρόνοι τήρησης (Πολιτική v2.0 §5). GET = ΜΟΝΟ δείχνει, POST = σβήνει.
   if (path === "/api/km/admin/mail" && method === "GET") return adminMail(request, env);
+  // Brief Β (4/9/2026, (α)-(δ) του Stavros) — ο Πίνακας Ελέγχου. JSON μόνο· η
+  // οθόνη ζει στο /pinakas/ (PWA, ΕΞΩ από το /kostometro/ — μάθημα 15/9).
+  if (path === "/api/km/admin/pinakas" && method === "GET") return adminPinakas(request, env);
   // Η.11β: GET = ποιοι ΘΑ σβήνονταν τώρα · POST = σβήνει. Ιδιο μοτίβο με το
   // admin/cleanup, και για τον ίδιο λόγο: δεν εμπιστεύεσαι αυτόματη διαγραφή
   // που δεν μπορείς να δεις πρώτα. Το ?now= επιτρέπει στα τεστ να «γεράσουν»
@@ -1364,6 +1368,158 @@ async function adminDue(request, env, doIt) {
     });
   }
   return json({ ok: true, mode: "deleted", now: t, result: await kmDeleteDue(env, t) });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ΠΙΝΑΚΑΣ ΕΛΕΓΧΟΥ — Brief Β (Stavros, 4/9/2026: «νιώθω τα μάτια μου κλειστά»)
+//
+// Τι δείχνει, με τα δικά του λόγια:
+//   (α) ποιος έκανε εγγραφή (email) και ΑΠΟ ΠΟΥ (source)
+//   (β) πρόγραμμα επιβράβευσης         → περιμένει την παράλληλη συνεδρία (16/9)
+//   (γ) συστάσεις — ποιος σύστησε ποιον (ref)
+//   (δ) αργότερα, συνδρομές ενεργές/αδρανείς (plan — σήμερα όλα NULL = δωρεάν)
+//
+// 🔴 Η ΑΡΧΗ (6/9/2026): ΒΛΕΠΕΙ ΛΟΓΑΡΙΑΣΜΟ, ΠΟΤΕ ΠΕΡΙΕΧΟΜΕΝΟ. «Τίποτα από τα
+//    δεδομένα τους, τα πάντα για τη μεταξύ μας συνεργασία.» Εδώ διαβάζονται
+//    ΜΟΝΟ: email, πηγή, σύσταση, ημερομηνίες, χώρα, μέγεθος φακέλου (bytes,
+//    όχι τι είναι μέσα), συσκευές. Ο φάκελος είναι κρυπτογραφημένος και δεν
+//    ανοίγει — ούτε εδώ, ούτε πουθενά.
+//
+// Χωρίς KM_ADMIN_KEY η διαδρομή ΔΕΝ ΥΠΑΡΧΕΙ (404) — ίδιο μοτίβο με τις άλλες.
+// JSON, όχι HTML: η οθόνη είναι PWA στο /pinakas/ ώστε ο Stavros να τη βλέπει
+// από το κινητό, όπως το Kostometro (αίτημα 16/9/2026).
+// ═══════════════════════════════════════════════════════════════════════════
+
+function daysAgo(n, from) {
+  const d = from ? new Date(from) : new Date();
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString();
+}
+
+async function adminPinakas(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const nowIso = new URL(request.url).searchParams.get("now") || now();
+  const d7 = daysAgo(7, nowIso), d30 = daysAgo(30, nowIso), d1 = daysAgo(1, nowIso);
+  const one = async (sql, ...args) => ((await env.DB.prepare(sql).bind(...args).first()) || {});
+  const all = async (sql, ...args) => (await env.DB.prepare(sql).bind(...args).all()).results || [];
+
+  // ── Σύνολα ────────────────────────────────────────────────────────────
+  const tot = await one(
+    `SELECT COUNT(*) AS all_rows,
+            SUM(CASE WHEN deleted IS NULL THEN 1 ELSE 0 END) AS live,
+            SUM(CASE WHEN deleted IS NOT NULL THEN 1 ELSE 0 END) AS tombstones,
+            SUM(CASE WHEN deleted IS NULL AND delete_due_at IS NOT NULL THEN 1 ELSE 0 END) AS pending_delete,
+            SUM(CASE WHEN deleted IS NULL AND created >= ? THEN 1 ELSE 0 END) AS new_1d,
+            SUM(CASE WHEN deleted IS NULL AND created >= ? THEN 1 ELSE 0 END) AS new_7d,
+            SUM(CASE WHEN deleted IS NULL AND created >= ? THEN 1 ELSE 0 END) AS new_30d,
+            SUM(CASE WHEN deleted IS NULL AND last_sync >= ? THEN 1 ELSE 0 END) AS active_7d,
+            SUM(CASE WHEN deleted IS NULL AND last_sync >= ? THEN 1 ELSE 0 END) AS active_30d,
+            SUM(CASE WHEN deleted IS NULL AND folder_version > 0 THEN 1 ELSE 0 END) AS with_data,
+            SUM(CASE WHEN deleted IS NULL THEN folder_bytes ELSE 0 END) AS bytes,
+            SUM(CASE WHEN deleted IS NULL AND has_key = 1 THEN 1 ELSE 0 END) AS with_gemini_key,
+            SUM(CASE WHEN deleted IS NULL AND plan IS NOT NULL THEN 1 ELSE 0 END) AS paid
+     FROM km_accounts`, d1, d7, d30, d7, d30);
+
+  // ── (α) ΑΠΟ ΠΟΥ ───────────────────────────────────────────────────────
+  const bySource = await all(
+    `SELECT COALESCE(source, '(άγνωστη)') AS source, COUNT(*) AS n
+     FROM km_accounts WHERE deleted IS NULL GROUP BY source ORDER BY n DESC`);
+
+  // ── (γ) ΠΟΙΟΣ ΣΥΣΤΗΣΕ ΠΟΙΟΝ ───────────────────────────────────────────
+  const byRef = await all(
+    `SELECT ref, COUNT(*) AS n FROM km_accounts
+     WHERE deleted IS NULL AND ref IS NOT NULL AND ref <> '' GROUP BY ref ORDER BY n DESC LIMIT 50`);
+
+  // ── ανά ημέρα, 30 ημέρες ──────────────────────────────────────────────
+  const perDay = await all(
+    `SELECT substr(created, 1, 10) AS day, COUNT(*) AS n
+     FROM km_accounts WHERE created >= ? GROUP BY day ORDER BY day`, d30);
+
+  // ── χώρες ─────────────────────────────────────────────────────────────
+  const byCountry = await all(
+    `SELECT COALESCE(country, '?') AS country, COUNT(*) AS n
+     FROM km_accounts WHERE deleted IS NULL GROUP BY country ORDER BY n DESC LIMIT 20`);
+
+  // ── συσκευές ──────────────────────────────────────────────────────────
+  const dev = await one(
+    `SELECT COUNT(*) AS links,
+            COUNT(DISTINCT install_id) AS distinct_devices,
+            SUM(CASE WHEN last_seen >= ? THEN 1 ELSE 0 END) AS seen_7d,
+            SUM(CASE WHEN unsynced > 0 THEN 1 ELSE 0 END) AS with_unsynced
+     FROM km_device_links`, d7);
+
+  // ── εκκρεμείς διαγραφές (Η.11β) — μόνο ημερομηνίες, ΟΧΙ email ─────────
+  const pending = await all(
+    `SELECT substr(folder_id, 1, 8) AS folder, delete_requested_at, delete_due_at
+     FROM km_accounts WHERE deleted IS NULL AND delete_due_at IS NOT NULL ORDER BY delete_due_at`);
+
+  // ── email + γνώμες ────────────────────────────────────────────────────
+  const mail = await one(
+    `SELECT COUNT(*) AS sent, SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END) AS ok,
+            SUM(CASE WHEN ok = 0 THEN 1 ELSE 0 END) AS failed
+     FROM km_mail_log WHERE at >= ?`, d30);
+  const fb = await one(
+    `SELECT COUNT(*) AS n, AVG(stars) AS avg_stars,
+            SUM(CASE WHEN email IS NOT NULL THEN 1 ELSE 0 END) AS want_reply
+     FROM km_feedback`);
+
+  // ── (α) Η ΛΙΣΤΑ — ποιος, από πού, πότε, τελευταία δραστηριότητα ───────
+  // Το email ΕΙΝΑΙ δεδομένο συνεργασίας (Brief Β (α)): ο Stavros πρέπει να
+  // βλέπει ποιος γράφτηκε. Οι ταφόπετρες έχουν κενό email και δεν μπαίνουν.
+  const list = await all(
+    `SELECT a.email, a.created, a.country, a.source, a.ref, a.last_sync,
+            a.folder_version, a.folder_bytes, a.has_key, a.plan,
+            a.delete_due_at, substr(a.folder_id, 1, 8) AS folder,
+            (SELECT COUNT(*) FROM km_device_links l WHERE l.folder_id = a.folder_id) AS devices
+     FROM km_accounts a WHERE a.deleted IS NULL ORDER BY a.created DESC LIMIT 500`);
+
+  // ── FastWrite Desktop (Hetzner) — ο Worker ρωτά ο ίδιος τον server ──────
+  // Το κλειδί ΔΕΝ φεύγει ποτέ προς τον browser σε νέο σημείο: ο Worker το
+  // στέλνει server-to-server στο /api/admin/pinakas του Flask (main_api.py).
+  // Αν ο Hetzner δεν απαντήσει, ο πίνακας ΔΕΝ πέφτει — γυρίζει error string.
+  const fastwrite = await fetchFastWrite(env);
+
+  return json({
+    ok: true,
+    at: nowIso,
+    fastwrite,
+    totals: {
+      live: tot.live || 0, tombstones: tot.tombstones || 0, pending_delete: tot.pending_delete || 0,
+      new_1d: tot.new_1d || 0, new_7d: tot.new_7d || 0, new_30d: tot.new_30d || 0,
+      active_7d: tot.active_7d || 0, active_30d: tot.active_30d || 0,
+      with_data: tot.with_data || 0, bytes: tot.bytes || 0,
+      with_gemini_key: tot.with_gemini_key || 0, paid: tot.paid || 0,
+    },
+    by_source: bySource, by_ref: byRef, per_day: perDay, by_country: byCountry,
+    devices: { links: dev.links || 0, distinct: dev.distinct_devices || 0, seen_7d: dev.seen_7d || 0, with_unsynced: dev.with_unsynced || 0 },
+    pending_deletions: pending,
+    mail_30d: { sent: mail.sent || 0, ok: mail.ok || 0, failed: mail.failed || 0 },
+    feedback: { n: fb.n || 0, avg_stars: fb.avg_stars ? Number(fb.avg_stars).toFixed(2) : null, want_reply: fb.want_reply || 0 },
+    accounts: list,
+    // (β) και (δ): θέσεις κρατημένες, τίποτα ακόμα — λέγεται ρητά, όχι σιωπηλά
+    rewards: { status: "pending_parallel_session", note: "Πρόγραμμα επιβράβευσης — παράλληλη συνεδρία σε εξέλιξη (16/9)" },
+    subscriptions: { status: "later", paid: tot.paid || 0 },
+  });
+}
+
+const FW_PINAKAS_URL = "https://api.fastwrite.tech/api/admin/pinakas";
+const FW_TIMEOUT_MS = 4000;
+
+async function fetchFastWrite(env) {
+  const key = env.KM_ADMIN_KEY || "";
+  if (!key) return { ok: false, error: "no_key" };
+  try {
+    const r = await fetch(FW_PINAKAS_URL, {
+      headers: { "X-Km-Admin": key, "Accept": "application/json" },
+      signal: AbortSignal.timeout(FW_TIMEOUT_MS),
+    });
+    if (!r.ok) return { ok: false, error: "http_" + r.status };
+    const data = await r.json();
+    if (!data || data.ok !== true) return { ok: false, error: "bad_body" };
+    return data;
+  } catch (e) {
+    return { ok: false, error: String((e && e.name) || e).slice(0, 60) };
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

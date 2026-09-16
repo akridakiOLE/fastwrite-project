@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e14">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Πίνακας">
+<title>Πίνακας Ελέγχου · Kostometro · FastWrite</title>
+<link rel="manifest" href="/pinakas/manifest.webmanifest">
+<link rel="icon" href="/kostometro/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/kostometro/icons/icon-180.png">
+<!--
+  ΠΙΝΑΚΑΣ ΕΛΕΓΧΟΥ — Brief Β (Stavros, 4/9/2026) — γράφτηκε 16/9/2026
+  ---------------------------------------------------------------------------
+  Τι δείχνει, με τα λόγια του Stavros («νιώθω τα μάτια μου κλειστά»):
+    (α) ποιος έκανε εγγραφή και ΑΠΟ ΠΟΥ · (β) επιβράβευση · (γ) ποιος σύστησε
+    ποιον · (δ) αργότερα συνδρομές.
+  Αρχή (6/9/2026): ΒΛΕΠΕΙ ΛΟΓΑΡΙΑΣΜΟ, ΠΟΤΕ ΠΕΡΙΕΧΟΜΕΝΟ.
+
+  Γιατί PWA και όχι σελίδα διαχείρισης: αίτημα Stavros 16/9 — «να μπορώ να το
+  κατεβάσω και να το παρακολουθώ εύκολα και από το κινητό μου», όπως το
+  Kostometro. Γιατί στο /pinakas/ και ΟΧΙ κάτω από /kostometro/: ο service
+  worker της εφαρμογής θα το έκλεβε (μάθημα 15/9, σελίδα ακύρωσης).
+
+  Το κλειδί (KM_ADMIN_KEY) μπαίνει ΜΙΑ φορά και μένει στη συσκευή
+  (localStorage). Δεν φεύγει πουθενά αλλού· δεν υπάρχει «λογαριασμός».
+
+  16/9/2026 — αίτημα Stavros: «Πίνακας Ελέγχου για kostometro Free / PRO /
+  FastWrite». Τρεις ζώνες, ΜΙΑ κλήση: ο Worker ρωτά ο ίδιος τον Hetzner
+  (api.fastwrite.tech/api/admin/pinakas, ίδιο κλειδί, server-to-server) και
+  κολλάει την απάντηση στο πεδίο `fastwrite`. Αν ο Hetzner δεν απαντήσει, η
+  ζώνη FastWrite λέει «δεν απάντησε» και οι άλλες δύο δουλεύουν κανονικά.
+-->
+<style>
+  :root{--bg:#0a0e14;--bg2:#131820;--bg3:#1a2030;--border:#2a3140;--text:#e6e8ec;--text2:#a8b0bd;--text3:#6b7385;--accent:#00E5A0;--accent-dim:rgba(0,229,160,.12);--danger:#f87171;--warn:#fbbf24}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:16px 14px 60px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+  header h1{font-size:19px;font-weight:700}
+  header .sub{font-size:12px;color:var(--text3)}
+  .btn{border:0;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--bg3);color:var(--text)}
+  .btn.primary{background:var(--accent);color:#04131a}
+  .btn.ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+  .btn[disabled]{opacity:.4}
+  input[type=password],input[type=text]{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:13px;font-size:16px;width:100%}
+  input:focus{outline:none;border-color:var(--accent)}
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+  .card h2{font-size:12px;font-weight:600;color:var(--text3);letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  @media(min-width:520px){.grid{grid-template-columns:repeat(4,1fr)}}
+  .kpi{background:var(--bg3);border-radius:12px;padding:12px}
+  .kpi .n{font-size:28px;font-weight:700;line-height:1.1}
+  .kpi .l{font-size:12px;color:var(--text2);margin-top:2px}
+  .kpi.acc .n{color:var(--accent)}
+  .kpi.warn .n{color:var(--warn)}
+  .kpi.dng .n{color:var(--danger)}
+  .bar{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:14px}
+  .bar .lab{width:120px;flex:none;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bar .trk{flex:1;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden}
+  .bar .fil{height:100%;background:var(--accent);border-radius:5px}
+  .bar .val{width:34px;text-align:right;font-weight:600;flex:none}
+  .days{display:flex;align-items:flex-end;gap:2px;height:64px;margin-top:6px}
+  .days .d{flex:1;background:var(--accent);opacity:.75;border-radius:2px 2px 0 0;min-height:2px}
+  .days .d.zero{background:var(--bg3);opacity:1}
+  .days-lab{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:4px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--text3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+  td.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:6px;background:var(--bg3);color:var(--text2)}
+  .tag.dng{background:rgba(248,113,113,.15);color:var(--danger)}
+  .tag.acc{background:var(--accent-dim);color:var(--accent)}
+  .fine{font-size:13px;color:var(--text2)}
+  .fine.hint{color:var(--text3);font-size:12px}
+  .err{color:var(--danger);font-size:14px;margin-top:8px}
+  .muted{color:var(--text3)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* λίστα λογαριασμών: κάρτα ανά γραμμή, όχι πίνακας — σε 390px ο πίνακας
+     6 στηλών κοβόταν (μετρήθηκε 16/9 σε στιγμιότυπο) */
+  .row{padding:10px 0;border-bottom:1px solid var(--border)}
+  .row:last-child{border-bottom:0}
+  .row .em{font-weight:600;word-break:break-all}
+  .row .meta{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:5px;font-size:12px;color:var(--text2)}
+  .row .meta b{color:var(--text)}
+  .band{display:flex;align-items:center;gap:10px;margin:18px 0 10px}
+  .band:first-child{margin-top:0}
+  .band h3{font-size:14px;font-weight:700;letter-spacing:.02em}
+  .band .ln{flex:1;height:1px;background:var(--border)}
+  .band .pill{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--bg3);color:var(--text2)}
+  .band .pill.acc{background:var(--accent-dim);color:var(--accent)}
+  .band .pill.dng{background:rgba(248,113,113,.15);color:var(--danger)}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Πίνακας Ελέγχου</h1>
+    <div class="sub" id="at">Kostometro · FastWrite</div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn ghost" id="b-key" title="Αλλαγή κλειδιού">🔑</button>
+    <button class="btn primary" id="b-refresh">Ανανέωση</button>
+  </div>
+</header>
+
+<!-- ΚΛΕΙΔΙ — μία φορά -->
+<section class="card" id="s-key">
+  <h2>Κλειδί διαχείρισης</h2>
+  <p class="fine">Το κλειδί μένει σε αυτή τη συσκευή και δεν φεύγει πουθενά αλλού. Χωρίς σωστό κλειδί ο server απαντά «δεν υπάρχει».</p>
+  <input type="password" id="key" autocomplete="off" placeholder="KM_ADMIN_KEY" style="margin-top:10px">
+  <p class="err" id="key-err" hidden></p>
+  <button class="btn primary" id="b-save" style="margin-top:10px;width:100%">Αποθήκευση και άνοιγμα</button>
+</section>
+
+<div id="s-data" hidden>
+
+  <p class="err" id="err" hidden></p>
+
+  <!-- ═══ ΖΩΝΗ 1: KOSTOMETRO FREE ═══ -->
+  <div class="band"><h3>Kostometro</h3><span class="pill acc">Free</span><span class="ln"></span></div>
+
+  <!-- ΣΥΝΟΛΑ -->
+  <section class="card">
+    <h2>Λογαριασμοί</h2>
+    <div class="grid">
+      <div class="kpi acc"><div class="n" id="k-live">—</div><div class="l">ζωντανοί</div></div>
+      <div class="kpi"><div class="n" id="k-new1">—</div><div class="l">νέοι σήμερα</div></div>
+      <div class="kpi"><div class="n" id="k-new7">—</div><div class="l">νέοι 7 ημ.</div></div>
+      <div class="kpi"><div class="n" id="k-new30">—</div><div class="l">νέοι 30 ημ.</div></div>
+      <div class="kpi"><div class="n" id="k-act7">—</div><div class="l">ενεργοί 7 ημ.</div></div>
+      <div class="kpi"><div class="n" id="k-data">—</div><div class="l">με δεδομένα</div></div>
+      <div class="kpi warn"><div class="n" id="k-pend">—</div><div class="l">εκκρεμείς διαγραφές</div></div>
+      <div class="kpi"><div class="n" id="k-tomb">—</div><div class="l">διαγραμμένοι</div></div>
+    </div>
+    <p class="fine hint" style="margin-top:10px">Χώρος στον server: <b id="k-bytes">—</b> · με κλειδί Gemini: <b id="k-gem">—</b></p>
+  </section>
+
+  <!-- ΑΝΑ ΗΜΕΡΑ -->
+  <section class="card">
+    <h2>Νέες εγγραφές — 30 ημέρες</h2>
+    <div class="days" id="days"></div>
+    <div class="days-lab"><span id="days-from"></span><span id="days-to"></span></div>
+  </section>
+
+  <!-- (α) ΑΠΟ ΠΟΥ -->
+  <section class="card">
+    <h2>(α) Από πού ήρθαν</h2>
+    <div id="src"></div>
+  </section>
+
+  <!-- (γ) ΣΥΣΤΑΣΕΙΣ -->
+  <section class="card">
+    <h2>(γ) Ποιος σύστησε ποιον</h2>
+    <div id="ref"></div>
+  </section>
+
+  <!-- ΣΥΣΚΕΥΕΣ / EMAIL / ΓΝΩΜΕΣ -->
+  <section class="card">
+    <h2>Συσκευές · Email · Γνώμες</h2>
+    <div class="grid">
+      <div class="kpi"><div class="n" id="k-dev">—</div><div class="l">συσκευές</div></div>
+      <div class="kpi"><div class="n" id="k-dev7">—</div><div class="l">είδαμε 7 ημ.</div></div>
+      <div class="kpi"><div class="n" id="k-mail">—</div><div class="l">email 30 ημ.</div></div>
+      <div class="kpi"><div class="n" id="k-fb">—</div><div class="l">γνώμες</div></div>
+    </div>
+    <p class="fine hint" style="margin-top:10px" id="k-more"></p>
+  </section>
+
+  <!-- ΕΚΚΡΕΜΕΙΣ ΔΙΑΓΡΑΦΕΣ -->
+  <section class="card" id="c-pend" hidden>
+    <h2>Εκκρεμείς διαγραφές (72 ώρες)</h2>
+    <div class="scroll"><table><thead><tr><th>φάκελος</th><th>ζητήθηκε</th><th>λήγει</th></tr></thead><tbody id="pend"></tbody></table></div>
+  </section>
+
+  <!-- ΛΙΣΤΑ -->
+  <section class="card">
+    <h2>Ποιος γράφτηκε <span class="muted" id="n-acc"></span></h2>
+    <div id="acc"></div>
+    <p class="fine hint" style="margin-top:8px">Βλέπει λογαριασμό, ποτέ περιεχόμενο. Ο φάκελος κάθε χρήστη είναι κρυπτογραφημένος και δεν ανοίγει εδώ.</p>
+  </section>
+
+  <!-- ═══ ΖΩΝΗ 2: KOSTOMETRO PRO ═══ -->
+  <div class="band"><h3>Kostometro</h3><span class="pill">PRO</span><span class="ln"></span></div>
+
+  <!-- (δ) (β) -->
+  <section class="card">
+    <h2>(δ) Συνδρομές · (β) Επιβράβευση</h2>
+    <div class="grid">
+      <div class="kpi"><div class="n" id="k-paid">—</div><div class="l">πληρωμένοι</div></div>
+      <div class="kpi"><div class="n" id="k-free">—</div><div class="l">στο δωρεάν</div></div>
+    </div>
+    <p class="fine" id="sub" style="margin-top:10px">—</p>
+    <p class="fine" id="rew" style="margin-top:6px">—</p>
+  </section>
+
+  <!-- ═══ ΖΩΝΗ 3: FASTWRITE DESKTOP ═══ -->
+  <div class="band"><h3>FastWrite</h3><span class="pill">Desktop</span><span class="pill dng" id="fw-off" hidden>δεν απάντησε</span><span class="ln"></span></div>
+
+  <p class="err" id="fw-err" hidden></p>
+
+  <section class="card" id="fw-c1">
+    <h2>Χρήστες</h2>
+    <div class="grid">
+      <div class="kpi acc"><div class="n" id="f-users">—</div><div class="l">λογαριασμοί</div></div>
+      <div class="kpi"><div class="n" id="f-active">—</div><div class="l">ενεργοί</div></div>
+      <div class="kpi"><div class="n" id="f-new7">—</div><div class="l">νέοι 7 ημ.</div></div>
+      <div class="kpi"><div class="n" id="f-new30">—</div><div class="l">νέοι 30 ημ.</div></div>
+      <div class="kpi"><div class="n" id="f-inst">—</div><div class="l">εγκαταστάσεις</div></div>
+      <div class="kpi"><div class="n" id="f-seen7">—</div><div class="l">είδαμε 7 ημ.</div></div>
+      <div class="kpi"><div class="n" id="f-docs">—</div><div class="l">έγγραφα</div></div>
+      <div class="kpi acc"><div class="n" id="f-pay">—</div><div class="l">πληρώνουν</div></div>
+    </div>
+    <p class="fine hint" style="margin-top:10px" id="f-more"></p>
+  </section>
+
+  <section class="card" id="fw-c2">
+    <h2>Πλάνα · Εκδόσεις</h2>
+    <p class="fine hint">συνδρομές ανά πλάνο</p>
+    <div id="f-plans"></div>
+    <p class="fine hint" style="margin-top:10px">εγκαταστάσεις ανά έκδοση</p>
+    <div id="f-vers"></div>
+  </section>
+
+  <section class="card" id="fw-c3">
+    <h2>Ποιος γράφτηκε <span class="muted" id="f-nacc"></span></h2>
+    <div id="f-acc"></div>
+    <p class="fine hint" style="margin-top:8px">Από τον server της Hetzner (api.fastwrite.tech). Λογαριασμοί και μετρητές· κανένα έγγραφο, κανένα περιεχόμενο.</p>
+  </section>
+
+</div>
+</div>
+<script src="/pinakas/app.js"></script>
+</body>
+</html>

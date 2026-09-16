@@ -27,10 +27,24 @@
     αναγνωριστικό συσκευής, που ο server ζητάει σε κάθε κλήση.
 -->
 <style>
+  /* Η σελίδα δανείζεται το app.css της εφαρμογής, αλλά ΔΕΝ ζει μέσα σε .screen
+     και δεν χρησιμοποιεί <input type=text>. Αποτέλεσμα (μετρημένο 15/9/2026 με
+     getComputedStyle): το textarea έβγαινε λευκό με μαύρο κείμενο και το .btn
+     γκρι του λειτουργικού, μέσα σε σκούρα σελίδα. Δύο κανόνες που λείπουν από
+     το app.css — γράφονται ΕΔΩ, όχι εκεί: το app.css το μοιράζεται ολόκληρη η
+     εφαρμογή και μια αλλαγή του θα απαιτούσε να ξανατρέξει κάθε οθόνη. */
   .ak { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
   .ak h1 { font-size: 22px; margin: 0 0 4px; }
-  .ak textarea { width: 100%; min-height: 108px; box-sizing: border-box; }
-  .ak .ok { color: #7ee2a8; }
+  .ak textarea {
+    background: var(--bg2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 14px; font-size: 16px; line-height: 1.6;
+    width: 100%; min-height: 120px; box-sizing: border-box;
+    font-family: inherit; resize: vertical;
+  }
+  .ak textarea:focus { outline: none; border-color: var(--accent); }
+  .ak textarea::placeholder { color: var(--text3); }
+  .ak .btn { margin-top: 14px; }
+  .ak .ok { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -43,7 +57,7 @@
     <p class="fine hint">Με κενά ανάμεσα, με τη σειρά που τις έχεις γραμμένες. Κεφαλαία ή μικρά δεν έχει σημασία.</p>
     <textarea id="ak-words" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="λέξη1 λέξη2 λέξη3 …"></textarea>
     <p class="err" id="ak-err" hidden></p>
-    <button class="btn" id="ak-go">Σταμάτησε τη διαγραφή</button>
+    <button class="btn primary" id="ak-go">Σταμάτησε τη διαγραφή</button>
     <p class="fine hint">Οι 12 λέξεις σου <b>δεν φεύγουν από αυτή τη σελίδα</b>. Στον διακομιστή πηγαίνει μόνο ένας κωδικός που βγαίνει από αυτές και δεν γυρίζει πίσω σε λέξεις.</p>
   </div>
 

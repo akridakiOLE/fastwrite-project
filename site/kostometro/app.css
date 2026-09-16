@@ -527,3 +527,29 @@ input:focus{outline:none;border-color:var(--accent)}
 .kv-edit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .kv-edit b { flex: 1 1 auto; }
 .kv-edit .btn { flex: 0 0 auto; padding: 4px 10px; font-size: .85rem; }
+
+/* ══ v62 · Brief Ε — μενού με ομάδες και υπογραφές, FAQ, γνώμη ═══════════ */
+.grp{color:var(--text3);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:14px 4px 4px}
+.row-l{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0}
+.row-sub{color:var(--text3);font-size:12.5px;font-weight:400;line-height:1.3}
+.menu-foot{color:var(--text3);font-size:12px;text-align:center;padding:18px 4px 6px}
+.menu-foot a{color:var(--text2);text-decoration:underline}
+/* FAQ: <details> — ανοίγει με πάτημα, χωρίς JS για την ίδια την αναδίπλωση */
+.faq-h{color:var(--text3);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:16px 4px 6px}
+details.faq{border-bottom:1px solid var(--border)}
+details.faq summary{list-style:none;cursor:pointer;padding:13px 4px;font-size:15.5px;font-weight:600;display:flex;justify-content:space-between;gap:10px}
+details.faq summary::-webkit-details-marker{display:none}
+details.faq summary::after{content:'+';color:var(--text3);font-weight:400;flex:none}
+details.faq[open] summary::after{content:'–'}
+details.faq .a{color:var(--text2);font-size:14.5px;line-height:1.55;padding:0 4px 14px}
+details.faq .a b{color:var(--text)}
+details.faq .a .go{display:inline-block;margin-top:8px;color:var(--accent);font-weight:600;background:transparent;border:0;padding:0;font:inherit;font-weight:600;cursor:pointer}
+/* Η γνώμη σου */
+.stars{display:flex;gap:6px;justify-content:center;padding:6px 0 14px}
+.stars button{background:transparent;border:0;font-size:38px;line-height:1;color:var(--border);cursor:pointer;padding:2px 4px}
+.stars button.on{color:var(--accent)}
+textarea#fb-text{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:14px;font-size:16px;width:100%;font-family:inherit;line-height:1.5;resize:vertical;margin-bottom:10px}
+textarea#fb-text:focus{outline:none;border-color:var(--accent)}
+.chk{display:flex;align-items:center;gap:10px;padding:8px 2px 12px;font-size:15px;color:var(--text2)}
+.chk input{width:20px;height:20px;accent-color:var(--accent)}
+.fine.ok{color:var(--accent);font-weight:600}

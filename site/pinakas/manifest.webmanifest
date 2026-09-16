@@ -1,0 +1,13 @@
+{
+  "name": "Πίνακας Ελέγχου · Kostometro · FastWrite",
+  "short_name": "Πίνακας",
+  "start_url": "/pinakas/",
+  "scope": "/pinakas/",
+  "display": "standalone",
+  "background_color": "#0a0e14",
+  "theme_color": "#0a0e14",
+  "icons": [
+    { "src": "/kostometro/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/kostometro/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

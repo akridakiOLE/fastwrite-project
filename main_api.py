@@ -3339,6 +3339,101 @@ def admin_feedback_image(feedback_id):
     return send_file(fpath, mimetype=mime)
 
 
+# ── ΠΙΝΑΚΑΣ ΕΛΕΓΧΟΥ (Brief Β) — ΤΑ ΝΟΥΜΕΡΑ ΤΟΥ FASTWRITE DESKTOP ─────────────
+# 16/9/2026. Το ζητούμενο του Stavros: ΕΝΑΣ πίνακας για Kostometro Free, PRO και
+# FastWrite. Ο πίνακας ζει στο Cloudflare (/pinakas/); ο Worker καλεί ΑΥΤΟ το
+# endpoint server-side και ενώνει την απάντηση στο δικό του JSON.
+#
+# 🔴 ΑΥΘΕΝΤΙΚΟΠΟΙΗΣΗ: ΟΧΙ cookie σύνδεσης (ο Worker δεν έχει), αλλά το ΙΔΙΟ
+#    κλειδί που φυλάει όλες τις admin διαδρομές του Kostometro (KM_ADMIN_KEY),
+#    διαβασμένο από SECRETS_DIR/km_admin_key.txt. Ένα κλειδί για όλα, μία κλήση
+#    από τον browser, καμία CORS. Αν το αρχείο ΔΕΝ υπάρχει στον server, η
+#    διαδρομή δεν υπάρχει (404) — ασφαλής προεπιλογή, ίδιο μοτίβο με το km.js.
+#
+# 🔴 ΒΛΕΠΕΙ ΛΟΓΑΡΙΑΣΜΟ, ΠΟΤΕ ΠΕΡΙΕΧΟΜΕΝΟ (αρχή 6/9): κανένα έγγραφο, κανένα
+#    αποτέλεσμα εξαγωγής, κανένα password_hash / totp_secret. Μόνο ποιος,
+#    πότε, τι πλάνο, πόσα έγγραφα ΜΕΤΡΗΘΗΚΑΝ.
+
+KM_ADMIN_KEY_FILE = SECRETS_DIR / "km_admin_key.txt"
+
+def _km_admin_ok(req) -> bool:
+    try:
+        want = KM_ADMIN_KEY_FILE.read_text(encoding="utf-8").strip()
+    except Exception:
+        return False
+    if not want or len(want) < 32:
+        return False
+    got = (req.headers.get("X-Km-Admin") or req.args.get("k") or "").strip()
+    return got == want
+
+
+@app.get("/api/admin/pinakas")
+def admin_pinakas():
+    """Συγκεντρωτικά FastWrite Desktop για τον Πίνακα Ελέγχου. Κλειδί KM_ADMIN_KEY, όχι cookie."""
+    if not _km_admin_ok(request):
+        return jsonify({"error": "not found"}), 404
+    c = db.conn
+    one = lambda sql, *a: (c.execute(sql, a).fetchone() or [0])[0]
+    def rows(sql, *a):
+        return [dict(r) for r in c.execute(sql, a).fetchall()]
+    # Οι στήλες created_at/last_seen είναι ISO με 'T' (datetime.utcnow().isoformat()).
+    # Το datetime('now') δίνει κενό αντί για 'T' → λάθος σύγκριση. Μορφοποιούμε ίδια.
+    iso = lambda mod: c.execute("SELECT strftime('%Y-%m-%dT%H:%M:%S','now',?)", (mod,)).fetchone()[0]
+    now = iso('+0 seconds')
+    d1  = iso('-1 day')
+    d7  = iso('-7 days')
+    d30 = iso('-30 days')
+
+    users = {
+        "total":     one("SELECT COUNT(*) FROM users"),
+        "active":    one("SELECT COUNT(*) FROM users WHERE is_active = 1"),
+        "admins":    one("SELECT COUNT(*) FROM users WHERE role = 'admin'"),
+        "with_2fa":  one("SELECT COUNT(*) FROM users WHERE totp_enabled = 1"),
+        "new_1d":    one("SELECT COUNT(*) FROM users WHERE created_at >= ?", d1),
+        "new_7d":    one("SELECT COUNT(*) FROM users WHERE created_at >= ?", d7),
+        "new_30d":   one("SELECT COUNT(*) FROM users WHERE created_at >= ?", d30),
+    }
+    subs = {
+        "by_status": rows("SELECT status, COUNT(*) AS n FROM subscriptions GROUP BY status ORDER BY n DESC"),
+        "by_plan":   rows("""SELECT p.display_name AS plan, COUNT(*) AS n FROM subscriptions s
+                             JOIN plans p ON p.id = s.plan_id
+                             WHERE s.status IN ('active','trialing','past_due') GROUP BY p.id ORDER BY n DESC"""),
+        "paying":    one("""SELECT COUNT(*) FROM subscriptions s JOIN plans p ON p.id = s.plan_id
+                            WHERE s.status = 'active' AND p.price_cents > 0"""),
+    }
+    installs = {
+        "total":      one("SELECT COUNT(*) FROM installs"),
+        "seen_7d":    one("SELECT COUNT(*) FROM installs WHERE last_seen >= ?", d7),
+        "seen_30d":   one("SELECT COUNT(*) FROM installs WHERE last_seen >= ?", d30),
+        "docs_total": one("SELECT COALESCE(SUM(docs_total),0) FROM installs"),
+        "by_version": rows("SELECT app_version AS v, COUNT(*) AS n FROM installs GROUP BY app_version ORDER BY n DESC LIMIT 10"),
+    }
+    docs = {
+        "total":  one("SELECT COUNT(*) FROM documents"),
+        "d30":    one("SELECT COUNT(*) FROM documents WHERE created_at >= ?", d30) if "created_at" in [r[1] for r in c.execute("PRAGMA table_info(documents)").fetchall()] else None,
+    }
+    feedback = {
+        "total": one("SELECT COUNT(*) FROM feedback"),
+        "d30":   one("SELECT COUNT(*) FROM feedback WHERE created_at >= ?", d30),
+    }
+    # Η ΛΙΣΤΑ — ποιος, πότε, πλάνο, πόσα έγγραφα. Χωρίς hash, χωρίς secret.
+    accounts = rows("""
+        SELECT u.username, u.email, u.created_at, u.role, u.is_active,
+               p.display_name AS plan, s.status AS sub_status,
+               (SELECT COUNT(*) FROM documents d WHERE d.user_id = u.id) AS docs,
+               (SELECT MAX(i.last_seen) FROM installs i WHERE i.username = u.username OR (i.email <> '' AND i.email = u.email)) AS last_seen
+        FROM users u
+        LEFT JOIN subscriptions s ON s.user_id = u.id AND s.status IN ('active','trialing','past_due')
+        LEFT JOIN plans p ON p.id = s.plan_id
+        ORDER BY u.created_at DESC LIMIT 300
+    """)
+    return jsonify({
+        "ok": True, "at": now, "product": "FastWrite Desktop",
+        "users": users, "subscriptions": subs, "installs": installs,
+        "documents": docs, "feedback": feedback, "accounts": accounts,
+    })
+
+
 # ── Login Page ────────────────────────────────────────────────────────────────
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="el">

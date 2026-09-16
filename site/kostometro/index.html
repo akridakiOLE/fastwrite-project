@@ -93,7 +93,7 @@
     </label>
     <p class="err" id="err-email" hidden>Γράψε μια σωστή διεύθυνση email.</p>
     <button class="btn primary" id="go-email">Συνέχεια</button>
-    <p class="fine">Δωρεάν, χωρίς όριο χρόνου. Το email είναι για ενημερώσεις και αναβαθμίσεις.</p>
+    <p class="fine">Δωρεάν, χωρίς όριο χρόνου. Το email είναι για <b>ειδοποιήσεις ασφαλείας</b> (αν ζητηθεί διαγραφή ή αλλάξουν οι 12 λέξεις) και για ενημερώσεις της εφαρμογής.</p>
   </div>
 </section>
 
@@ -101,9 +101,9 @@
 <section id="s-key" class="screen setup" hidden>
   <div class="setup-inner">
     <h2>Να διαβάζει μόνο του τα ποσά;</h2>
-    <p class="lede">Με δικό σου κλειδί Gemini, η εφαρμογή διαβάζει <b>σύνολο, ΦΠΑ και υπόλοιπο</b> από τη φωτογραφία. Χωρίς κλειδί, τα γράφεις εσύ.</p>
+    <p class="lede">Με δικό σου κλειδί Gemini, η εφαρμογή διαβάζει <b>καθαρό ποσό, ΦΠΑ και σύνολο</b> από τη φωτογραφία. Χωρίς κλειδί, τα γράφεις εσύ.</p>
     <p class="note">Η φωτογραφία πηγαίνει <b>απευθείας από τη συσκευή σου στο Gemini</b>. Δεν περνάει ποτέ από δικό μας διακομιστή. Το κλειδί μένει μόνο εδώ, στο κινητό σου.</p>
-    <p class="note">Με <b>δωρεάν</b> κλειδί, η Google μπορεί να χρησιμοποιήσει τις φωτογραφίες για βελτίωση των μοντέλων της. Με <b>πληρωμένο</b>, όχι. Η επιλογή είναι δική σου.</p>
+    <p class="note">Η φωτογραφία πάει απευθείας από το κινητό σου στην Google, με το δικό σου κλειδί — όχι από δικό μας διακομιστή. Για χρήστες στην ΕΕ η Google δηλώνει ότι <b>δεν</b> χρησιμοποιεί τις φωτογραφίες για να βελτιώσει τα μοντέλα της, ούτε με δωρεάν κλειδί. Με <b>δωρεάν</b> κλειδί υπάρχει όριο αναγνώσεων ανά λεπτό· με <b>πληρωμένο</b>, όχι. Η επιλογή είναι δική σου.</p>
     <label class="fld">
       <span>Κλειδί Gemini</span>
       <input type="text" id="in-key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIza…">
@@ -228,12 +228,77 @@
     <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
     <h2>Μενού</h2>
   </header>
+  <!-- v62 · Brief Ε §1 (εγκρίθηκε 11/9/2026): τρεις ομάδες, υπογραφή κάτω από
+       κάθε τίτλο — «γεμίζει η οθόνη με πληροφορία, όχι με διακόσμηση». -->
   <div class="pg-body">
-    <button class="row" data-go="s-pend"><span class="row-t">Εκκρεμή</span><span class="row-b" id="m-pend">0</span></button>
-    <button class="row" data-go="s-sup"><span class="row-t">Προμηθευτές</span><span class="row-b" id="m-sup">0</span></button>
-    <button class="row" data-go="s-ref"><span class="row-t">Κάλεσε</span><span class="row-b">→</span></button>
+    <div class="grp">Τα τιμολόγιά μου</div>
+    <button class="row" data-go="s-pend"><span class="row-l"><span class="row-t">Εκκρεμή</span><span class="row-sub">περιμένουν ποσά</span></span><span class="row-b" id="m-pend">0</span></button>
+    <button class="row" data-go="s-sup"><span class="row-l"><span class="row-t">Προμηθευτές</span><span class="row-sub">όλα τα τιμολόγια ανά προμηθευτή</span></span><span class="row-b" id="m-sup">0</span></button>
+    <div class="grp">Βοήθεια</div>
+    <button class="row" data-go="s-faq"><span class="row-l"><span class="row-t">Ερωτήσεις &amp; απαντήσεις</span><span class="row-sub">ό,τι ρωτάνε όλοι</span></span><span class="row-b">→</span></button>
+    <button class="row" data-go="s-help"><span class="row-l"><span class="row-t">Υποστήριξη</span><span class="row-sub">γράψε μας — απαντάμε με email</span></span><span class="row-b">→</span></button>
+    <button class="row" data-go="s-fb"><span class="row-l"><span class="row-t">Η γνώμη σου</span><span class="row-sub">τι να αλλάξει, τι σου αρέσει</span></span><span class="row-b">→</span></button>
+    <div class="grp">Μοιράσου</div>
+    <button class="row" data-go="s-ref"><span class="row-l"><span class="row-t">Κάλεσε</span><span class="row-sub">δωρεάν και για όποιον καλέσεις</span></span><span class="row-b">→</span></button>
     <div class="sep"></div>
-    <button class="row" data-go="s-settings"><span class="row-t">Ρυθμίσεις</span><span class="row-b">→</span></button>
+    <button class="row" data-go="s-settings"><span class="row-l"><span class="row-t">Ρυθμίσεις</span></span><span class="row-b">→</span></button>
+    <p class="menu-foot"><a href="/legal/privacy" target="_blank" rel="noopener">Πολιτική απορρήτου</a> · <a href="/legal/terms" target="_blank" rel="noopener">Όροι χρήσης</a> · <span id="m-ver"></span></p>
+  </div>
+</section>
+
+<!-- ══ v62 · Brief Ε §4 — ΕΡΩΤΗΣΕΙΣ & ΑΠΑΝΤΗΣΕΙΣ ══════════════════
+     15 κείμενα εγκεκριμένα 11/9/2026 (το #14 iPhone μπαίνει ΜΕΤΑ τη δοκιμή σε
+     πραγματικό iPhone — απόφαση Stavros). Το #12 ενημερώθηκε 16/9 για την
+     αναστολή 72 ωρών (Η.11β). Τα κείμενα ζουν στο app.js (FAQ), ώστε οι
+     🔗 σύνδεσμοι να οδηγούν σε οθόνες. -->
+<section id="s-faq" class="screen page" hidden>
+  <header class="pg-head">
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
+    <h2>Ερωτήσεις &amp; απαντήσεις</h2>
+  </header>
+  <div class="pg-body" id="faq-body"></div>
+</section>
+
+<!-- ══ v62 · Brief Ε §2 — ΥΠΟΣΤΗΡΙΞΗ ═══════════════════════════════
+     Ανοίγει το email του κινητού προς support@ με αριθμό εισιτηρίου KM-XXXX
+     στο θέμα και έκδοση/συσκευή στο σώμα — ο χρήστης τα βλέπει και μπορεί να
+     τα σβήσει. Τίποτα δεν πάει στον server. -->
+<section id="s-help" class="screen page" hidden>
+  <header class="pg-head">
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
+    <h2>Υποστήριξη</h2>
+  </header>
+  <div class="pg-body">
+    <p class="lede">Γράψε μας τι συμβαίνει — απαντάμε στο email σου.</p>
+    <p class="fine">Το email ανοίγει με έτοιμο αριθμό εισιτηρίου, την έκδοση και τη συσκευή σου, για να σε βοηθήσουμε πιο γρήγορα. Τα βλέπεις πριν στείλεις και μπορείς να τα σβήσεις.</p>
+    <button class="btn primary" id="hp-mail">Γράψε μας</button>
+    <div class="sep"></div>
+    <p class="fine hint">Αν το κινητό σου δεν έχει ρυθμισμένο email:</p>
+    <div class="kv"><span>Διεύθυνση</span><b>support@fastwrite.tech</b></div>
+    <div class="kv"><span>Αριθμός εισιτηρίου</span><b id="hp-ticket">—</b></div>
+    <button class="btn ghost" id="hp-copy">Αντιγραφή διεύθυνσης και αριθμού</button>
+    <p class="fine" id="hp-note" hidden></p>
+  </div>
+</section>
+
+<!-- ══ v62 · Brief Ε §3 — Η ΓΝΩΜΗ ΣΟΥ ══════════════════════════════
+     POST /api/km/feedback (ο server ζει από 14/9). Χωρίς folder_id, χωρίς IP·
+     το email ΜΟΝΟ αν τσεκαριστεί «Θέλω απάντηση». 5 ανά συσκευή ανά ημέρα. -->
+<section id="s-fb" class="screen page" hidden>
+  <header class="pg-head">
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
+    <h2>Η γνώμη σου</h2>
+  </header>
+  <div class="pg-body">
+    <div class="stars" id="fb-stars" role="radiogroup" aria-label="Αστέρια">
+      <button type="button" data-s="1" aria-label="1 αστέρι">★</button><button type="button" data-s="2" aria-label="2 αστέρια">★</button><button type="button" data-s="3" aria-label="3 αστέρια">★</button><button type="button" data-s="4" aria-label="4 αστέρια">★</button><button type="button" data-s="5" aria-label="5 αστέρια">★</button>
+    </div>
+    <textarea id="fb-text" rows="5" maxlength="2000" placeholder="Τι να αλλάξει; Τι σου αρέσει;"></textarea>
+    <label class="chk"><input type="checkbox" id="fb-reply"> <span>Θέλω απάντηση στο email μου</span></label>
+    <p class="fine hint">Η γνώμη σου δεν συνδέεται με τον λογαριασμό σου. Το email σου φεύγει <b>μόνο</b> αν τσεκάρεις «Θέλω απάντηση».</p>
+    <p class="err" id="fb-err" hidden></p>
+    <button class="btn primary" id="fb-send">Στείλε</button>
+    <p class="fine ok" id="fb-ok" hidden>Ευχαριστούμε. Έφτασε.</p>
   </div>
 </section>
 
@@ -263,6 +328,9 @@
   </header>
   <div class="pg-body">
     <p class="lede">Στείλε τον σύνδεσμό σου. Όποιος τον ανοίξει παίρνει <b>ακριβώς τα ίδια</b>, δωρεάν, χωρίς όριο χρόνου.</p>
+    <!-- v62 · Brief Ε §5: αληθινό μόνο επειδή το ?ref= φεύγει πλέον στον server
+         (μετρήθηκε 16/9 στο register: source + ref γράφονται στο km_accounts). -->
+    <p class="fine"><b>Όσοι καλούν μπαίνουν πρώτοι στη λίστα για ό,τι νέο ετοιμάζουμε.</b> Ως σύσταση μετράει λογαριασμός που φτιάχτηκε από τον σύνδεσμό σου και παραμένει ενεργός.</p>
     <div class="linkbox" id="ref-link"></div>
     <button class="btn primary" id="ref-share">Στείλε τον σύνδεσμο</button>
     <button class="btn ghost" id="ref-copy">Αντιγραφή</button>
