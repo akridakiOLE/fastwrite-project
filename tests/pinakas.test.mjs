@@ -28,6 +28,9 @@ const MUTATIONS = [
    'headers: { "Accept": "application/json" },'],
   // 5. 🔴 ΤΟ ΣΙΩΠΗΛΟ ΨΕΜΑ: το σύνολο γίνεται «όσοι στάλθηκαν» αντί «όσοι ταιριάζουν».
   ["accounts_total: list.total,", "accounts_total: list.rows.length,"],
+  // 7. Η ρύθμιση FW_ORIGIN αγνοείται και ξαναγίνεται καρφωτή διεύθυνση.
+  ['const o = String((env && env.FW_ORIGIN) || FW_ORIGIN_DEFAULT).trim();',
+   'const o = String(FW_ORIGIN_DEFAULT).trim();'],
   // 6. Η σελιδοποίηση αγνοεί το off → το «κι άλλους» ξαναδίνει την ίδια σελίδα.
   ["ORDER BY a.created DESC LIMIT ? OFFSET ?`,\n    ...f.args, n, off);",
    "ORDER BY a.created DESC LIMIT ? OFFSET ?`,\n    ...f.args, n, 0);"],
@@ -176,7 +179,7 @@ await check("Π-9 · FastWrite: ο Worker ρωτά ΜΟΝΟΣ τον Hetzner μ�
   const j = await pinakas();
   eq(hetzner.calls.length, 1, "κλήσεις προς Hetzner:");
   const c = hetzner.calls[0];
-  if (!c.url.startsWith("https://api.fastwrite.tech/api/admin/pinakas")) throw new Error("λάθος διεύθυνση " + c.url);
+  if (!c.url.startsWith("https://fastwrite.duckdns.org/api/admin/pinakas")) throw new Error("λάθος διεύθυνση " + c.url);
   if (c.url.includes("s3cret")) throw new Error("ΤΟ ΚΛΕΙΔΙ ΜΠΗΚΕ ΣΤΟ URL");
   eq(c.headers["X-Km-Admin"], "s3cret", "header:");
   eq(j.fastwrite.ok, true, "fastwrite.ok:");
@@ -261,6 +264,17 @@ await check("Π-17 · τα φίλτρα του FastWrite ταξιδεύουν σ
   eq(u.searchParams.get("off"), "100", "off:");
   eq(u.searchParams.get("only"), "accounts", "only:");
   if (u.searchParams.get("k")) throw new Error("ΤΟ ΚΛΕΙΔΙ ΜΠΗΚΕ ΣΤΟ URL");
+});
+
+await check("Π-19 · 🔴 η διεύθυνση του Hetzner είναι ΡΥΘΜΙΣΗ, όχι σταθερά (FW_ORIGIN)", async () => {
+  hetzner.mode = "ok"; hetzner.calls.length = 0;
+  const env2 = Object.assign({}, env, { FW_ORIGIN: "https://api.fastwrite.tech/" });
+  const r = await mod.handleKm(new Request("https://x/api/km/admin/pinakas?k=s3cret&only=fw"), env2, null, "/api/km/admin/pinakas");
+  await r.json();
+  eq(hetzner.calls.length, 1, "κλήσεις:");
+  const u = hetzner.calls[0].url;
+  if (!u.startsWith("https://api.fastwrite.tech/api/admin/pinakas")) throw new Error("η μεταβλητή αγνοήθηκε: " + u);
+  if (u.includes(".tech//")) throw new Error("διπλή κάθετος από το τέλος της μεταβλητής: " + u);
 });
 
 await check("Π-18 · παράλογη σελίδα δεν ρίχνει τον πίνακα (n=99999, off=-5)", async () => {

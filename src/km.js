@@ -1564,8 +1564,21 @@ async function kmAccounts(all, one, params) {
   return { rows, total: (t && t.n) || 0, off, n, filters: f.echo };
 }
 
-const FW_PINAKAS_URL = "https://api.fastwrite.tech/api/admin/pinakas";
+// 🔴 ΜΑΘΗΜΑ 16/9 (πέμπτο, το ακριβότερο): είχα καρφώσει το
+//    api.fastwrite.tech επειδή έτσι έλεγε μια παλιά σημείωση. ΔΕΝ ΥΠΑΡΧΕΙ —
+//    μετρήθηκε: /health εκεί δίνει 404, ενώ στο fastwrite.duckdns.org δίνει
+//    {"status":"healthy"}. Στον κώδικα το api.fastwrite.tech υπάρχει μόνο ως
+//    προεπιλογή του DEMO_SERVER_URL, δηλαδή σαν πρόθεση, όχι σαν υποδομή.
+//    Τώρα η διεύθυνση είναι ΡΥΘΜΙΣΗ, όχι σταθερά: όταν στηθεί το δικό μας
+//    domain, αλλάζει η μεταβλητή FW_ORIGIN στο Cloudflare — κανένα deploy.
+const FW_ORIGIN_DEFAULT = "https://fastwrite.duckdns.org";
+const FW_PINAKAS_PATH = "/api/admin/pinakas";
 const FW_TIMEOUT_MS = 4000;
+
+function fwOrigin(env) {
+  const o = String((env && env.FW_ORIGIN) || FW_ORIGIN_DEFAULT).trim();
+  return o.replace(/\/+$/, "");
+}
 
 // Τα φίλτρα του FastWrite ταξιδεύουν με πρόθεμα f (ffrom, fto, fq, fplan,
 // fst, foff, fn) ώστε να μην μπλέκονται με του Kostometro στην ίδια κλήση.
@@ -1585,7 +1598,7 @@ async function fetchFastWrite(env, params, onlyAccounts) {
   const key = env.KM_ADMIN_KEY || "";
   if (!key) return { ok: false, error: "no_key" };
   try {
-    const r = await fetch(FW_PINAKAS_URL + fwQuery(params, onlyAccounts), {
+    const r = await fetch(fwOrigin(env) + FW_PINAKAS_PATH + fwQuery(params, onlyAccounts), {
       headers: { "X-Km-Admin": key, "Accept": "application/json" },
       signal: AbortSignal.timeout(FW_TIMEOUT_MS),
     });

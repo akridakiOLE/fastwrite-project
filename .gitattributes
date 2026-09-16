@@ -3,3 +3,14 @@
 *.png -text
 *.ico -text
 *.zip -text
+
+# Shell scripts τρέχουν σε Linux server. Με CRLF το bash σκάει αμέσως με
+# «$'\r': command not found» — και το μήνυμα ΔΕΝ λέει ότι φταίνε τα τέλη
+# γραμμής. Κλειδώνονται σε LF, ό,τι κι αν κάνει το autocrlf των Windows.
+# (16/9/2026, μετά από προειδοποίηση του git στο deploy της v63.)
+*.sh text eol=lf
+
+# Τα .bat είναι το αντίθετο: με LF δεν εκτελούνται ΚΑΘΟΛΟΥ, χωρίς μήνυμα.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

@@ -18,12 +18,12 @@ echo [1/3] Stelno to kleidi...
 scp secrets\km_admin_key.txt %SSHUSER%@46.62.255.91:/app/projects/secrets/km_admin_key.txt
 if errorlevel 1 goto scpfail
 
-echo [2/3] Stelno to script (sosti riza: /app/projects)...
-scp hetzner_pinakas.sh %SSHUSER%@46.62.255.91:/app/projects/hetzner_pinakas.sh
+echo [2/3] Stelno to script se /root - EXO apo to worktree tou git...
+scp hetzner_pinakas.sh %SSHUSER%@46.62.255.91:/root/pinakas_step.sh
 if errorlevel 1 goto scpfail
 
 echo [3/3] Restart + autoelegxos...
-ssh %SSHUSER%@46.62.255.91 "bash /app/projects/hetzner_pinakas.sh"
+ssh %SSHUSER%@46.62.255.91 "sed -i 's/\r$//' /root/pinakas_step.sh; bash /root/pinakas_step.sh"
 if errorlevel 1 goto shfail
 
 echo.

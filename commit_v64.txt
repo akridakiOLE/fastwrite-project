@@ -1,0 +1,44 @@
+v64: the FastWrite zone talks to a host that actually exists - and the host is now a setting
+
+THE BUG, AND IT WAS MINE: the Worker called https://api.fastwrite.tech because
+an old note said that was the FastWrite server. It is not. Measured today:
+  api.fastwrite.tech/health      -> 404
+  fastwrite.duckdns.org/health   -> {"checks":{"database":"ok",...},"status":"healthy"}
+  fastwrite.duckdns.org/api/demo-key/status -> {"active":false,...}   (so /api/* is proxied)
+In the code api.fastwrite.tech appears exactly once, as the DEFAULT of
+DEMO_SERVER_URL - an intention, never infrastructure. The panel therefore
+showed "did not answer - http_404" for the FastWrite zone while the same route
+answered 200 from inside the server seconds earlier.
+
+Worse than the bug: yesterday I fetched api.fastwrite.tech/api/admin/pinakas,
+got 404, and read that as "the guard works from outside". A 404 from nowhere
+looks exactly like a 404 from a route that is refusing you. The check proved
+nothing and I reported it as proof.
+
+FIX: the origin is a SETTING, not a constant. fwOrigin(env) reads env.FW_ORIGIN
+and falls back to the host that works today; a trailing slash is trimmed so the
+URL never doubles. When api.fastwrite.tech is really configured on the domain,
+it becomes one variable in the Cloudflare dashboard - no code, no deploy.
+
+TESTS: 19/19. New P-19 sets FW_ORIGIN and proves the call follows it and that
+"https://host/" + "/api/..." does not produce a double slash. 7 mutations -> 10
+guards red; the new mutation ignores the variable and re-hardcodes the host.
+
+ALSO IN THIS COMMIT - three deploy-tool fixes from the same session, each one a
+failure that cost a round trip:
+- .gitattributes: *.sh locked to LF, *.bat/*.cmd/*.ps1 to CRLF. Git warned it
+  was about to turn hetzner_pinakas.sh into CRLF, which makes bash die with
+  "$'\r': command not found" - a message that never mentions line endings.
+- deploy_hetzner.bat sends the server script to /root, NOT into /app/projects.
+  It is a tracked file: written inside the worktree it became a local change and
+  git refused to pull. The script also strips CR on the server before running.
+- hetzner_pinakas.sh: pulls at the real repository root (/app/projects - the
+  fastwrite-project folder under it is untracked), discards only its own stale
+  copy (never reset --hard), and verifies the indexes with python3 reading the
+  database path OUT OF main_api.py. Two earlier versions of that check used the
+  sqlite3 binary (not installed here, printed "?" and passed) and then a guessed
+  filename (fastwrite.db - a stale file next to the real app.db, 0 indexes,
+  reported as failure). Now it prints which file it opened and the index names.
+
+NOT TESTED: the panel's FastWrite zone against the live host - that needs the
+admin key and is Stavros's check, not mine.
