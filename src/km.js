@@ -105,6 +105,10 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/folder" && method === "PUT") return putFolder(request, env);
   if (path === "/api/km/activate" && method === "POST") return activate(request, env);
 
+  // ΣΥΣΤΑΣΕΙΣ (17/9/2026) — ο κωδικός ανήκει στον λογαριασμό. schema/km_ref.sql
+  if (path === "/api/km/ref" && method === "GET") return refInfo(request, env);
+  if (path === "/api/km/ref/hit" && method === "POST") return refHit(request, env);
+
   if (path === "/api/km/delete" && method === "POST") return requestDelete(request, env, ctx);
   if (path === "/api/km/delete/cancel" && method === "POST") return cancelDelete(request, env, ctx);
   if (path === "/api/km/admin/delete" && method === "POST") return adminDelete(request, env);
@@ -290,6 +294,112 @@ async function lockSummary(env, folder) {
   return (r.results || []).map((l) => ({ lock_id: l.lock_id, kind: l.kind, created: l.created, label: l.label || null }));
 }
 
+/* ══ ΣΥΣΤΑΣΕΙΣ ═══════════════════════════════════════════════════════════
+   🔴 Ο ΚΩΔΙΚΟΣ ΣΥΣΤΑΣΗΣ ΒΓΑΙΝΕΙ ΑΠΟ ΤΟΝ ΛΟΓΑΡΙΑΣΜΟ (17/9/2026).
+   Το «γιατί» με μετρήσεις: schema/km_ref.sql. Σε μία γραμμή: ως χθες τον
+   παρήγαγε η ΣΥΣΚΕΥΗ από localStorage, άρα κάθε αλλαγή κινητού έσβηνε τις
+   συστάσεις ενός χρήστη που είχε ήδη καλέσει επιχειρήσεις.
+
+   Αλφάβητο 30 χαρακτήρων χωρίς I, L, O, U, 0, 1 — ο κωδικός λέγεται και στο
+   τηλέφωνο χωρίς να μπερδευτεί. 30^10 ≈ 5,9·10^14 συνδυασμοί: στο 1.000.000
+   λογαριασμών η πιθανότητα έστω μίας σύγκρουσης είναι ~0,0008%. ΚΑΙ ο
+   μοναδικός δείκτης την πιάνει ούτως ή άλλως — ΣΧΕΔΙΑΖΟΥΜΕ ΓΙΑ ΤΟ ΜΕΓΑΛΟ. */
+const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
+const REF_LEN = 10;
+
+async function refCodeFor(folderId, attempt) {
+  const h = await sha256hex(folderId + ":ref:" + (attempt || 0));
+  let out = "";
+  for (let i = 0; i < REF_LEN; i++) {
+    out += REF_ALPHABET[parseInt(h.slice(i * 2, i * 2 + 2), 16) % REF_ALPHABET.length];
+  }
+  return out;
+}
+
+/* Ο κωδικός γράφεται ΜΙΑ φορά και δεν αλλάζει ποτέ.
+   ⚠ Οι λογαριασμοί που φτιάχτηκαν ΠΡΙΝ τις 17/9 δεν έχουν κωδικό. Τον
+   αποκτούν εδώ, την πρώτη φορά που ανοίγουν την οθόνη: καμία μετάβαση βάσης
+   δεν μπορεί να τον υπολογίσει, γιατί το SQLite δεν έχει sha256.
+   Το UPDATE ... WHERE ref_code IS NULL είναι ο φρουρός: δύο ταυτόχρονες
+   κλήσεις από δύο συσκευές δεν μπορούν να δώσουν δύο διαφορετικούς κωδικούς. */
+async function ensureRefCode(env, folderId, existing) {
+  if (existing) return existing;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = await refCodeFor(folderId, attempt);
+    const r = await env.DB.prepare(
+      "UPDATE km_accounts SET ref_code = ? WHERE folder_id = ? AND ref_code IS NULL"
+    ).bind(code, folderId).run().catch(() => null);
+    if (r && r.meta && r.meta.changes) return code;
+    const cur = await env.DB.prepare(
+      "SELECT ref_code FROM km_accounts WHERE folder_id = ?").bind(folderId).first();
+    if (cur && cur.ref_code) return cur.ref_code;
+  }
+  return null;
+}
+
+/* Ο κωδικός ταξιδεύει σε URL και μπορεί να πληκτρολογηθεί με πεζά.
+   Μία μορφή παντού — αλλιώς ο ίδιος σύνδεσμος μετράει σε δύο κουβάδες. */
+function normRef(v) { return (clean(v, 40) || "").toUpperCase() || null; }
+
+/* GET /api/km/ref — ό,τι χρειάζεται η οθόνη «Κάλεσε», σε μία κλήση. */
+async function refInfo(request, env) {
+  const a = await authed(request, env);
+  if (a.err) return a.err;
+  const code = await ensureRefCode(env, a.id.folder, a.acc.ref_code);
+  if (!code) return json({ ok: false, error: "ref_code" }, 500);
+
+  const n = async (sql) => {
+    const r = await env.DB.prepare(sql).bind(code).first();
+    return r ? Number(r.n) : 0;
+  };
+  const opened  = await n("SELECT COUNT(*) AS n FROM km_ref_hits WHERE ref_code = ?");
+  const signups = await n("SELECT COUNT(*) AS n FROM km_accounts WHERE ref = ? AND deleted IS NULL");
+
+  /* ΕΝΕΡΓΗ ΣΥΣΤΑΣΗ — κλείδωσε 17/9/2026 (έγκριση Stavros):
+     επιχείρηση που κάλεσες εσύ ΚΑΙ πληρώνει συνδρομή PRO, για όσο πληρώνει.
+     Απαιτεί ΚΑΙ ο συστήνων να έχει ενεργή δική του συνδρομή: δεν πληρώνουμε
+     ποσοστό σε κάποιον που δεν είναι πελάτης μας.
+     ⚠ Όσο δεν υπάρχει PRO, το νούμερο είναι σκόπιμα null και η οθόνη δείχνει
+     «—». Το μηδέν θα διαβαζόταν «κανείς δεν μπήκε»· η αλήθεια είναι «όχι
+     ακόμα», και είναι διαφορετικό πράγμα. */
+  const live = proLive(env);
+  const active = live
+    ? await n("SELECT COUNT(*) AS n FROM km_accounts WHERE ref = ? AND deleted IS NULL AND plan IS NOT NULL")
+    : null;
+
+  return json({
+    ok: true,
+    code: code,
+    opened: opened,
+    signups: signups,
+    active: active,
+    self_active: !!a.acc.plan,
+    pro_live: live,
+  });
+}
+
+/* POST /api/km/ref/hit — «άνοιξα τον σύνδεσμο κάποιου».
+   ΧΩΡΙΣ ταυτοποίηση, και σωστά: ο επισκέπτης δεν έχει ακόμα λογαριασμό.
+   Ό,τι γράφεται εδώ είναι ο κωδικός και ένα τυχαίο install_id — κανένα
+   στοιχείο προσώπου, καμία IP. Ο κανόνας «βλέπει λογαριασμό, ΠΟΤΕ
+   περιεχόμενο» (6/9/2026) ισχύει και εδώ. */
+async function refHit(request, env) {
+  const b = (await safeJson(request)) || {};
+  const code = normRef(b.ref);
+  const inst = clean(b.install_id, 64);
+  if (!code || !inst) return json({ ok: false, error: "bad" }, 400);
+  await env.DB.prepare(
+    `INSERT INTO km_ref_hits (ref_code, install_id, first_seen, country)
+     VALUES (?, ?, ?, ?) ON CONFLICT(ref_code, install_id) DO NOTHING`
+  ).bind(code, inst, now(), (request.cf && request.cf.country) || null).run().catch(() => null);
+  return json({ ok: true });
+}
+
+/* Η σημαία που γυρίζει την οθόνη από «ΤΙ ΕΡΧΕΤΑΙ» σε «ΤΙ ΚΑΝΕΙ ΤΟ PRO».
+   Ρύθμιση του Worker, ΟΧΙ καρφωτό κείμενο: την ημέρα που βγαίνει το PRO
+   αλλάζει μία μεταβλητή, δεν γίνεται deploy νέου κειμένου. */
+function proLive(env) { return String((env && env.PRO_LIVE) || "") === "1"; }
+
 function pub(acc) {
   return {
     folder_version: acc.folder_version,
@@ -345,15 +455,18 @@ async function register(request, env) {
     const stmts = [
       env.DB.prepare(
         `INSERT INTO km_accounts (folder_id, auth_hash, email, created, country, source, ref, has_key,
-                                  active_device_id, active_since)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                                  active_device_id, active_since, ref_code)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         id.folder, h, email, ts,
         (request.cf && request.cf.country) || null,
         clean(b.source, 20) || "link",
-        clean(b.ref, 40),
+        normRef(b.ref),
         b.has_key ? 1 : 0,
-        id.device, ts
+        id.device, ts,
+        // 17/9/2026: ο κωδικός γεννιέται ΜΑΖΙ με τον λογαριασμό. Δεν
+        // περιμένει να ανοίξει ο χρήστης την οθόνη «Κάλεσε».
+        await refCodeFor(id.folder, 0)
       ),
     ];
     if (id.lock) {

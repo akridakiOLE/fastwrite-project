@@ -1,0 +1,52 @@
+v65: the referral code belongs to the ACCOUNT, not the device - and the reward screen
+
+MEASURED BUG (17/9/2026), found by reading the code, not by guessing:
+  site/kostometro/app.js:1781  refCode() = localStorage('km_install_id').slice(-8)
+  site/kostometro/app.js:3932  install_id is born ON THE DEVICE, at random.
+Consequences, all three real:
+  (a) new phone / reinstall / cleared data => NEW code. Referrals already
+      written to km_accounts.ref under the OLD code are orphaned. A user who
+      had already invited businesses loses them, through no fault of theirs.
+  (b) same user, two devices => two codes; referrals split in half.
+  (c) 8 chars from timestamp+random with NO server-side uniqueness check:
+      two users can share a code and a referral can be credited to the wrong
+      person.
+The screen promises "one link per account, once". Now it means it.
+
+SERVER
+- schema/km_ref.sql: km_accounts.ref_code + UNIQUE index; km_ref_hits with
+  PRIMARY KEY (ref_code, install_id) so de-duplication is structural.
+- code derived from folder_id (the 12 words): 30-char alphabet without
+  I/L/O/U/0/1, length 10 => 5.9e14 combinations. At 1,000,000 accounts the
+  chance of any collision is 0.0008%, and the unique index catches it anyway.
+  DESIGNED FOR BIG, not for today.
+- GET  /api/km/ref       code + counters + pro_live flag, one call.
+- POST /api/km/ref/hit   link opened; unauthenticated by necessity (the
+  visitor has no account yet) and stores nothing personal.
+- accounts created before today get their code lazily on first read: no
+  migration can compute it, SQLite has no sha256.
+- PRO_LIVE follows the FW_ORIGIN convention: a Cloudflare setting, not code.
+  On PRO launch day one variable changes - no text deploy.
+
+SCREEN (v65)
+- ONE screen, TWO states driven by the server flag (data-pro soon/live).
+- No price, no release date anywhere: price still has room upwards until the
+  paralavi test, and the MoR provider is unchosen so VAT display is unknown.
+  The percentage has neither problem.
+- counter says "opened your link", NOT "invitations you sent": the Web Share
+  API never reports whether the user actually sent anything, so that number
+  would have been a lie on a screen that promises "they do not expire".
+- reward terms locked 17/9: 20% per active referral, whole subscription back
+  at 5, paid quarterly against an invoice the member issues, BOTH sides must
+  be active, 6-month reconnection window on either side.
+
+TESTS
+- tests/ref.test.mjs     11 checks, 5 mutations, EACH proven separately.
+- tests/ref_ui.test.mjs  12 guards on the customer-facing text, 6 mutations.
+- mutation proof is now PER MUTATION: running them together made two cancel
+  each other out and a test went falsely green (measured 17/9 on S-7).
+- pinakas/h11b broke the moment the column landed (they built the schema
+  without km_ref.sql) - fixed; all six suites green.
+
+ORDER ON DEPLOY: the D1 migration runs BEFORE the worker. The new register
+writes ref_code; without the column every registration returns 500.

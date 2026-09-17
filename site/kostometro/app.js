@@ -15,6 +15,12 @@
     id:    'km_install_id',
     perm:  'km_perm_seen',
     src:   'km_source',
+    /* v65 · ΣΥΣΤΑΣΕΙΣ (17/9/2026) — ο κωδικός ΕΡΧΕΤΑΙ ΑΠΟ ΤΟΝ SERVER και
+       απλώς φυλάγεται εδώ για να φαίνεται ο σύνδεσμος χωρίς δίκτυο. ΔΕΝ
+       παράγεται ποτέ στη συσκευή: ως τη v63 παραγόταν, και κάθε αλλαγή
+       κινητού έσβηνε τις συστάσεις όποιου είχε ήδη καλέσει επιχειρήσεις. */
+    refCode: 'km_ref_code',
+    refHit:  'km_ref_hit',
     diag:  'km_ai_diag',
     model: 'km_ai_model',
     /* v26 · Η.2β-1 — ο λογαριασμός. Οι 12 λέξεις ΜΕΝΟΥΝ στη συσκευή:
@@ -1778,15 +1784,76 @@
   }
 
   /* ══ ΚΑΛΕΣΕ ══ */
-  function refCode() {
-    var id = localStorage.getItem(LS.id) || '';
-    return id.replace('km_', '').replace('hc_', '').slice(-8);
+  /* 🔴 Ο ΚΩΔΙΚΟΣ ΑΝΗΚΕΙ ΣΤΟΝ ΛΟΓΑΡΙΑΣΜΟ, ΟΧΙ ΣΤΗ ΣΥΣΚΕΥΗ (v65, 17/9/2026).
+     Ως τη v63: refCode() = localStorage('km_install_id').slice(-8). Άρα
+     αλλαγή κινητού, επανεγκατάσταση ή καθαρισμός δεδομένων έδινε ΝΕΟ κωδικό,
+     και οι συστάσεις που είχαν ήδη γραφτεί με τον παλιό έμεναν ορφανές. Δύο
+     συσκευές του ίδιου χρήστη έδιναν δύο κωδικούς. Η οθόνη λέει «ένας
+     σύνδεσμος ανά λογαριασμό, μία φορά» — τώρα το εννοεί.
+     Εδώ μένει μόνο ΑΝΤΙΓΡΑΦΟ του κωδικού που έδωσε ο server, ώστε ο
+     σύνδεσμος να φαίνεται και χωρίς δίκτυο. */
+  function refCode() { return localStorage.getItem(LS.refCode) || ''; }
+  function refUrl()  { var c = refCode(); return c ? (location.origin + '/kostometro/?ref=' + c) : ''; }
+
+  /* Οι δύο καταστάσεις της οθόνης. Η σημαία έρχεται ΑΠΟ ΤΟΝ SERVER: την
+     ημέρα που βγαίνει το PRO αλλάζει μία ρύθμιση, ΟΧΙ το κείμενο. */
+  function refProState(live) {
+    var n = document.querySelectorAll('#s-ref [data-pro]');
+    for (var i = 0; i < n.length; i++) {
+      n[i].hidden = (n[i].getAttribute('data-pro') === 'live') ? !live : !!live;
+    }
   }
-  function refUrl() { return location.origin + '/kostometro/?ref=' + refCode(); }
+
   function renderRef() {
-    el('ref-link').textContent = refUrl();
+    var link = el('ref-link');
+    link.textContent = refUrl() || 'Φόρτωση…';
     el('ref-note').textContent = navigator.share ? '' : 'Ο browser σου δεν έχει κουμπί κοινοποίησης — χρησιμοποίησε την Αντιγραφή.';
     el('ref-share').hidden = !navigator.share;
+    /* Χωρίς κωδικό δεν μοιράζεται τίποτα: σύνδεσμος χωρίς ?ref= είναι
+       σύσταση που χάθηκε, και ο χρήστης δεν θα το μάθει ποτέ. */
+    el('ref-share').disabled = !refCode();
+    el('ref-copy').disabled  = !refCode();
+
+    if (!localStorage.getItem(LS.folder)) { return; }
+    kmFetch('ref', { headers: kmHead() }).then(function (r) {
+      return r.ok ? r.json() : null;
+    }).then(function (j) {
+      if (!j || !j.ok) { return; }
+      localStorage.setItem(LS.refCode, j.code);
+      link.textContent = refUrl();
+      el('ref-share').disabled = false;
+      el('ref-copy').disabled  = false;
+      el('ref-opened').textContent  = String(j.opened);
+      el('ref-signups').textContent = String(j.signups);
+      /* ⚠ ΤΟ «—» ΔΕΝ ΓΙΝΕΤΑΙ «0» ΠΡΙΝ ΥΠΑΡΞΕΙ ΤΟ PRO. Το μηδέν διαβάζεται
+         «κανείς δεν μπήκε»· η αλήθεια είναι «όχι ακόμα». */
+      el('ref-active').textContent = (j.active === null || j.active === undefined) ? '—' : String(j.active);
+      refProState(!!j.pro_live);
+      /* Η γραμμή επιστροφής σε ευρώ θέλει τιμολόγηση, που δεν υπάρχει ακόμα.
+         Ως τότε μένει ΚΡΥΦΗ: άδειο κουτί σε ζωντανή οθόνη διαβάζεται ως
+         «κάτι χάλασε». Ο server θα στείλει `credit_line` όταν υπάρχει MoR. */
+      var cr = el('ref-credit');
+      if (j.credit_line) { cr.textContent = j.credit_line; cr.hidden = !j.pro_live; }
+      else { cr.hidden = true; }
+    }).catch(function () {});
+  }
+
+  /* «Άνοιξα τον σύνδεσμο κάποιου» — λέγεται ΜΙΑ φορά ανά κωδικό, από τη
+     συσκευή που τον άνοιξε. Ο server έχει και δικό του de-duplication
+     (πρωτεύον κλειδί ref_code+install_id): εδώ απλώς δεν ξαναχτυπάμε το
+     δίκτυο σε κάθε άνοιγμα της εφαρμογής. */
+  function refReportHit() {
+    var m = /[?&]ref=([A-Za-z0-9]+)/.exec(location.search);
+    if (!m) { return; }
+    var code = m[1].toUpperCase();
+    if (localStorage.getItem(LS.refHit) === code) { return; }
+    var inst = localStorage.getItem(LS.id) || '';
+    if (!inst) { return; }
+    kmFetch('ref/hit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: code, install_id: inst })
+    }).then(function () { localStorage.setItem(LS.refHit, code); }).catch(function () {});
   }
 
   /* ══ ΡΥΘΜΙΣΕΙΣ ══ */
@@ -1836,7 +1903,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v63';
+  var APP_VER = 'φέτα 3 · v65';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -3937,6 +4004,11 @@
       var st = /[?&]src=([A-Za-z0-9:_-]+)/.exec(location.search);
       localStorage.setItem(LS.src, m ? ('ref:' + m[1]) : (st ? st[1] : 'link'));
     }
+    /* v65 — το άνοιγμα μετριέται ΑΝΕΞΑΡΤΗΤΑ από το αν θα γίνει εγγραφή.
+       Μπαίνει ΕΞΩ από το «if (!LS.src)» πιο πάνω: εκείνο τρέχει μόνο στην
+       πρώτη εγκατάσταση, ενώ ο σύνδεσμος μπορεί να ανοιχτεί και από κάποιον
+       που έχει ήδη την εφαρμογή. */
+    refReportHit();
     /* v26 · Η.2β-1 — τρεις καταστάσεις, με αυτή τη σειρά:
        (α) ούτε email ούτε λέξεις  -> εντελώς νέος, πρώτη οθόνη
        (β) email αλλά ΟΧΙ λέξεις   -> υπάρχων χρήστης· αποκτά κλειδί τώρα,
