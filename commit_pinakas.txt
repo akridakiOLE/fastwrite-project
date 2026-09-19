@@ -1,0 +1,72 @@
+Control Panel: four improvements (D4 packages, D2 calendar, D1 boot gate, D3 keyset paging)
+
+From a parallel session's proposal (19/9/2026). It wrote no code by design -
+the rule held and it stopped rather than writing over work in src/km.js. Three
+of its four points needed correcting against the actual source before building.
+
+D4 · THE PACKAGES THAT DO NOT EXIST
+"subscriptions by plan" and the "Plan" filter are gone. Free/Starter/
+Professional/Business/Enterprise are a leftover of the FastWrite Desktop
+database and apply to no product today; a dashboard showing them teaches its
+reader a false picture. "Installs by version" stays - with two versions live it
+shows who has not updated.
+MEASURED: both belong entirely to the FastWrite (Hetzner) zone. The Worker has
+no plan filter at all, so nothing server-side changed. `a.plan IS NOT NULL` in
+the Kostometro zone STAYS - it is what counts active referrals.
+
+D2 · THE CALENDAR ICON
+Native Chrome icon, dark on dark. invert(1), and the touch target goes 14px ->
+28px. The whole field now opens the picker, not just the icon: showPicker(),
+wrapped, because it THROWS when the picker is already open - which is exactly
+when the icon itself was clicked.
+mm/dd/yyyy is the browser's locale, not style. Not fixable here; needs our own
+date control. Not now, and said so rather than half-done.
+
+D1 · THE BOOT FLASH
+MEASURED CAUSE: <section id="s-key"> arrives with no `hidden` attribute, while
+#s-data has one. So the key screen is always painted first and only hides after
+the NETWORK returns - 1 to 3 seconds of flashing on every PWA open, for someone
+who already has a key. The decision is now synchronous, in an inline script in
+<head>, before first paint. Until it is made, NEITHER screen shows: a few
+milliseconds of blank beats two seconds of the wrong screen.
+CORRECTION TO THE PROPOSAL: it asked for a separate km_admin_has_key flag and
+said "never the key value in localStorage". The key is ALREADY in localStorage
+(pk_admin_key) and stays there - a separate flag would only add a second source
+of truth that can drift and show the wrong screen. The gate reads whether a key
+exists, never its value.
+DECIDED, NOT DEFERRED: the admin key stays in localStorage. sessionStorage
+would mean retyping 30+ characters on every open, and a dashboard nobody opens
+protects nothing. The exposure is bounded to whoever has the unlocked device;
+the key never travels in a URL and the endpoint 404s without it.
+
+D3 · PAGING BY KEY, NOT OFFSET
+"LIMIT 100 OFFSET 20000" does not skip - it SCANS 20,100 rows and throws 20,000
+away. The 200th page costs 200x the first.
+🔴 THE PROPOSAL COULD NOT BE BUILT AS WRITTEN. It specified a cursor of
+"created_at + id". There is no `id` column, and the column is `created`. The
+only unique tiebreaker is folder_id - which is DERIVED FROM THE USER'S 12 WORDS,
+which this dashboard deliberately truncates to 8 characters, and which an
+existing test forbids in the JSON. That cursor would have shipped it to the
+browser on every "more".
+SOLVED WITH rowid: it leaks insertion order and nothing else. And SQLite already
+stores rowid as the final tiebreaker inside every index entry, so the EXISTING
+idx_km_accounts_live_created (deleted, created) already yields exactly
+(deleted, created, rowid). No new index, no migration.
+The total is now counted ONCE per filter change: COUNT(*) is the expensive part
+and does not change while scrolling. On "more" the server returns total: null
+and the screen keeps what it already measured.
+Page size 20/50/100/200 plus a free field, capped at 500 server-side - the URL
+is written by the user, not by us. Changing the size restarts from the top.
+Accepted price: no "jump to page 7", only forward. The panel already worked
+that way.
+
+TESTS
+- new tests/pinakas_ui.test.mjs: 9 guards, 6 mutations. P-O2 checks that NO el()
+  was left orphaned by the deletions - across every id, not just today's.
+- pinakas.test.mjs: P-13/P-14/P-18 guarded the OFFSET contract and were
+  rewritten for the cursor. P-14 now walks every page and asserts 6 unique rows
+  with no overlap and none lost. Two mutations replaced: dropping the second
+  cursor term, and re-counting the total on every page.
+- 8 suites green.
+
+No database change. Rollback: git revert + push.

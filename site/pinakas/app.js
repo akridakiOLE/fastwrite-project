@@ -15,7 +15,48 @@
   var st = { kmShown: 0, kmTotal: 0, fwShown: 0, fwTotal: 0 };
 
   var KM_F = { 'f-from': 'from', 'f-to': 'to', 'f-q': 'q', 'f-src': 'src', 'f-ref': 'ref', 'f-cty': 'cty', 'f-st': 'st' };
-  var FW_F = { 'g-from': 'ffrom', 'g-to': 'fto', 'g-q': 'fq', 'g-plan': 'fplan', 'g-st': 'fst' };
+  /* Δ4 · 19/9/2026 — το 'g-plan' έφυγε μαζί με τα παλιά πακέτα. */
+  var FW_F = { 'g-from': 'ffrom', 'g-to': 'fto', 'g-q': 'fq', 'g-st': 'fst' };
+
+  /* ══ Δ2 · ΟΛΟΚΛΗΡΟ ΤΟ ΠΕΔΙΟ ΑΝΟΙΓΕΙ ΤΟ ΗΜΕΡΟΛΟΓΙΟ (19/9/2026) ══════════
+     Το CSS κάνει το native εικονίδιο ορατό και μεγαλύτερο, αλλά ο χρήστης
+     πατάει το ΠΕΔΙΟ — και τότε δεν ανοίγει τίποτα.
+     ⚠ Το showPicker() ΡΙΧΝΕΙ εξαίρεση αν κληθεί χωρίς ενέργεια χρήστη ή αν
+     το ημερολόγιο είναι ΗΔΗ ανοιχτό (ακριβώς όταν πατήθηκε το εικονίδιο).
+     Χωρίς try/catch, το πάτημα στο εικονίδιο θα έριχνε σφάλμα στην κονσόλα
+     σε κάθε χρήση. Και δεν υπάρχει παντού — γι' αυτό έλεγχος ύπαρξης. */
+  /* Δ3 · πόσους τη φορά. Το «άλλο…» ανοίγει ελεύθερο πεδίο.
+     ⚠ Ο έλεγχος εδώ είναι ΕΥΓΕΝΕΙΑ, όχι ασφάλεια: ο server κόβει στο 500
+     ούτως ή άλλως, γιατί το URL το γράφει ο χρήστης και όχι εμείς. */
+  function accN() {
+    var sel = el('acc-n'), nx = el('acc-nx');
+    var v = (sel && sel.value === '__x') ? parseInt((nx && nx.value) || '100', 10)
+                                         : parseInt((sel && sel.value) || '100', 10);
+    if (!isFinite(v) || v < 1) { v = 100; }
+    return Math.min(v, 500);
+  }
+  function wireAccN() {
+    var sel = el('acc-n'), nx = el('acc-nx');
+    if (!sel || !nx) { return; }
+    sel.onchange = function () {
+      nx.hidden = sel.value !== '__x';
+      if (sel.value !== '__x') { loadKm(false); } else { nx.focus(); }
+    };
+    /* Αλλαγή μεγέθους = ΞΑΝΑ από την κορυφή. Αλλιώς ανακατεύονται σελίδες
+       δύο μεγεθών πάνω από τον ίδιο σελιδοδείκτη και βλέπεις διπλές γραμμές. */
+    nx.onchange = function () { loadKm(false); };
+  }
+
+  function wireDatePickers() {
+    var ds = document.querySelectorAll('input[type="date"]');
+    for (var i = 0; i < ds.length; i++) {
+      ds[i].addEventListener('click', function (e) {
+        var inp = e.currentTarget;
+        if (typeof inp.showPicker !== 'function') { return; }
+        try { inp.showPicker(); } catch (err) {}
+      });
+    }
+  }
 
   function val(id) { var e = el(id); return e ? String(e.value || '').trim() : ''; }
   function qsFrom(map) {
@@ -88,7 +129,13 @@
     }).join('');
   }
 
+  /* Ο διακόπτης του φράγματος (Δ1). Γυρίζει ΜΑΖΙ με τις οθόνες — αλλιώς το
+     CSS με !important θα κρατούσε κρυφή την οθόνη που μόλις ζητήθηκε. */
+  function gate(which) {
+    try { document.documentElement.setAttribute('data-gate', which); } catch (e) {}
+  }
   function showKeyScreen(msg) {
+    gate('key');
     el('s-key').hidden = false; el('s-data').hidden = true;
     el('key-err').hidden = !msg; el('key-err').textContent = msg || '';
     el('key').value = '';
@@ -179,13 +226,22 @@
 
   function renderKmAcc(j, append) {
     var a = j.accounts || [];
-    st.kmTotal = Number(j.accounts_total) || 0;
+    /* Δ3 · το σύνολο μετριέται ΜΙΑ φορά ανά φίλτρο: σε «κι άλλους» ο server
+       στέλνει null και κρατάμε αυτό που ήδη ξέρουμε. Χωρίς αυτό, το
+       ακριβό COUNT(*) θα έτρεχε σε κάθε πάτημα. */
+    if (j.accounts_total !== null && j.accounts_total !== undefined) {
+      st.kmTotal = Number(j.accounts_total) || 0;
+    }
+    st.kmNext = j.next || null;
     st.kmShown = append ? st.kmShown + a.length : a.length;
     var html = a.map(kmRow).join('');
     if (append) { el('acc').insertAdjacentHTML('beforeend', html); }
     else { el('acc').innerHTML = html || '<p class="fine muted">κανένας λογαριασμός με αυτά τα φίλτρα</p>'; }
     el('n-acc').textContent = '(' + fmtN(st.kmTotal) + ')';
     counter('acc-cnt', 'acc-more', st.kmShown, st.kmTotal);
+    /* Ο σελιδοδείκτης είναι η ΑΛΗΘΕΙΑ για το αν υπάρχει συνέχεια — όχι η
+       σύγκριση shown >= total, που ψεύδεται αν μπει νέα εγγραφή όσο κυλάμε. */
+    el('acc-more').hidden = !st.kmNext;
     badge('km-flt-on', KM_F);
   }
 
@@ -224,13 +280,9 @@
       'Έγγραφα 30 ημ.: <b>' + (d.d30 === null || d.d30 === undefined ? '—' : d.d30) + '</b> · ' +
       'Γνώμες: <b>' + (fb.total || 0) + '</b>' + (fb.d30 ? ' (' + fb.d30 + ' σε 30 ημ.)' : '');
 
-    var plans = (sb.by_plan || []).map(function (r) { return { lab: r.plan, n: r.n }; });
-    if (!plans.length) { plans = (sb.by_status || []).map(function (r) { return { lab: r.status, n: r.n }; }); }
-    bars(el('f-plans'), plans, 'lab');
     var vers = (i.by_version || []).map(function (r) { return { lab: r.v || '(χωρίς έκδοση)', n: r.n }; });
     bars(el('f-vers'), vers, 'lab');
 
-    fillSel('g-plan', (f.options || {}).plans, 'όλα');
     renderFwAcc(f, false);
   }
 
@@ -284,8 +336,11 @@
     el('err').hidden = true;
     var p = qsFrom(KM_F);
     qsFrom(FW_F).forEach(function (v, k) { p.set(k, v); });
-    p.set('n', PAGE); p.set('fn', PAGE);
+    /* Η πρώτη φόρτωση σέβεται κι αυτή την επιλογή μεγέθους. Το fn μένει
+       PAGE: η ζώνη FastWrite είναι ο Hetzner και δεν άλλαξε (Δ3 = Kostometro). */
+    p.set('n', accN()); p.set('fn', PAGE);
     api(p).then(function (j) {
+      gate('data');
       el('s-key').hidden = true; el('s-data').hidden = false;
       render(j);
     }).catch(fail).then(done);
@@ -297,7 +352,10 @@
     if (!key() || busy) return; busy = true;
     var b = el('acc-more'); b.disabled = true;
     var p = qsFrom(KM_F);
-    p.set('only', 'km'); p.set('n', PAGE); p.set('off', append ? st.kmShown : 0);
+    /* Δ3 · ΣΕΛΙΔΟΔΕΙΚΤΗΣ αντί για OFFSET. Στέλνουμε πού σταματήσαμε, όχι
+       πόσα να προσπεράσει: η 200ή σελίδα κοστίζει όσο η πρώτη. */
+    p.set('only', 'km'); p.set('n', accN());
+    if (append && st.kmNext) { p.set('ac', st.kmNext.c); p.set('ar', st.kmNext.r); }
     api(p).then(function (j) { renderKmAcc(j, append); })
       .catch(fail).then(function () { busy = false; b.disabled = false; done(); });
   }
@@ -337,5 +395,7 @@
   el('b-key').onclick = function () { showKeyScreen(); };
 
   if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/pinakas/sw.js').catch(function () {}); }
+  wireDatePickers();
+  wireAccN();
   load();
 })();

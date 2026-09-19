@@ -1593,8 +1593,10 @@ async function adminPinakas(request, env) {
   // Hetzner. Στα 1000+ μέλη αυτή η διαφορά είναι μισό δευτερόλεπτο ανά πάτημα.
   if (only === "km") {
     const pg = await kmAccounts(all, one, params);
+    /* Δ3 · ο σελιδοδείκτης αντικατέστησε το off. Το accounts_total είναι
+       null σε «κι άλλους»: η οθόνη κρατάει αυτό που ήδη μέτρησε. */
     return json({ ok: true, at: nowIso, accounts: pg.rows, accounts_total: pg.total,
-                  off: pg.off, n: pg.n, filters: pg.filters });
+                  next: pg.next, n: pg.n, filters: pg.filters });
   }
   if (only === "fw") {
     return json({ ok: true, at: nowIso, fastwrite: await fetchFastWrite(env, params, true) });
@@ -1689,7 +1691,7 @@ async function adminPinakas(request, env) {
     feedback: { n: fb.n || 0, avg_stars: fb.avg_stars ? Number(fb.avg_stars).toFixed(2) : null, want_reply: fb.want_reply || 0 },
     accounts: list.rows,
     accounts_total: list.total,
-    off: list.off, n: list.n, filters: list.filters,
+    next: list.next, n: list.n, filters: list.filters,
     options: {
       sources: bySource.map((r) => r.source),
       refs: byRef.map((r) => r.ref),
@@ -1701,20 +1703,61 @@ async function adminPinakas(request, env) {
   });
 }
 
-// Η λίστα λογαριασμών: φιλτραρισμένη, σελιδοποιημένη, με ΑΛΗΘΙΝΟ σύνολο.
+/* ══ Η ΛΙΣΤΑ ΛΟΓΑΡΙΑΣΜΩΝ — ΣΕΛΙΔΟΠΟΙΗΣΗ ΚΑΤΑ ΚΛΕΙΔΙ (Δ3, 19/9/2026) ══════
+   ΓΙΑΤΙ ΕΦΥΓΕ ΤΟ OFFSET: το «LIMIT 100 OFFSET 20000» δεν πηδάει — ΣΑΡΩΝΕΙ
+   20.100 γραμμές και πετάει τις 20.000. Η 200ή σελίδα κοστίζει 200 φορές
+   όσο η πρώτη. ΣΧΕΔΙΑΖΟΥΜΕ ΓΙΑ ΤΟ ΜΕΓΑΛΟ (Α400 §Δ): με τη διανομή στους
+   73 leads και μετά, ο πίνακας δεν επιτρέπεται να γονατίζει στο βάθος.
+
+   🔴 ΤΟ ΔΕΥΤΕΡΟ ΣΚΕΛΟΣ ΕΙΝΑΙ ΥΠΟΧΡΕΩΤΙΚΟ. Με σκέτο `created`, δύο εγγραφές
+   του ίδιου χιλιοστού στο σύνορο σελίδας είτε χάνονται είτε διπλασιάζονται.
+   ⚠ ΚΑΙ ΔΕΝ ΜΠΟΡΕΙ ΝΑ ΕΙΝΑΙ ΤΟ folder_id: παράγεται από τις 12 λέξεις του
+   χρήστη, ο πίνακας το κόβει επίτηδες σε 8 χαρακτήρες, και υπάρχει τεστ που
+   απαγορεύει το πλήρες στο JSON. Σελιδοδείκτης με folder_id θα το έστελνε
+   στον browser σε κάθε «Κι άλλους».
+   ✅ Άρα: `rowid`. Διαρρέει μόνο σειρά εισαγωγής. Και το SQLite βάζει ΗΔΗ
+   το rowid ως τελικό σκέλος κάθε εγγραφής δείκτη — ο υπάρχων
+   idx_km_accounts_live_created (deleted, created) δίνει ακριβώς τη σειρά
+   (deleted, created, rowid). ΚΑΝΕΝΑΣ νέος δείκτης, καμία μετάβαση.
+
+   ΤΟ ΤΙΜΗΜΑ, ΔΕΚΤΟ: δεν υπάρχει «πήγαινε στη σελίδα 7» — μόνο μπροστά.
+   Ο πίνακας έτσι δούλευε ήδη («Κι άλλους»), άρα δεν χάνεται τίποτα.
+   ΤΟ ΣΥΝΟΛΟ μετριέται ΜΙΑ φορά ανά αλλαγή φίλτρου: το COUNT(*) είναι το
+   ακριβό μέρος και δεν αλλάζει όσο κυλάμε. Χωρίς σελιδοδείκτη = νέο φίλτρο
+   = ξαναμετράμε· με σελιδοδείκτη γυρίζει total: null και η οθόνη κρατάει
+   αυτό που ήδη ξέρει. */
 async function kmAccounts(all, one, params) {
   const f = pkFilters(params);
-  const off = pkNum(params.get("off"), 0, 0, 1000000);
   const n = pkNum(params.get("n"), 100, 1, 500);
-  const t = await one(`SELECT COUNT(*) AS n FROM km_accounts a${f.where}`, ...f.args);
+  const ac = String(params.get("ac") || "").slice(0, 30);   // created του τελευταίου
+  const ar = pkNum(params.get("ar"), 0, 0, 1e15);           // rowid του τελευταίου
+  const more = !!ac;
+
+  const w = f.where ? f.where + " AND " : " WHERE ";
+  const seek = more ? `${w}(a.created < ? OR (a.created = ? AND a.rowid < ?))` : f.where;
+  const seekArgs = more ? [...f.args, ac, ac, ar] : [...f.args];
+
+  /* Το σύνολο ΜΟΝΟ στην πρώτη σελίδα — βλ. σχόλιο πιο πάνω. */
+  const t = more ? null : await one(`SELECT COUNT(*) AS n FROM km_accounts a${f.where}`, ...f.args);
+
   const rows = await all(
-    `SELECT a.email, a.created, a.country, a.source, a.ref, a.last_sync,
+    `SELECT a.rowid AS rid, a.email, a.created, a.country, a.source, a.ref, a.last_sync,
             a.folder_version, a.folder_bytes, a.has_key, a.plan,
             a.delete_due_at, substr(a.folder_id, 1, 8) AS folder,
             (SELECT COUNT(*) FROM km_device_links l WHERE l.folder_id = a.folder_id) AS devices
-     FROM km_accounts a${f.where} ORDER BY a.created DESC LIMIT ? OFFSET ?`,
-    ...f.args, n, off);
-  return { rows, total: (t && t.n) || 0, off, n, filters: f.echo };
+     FROM km_accounts a${seek} ORDER BY a.created DESC, a.rowid DESC LIMIT ?`,
+    ...seekArgs, n);
+
+  /* Ο σελιδοδείκτης της ΤΕΛΕΥΤΑΙΑΣ γραμμής. null όταν δεν υπάρχει συνέχεια:
+     η οθόνη κρύβει το «Κι άλλους» χωρίς δεύτερη κλήση για να το μάθει. */
+  const last = rows.length ? rows[rows.length - 1] : null;
+  const next = (last && rows.length === n) ? { c: last.created, r: last.rid } : null;
+
+  /* 🔴 Το rowid ΔΕΝ φεύγει μέσα στις γραμμές — μόνο μία φορά, στο next.
+     Δεν είναι μυστικό, αλλά δεν έχει καμία δουλειά σε κάθε γραμμή. */
+  for (const r of rows) { delete r.rid; }
+
+  return { rows, total: t ? t.n : null, n, next, filters: f.echo };
 }
 
 // 🔴 ΜΑΘΗΜΑ 16/9 (πέμπτο, το ακριβότερο): είχα καρφώσει το

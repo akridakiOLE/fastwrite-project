@@ -31,9 +31,12 @@ const MUTATIONS = [
   // 7. Η ρύθμιση FW_ORIGIN αγνοείται και ξαναγίνεται καρφωτή διεύθυνση.
   ['const o = String((env && env.FW_ORIGIN) || FW_ORIGIN_DEFAULT).trim();',
    'const o = String(FW_ORIGIN_DEFAULT).trim();'],
-  // 6. Η σελιδοποίηση αγνοεί το off → το «κι άλλους» ξαναδίνει την ίδια σελίδα.
-  ["ORDER BY a.created DESC LIMIT ? OFFSET ?`,\n    ...f.args, n, off);",
-   "ORDER BY a.created DESC LIMIT ? OFFSET ?`,\n    ...f.args, n, 0);"],
+  /* 6. Δ3 · ΤΟ ΔΕΥΤΕΡΟ ΣΚΕΛΟΣ ΤΟΥ ΣΕΛΙΔΟΔΕΙΚΤΗ ΦΕΥΓΕΙ.
+        Με σκέτο created, δύο εγγραφές του ίδιου χιλιοστού στο σύνορο
+        σελίδας χάνονται ή διπλασιάζονται — σιωπηλά. */
+  ["(a.created < ? OR (a.created = ? AND a.rowid < ?))", "(a.created < ?)"],
+  // 8. Δ3 · το σύνολο ξαναμετριέται σε κάθε «κι άλλους» (το ακριβό COUNT).
+  ["const t = more ? null : await one(", "const t = await one("],
 ];
 if (MUTATE) for (const [a, b] of MUTATIONS) {
   if (!src.includes(a)) { console.log("Η ΜΕΤΑΛΛΑΞΗ ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ:\n" + a.slice(0, 90)); process.exit(1); }
@@ -214,17 +217,27 @@ await check("Π-13 · 🔴 accounts_total = πόσοι ΤΑΙΡΙΑΖΟΥΝ, ό�
   const j = await r.json();
   eq(j.accounts.length, 2, "στάλθηκαν:");
   eq(j.accounts_total, 6, "σύνολο:");          // 6 ζωντανοί, 2 στη σελίδα
-  eq(j.n, 2, "n:"); eq(j.off, 0, "off:");
+  eq(j.n, 2, "n:");
+  /* Δ3 · αντί για off, σελιδοδείκτης. Υπάρχει επειδή μένουν κι άλλοι. */
+  if (!j.next || !j.next.c || !j.next.r) throw new Error("λείπει σελιδοδείκτης: " + JSON.stringify(j.next));
 });
 
-await check("Π-14 · η σελίδα 2 φέρνει ΑΛΛΟΥΣ — το «κι άλλους» δεν ξαναδίνει τα ίδια", async () => {
-  const p1 = await (await call("/api/km/admin/pinakas?k=s3cret&n=2&off=0", {})).json();
-  const p2 = await (await call("/api/km/admin/pinakas?k=s3cret&n=2&off=2", {})).json();
-  eq(p2.off, 2, "off:");
-  const a = p1.accounts.map((r) => r.email), b = p2.accounts.map((r) => r.email);
-  if (a.some((e) => b.includes(e))) throw new Error("η σελίδα 2 επαναλαμβάνει τη σελίδα 1");
-  // και οι δύο σελίδες μαζί δεν ξεπερνούν το σύνολο
-  if (a.length + b.length > p1.accounts_total) throw new Error("περισσότερες γραμμές από το σύνολο");
+await check("Π-14 · 🔴 Δ3 · ΣΕΛΙΔΟΠΟΙΗΣΗ ΚΑΤΑ ΚΛΕΙΔΙ — ΚΑΜΙΑ ΕΠΙΚΑΛΥΨΗ, ΚΑΜΙΑ ΑΠΩΛΕΙΑ", async () => {
+  const seen = [], size = 2;
+  let cur = null, guard = 0;
+  while (guard++ < 20) {
+    const q = "/api/km/admin/pinakas?k=s3cret&only=km&n=" + size +
+              (cur ? "&ac=" + encodeURIComponent(cur.c) + "&ar=" + cur.r : "");
+    const j = await (await call(q, {})).json();
+    for (const a of j.accounts) { seen.push(a.email); }
+    /* Το σύνολο μετριέται ΜΙΑ φορά: στη συνέχεια έρχεται null. */
+    if (cur) { eq(j.accounts_total, null, "σύνολο σε συνέχεια:"); }
+    else { eq(j.accounts_total, 6, "σύνολο στην πρώτη:"); }
+    if (!j.next) break;
+    cur = j.next;
+  }
+  eq(seen.length, 6, "συνολικά που ήρθαν:");
+  eq(new Set(seen).size, 6, "ΜΟΝΑΔΙΚΟΙ (καμία επικάλυψη):");
 });
 
 await check("Π-15 · τα φίλτρα δουλεύουν ΣΤΗ ΒΑΣΗ και μειώνουν ΚΑΙ το σύνολο", async () => {
@@ -277,11 +290,14 @@ await check("Π-19 · 🔴 η διεύθυνση του Hetzner είναι ΡΥ�
   if (u.includes(".tech//")) throw new Error("διπλή κάθετος από το τέλος της μεταβλητής: " + u);
 });
 
-await check("Π-18 · παράλογη σελίδα δεν ρίχνει τον πίνακα (n=99999, off=-5)", async () => {
-  const j = await (await call("/api/km/admin/pinakas?k=s3cret&n=99999&off=-5", {})).json();
+await check("Π-18 · παράλογη σελίδα δεν ρίχνει τον πίνακα (n=99999, σκουπίδια σελιδοδείκτη)", async () => {
+  const j = await (await call("/api/km/admin/pinakas?k=s3cret&n=99999", {})).json();
   if (j.n > 500) throw new Error("n χωρίς ταβάνι: " + j.n);
-  if (j.off < 0) throw new Error("αρνητικό off: " + j.off);
   eq(j.accounts_total, 6, "σύνολο:");
+  /* Σελιδοδείκτης από σκουπίδια: δεν σκάει, απλώς δεν φέρνει τίποτα. */
+  const bad = await (await call("/api/km/admin/pinakas?k=s3cret&only=km&n=5&ac=ΣΚΟΥΠΙΔΙ&ar=-9", {})).json();
+  if (!bad.ok) throw new Error("έσκασε σε σκουπίδια");
+  if (!Array.isArray(bad.accounts)) throw new Error("δεν γύρισε λίστα");
 });
 
 console.log(failed ? "\nΚΟΚΚΙΝΟ: " + failed + " φρουροί έπεσαν" : "\nΠΡΑΣΙΝΟ: όλοι οι φρουροί πέρασαν");
