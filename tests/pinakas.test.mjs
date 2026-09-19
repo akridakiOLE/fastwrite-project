@@ -42,7 +42,7 @@ if (MUTATE) for (const [a, b] of MUTATIONS) {
 const mod = await import("data:text/javascript;base64," + Buffer.from(src).toString("base64"));
 
 const db = new DatabaseSync(":memory:");
-for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_feedback.sql", "km_h11b.sql", "km_ref.sql"]) {
+for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_feedback.sql", "km_h11b.sql", "km_ref.sql", "km_ref2.sql"]) {
   const sql = readFileSync("schema/" + f, "utf8").split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
   for (const s of sql.split(";")) { const t = s.trim(); if (!t) continue;
     try { db.exec(t + ";"); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }

@@ -367,11 +367,29 @@ async function refInfo(request, env) {
     ? await n("SELECT COUNT(*) AS n FROM km_accounts WHERE ref = ? AND deleted IS NULL AND plan IS NOT NULL")
     : null;
 
+  /* Η ΛΙΣΤΑ ΤΩΝ ΕΓΓΡΑΦΩΝ.
+     🔴 Ο ΦΡΟΥΡΟΣ ΕΙΝΑΙ ΤΟ CASE, ΚΑΙ ΖΕΙ ΣΤΟ SQL ΕΠΙΤΗΔΕΣ: το email φεύγει
+     από τη βάση ΜΟΝΟ αν ο ίδιος ο συστημένος το επέτρεψε. Αν ζούσε στη
+     JavaScript, μια λάθος γραμμή αργότερα θα το διέρρεε — εδώ δεν υπάρχει
+     καν στο αποτέλεσμα για να διαρρεύσει.
+     ⚠ Ημερομηνία ΜΟΝΟ (10 χαρακτήρες), όχι ώρα: η ακριβής ώρα εγγραφής δεν
+     χρειάζεται σε κανέναν και στενεύει πολύ το ποιος είναι.
+     Όριο 50, νεότερες πρώτα — ΣΧΕΔΙΑΖΟΥΜΕ ΓΙΑ ΤΟ ΜΕΓΑΛΟ: με 300 συστάσεις
+     η οθόνη δεν κατεβάζει 300 γραμμές σε κινητό. */
+  const rows = await env.DB.prepare(
+    `SELECT substr(created, 1, 10) AS pote,
+            CASE WHEN ref_share = 1 THEN email ELSE NULL END AS email
+       FROM km_accounts
+      WHERE ref = ? AND deleted IS NULL
+      ORDER BY created DESC LIMIT 50`
+  ).bind(code).all();
+
   return json({
     ok: true,
     code: code,
     opened: opened,
     signups: signups,
+    list: (rows.results || []).map((r) => ({ when: r.pote, email: r.email || null })),
     active: active,
     self_active: !!a.acc.plan,
     pro_live: live,
@@ -455,8 +473,8 @@ async function register(request, env) {
     const stmts = [
       env.DB.prepare(
         `INSERT INTO km_accounts (folder_id, auth_hash, email, created, country, source, ref, has_key,
-                                  active_device_id, active_since, ref_code)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                                  active_device_id, active_since, ref_code, ref_share)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         id.folder, h, email, ts,
         (request.cf && request.cf.country) || null,
@@ -466,7 +484,11 @@ async function register(request, env) {
         id.device, ts,
         // 17/9/2026: ο κωδικός γεννιέται ΜΑΖΙ με τον λογαριασμό. Δεν
         // περιμένει να ανοίξει ο χρήστης την οθόνη «Κάλεσε».
-        await refCodeFor(id.folder, 0)
+        await refCodeFor(id.folder, 0),
+        /* 19/9/2026 — συγκατάθεση να φανεί το email στον συστήνοντα.
+           Έχει νόημα ΜΟΝΟ όταν υπάρχει σύσταση: χωρίς ref δεν υπάρχει
+           κανείς να το δει, και το 1 θα ήταν σκουπίδι στη βάση. */
+        (normRef(b.ref) && b.ref_share) ? 1 : 0
       ),
     ];
     if (id.lock) {

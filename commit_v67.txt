@@ -1,0 +1,58 @@
+v67: the invited person decides whether their name is shown - consent, not disclosure
+
+ASKED FOR by Stavros (19/9/2026): the referrer should see WHICH invitation
+converted, otherwise the counter is an opaque number. Real need.
+
+OBJECTION RAISED, AND WHY IT CHANGED THE DESIGN: the email belongs to the
+invited business, not to whoever sent them the link. Showing it outright has
+no legal basis, contradicts the product's own promise ("sees an account, never
+content"), and leaks competitive intelligence - anyone spraying their link
+learns which local businesses use Kostometro.
+
+Stavros's answer, from having been on the receiving end of such programs:
+disclose it at signup. Correct - with one precision: notice alone is not a
+legal basis. The person must be able to say no. So it is CONSENT, and the
+referral counts either way.
+
+DESIGN
+- checkbox on the email screen, shown ONLY to someone who arrived via a link
+- UNCHECKED by default: a pre-ticked box is not consent and is the first thing
+  any review fails
+- the screen says outright "the referral counts anyway" so nobody feels they
+  owe their name to the person who invited them
+- without consent the referrer sees "Εγγραφή #2 — 19/09": a running number and
+  a date, which is exactly as revealing as the counter already was
+- date only, never the time: the exact minute narrows down who far too much
+- list capped at 50, newest first - a member with 300 referrals must not pull
+  300 rows onto a phone
+
+WHERE THE GUARD LIVES
+CASE WHEN ref_share = 1 THEN email ELSE NULL, in SQL, on purpose. If it lived
+in JavaScript a wrong line later would leak an address; here the address is
+not in the result to leak. Default 0, so every existing account stays hidden -
+they were never asked.
+
+The list is drawn with createElement + textContent, never innerHTML: the email
+is typed by one human and rendered on another human's screen.
+
+CAUGHT WHILE BUILDING (measured, before shipping)
+- `.chk` was ALREADY defined twice in app.css and is used by other screens.
+  A bare `.chk` rule here would have silently restyled all of them. Scoped to
+  `.consent .chk`.
+- `esc()` does not exist in this codebase - the grep-before-naming rule caught
+  it before the name was used.
+- ref.test M2 anchored on the code that FOLLOWED it and lost its target when
+  the list query landed between. A mutation that finds no target stops proving
+  anything; re-anchored to the expression itself. Same failure as M5 in v66.
+- test O-20 first went red on its own comment. A check that reads comments is
+  not checking code; it now strips them.
+
+TESTS
+- 4 server checks (S-12..S-15) + 2 mutations: M6 leaks the email without
+  consent, M7 writes consent for someone who never came from a referral.
+- 4 screen checks (O-18..O-21) + 3 mutations: pre-ticked box, innerHTML with
+  user data, and the CSS rule escaping its scope.
+- 7 suites green; 19 mutations proven red ONE AT A TIME.
+
+ORDER ON DEPLOY: the D1 migration runs BEFORE the worker. The new register
+writes ref_share; without the column every registration returns 500.

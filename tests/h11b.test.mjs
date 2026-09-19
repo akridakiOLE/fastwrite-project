@@ -36,7 +36,7 @@ const mod = await import("data:text/javascript;base64," + Buffer.from(src).toStr
 
 // ── βάση + R2 ──────────────────────────────────────────────────────────────
 const db = new DatabaseSync(":memory:");
-for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_h11b.sql", "km_ref.sql"]) {
+for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_h11b.sql", "km_ref.sql", "km_ref2.sql"]) {
   // ⚠ Οι γραμμές σχολίων φεύγουν ΠΡΙΝ το σπάσιμο σε εντολές. Πρώτη γραφή:
   // split(";") και μετά «πέτα ό,τι αρχίζει με --» — που πετούσε ΟΛΟΚΛΗΡΟ το
   // πρώτο κομμάτι, σχόλιο ΚΑΙ το CREATE TABLE μαζί («no such table»).

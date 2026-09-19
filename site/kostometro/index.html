@@ -92,6 +92,17 @@
       <input type="email" id="in-email" inputmode="email" autocomplete="email" placeholder="onoma@example.com">
     </label>
     <p class="err" id="err-email" hidden>Γράψε μια σωστή διεύθυνση email.</p>
+    <!-- v67 · ΣΥΓΚΑΤΑΘΕΣΗ ΓΙΑ ΤΟ ΟΝΟΜΑ (19/9/2026).
+         Φαίνεται ΜΟΝΟ σε όποιον ήρθε από πρόσκληση. Το κουτάκι είναι
+         ΑΣΥΜΠΛΗΡΩΤΟ: προεπιλεγμένο «ναι» δεν είναι συγκατάθεση, είναι
+         το πρώτο πράγμα που πέφτει σε οποιονδήποτε έλεγχο.
+         Και λέει ρητά ότι η σύσταση μετράει έτσι κι αλλιώς — ώστε κανείς
+         να μη νιώσει ότι «χρωστάει» το όνομά του σε αυτόν που τον κάλεσε. -->
+    <div class="consent" id="ref-consent" hidden>
+      <p class="fine"><b>Ήρθες από πρόσκληση κάποιου.</b></p>
+      <label class="chk"><input type="checkbox" id="ref-consent-ok"><span>Να βλέπει το email μου στα στατιστικά της σύστασής του.</span></label>
+      <p class="fine">Η σύστασή του <b>μετράει έτσι κι αλλιώς</b> — αυτό αφορά μόνο αν θα δει ποιος είσαι. Αλλιώς βλέπει «Εγγραφή #2 — <span id="ref-today">σήμερα</span>».</p>
+    </div>
     <button class="btn primary" id="go-email">Συνέχεια</button>
     <p class="fine">Δωρεάν, χωρίς όριο χρόνου. Το email είναι για <b>ειδοποιήσεις ασφαλείας</b> (αν ζητηθεί διαγραφή ή αλλάξουν οι 12 λέξεις) και για ενημερώσεις της εφαρμογής.</p>
   </div>
@@ -396,6 +407,10 @@
     <div class="kv"><span>Άνοιξαν τον σύνδεσμό σου</span><b id="ref-opened">—</b></div>
     <div class="kv"><span>Εγγραφές που ήρθαν</span><b id="ref-signups">—</b></div>
     <div class="kv"><span>Ενεργές συστάσεις</span><b id="ref-active">—</b></div>
+    <!-- v67 — ΠΟΙΟΣ ΓΡΑΦΤΗΚΕ. Email μόνο όπου ο ίδιος ο συστημένος το
+         επέτρεψε· αλλιώς αύξων αριθμός και ημερομηνία. Ο φρουρός ζει στο
+         SQL (CASE WHEN ref_share), όχι εδώ. -->
+    <div id="ref-list"></div>
     <p class="fine" data-pro="soon">Οι ενεργές συστάσεις ενεργοποιούνται μόλις βγει η έκδοση PRO.<br><b>ΟΙ ΠΡΟΣΚΛΗΣΕΙΣ ΣΟΥ ΚΑΤΑΓΡΑΦΟΝΤΑΙ ΑΠΟ ΣΗΜΕΡΑ ΚΑΙ ΔΕΝ ΛΗΓΟΥΝ.</b></p>
     <p class="fine" id="ref-credit" data-pro="live" hidden></p>
     <p class="good" data-pro="soon">🟢 Το PRO θα το κατεβάσουν πρώτοι όσοι χρησιμοποιούν ήδη το Kostometro Free.</p>

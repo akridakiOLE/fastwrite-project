@@ -21,6 +21,9 @@
        κινητού έσβηνε τις συστάσεις όποιου είχε ήδη καλέσει επιχειρήσεις. */
     refCode: 'km_ref_code',
     refHit:  'km_ref_hit',
+    /* v67 — η συγκατάθεση του ΣΥΣΤΗΜΕΝΟΥ να φανεί το email του σε αυτόν
+       που τον κάλεσε. Κρατιέται ως την εγγραφή και στέλνεται μία φορά. */
+    refShare: 'km_ref_share',
     diag:  'km_ai_diag',
     model: 'km_ai_model',
     /* v26 · Η.2β-1 — ο λογαριασμός. Οι 12 λέξεις ΜΕΝΟΥΝ στη συσκευή:
@@ -356,6 +359,7 @@
       if (supView) { var v = supView; all().then(function (rs) { openSupplier(v, rs); }); }
       else { renderSupPage(); }
     }
+    if (id === 's-email')    { renderConsent(); }
     if (id === 's-ref')      { renderRef(); }
     if (id === 's-dpend')    { dpStart(); } else { dpStop(); }
     if (id === 's-settings') { renderSettings(); }
@@ -1826,6 +1830,43 @@
     }
   }
 
+  /* Η συγκατάθεση φαίνεται ΜΟΝΟ σε όποιον ήρθε από πρόσκληση: σε όλους τους
+     άλλους δεν υπάρχει κανείς να δει το email τους, και ένα κουτάκι που δεν
+     αφορά κανέναν είναι θόρυβος πάνω στην πρώτη οθόνη του προϊόντος. */
+  function renderConsent(){
+    var src = localStorage.getItem(LS.src) || '';
+    var isRef = /^ref:/.test(src);
+    el('ref-consent').hidden = !isRef;
+    if (!isRef) { return; }
+    var d = new Date();
+    el('ref-today').textContent = ('0'+d.getDate()).slice(-2) + '/' + ('0'+(d.getMonth()+1)).slice(-2);
+  }
+
+  /* Η λίστα «ποιος γράφτηκε». Ο server στέλνει email ΜΟΝΟ όπου δόθηκε
+     συγκατάθεση — εδώ απλώς ζωγραφίζουμε ό,τι ήρθε, χωρίς δεύτερη κρίση.
+     ⚠ createElement + textContent, ΠΟΤΕ innerHTML με δεδομένα χρήστη: το
+     email το γράφει άνθρωπος και καταλήγει στην οθόνη άλλου ανθρώπου.
+     Ίδιο μοτίβο με τις υπόλοιπες λίστες της εφαρμογής (γρ. 941, 1298). */
+  function renderRefList(list){
+    var box = el('ref-list');
+    if (!box) { return; }
+    box.innerHTML = '';
+    if (!list || !list.length) { return; }
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      var row = document.createElement('div');
+      row.className = 'kv sub';
+      var who = document.createElement('span');
+      who.textContent = r.email ? r.email : ('Εγγραφή #' + (list.length - i));
+      if (!r.email) { who.className = 'anon'; }
+      var when = document.createElement('b');
+      var d = String(r.when || '');
+      when.textContent = (d.length === 10) ? (d.slice(8, 10) + '/' + d.slice(5, 7)) : d;
+      row.appendChild(who); row.appendChild(when);
+      box.appendChild(row);
+    }
+  }
+
   function renderRef() {
     var link = el('ref-link');
     link.textContent = refUrl() || 'Φόρτωση…';
@@ -1850,6 +1891,7 @@
       /* ⚠ ΤΟ «—» ΔΕΝ ΓΙΝΕΤΑΙ «0» ΠΡΙΝ ΥΠΑΡΞΕΙ ΤΟ PRO. Το μηδέν διαβάζεται
          «κανείς δεν μπήκε»· η αλήθεια είναι «όχι ακόμα». */
       el('ref-active').textContent = (j.active === null || j.active === undefined) ? '—' : String(j.active);
+      renderRefList(j.list);
       refProState(!!j.pro_live);
       /* Η γραμμή επιστροφής σε ευρώ θέλει τιμολόγηση, που δεν υπάρχει ακόμα.
          Ως τότε μένει ΚΡΥΦΗ: άδειο κουτί σε ζωντανή οθόνη διαβάζεται ως
@@ -1925,7 +1967,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v66';
+  var APP_VER = 'φέτα 3 · v67';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2794,6 +2836,7 @@
         email: email,
         source: ref ? 'link' : src,
         ref: ref ? ref[1] : null,
+        ref_share: (ref && localStorage.getItem(LS.refShare)) ? 1 : 0,
         has_key: !!localStorage.getItem(LS.key),
         device_name: devName(),
         /* v47 · Η.13 — σε ΝΕΟ λογαριασμό, η πρώτη κλειδαριά γράφεται στην
@@ -4199,6 +4242,14 @@
     if (!validEmail(v)) { el('err-email').hidden = false; return; }
     el('err-email').hidden = true;
     localStorage.setItem(LS.email, v);
+    /* Κρατιέται ΜΟΝΟ αν δόθηκε. Η απουσία του κλειδιού = όχι. */
+    /* ⚠ ΟΧΙ 'ref-share': το id το κρατάει ΗΔΗ το κουμπί «Στείλ' τον» της
+       οθόνης «Κάλεσε». Η οθόνη email είναι πιο πάνω στο HTML, άρα το
+       el('ref-share') θα γύριζε το κουτάκι αντί για το κουμπί και θα
+       έσπαγαν και τα δύο. Μετρήθηκε 19/9/2026 πριν ανέβει. */
+    var ck = el('ref-consent-ok');
+    if (ck && ck.checked) { localStorage.setItem(LS.refShare, '1'); }
+    else { localStorage.removeItem(LS.refShare); }
     startWords(false);
   };
   el('go-key').onclick = function () {

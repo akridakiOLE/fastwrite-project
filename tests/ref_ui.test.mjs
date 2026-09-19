@@ -15,6 +15,7 @@ const VER = JSON.parse(readFileSync("site/kostometro/version.json", "utf8")).v;
 let html = readFileSync("site/kostometro/index.html", "utf8");
 let js   = readFileSync("site/kostometro/app.js", "utf8");
 let sw   = readFileSync("site/kostometro/sw.js", "utf8");
+let css  = readFileSync("site/kostometro/app.css", "utf8");
 
 const MUTATIONS = [
   // Μ1 · χάνεται η κατάσταση Β — την ημέρα του PRO η οθόνη λέει ακόμα «ΤΙ ΕΡΧΕΤΑΙ».
@@ -40,15 +41,22 @@ const MUTATIONS = [
   ["js", "return 'ref:' + qRef[1].toUpperCase();", "return 'ref:' + qRef[1];"],
   // Μ9 · η σύσταση αρχίζει να αλλάζει ΑΝΑΔΡΟΜΙΚΑ, μετά την εγγραφή (Α400 §Δ).
   ["js", "if (qRef && !registered) {", "if (qRef) {"],
+  // Μ10 · 🔴 ΤΟ ΚΟΥΤΑΚΙ ΣΥΓΚΑΤΑΘΕΣΗΣ ΕΡΧΕΤΑΙ ΠΡΟΕΠΙΛΕΓΜΕΝΟ — δεν είναι συγκατάθεση.
+  ["html", '<input type="checkbox" id="ref-consent-ok">', '<input type="checkbox" id="ref-consent-ok" checked>'],
+  // Μ11 · το email μπαίνει σε innerHTML — δεδομένο χρήστη στην οθόνη άλλου χρήστη.
+  ["js", "who.textContent = r.email ? r.email : ('Εγγραφή #' + (list.length - i));",
+         "who.innerHTML = r.email ? r.email : ('Εγγραφή #' + (list.length - i));"],
+  // Μ12 · ο κανόνας ξεφεύγει από το .consent και αλλάζει ΟΛΑ τα κουτάκια.
+  ["css", ".consent .chk { align-items: flex-start;", ".chk { align-items: flex-start;"],
 ];
 if (ONLY !== null) {
   const m = MUTATIONS[ONLY - 1];
   if (!m) { console.log("Δεν υπάρχει μετάλλαξη Μ" + ONLY); process.exit(1); }
   const [which, a, b] = m;
-  const bag = { html, js, sw };
+  const bag = { html, js, sw, css };
   if (!bag[which].includes(a)) { console.log("Η ΜΕΤΑΛΛΑΞΗ Μ" + ONLY + " ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ:\n" + a.slice(0, 90)); process.exit(1); }
   bag[which] = bag[which].replace(a, b);
-  ({ html, js, sw } = bag);
+  ({ html, js, sw, css } = bag);
 }
 
 // Μόνο η ενότητα της οθόνης — όχι όλο το index.html.
@@ -141,6 +149,48 @@ check("Ο-12 · το άνοιγμα αναφέρεται μία φορά, και
   const iHit = boot.indexOf("refReportHit();");
   if (iHit < 0) throw new Error("το boot δεν αναφέρει το άνοιγμα");
   if (iHit < iSrc) throw new Error("η αναφορά είναι ΜΕΣΑ στο «πρώτη εγκατάσταση»");
+});
+
+check("Ο-18 · 🔴 ΤΟ ΚΟΥΤΑΚΙ ΣΥΓΚΑΤΑΘΕΣΗΣ ΕΙΝΑΙ ΑΣΥΜΠΛΗΡΩΤΟ", () => {
+  const S2 = html.slice(html.indexOf('id="ref-consent"'), html.indexOf('id="go-email"'));
+  has(S2, '<input type="checkbox" id="ref-consent-ok">', "το κουτάκι");
+  hasnt(S2, /id="ref-consent-ok"[^>]*checked/, "προεπιλεγμένο ναι");
+});
+
+check("Ο-22 · 🔴 ΚΑΝΕΝΑ ΔΙΠΛΟ id ΣΕ ΟΛΟ ΤΟ index.html", () => {
+  /* 19/9/2026: το κουτάκι συγκατάθεσης πήρε id="ref-share", που το κρατούσε
+     ΗΔΗ το κουμπί «Στείλ' τον». Το el() γυρίζει το ΠΡΩΤΟ στο έγγραφο, άρα
+     θα έσπαγαν και τα δύο — σιωπηλά, χωρίς κανένα σφάλμα στην κονσόλα.
+     Ο φρουρός μπαίνει για ΟΛΑ τα id, όχι μόνο για τα δικά μου. */
+  const ids = (html.match(/\sid="([^"]+)"/g) || []).map((m) => m.slice(5, -1));
+  const seen = {}, dup = [];
+  for (const id of ids) { if (seen[id]) { dup.push(id); } seen[id] = 1; }
+  if (dup.length) throw new Error("διπλά id: " + [...new Set(dup)].join(", "));
+});
+
+check("Ο-19 · λέει ρητά ότι η σύσταση μετράει ΚΑΙ ΧΩΡΙΣ αυτό", () => {
+  const S2 = html.slice(html.indexOf('id="ref-consent"'), html.indexOf('id="go-email"'));
+  has(S2, "μετράει έτσι κι αλλιώς", "χωρίς πίεση");
+  has(S2, "Ήρθες από πρόσκληση", "διαφάνεια");
+});
+
+check("Ο-20 · 🔴 ΤΟ EMAIL ΑΛΛΟΥ ΧΡΗΣΤΗ ΔΕΝ ΜΠΑΙΝΕΙ ΠΟΤΕ ΣΕ innerHTML", () => {
+  const raw = js.slice(js.indexOf("function renderRefList"), js.indexOf("function renderRef()"));
+  // ⚠ ΧΩΡΙΣ ΣΧΟΛΙΑ: η πρώτη γραφή του ελέγχου κοκκίνιζε στο ίδιο του το
+  //    σχόλιο («ΠΟΤΕ innerHTML με δεδομένα χρήστη»). Ένας έλεγχος που
+  //    διαβάζει σχόλια δεν ελέγχει κώδικα.
+  const f = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  has(f, "who.textContent =", "textContent");
+  if (/innerHTML\s*=\s*[^'\s]/.test(f) || /innerHTML\s*\+=/.test(f)) {
+    throw new Error("innerHTML με δεδομένα");
+  }
+});
+
+check("Ο-21 · ο κανόνας του κουτακιού ΔΕΝ ξεφεύγει στα υπόλοιπα .chk της εφαρμογής", () => {
+  // Το .chk ορίζεται ΗΔΗ δύο φορές και το χρησιμοποιούν άλλες οθόνες.
+  has(css, ".consent .chk {", "περιορισμένο");
+  const mine = css.slice(css.indexOf("v67 · ΣΥΓΚΑΤΑΘΕΣΗ"));
+  if (/^\.chk\s*\{/m.test(mine)) throw new Error("γενικός κανόνας .chk στο v67");
 });
 
 /* ── Η ΣΥΛΛΗΨΗ ΤΗΣ ΣΥΣΤΑΣΗΣ, ΜΕΤΡΗΜΕΝΗ ΣΤΗΝ ΠΡΑΞΗ (v66) ──

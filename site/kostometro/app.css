@@ -580,3 +580,29 @@ textarea#fb-text:focus{outline:none;border-color:var(--accent)}
 }
 /* Κουμπί χωρίς κωδικό = σύνδεσμος χωρίς ?ref= = σύσταση που χάθηκε σιωπηλά. */
 #s-ref .btn[disabled] { opacity: .45; pointer-events: none; }
+
+
+/* ══ v67 · ΣΥΓΚΑΤΑΘΕΣΗ ΚΑΙ ΛΙΣΤΑ ΣΥΣΤΑΣΕΩΝ (19/9/2026) ═════════════════ */
+/* Η συγκατάθεση κάθεται πάνω στην ΠΡΩΤΗ οθόνη του προϊόντος. Δεν φωνάζει
+   και δεν κρύβεται: πλαίσιο, όχι κόκκινο· διαβάζεται, δεν τρομάζει. */
+.consent {
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .03);
+  text-align: left;
+}
+.consent .fine { margin: 0 0 8px; }
+.consent .fine:last-child { margin: 8px 0 0; }
+/* ⚠ ΠΕΡΙΟΡΙΣΜΕΝΟ ΣΤΟ .consent ΕΠΙΤΗΔΕΣ. Το .chk ορίζεται ΗΔΗ δύο φορές πιο
+   πάνω (γρ. 476 και 553) και το χρησιμοποιούν άλλες οθόνες. Σκέτο «.chk»
+   εδώ θα τις άλλαζε ΟΛΕΣ σιωπηλά — μετρήθηκε 19/9/2026 πριν ανέβει. */
+.consent .chk { align-items: flex-start; cursor: pointer; line-height: 1.45; margin: 0; }
+/* 24px: κάτω από αυτό το κουτάκι αστοχεί με το δάχτυλο σε κινητό. */
+.consent .chk input { width: 24px; height: 24px; margin-top: 1px; flex: 0 0 24px; }
+
+#ref-list { margin: 4px 0 14px; }
+#ref-list .kv.sub { padding: 7px 0; font-size: 14px; opacity: .92; }
+/* Ο ανώνυμος δεν είναι «λιγότερος» — απλώς δεν έδωσε όνομα. */
+#ref-list .anon { opacity: .62; font-style: italic; }

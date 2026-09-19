@@ -27,8 +27,12 @@ const MUTATIONS = [
    'const signups = await n("SELECT COUNT(*) AS n FROM km_accounts WHERE ref = ?");'],
   // Μ2 · 🔴 ΤΟ ΣΙΩΠΗΛΟ ΨΕΜΑ: το «—» γίνεται «0» πριν υπάρξει PRO.
   //      «0 ενεργές» διαβάζεται «κανείς δεν μπήκε». Η αλήθεια είναι «όχι ακόμα».
-  ['    : null;\n\n  return json({\n    ok: true,\n    code: code,',
-   '    : 0;\n\n  return json({\n    ok: true,\n    code: code,'],
+  /* ⚠ ΑΓΚΥΡΑ ΣΤΗΝ ΙΔΙΑ ΤΗΝ ΕΚΦΡΑΣΗ, ΟΧΙ ΣΤΟ ΤΙ ΑΚΟΛΟΥΘΕΙ: η πρώτη γραφή
+     έδενε με το «return json({...}) από κάτω» και έχασε τον στόχο της μόλις
+     μπήκε η λίστα ανάμεσα (19/9/2026). Μια μετάλλαξη που δεν βρίσκει στόχο
+     παύει σιωπηλά να αποδεικνύει — ο φρουρός «ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ» το έπιασε. */
+  ['  const active = live\n    ? await n("SELECT COUNT(*) AS n FROM km_accounts WHERE ref = ? AND deleted IS NULL AND plan IS NOT NULL")\n    : null;',
+   '  const active = live\n    ? await n("SELECT COUNT(*) AS n FROM km_accounts WHERE ref = ? AND deleted IS NULL AND plan IS NOT NULL")\n    : 0;'],
   // Μ3 · φεύγει η κανονικοποίηση — ο ίδιος σύνδεσμος μετράει σε δύο κουβάδες.
   ['function normRef(v) { return (clean(v, 40) || "").toUpperCase() || null; }',
    'function normRef(v) { return clean(v, 40) || null; }'],
@@ -38,6 +42,10 @@ const MUTATIONS = [
   // Μ5 · 🔴 Η ΠΑΛΙΝΔΡΟΜΗΣΗ ΠΟΥ ΔΙΟΡΘΩΣΑΜΕ: ο κωδικός ξαναγίνεται της ΣΥΣΚΕΥΗΣ.
   ['const code = await ensureRefCode(env, a.id.folder, a.acc.ref_code);',
    'const code = await refCodeFor(a.id.device, 0);'],
+  // Μ6 · 🔴 ΔΙΑΡΡΟΗ: το email φεύγει από τη βάση ΧΩΡΙΣ συγκατάθεση.
+  ['CASE WHEN ref_share = 1 THEN email ELSE NULL END AS email', 'email AS email'],
+  // Μ7 · γράφεται συγκατάθεση σε λογαριασμό που δεν ήρθε καν από σύσταση.
+  ['(normRef(b.ref) && b.ref_share) ? 1 : 0', 'b.ref_share ? 1 : 0'],
 ];
 if (MUTATE) MUTATIONS.forEach(([a, b], i) => {
   if (ONLY !== null && ONLY !== i + 1) return;
@@ -47,7 +55,7 @@ if (MUTATE) MUTATIONS.forEach(([a, b], i) => {
 const mod = await import("data:text/javascript;base64," + Buffer.from(src).toString("base64"));
 
 const db = new DatabaseSync(":memory:");
-for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_feedback.sql", "km_h11b.sql", "km_ref.sql"]) {
+for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_feedback.sql", "km_h11b.sql", "km_ref.sql", "km_ref2.sql"]) {
   const sql = readFileSync("schema/" + f, "utf8").split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
   for (const s of sql.split(";")) { const t = s.trim(); if (!t) continue;
     try { db.exec(t + ";"); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }
@@ -166,6 +174,46 @@ await check("Σ-10 · σκουπίδια στο /ref/hit → 400, και τίπ�
   eq((await post("/api/km/ref/hit", {}, {})).status, 400, "άδειο:");
   eq((await post("/api/km/ref/hit", {}, { ref: "X" })).status, 400, "χωρίς install:");
   eq(db.prepare("SELECT COUNT(*) AS n FROM km_ref_hits").get().n, before, "γραμμές:");
+});
+
+await check("Σ-12 · 🔴 ΧΩΡΙΣ ΣΥΓΚΑΤΑΘΕΣΗ ΤΟ EMAIL ΔΕΝ ΦΕΥΓΕΙ ΑΠΟ ΤΗ ΒΑΣΗ", async () => {
+  const C = await account({ source: "link" });
+  const jc = await refOf(C);
+  await account({ source: "link", ref: jc.code });                    // χωρίς ref_share
+  await account({ source: "link", ref: jc.code, ref_share: 0 });      // ρητό όχι
+  const j = await refOf(C);
+  eq(j.list.length, 2, "γραμμές:");
+  for (const r of j.list) {
+    if (r.email !== null) throw new Error("ΔΙΑΡΡΟΗ email: " + r.email);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.when)) throw new Error("ημερομηνία: " + r.when);
+  }
+});
+
+await check("Σ-13 · με ρητή συγκατάθεση το email φαίνεται — και ΜΟΝΟ αυτό", async () => {
+  const C = await account({ source: "link" });
+  const jc = await refOf(C);
+  const yes = await account({ source: "link", ref: jc.code, ref_share: 1 });
+  await account({ source: "link", ref: jc.code });
+  const j = await refOf(C);
+  const shown = j.list.filter((r) => r.email);
+  eq(shown.length, 1, "πόσα email φαίνονται:");
+  eq(shown[0].email, yes.email, "ποιο:");
+});
+
+await check("Σ-14 · συγκατάθεση ΧΩΡΙΣ σύσταση δεν γράφεται (σκουπίδι στη βάση)", async () => {
+  const solo = await account({ source: "link", ref_share: 1 });
+  const row = db.prepare("SELECT ref_share FROM km_accounts WHERE folder_id = ?").get(solo.folder);
+  eq(row.ref_share, 0, "ref_share:");
+});
+
+await check("Σ-15 · η λίστα δεν δείχνει διαγραμμένους", async () => {
+  const C = await account({ source: "link" });
+  const jc = await refOf(C);
+  const dead = await account({ source: "link", ref: jc.code, ref_share: 1 });
+  eq((await refOf(C)).list.length, 1, "πριν:");
+  await post("/api/km/delete", H(dead), { confirm: "ΔΙΑΓΡΑΦΗ" });
+  await mod.kmDeleteDue(env, "2030-01-01T00:00:00Z");
+  eq((await refOf(C)).list.length, 0, "μετά:");
 });
 
 await check("Σ-11 · χωρίς ταυτότητα ο κωδικός ΔΕΝ δίνεται", async () => {
