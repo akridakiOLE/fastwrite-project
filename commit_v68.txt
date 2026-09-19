@@ -1,0 +1,41 @@
+v68: fix - the consent checkbox never appeared, and detail in the referral list
+
+THE BUG (found by Stavros on the live v67, reproduced in a clean browser)
+The consent checkbox was in the DOM but its box stayed hidden. Cause: the v67
+hook went into render(id), which is called ONLY by menu navigation. The email
+screen is reached through show('s-email'), which has no hooks. So the checkbox
+never appeared for anyone - silently, with no console error.
+
+My mistake: I assumed where the hook block lived instead of measuring it. The
+codebase has two functions - show(id) flips the screens, render(id) fills them
+- and only the second carries the hooks.
+
+The hook now lives in show(), the single point every path goes through. Same
+reasoning as the v49 lock comment three lines below it: what must hold on every
+route belongs where every route passes, not on the buttons.
+
+Reproduction, measured before and after: fresh profile, localStorage cleared,
+service worker unregistered, open with ?ref= -> km_source = "ref:MH8Y9QVNHH"
+correct, s-email shown, #ref-consent hidden:true. That is the failure.
+
+DETAIL IN THE LIST (asked for by Stavros: date / time / day)
+Granted where it is safe, refused where it is not:
+- WITH consent: day, date and time. The email is already shown, so the time
+  adds no exposure and helps the referrer match the invitation.
+- WITHOUT consent: date ONLY. On an anonymous row the exact time identifies:
+  "Εγγραφή #2 — 19/09 19:42" and a referrer who sent one invitation at 19:40
+  knows exactly who it is. That would cancel, in practice, the refusal the
+  person just gave us - the whole point of asking.
+The split lives in SQL, next to the email guard: CASE WHEN ref_share = 1 THEN
+created ELSE substr(created, 1, 10).
+
+TESTS
+- S-16: the time leaves the database only together with the email.
+- O-23: the consent hook hangs off show(), not render() - the guard for exactly
+  tonight's bug, including "no duplicate hook in render()".
+- O-24: refWhen() is extracted and RUN: a 10-character input must never produce
+  a time; a full timestamp must produce day and time.
+- 3 new mutations (M8 leaks the time on anonymous rows, M13 puts the hook back
+  in render()). 7 suites green, 23 mutations proven red ONE AT A TIME.
+
+No database change. Rollback: git revert + push.

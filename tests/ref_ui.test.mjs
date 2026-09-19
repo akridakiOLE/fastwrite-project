@@ -48,6 +48,9 @@ const MUTATIONS = [
          "who.innerHTML = r.email ? r.email : ('Εγγραφή #' + (list.length - i));"],
   // Μ12 · ο κανόνας ξεφεύγει από το .consent και αλλάζει ΟΛΑ τα κουτάκια.
   ["css", ".consent .chk { align-items: flex-start;", ".chk { align-items: flex-start;"],
+  // Μ13 · 🔴 ΤΟ ΣΦΑΛΜΑ ΤΗΣ v67: το hook γυρίζει στο render(), όπου η οθόνη
+  //       email ΔΕΝ περνάει ποτέ — το κουτάκι εξαφανίζεται σιωπηλά.
+  ["js", "    if (id === 's-email') { renderConsent(); }\n  }", "  }"],
 ];
 if (ONLY !== null) {
   const m = MUTATIONS[ONLY - 1];
@@ -155,6 +158,27 @@ check("Ο-18 · 🔴 ΤΟ ΚΟΥΤΑΚΙ ΣΥΓΚΑΤΑΘΕΣΗΣ ΕΙΝΑΙ Α�
   const S2 = html.slice(html.indexOf('id="ref-consent"'), html.indexOf('id="go-email"'));
   has(S2, '<input type="checkbox" id="ref-consent-ok">', "το κουτάκι");
   hasnt(S2, /id="ref-consent-ok"[^>]*checked/, "προεπιλεγμένο ναι");
+});
+
+check("Ο-23 · 🔴 Η ΣΥΓΚΑΤΑΘΕΣΗ ΚΡΕΜΕΤΑΙ ΑΠΟ ΤΗ show(), ΤΟ ΕΝΑ ΣΗΜΕΙΟ", () => {
+  /* v67: το hook είχε μπει στο render(id), που καλείται ΜΟΝΟ από την
+     πλοήγηση του μενού. Η οθόνη email έρχεται από show('s-email'), άρα το
+     κουτάκι δεν εμφανιζόταν ΠΟΤΕ. Το βρήκε ο Stavros στη ζωντανή. */
+  const showFn = js.slice(js.indexOf("function show(id)"), js.indexOf("function show(id)") + 1400);
+  const body = showFn.slice(0, showFn.indexOf("\n  }") + 4);
+  if (!body.includes("renderConsent()")) throw new Error("το hook ΔΕΝ είναι στη show()");
+  const renderFn = js.slice(js.indexOf("function render(id)"), js.indexOf("function render(id)") + 1200);
+  if (renderFn.includes("renderConsent")) throw new Error("διπλό hook στο render()");
+});
+
+check("Ο-24 · 🔴 ΩΡΑ ΜΟΝΟ ΟΠΟΥ ΥΠΑΡΧΕΙ EMAIL — ανώνυμη γραμμή παίρνει ΜΟΝΟ ημερομηνία", () => {
+  const src = js.slice(js.indexOf("var MERES ="), js.indexOf("function renderRefList"));
+  const refWhen = new Function(src + "; return refWhen;")();
+  const anon = refWhen("2026-09-19");
+  if (/\d{2}:\d{2}/.test(anon)) throw new Error("ώρα σε ανώνυμη: " + anon);
+  const full = refWhen("2026-09-19T19:42:00.000Z");
+  if (!/\d{2}:\d{2}/.test(full)) throw new Error("λείπει η ώρα: " + full);
+  if (!/^(Κυρ|Δευ|Τρί|Τετ|Πέμ|Παρ|Σάβ)/.test(full)) throw new Error("λείπει η ημέρα: " + full);
 });
 
 check("Ο-22 · 🔴 ΚΑΝΕΝΑ ΔΙΠΛΟ id ΣΕ ΟΛΟ ΤΟ index.html", () => {

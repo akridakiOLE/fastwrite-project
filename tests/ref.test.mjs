@@ -46,6 +46,9 @@ const MUTATIONS = [
   ['CASE WHEN ref_share = 1 THEN email ELSE NULL END AS email', 'email AS email'],
   // Μ7 · γράφεται συγκατάθεση σε λογαριασμό που δεν ήρθε καν από σύσταση.
   ['(normRef(b.ref) && b.ref_share) ? 1 : 0', 'b.ref_share ? 1 : 0'],
+  // Μ8 · 🔴 Η ΩΡΑ ΦΕΥΓΕΙ ΚΑΙ ΣΕ ΑΝΩΝΥΜΗ ΓΡΑΜΜΗ — ταυτοποιεί όποιον είπε ΟΧΙ.
+  ['CASE WHEN ref_share = 1 THEN created ELSE substr(created, 1, 10) END AS pote',
+   'created AS pote'],
 ];
 if (MUTATE) MUTATIONS.forEach(([a, b], i) => {
   if (ONLY !== null && ONLY !== i + 1) return;
@@ -214,6 +217,21 @@ await check("Σ-15 · η λίστα δεν δείχνει διαγραμμένο
   await post("/api/km/delete", H(dead), { confirm: "ΔΙΑΓΡΑΦΗ" });
   await mod.kmDeleteDue(env, "2030-01-01T00:00:00Z");
   eq((await refOf(C)).list.length, 0, "μετά:");
+});
+
+await check("Σ-16 · 🔴 Η ΩΡΑ ΦΕΥΓΕΙ ΜΟΝΟ ΜΑΖΙ ΜΕ ΤΟ EMAIL", async () => {
+  const C = await account({ source: "link" });
+  const jc = await refOf(C);
+  await account({ source: "link", ref: jc.code, ref_share: 1 });   // ναι
+  await account({ source: "link", ref: jc.code });                 // όχι
+  const j = await refOf(C);
+  for (const r of j.list) {
+    if (r.email) {
+      if (r.when.length <= 10) throw new Error("με συγκατάθεση λείπει η ώρα: " + r.when);
+    } else {
+      if (r.when.length !== 10) throw new Error("ΔΙΑΡΡΟΗ ώρας σε ανώνυμη: " + r.when);
+    }
+  }
 });
 
 await check("Σ-11 · χωρίς ταυτότητα ο κωδικός ΔΕΝ δίνεται", async () => {

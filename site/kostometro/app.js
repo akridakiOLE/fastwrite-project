@@ -303,6 +303,14 @@
     var pv = el('preview');
     if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
     SCREENS.forEach(function (s) { el(s).hidden = (s !== id); });
+    /* 🔴 v68 (19/9/2026) — ΕΔΩ, ΟΧΙ ΣΤΟ render(). Λάθος Claude στη v67: το
+       hook της συγκατάθεσης μπήκε στο render(id), που καλείται ΜΟΝΟ από την
+       πλοήγηση του μενού. Η οθόνη email έρχεται από show('s-email') — άρα το
+       κουτάκι ΔΕΝ εμφανιζόταν ποτέ σε κανέναν. Το έπιασε ο Stavros στη
+       ζωντανή, και αναπαράχθηκε σε καθαρό browser.
+       Ίδια λογική με τον φραγμό του v49 από κάτω: ό,τι πρέπει να ισχύει σε
+       ΚΑΘΕ διαδρομή μπαίνει στο ΕΝΑ σημείο απ' όπου περνάνε όλες. */
+    if (id === 's-email') { renderConsent(); }
   }
   /* 🔴 v49 — Ο ΦΡΑΓΜΟΣ ΤΟΥ ΚΛΕΙΔΩΜΑΤΟΣ, ΣΕ ΕΝΑ ΣΗΜΕΙΟ.
      Κάθε οθόνη που δείχνει δεδομένα περνάει από εδώ. Αν ο φραγμός έμπαινε
@@ -359,7 +367,6 @@
       if (supView) { var v = supView; all().then(function (rs) { openSupplier(v, rs); }); }
       else { renderSupPage(); }
     }
-    if (id === 's-email')    { renderConsent(); }
     if (id === 's-ref')      { renderRef(); }
     if (id === 's-dpend')    { dpStart(); } else { dpStop(); }
     if (id === 's-settings') { renderSettings(); }
@@ -1836,7 +1843,9 @@
   function renderConsent(){
     var src = localStorage.getItem(LS.src) || '';
     var isRef = /^ref:/.test(src);
-    el('ref-consent').hidden = !isRef;
+    var box = el('ref-consent');
+    if (!box) { return; }
+    box.hidden = !isRef;
     if (!isRef) { return; }
     var d = new Date();
     el('ref-today').textContent = ('0'+d.getDate()).slice(-2) + '/' + ('0'+(d.getMonth()+1)).slice(-2);
@@ -1847,6 +1856,25 @@
      ⚠ createElement + textContent, ΠΟΤΕ innerHTML με δεδομένα χρήστη: το
      email το γράφει άνθρωπος και καταλήγει στην οθόνη άλλου ανθρώπου.
      Ίδιο μοτίβο με τις υπόλοιπες λίστες της εφαρμογής (γρ. 941, 1298). */
+  /* Πόσο αναλυτικά φαίνεται η στιγμή της εγγραφής.
+     🔴 ΜΕ συγκατάθεση: ημέρα, ημερομηνία και ώρα — το email φαίνεται ήδη,
+        η ώρα δεν προσθέτει καμία έκθεση και βοηθάει τον συστήνοντα.
+     🔴 ΧΩΡΙΣ: ΜΟΝΟ ημερομηνία. Σε ανώνυμη γραμμή η ώρα ταυτοποιεί — όποιος
+        έστειλε μία πρόσκληση στις 19:40 και δει «19:42» ξέρει ποιος είναι,
+        και η άρνηση του άλλου ακυρώνεται σιωπηλά.
+     Ο server στέλνει ήδη 10 χαρακτήρες στη μία περίπτωση και πλήρες ISO
+     στην άλλη — εδώ απλώς διαβάζουμε τι ήρθε. */
+  var MERES = ['Κυρ','Δευ','Τρί','Τετ','Πέμ','Παρ','Σάβ'];
+  function refWhen(v){
+    var d = String(v || '');
+    if (d.length === 10) { return d.slice(8, 10) + '/' + d.slice(5, 7); }
+    var t = new Date(d);
+    if (isNaN(t.getTime())) { return d; }
+    var p2 = function (n) { return ('0' + n).slice(-2); };
+    return MERES[t.getDay()] + ' ' + p2(t.getDate()) + '/' + p2(t.getMonth() + 1) +
+           ' · ' + p2(t.getHours()) + ':' + p2(t.getMinutes());
+  }
+
   function renderRefList(list){
     var box = el('ref-list');
     if (!box) { return; }
@@ -1860,8 +1888,7 @@
       who.textContent = r.email ? r.email : ('Εγγραφή #' + (list.length - i));
       if (!r.email) { who.className = 'anon'; }
       var when = document.createElement('b');
-      var d = String(r.when || '');
-      when.textContent = (d.length === 10) ? (d.slice(8, 10) + '/' + d.slice(5, 7)) : d;
+      when.textContent = refWhen(r.when);
       row.appendChild(who); row.appendChild(when);
       box.appendChild(row);
     }
@@ -1967,7 +1994,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v67';
+  var APP_VER = 'φέτα 3 · v68';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
