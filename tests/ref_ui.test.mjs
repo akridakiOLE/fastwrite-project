@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 
 const ONLY = (() => { const a = process.argv.find((x) => x.startsWith("--mutate=")); return a ? Number(a.split("=")[1]) : null; })();
+const VER = JSON.parse(readFileSync("site/kostometro/version.json", "utf8")).v;
 let html = readFileSync("site/kostometro/index.html", "utf8");
 let js   = readFileSync("site/kostometro/app.js", "utf8");
 let sw   = readFileSync("site/kostometro/sw.js", "utf8");
@@ -25,10 +26,20 @@ const MUTATIONS = [
   ["html", "<span>Άνοιξαν τον σύνδεσμό σου</span>", "<span>Προσκλήσεις που έστειλες</span>"],
   // Μ4 · μπαίνει τιμή στην οθόνη πριν κλειδώσει η τιμή και πριν επιλεγεί MoR.
   ["html", "<h3 class=\"sec\">Η ΕΠΙΒΡΑΒΕΥΣΗ</h3>", "<h3 class=\"sec\">Η ΕΠΙΒΡΑΒΕΥΣΗ</h3>\n    <p>Μόνο 59 € τον μήνα.</p>"],
-  // Μ5 · το SHELL cache δεν ανεβαίνει — ο κόσμος μένει με την παλιά οθόνη.
-  ["sw", "var CACHE = 'km-v65';", "var CACHE = 'km-v63';"],
+  /* Μ5 · το SHELL cache δεν ανεβαίνει — ο κόσμος μένει με την παλιά οθόνη.
+     ⚠ ΔΙΑΒΑΖΕΤΑΙ ΑΠΟ ΤΟ version.json, ΠΟΤΕ καρφωτό: στη v66 η καρφωτή
+     μετάλλαξη «km-v65» δεν έβρισκε πια στόχο και η απόδειξη έπαυε σιωπηλά
+     να ισχύει. Μετρήθηκε 19/9/2026 — το έπιασε ο φρουρός «ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ». */
+  ["sw", "var CACHE = 'km-" + VER + "';", "var CACHE = 'km-vPALIA';"],
   // Μ6 · ο σύνδεσμος γίνεται σύνδεσμος Store — το ?ref= δεν επιβιώνει του Play.
   ["js", "location.origin + '/kostometro/?ref=' + c", "'https://play.google.com/store/apps/details?id=km'"],
+  // Μ7 · 🔴 ΤΟ ΣΦΑΛΜΑ ΤΗΣ 17/9 ΞΑΝΑΜΠΑΙΝΕΙ: το ?ref= διαβάζεται μόνο σε καθαρή συσκευή.
+  ["js", "if (qRef && !registered) { return 'ref:' + qRef[1].toUpperCase(); }",
+         "if (qRef && !registered && !current) { return 'ref:' + qRef[1].toUpperCase(); }"],
+  // Μ8 · φεύγει η κανονικοποίηση σε κεφαλαία — δύο κουβάδες για τον ίδιο σύνδεσμο.
+  ["js", "return 'ref:' + qRef[1].toUpperCase();", "return 'ref:' + qRef[1];"],
+  // Μ9 · η σύσταση αρχίζει να αλλάζει ΑΝΑΔΡΟΜΙΚΑ, μετά την εγγραφή (Α400 §Δ).
+  ["js", "if (qRef && !registered) {", "if (qRef) {"],
 ];
 if (ONLY !== null) {
   const m = MUTATIONS[ONLY - 1];
@@ -130,6 +141,44 @@ check("Ο-12 · το άνοιγμα αναφέρεται μία φορά, και
   const iHit = boot.indexOf("refReportHit();");
   if (iHit < 0) throw new Error("το boot δεν αναφέρει το άνοιγμα");
   if (iHit < iSrc) throw new Error("η αναφορά είναι ΜΕΣΑ στο «πρώτη εγκατάσταση»");
+});
+
+/* ── Η ΣΥΛΛΗΨΗ ΤΗΣ ΣΥΣΤΑΣΗΣ, ΜΕΤΡΗΜΕΝΗ ΣΤΗΝ ΠΡΑΞΗ (v66) ──
+   Η λογική βγήκε από το boot() σε καθαρή συνάρτηση ακριβώς γι' αυτό: μέσα
+   στο boot δεν μετριόταν, και εκεί κρύφτηκε το σφάλμα της 17/9. */
+const fnSrc = js.slice(js.indexOf("function refCaptureSrc("), js.indexOf("function refCode()"));
+const refCaptureSrc = new Function(fnSrc + "; return refCaptureSrc;")();
+
+check("Ο-13 · καθαρή συσκευή + ?ref= → η σύσταση καταγράφεται", () => {
+  const g = refCaptureSrc("?ref=ABC23XYZ99", false, null);
+  if (g !== "ref:ABC23XYZ99") throw new Error("πήρα " + g);
+});
+
+check("Ο-14 · 🔴 ΣΥΣΚΕΥΗ ΠΟΥ ΕΧΕΙ ΞΑΝΑΝΟΙΞΕΙ ΤΟ KOSTOMETRO, ΧΩΡΙΣ ΛΟΓΑΡΙΑΣΜΟ (17/9)", () => {
+  // Αυτό ακριβώς απέτυχε στη δοκιμή του Stavros: km_source='link' από παλιά.
+  const g = refCaptureSrc("?ref=ABC23XYZ99", false, "link");
+  if (g !== "ref:ABC23XYZ99") throw new Error("η σύσταση χάθηκε ξανά: " + g);
+  const g2 = refCaptureSrc("?ref=ABC23XYZ99", false, "store:play");
+  if (g2 !== "ref:ABC23XYZ99") throw new Error("από Play: " + g2);
+});
+
+check("Ο-15 · 🔴 ΜΕΤΑ ΤΗΝ ΕΓΓΡΑΦΗ ΤΙΠΟΤΑ ΔΕΝ ΑΛΛΑΖΕΙ ΑΝΑΔΡΟΜΙΚΑ (Α400 §Δ)", () => {
+  const g = refCaptureSrc("?ref=ALLOS1234", true, "ref:PROTOS8888");
+  if (g !== null) throw new Error("άλλαξε σύσταση εγγεγραμμένου: " + g);
+  const g2 = refCaptureSrc("?ref=ALLOS1234", true, "link");
+  if (g2 !== null) throw new Error("άλλαξε πηγή εγγεγραμμένου: " + g2);
+});
+
+check("Ο-16 · πεζά στον σύνδεσμο γίνονται κεφαλαία (μία μορφή παντού)", () => {
+  const g = refCaptureSrc("?ref=abc23xyz99", false, null);
+  if (g !== "ref:ABC23XYZ99") throw new Error("πήρα " + g);
+});
+
+check("Ο-17 · χωρίς ?ref= η παλιά συμπεριφορά μένει ακριβώς ίδια", () => {
+  if (refCaptureSrc("?src=store:play", false, null) !== "store:play") throw new Error("src");
+  if (refCaptureSrc("", false, null) !== "link") throw new Error("κενό → link");
+  if (refCaptureSrc("", false, "store:ms") !== null) throw new Error("δεν πειράζει υπάρχον");
+  if (refCaptureSrc("?src=store:play", false, "link") !== null) throw new Error("δεν ξαναγράφει src");
 });
 
 console.log("\n" + (failed ? "✘ ΑΠΕΤΥΧΑΝ " + failed : "✔ ΟΛΑ ΠΕΡΑΣΑΝ"));

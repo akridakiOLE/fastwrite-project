@@ -1,0 +1,39 @@
+v66: the referral is recorded at REGISTRATION, not at first open
+
+MEASURED BUG (17/9/2026), found by Stavros on the live v65:
+he opened his own referral link on his computer - "opened your link" went to 1,
+then he registered and "signups" stayed at 0.
+
+Cause, read from the code (app.js:4002, a guard that predates v65):
+    if (!localStorage.getItem(LS.src)) { ...read ?ref=... }
+The ?ref= was only ever read on a device that had NEVER opened Kostometro.
+His computer already had km_source from earlier testing, so the referral was
+discarded silently.
+
+The real-world case is worse than the test. A business sees the Facebook ad,
+opens Kostometro, does NOT register, forgets it. Two weeks later a friend sends
+them a referral link. They open it and register. The friend's referral is lost,
+and neither the friend nor we would ever find out.
+
+Rule A400 SD (4/9/2026) says origin and referral are written AT THE MOMENT OF
+REGISTRATION or never. The code was writing them at the moment of FIRST OPEN
+and then locking them.
+
+FIX
+- refCaptureSrc(search, registered, current): while there is NO account, the
+  latest ?ref= wins. Once registered (LS.reg), nothing changes retroactively -
+  the "no retroactive attribution" rule stays intact.
+- pulled OUT of boot() into a pure function on purpose: inside boot it could not
+  be measured by any test, and that is exactly where the bug hid for two days.
+- ?ref= is upper-cased client-side too, matching the server's normRef.
+
+TESTS
+- 5 new behavioural checks (O-13..O-17) on refCaptureSrc, including the exact
+  case that failed on 17/9: a device with km_source already set and no account.
+- 3 new mutations (M7 reintroduces the 17/9 bug, M8 drops upper-casing,
+  M9 lets attribution change retroactively). All 9 proven red separately.
+- M5 was hard-coded to 'km-v65' and stopped finding its target at v66: the
+  proof was silently no longer proving anything. It now reads version.json.
+  Caught by the harness's own "MUTATION FOUND NO TARGET" guard.
+
+No database change. Rollback: git revert + push.
