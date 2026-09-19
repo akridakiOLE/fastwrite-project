@@ -1875,7 +1875,7 @@
            ' · ' + p2(t.getHours()) + ':' + p2(t.getMinutes());
   }
 
-  function renderRefList(list){
+  function renderRefList(list, total){
     var box = el('ref-list');
     if (!box) { return; }
     box.innerHTML = '';
@@ -1885,13 +1885,37 @@
       var row = document.createElement('div');
       row.className = 'kv sub';
       var who = document.createElement('span');
-      who.textContent = r.email ? r.email : ('Εγγραφή #' + (list.length - i));
+      /* ⚠ Η αρίθμηση βγαίνει από το ΣΥΝΟΛΟ, όχι από όσες είναι φορτωμένες.
+         Με 20 συστάσεις και 10 φορτωμένες, η πρώτη γραμμή είναι η #20. */
+      var pos = (total || list.length) - i;
+      who.textContent = r.email ? r.email : ('Εγγραφή #' + pos);
       if (!r.email) { who.className = 'anon'; }
       var when = document.createElement('b');
       when.textContent = refWhen(r.when);
       row.appendChild(who); row.appendChild(when);
       box.appendChild(row);
     }
+  }
+
+  /* Πόσες γραμμές κρατάμε ήδη στην οθόνη. Μηδενίζεται σε κάθε άνοιγμα της
+     οθόνης: ο χρήστης που ξαναμπαίνει θέλει τις νεότερες, όχι τη θέση που
+     είχε αφήσει πριν από τρεις μέρες. */
+  var refRows = [];
+
+  function refPage(off, n) {
+    return kmFetch('ref?n=' + n + '&off=' + off, { headers: kmHead() })
+      .then(function (r) { return r.ok ? r.json() : null; });
+  }
+
+  /* Το «Κι άλλες» δείχνει ΠΟΣΕΣ μένουν — «Κι άλλες 7» είναι πληροφορία,
+     «Κι άλλες» είναι κουμπί στα τυφλά. Όταν δεν μένει καμία, φεύγει. */
+  function refMoreState(total) {
+    var left = Math.max(total - refRows.length, 0);
+    el('ref-more').hidden = left === 0;
+    el('ref-more-btn').textContent = 'Κι άλλες ' + left + ' ↓';
+    var c = el('ref-count');
+    c.hidden = total === 0;
+    c.textContent = 'Δείχνω ' + refRows.length + ' από ' + total + '.';
   }
 
   function renderRef() {
@@ -1905,9 +1929,8 @@
     el('ref-copy').disabled  = !refCode();
 
     if (!localStorage.getItem(LS.folder)) { return; }
-    kmFetch('ref', { headers: kmHead() }).then(function (r) {
-      return r.ok ? r.json() : null;
-    }).then(function (j) {
+    refRows = [];
+    refPage(0, refN()).then(function (j) {
       if (!j || !j.ok) { return; }
       localStorage.setItem(LS.refCode, j.code);
       link.textContent = refUrl();
@@ -1918,7 +1941,9 @@
       /* ⚠ ΤΟ «—» ΔΕΝ ΓΙΝΕΤΑΙ «0» ΠΡΙΝ ΥΠΑΡΞΕΙ ΤΟ PRO. Το μηδέν διαβάζεται
          «κανείς δεν μπήκε»· η αλήθεια είναι «όχι ακόμα». */
       el('ref-active').textContent = (j.active === null || j.active === undefined) ? '—' : String(j.active);
-      renderRefList(j.list);
+      refRows = j.list || [];
+      renderRefList(refRows, j.signups);
+      refMoreState(j.signups);
       refProState(!!j.pro_live);
       /* Η γραμμή επιστροφής σε ευρώ θέλει τιμολόγηση, που δεν υπάρχει ακόμα.
          Ως τότε μένει ΚΡΥΦΗ: άδειο κουτί σε ζωντανή οθόνη διαβάζεται ως
@@ -1994,7 +2019,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v68';
+  var APP_VER = 'φέτα 3 · v69';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -4440,6 +4465,25 @@
       url: refUrl()
     }).catch(function () {});
   };
+  function refN() {
+    var v = parseInt((el('ref-n') && el('ref-n').value) || '10', 10);
+    return (v > 0 && v <= 200) ? v : 10;
+  }
+  el('ref-more-btn').onclick = function () {
+    var b = el('ref-more-btn');
+    b.disabled = true;
+    refPage(refRows.length, refN()).then(function (j) {
+      b.disabled = false;
+      if (!j || !j.ok) { return; }
+      refRows = refRows.concat(j.list || []);
+      renderRefList(refRows, j.signups);
+      refMoreState(j.signups);
+    }).catch(function () { b.disabled = false; });
+  };
+  /* Αλλαγή πλήθους = ξαναρχίζουμε από την κορυφή. Αλλιώς ανακατεύονται
+     σελίδες δύο διαφορετικών μεγεθών και ο χρήστης βλέπει διπλές γραμμές. */
+  el('ref-n').onchange = function () { renderRef(); };
+
   el('ref-copy').onclick = function () {
     var u = refUrl();
     if (navigator.clipboard) {

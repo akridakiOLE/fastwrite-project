@@ -411,6 +411,22 @@
          επέτρεψε· αλλιώς αύξων αριθμός και ημερομηνία. Ο φρουρός ζει στο
          SQL (CASE WHEN ref_share), όχι εδώ. -->
     <div id="ref-list"></div>
+    <!-- v69 · «Κι άλλες» + πόσες τη φορά. Ίδιο μοτίβο με τον Πίνακα Ελέγχου
+         («δείχνω N από M» + «Κι άλλους»): ο χρήστης δεν κατεβάζει 300 γραμμές
+         σε κινητό για να δει τις 3 τελευταίες. -->
+    <div class="ref-more" id="ref-more" hidden>
+      <button class="btn ghost" id="ref-more-btn">Κι άλλες ↓</button>
+      <label class="ref-n"><span>ανά</span>
+        <select id="ref-n">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+      </label>
+    </div>
+    <p class="fine" id="ref-count" hidden></p>
     <p class="fine" data-pro="soon">Οι ενεργές συστάσεις ενεργοποιούνται μόλις βγει η έκδοση PRO.<br><b>ΟΙ ΠΡΟΣΚΛΗΣΕΙΣ ΣΟΥ ΚΑΤΑΓΡΑΦΟΝΤΑΙ ΑΠΟ ΣΗΜΕΡΑ ΚΑΙ ΔΕΝ ΛΗΓΟΥΝ.</b></p>
     <p class="fine" id="ref-credit" data-pro="live" hidden></p>
     <p class="good" data-pro="soon">🟢 Το PRO θα το κατεβάσουν πρώτοι όσοι χρησιμοποιούν ήδη το Kostometro Free.</p>

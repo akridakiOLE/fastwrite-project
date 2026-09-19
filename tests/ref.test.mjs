@@ -49,6 +49,11 @@ const MUTATIONS = [
   // Μ8 · 🔴 Η ΩΡΑ ΦΕΥΓΕΙ ΚΑΙ ΣΕ ΑΝΩΝΥΜΗ ΓΡΑΜΜΗ — ταυτοποιεί όποιον είπε ΟΧΙ.
   ['CASE WHEN ref_share = 1 THEN created ELSE substr(created, 1, 10) END AS pote',
    'created AS pote'],
+  // Μ9 · το όριο ξεφεύγει — κινητό με 4G κατεβάζει 300 γραμμές.
+  ['Math.min(Math.max(Number.isFinite(nRaw) ? nRaw : 10, 1), 200)',
+   '(Number.isFinite(nRaw) ? nRaw : 10)'],
+  // Μ10 · η σελιδοποίηση αγνοεί το off — το «Κι άλλες» ξαναδίνει τα ίδια.
+  ['.bind(code, lim, off).all();', '.bind(code, lim, 0).all();'],
 ];
 if (MUTATE) MUTATIONS.forEach(([a, b], i) => {
   if (ONLY !== null && ONLY !== i + 1) return;
@@ -232,6 +237,31 @@ await check("Σ-16 · 🔴 Η ΩΡΑ ΦΕΥΓΕΙ ΜΟΝΟ ΜΑΖΙ ΜΕ ΤΟ EM
       if (r.when.length !== 10) throw new Error("ΔΙΑΡΡΟΗ ώρας σε ανώνυμη: " + r.when);
     }
   }
+});
+
+await check("Σ-17 · σελιδοποίηση: n + off δίνουν ΔΙΑΦΟΡΕΤΙΚΕΣ γραμμές, χωρίς επικάλυψη", async () => {
+  const C = await account({ source: "link" });
+  const jc = await refOf(C);
+  for (let i = 0; i < 7; i++) { await account({ source: "link", ref: jc.code, ref_share: 1 }); }
+  const p1 = await (await call("/api/km/ref?n=3&off=0", { headers: H(C) })).json();
+  const p2 = await (await call("/api/km/ref?n=3&off=3", { headers: H(C) })).json();
+  eq(p1.signups, 7, "αληθινό σύνολο:");
+  eq(p1.list.length, 3, "σελίδα 1:");
+  eq(p2.list.length, 3, "σελίδα 2:");
+  eq(p2.off, 3, "off:");
+  const a = p1.list.map((r) => r.email), b = p2.list.map((r) => r.email);
+  for (const e of b) { if (a.indexOf(e) !== -1) throw new Error("επικάλυψη: " + e); }
+});
+
+await check("Σ-18 · 🔴 ΤΟ ΟΡΙΟ ΔΕΝ ΞΕΦΕΥΓΕΙ: n=9999 κόβεται στο 200", async () => {
+  const C = await account({ source: "link" });
+  const jc = await refOf(C);
+  for (let i = 0; i < 4; i++) { await account({ source: "link", ref: jc.code }); }
+  const j = await (await call("/api/km/ref?n=9999&off=0", { headers: H(C) })).json();
+  eq(j.lim, 200, "lim:");
+  const neg = await (await call("/api/km/ref?n=-5&off=-9", { headers: H(C) })).json();
+  eq(neg.lim, 1, "αρνητικό n:");
+  eq(neg.off, 0, "αρνητικό off:");
 });
 
 await check("Σ-11 · χωρίς ταυτότητα ο κωδικός ΔΕΝ δίνεται", async () => {

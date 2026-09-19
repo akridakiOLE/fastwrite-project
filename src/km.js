@@ -377,15 +377,23 @@ async function refInfo(request, env) {
      συστήνων που έστειλε μία πρόσκληση στις 19:40 ξέρει ποιος είναι — και
      η άρνηση του συστημένου ακυρώνεται στην πράξη. Όπου υπάρχει
      συγκατάθεση το email φαίνεται ήδη, άρα η ώρα δεν προσθέτει έκθεση.
-     Όριο 50, νεότερες πρώτα — ΣΧΕΔΙΑΖΟΥΜΕ ΓΙΑ ΤΟ ΜΕΓΑΛΟ: με 300 συστάσεις
-     η οθόνη δεν κατεβάζει 300 γραμμές σε κινητό. */
+     🔴 ΣΕΛΙΔΟΠΟΙΗΣΗ (v69, 19/9/2026) — ΣΧΕΔΙΑΖΟΥΜΕ ΓΙΑ ΤΟ ΜΕΓΑΛΟ: με 300
+     συστάσεις η οθόνη δεν κατεβάζει 300 γραμμές σε κινητό με 4G. Η εφαρμογή
+     ζητάει όσες θέλει (`n`, ως 200) από όποια θέση (`off`), και το `signups`
+     πιο πάνω είναι το ΑΛΗΘΙΝΟ σύνολο — όχι «όσες έστειλα».
+     Ίδιο μοτίβο με τον Πίνακα Ελέγχου: «δείχνω N από M» + «Κι άλλες». */
+  const url = new URL(request.url);
+  const nRaw = parseInt(url.searchParams.get("n") || "10", 10);
+  const oRaw = parseInt(url.searchParams.get("off") || "0", 10);
+  const lim = Math.min(Math.max(Number.isFinite(nRaw) ? nRaw : 10, 1), 200);
+  const off = Math.max(Number.isFinite(oRaw) ? oRaw : 0, 0);
   const rows = await env.DB.prepare(
     `SELECT CASE WHEN ref_share = 1 THEN created ELSE substr(created, 1, 10) END AS pote,
             CASE WHEN ref_share = 1 THEN email ELSE NULL END AS email
        FROM km_accounts
       WHERE ref = ? AND deleted IS NULL
-      ORDER BY created DESC LIMIT 50`
-  ).bind(code).all();
+      ORDER BY created DESC LIMIT ? OFFSET ?`
+  ).bind(code, lim, off).all();
 
   return json({
     ok: true,
@@ -393,6 +401,10 @@ async function refInfo(request, env) {
     opened: opened,
     signups: signups,
     list: (rows.results || []).map((r) => ({ when: r.pote, email: r.email || null })),
+    /* Πόσες έδωσα και από πού — ώστε η εφαρμογή να ξέρει αν υπάρχουν κι άλλες
+       ΧΩΡΙΣ δεύτερη κλήση. Το «έχει κι άλλες» βγαίνει από signups > off+list. */
+    off: off,
+    lim: lim,
     active: active,
     self_active: !!a.acc.plan,
     pro_live: live,

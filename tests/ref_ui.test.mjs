@@ -44,13 +44,17 @@ const MUTATIONS = [
   // Μ10 · 🔴 ΤΟ ΚΟΥΤΑΚΙ ΣΥΓΚΑΤΑΘΕΣΗΣ ΕΡΧΕΤΑΙ ΠΡΟΕΠΙΛΕΓΜΕΝΟ — δεν είναι συγκατάθεση.
   ["html", '<input type="checkbox" id="ref-consent-ok">', '<input type="checkbox" id="ref-consent-ok" checked>'],
   // Μ11 · το email μπαίνει σε innerHTML — δεδομένο χρήστη στην οθόνη άλλου χρήστη.
-  ["js", "who.textContent = r.email ? r.email : ('Εγγραφή #' + (list.length - i));",
-         "who.innerHTML = r.email ? r.email : ('Εγγραφή #' + (list.length - i));"],
+  /* ⚠ ΑΓΚΥΡΑ ΣΤΟ ΕΛΑΧΙΣΤΟ ΣΤΑΘΕΡΟ ΚΟΜΜΑΤΙ. Η πλήρης γραμμή άλλαξε δύο φορές
+     (v69: η αρίθμηση πέρασε στο `pos`) και η μετάλλαξη έπαυε σιωπηλά να
+     αποδεικνύει. Το `who.textContent =` είναι ακριβώς ό,τι προστατεύουμε. */
+  ["js", "who.textContent = r.email", "who.innerHTML = r.email"],
   // Μ12 · ο κανόνας ξεφεύγει από το .consent και αλλάζει ΟΛΑ τα κουτάκια.
   ["css", ".consent .chk { align-items: flex-start;", ".chk { align-items: flex-start;"],
   // Μ13 · 🔴 ΤΟ ΣΦΑΛΜΑ ΤΗΣ v67: το hook γυρίζει στο render(), όπου η οθόνη
   //       email ΔΕΝ περνάει ποτέ — το κουτάκι εξαφανίζεται σιωπηλά.
   ["js", "    if (id === 's-email') { renderConsent(); }\n  }", "  }"],
+  // Μ14 · η αρίθμηση ξαναβγαίνει από τις ΦΟΡΤΩΜΕΝΕΣ αντί για το σύνολο.
+  ["js", "var pos = (total || list.length) - i;", "var pos = list.length - i;"],
 ];
 if (ONLY !== null) {
   const m = MUTATIONS[ONLY - 1];
@@ -158,6 +162,21 @@ check("Ο-18 · 🔴 ΤΟ ΚΟΥΤΑΚΙ ΣΥΓΚΑΤΑΘΕΣΗΣ ΕΙΝΑΙ Α�
   const S2 = html.slice(html.indexOf('id="ref-consent"'), html.indexOf('id="go-email"'));
   has(S2, '<input type="checkbox" id="ref-consent-ok">', "το κουτάκι");
   hasnt(S2, /id="ref-consent-ok"[^>]*checked/, "προεπιλεγμένο ναι");
+});
+
+check("Ο-25 · 🔴 Η ΑΡΙΘΜΗΣΗ ΒΓΑΙΝΕΙ ΑΠΟ ΤΟ ΣΥΝΟΛΟ, ΟΧΙ ΑΠΟ ΟΣΕΣ ΦΟΡΤΩΘΗΚΑΝ", () => {
+  /* Με 20 συστάσεις και 10 φορτωμένες, η πρώτη γραμμή είναι η #20 — όχι #10.
+     Χωρίς αυτό, κάθε πάτημα στο «Κι άλλες» ξαναριθμεί τη λίστα. */
+  const f = js.slice(js.indexOf("function renderRefList"), js.indexOf("function renderRef()"));
+  has(f, "(total || list.length) - i", "αρίθμηση από το σύνολο");
+  has(js, "renderRefList(refRows, j.signups)", "περνιέται το σύνολο");
+});
+
+check("Ο-26 · «Κι άλλες» λέει ΠΟΣΕΣ μένουν, και φεύγει όταν δεν μένει καμία", () => {
+  const f = js.slice(js.indexOf("function refMoreState"), js.indexOf("function renderRef()"));
+  has(f, "'Κι άλλες ' + left", "νούμερο στο κουμπί");
+  has(f, "hidden = left === 0", "κρύβεται στο τέλος");
+  has(f, "'Δείχνω ' + refRows.length + ' από ' + total", "δείχνω N από M");
 });
 
 check("Ο-23 · 🔴 Η ΣΥΓΚΑΤΑΘΕΣΗ ΚΡΕΜΕΤΑΙ ΑΠΟ ΤΗ show(), ΤΟ ΕΝΑ ΣΗΜΕΙΟ", () => {

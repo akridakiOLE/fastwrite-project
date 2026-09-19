@@ -606,3 +606,16 @@ textarea#fb-text:focus{outline:none;border-color:var(--accent)}
 #ref-list .kv.sub { padding: 7px 0; font-size: 14px; opacity: .92; }
 /* Ο ανώνυμος δεν είναι «λιγότερος» — απλώς δεν έδωσε όνομα. */
 #ref-list .anon { opacity: .62; font-style: italic; }
+
+
+/* ══ v69 · «ΚΙ ΑΛΛΕΣ» ΣΤΗ ΛΙΣΤΑ ΣΥΣΤΑΣΕΩΝ (19/9/2026) ═══════════════════
+   Ονόματα με πρόθεμα #s-ref/ .ref- : ελέγχθηκε ότι δεν υπάρχουν αλλού. */
+#s-ref .ref-more { display: flex; align-items: center; gap: 12px; margin: 2px 0 10px; }
+#s-ref .ref-more .btn { margin: 0; flex: 1 1 auto; }
+#s-ref .ref-n { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text2); }
+/* 44px ύψος: κάτω από αυτό το select αστοχεί με το δάχτυλο (Α440). */
+#s-ref .ref-n select {
+  min-height: 44px; padding: 6px 10px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.16); background: #0f1520; color: #e8eef6; font-size: 15px;
+}
+#s-ref #ref-count { margin: 0 0 14px; }

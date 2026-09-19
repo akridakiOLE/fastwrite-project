@@ -1,0 +1,33 @@
+v69: paging on the referral list - "show N of M" and "N more"
+
+ASKED FOR by Stavros: an arrow to open the full table, and to choose how many
+rows at a time (5/10/20/50/200).
+
+- GET /api/km/ref?n=<1..200>&off=<k>. n is clamped to 200 and off to >= 0: a
+  phone on 4G must never be handed 300 rows because a parameter said so.
+- the response carries off and lim, so the app knows whether more exist without
+  a second call; `signups` stays the TRUE total.
+- the button says how many are LEFT ("N more"), and disappears at zero. A bare
+  "more" is a button pressed blind.
+- "Showing N of M" under the list - the same pattern the Control Panel already
+  uses, so the product behaves consistently.
+- changing the page size restarts from the top: otherwise pages of two sizes
+  interleave and rows appear twice.
+
+FIXED WHILE BUILDING: the "Εγγραφή #N" numbering came from how many rows were
+LOADED, not from the total. With 20 referrals and 10 loaded, the top row said
+#10 when it is #20 - and every press of "more" renumbered the list. It now
+takes the total. Guard O-25, mutation M14.
+
+CAUGHT AGAIN BY THE HARNESS: ui-M11 anchored on the full textContent line,
+which this change rewrote - the mutation stopped finding its target and had
+silently stopped proving anything. Third time in two days that the "MUTATION
+FOUND NO TARGET" guard has saved a proof. Re-anchored to the minimal stable
+fragment (`who.textContent = r.email`), which is exactly what it protects.
+
+TESTS: S-17 (pages do not overlap, off is honoured), S-18 (n=9999 clamps to
+200, negatives clamp to 1/0), O-25 (numbering from the total), O-26 (the button
+states how many are left and hides at zero). 7 suites green, 26 mutations
+proven red ONE AT A TIME.
+
+No database change. Rollback: git revert + push.
