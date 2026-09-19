@@ -1,0 +1,38 @@
+v70: "so they know who to thank" + day/date/time on every row
+
+BOTH DECIDED BY STAVROS (19/9/2026), the second over a recorded objection.
+
+1. CONSENT WORDING. The checkbox now reads "Να ξέρει ποιον ευχαριστεί." -
+   same meaning, positive framing, and it should raise opt-in honestly. The
+   box stays UNCHECKED by default: that was never in question.
+
+2. DAY / DATE / TIME ON EVERY ROW, including anonymous ones.
+   My objection, made twice and logged to A320: on an anonymous row the exact
+   time narrows down who it is, so a referrer who sent one invitation at 19:40
+   and sees "19:42" identifies someone who declined to be named.
+   Stavros decided otherwise. It stands on two things that are true here:
+   the checkbox is a real choice (not pre-ticked), and the moment of signup is
+   now STATED OUTRIGHT in the consent text, so nobody is surprised.
+
+   THE CONSEQUENCE I FIXED WITHOUT BEING ASKED: the consent text still said
+   "otherwise they see Εγγραφή #2 — <date>". With the time now always shown,
+   that sentence had become false. A consent notice that understates what we
+   display is worse than no notice at all. It now says the day and time are
+   visible either way, and that the box only controls the email.
+
+WHAT DID NOT CHANGE, AND IS NOT NEGOTIABLE: the email never leaves the
+database without ref_share = 1, and that guard lives in SQL.
+
+TESTS REWRITTEN, NOT DELETED
+S-12 and S-16 asserted "anonymous row = date only" - a rule that changed by
+decision. A test guarding a rule that no longer exists is a test that lies.
+They now assert what is actually protected: the EMAIL. S-12 additionally
+requires a full timestamp, so the new behaviour is pinned rather than assumed.
+M8 lost its target with that SQL and was re-pointed at a real guard (the list
+must never show deleted accounts).
+
+NEW: O-27 checks the consent notice against reality - it reads both the HTML
+and src/km.js and fails if the text promises less than the server sends, or if
+the email guard disappears. M15 breaks it by softening the notice.
+
+7 suites green, 27 mutations proven red ONE AT A TIME. No database change.

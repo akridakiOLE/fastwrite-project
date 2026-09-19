@@ -46,9 +46,9 @@ const MUTATIONS = [
   ['CASE WHEN ref_share = 1 THEN email ELSE NULL END AS email', 'email AS email'],
   // Μ7 · γράφεται συγκατάθεση σε λογαριασμό που δεν ήρθε καν από σύσταση.
   ['(normRef(b.ref) && b.ref_share) ? 1 : 0', 'b.ref_share ? 1 : 0'],
-  // Μ8 · 🔴 Η ΩΡΑ ΦΕΥΓΕΙ ΚΑΙ ΣΕ ΑΝΩΝΥΜΗ ΓΡΑΜΜΗ — ταυτοποιεί όποιον είπε ΟΧΙ.
-  ['CASE WHEN ref_share = 1 THEN created ELSE substr(created, 1, 10) END AS pote',
-   'created AS pote'],
+  // Μ8 · η λίστα αρχίζει να δείχνει διαγραμμένους λογαριασμούς.
+  ['      WHERE ref = ? AND deleted IS NULL\n      ORDER BY created DESC',
+   '      WHERE ref = ?\n      ORDER BY created DESC'],
   // Μ9 · το όριο ξεφεύγει — κινητό με 4G κατεβάζει 300 γραμμές.
   ['Math.min(Math.max(Number.isFinite(nRaw) ? nRaw : 10, 1), 200)',
    '(Number.isFinite(nRaw) ? nRaw : 10)'],
@@ -193,7 +193,11 @@ await check("Σ-12 · 🔴 ΧΩΡΙΣ ΣΥΓΚΑΤΑΘΕΣΗ ΤΟ EMAIL ΔΕΝ �
   eq(j.list.length, 2, "γραμμές:");
   for (const r of j.list) {
     if (r.email !== null) throw new Error("ΔΙΑΡΡΟΗ email: " + r.email);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.when)) throw new Error("ημερομηνία: " + r.when);
+    /* v70 — η ΣΤΙΓΜΗ φαίνεται πλέον παντού (απόφαση Stavros 19/9/2026).
+       Αυτό που φυλάει αυτός ο έλεγχος είναι ΜΟΝΟ το email. Ο παλιός
+       ισχυρισμός «ανώνυμη γραμμή = 10 χαρακτήρες» δεν ισχύει πια, και ένα
+       τεστ που φυλάει κανόνα που άλλαξε είναι τεστ που λέει ψέματα. */
+    if (!/^\d{4}-\d{2}-\d{2}T/.test(r.when)) throw new Error("στιγμή: " + r.when);
   }
 });
 
@@ -224,19 +228,21 @@ await check("Σ-15 · η λίστα δεν δείχνει διαγραμμένο
   eq((await refOf(C)).list.length, 0, "μετά:");
 });
 
-await check("Σ-16 · 🔴 Η ΩΡΑ ΦΕΥΓΕΙ ΜΟΝΟ ΜΑΖΙ ΜΕ ΤΟ EMAIL", async () => {
+await check("Σ-16 · 🔴 Η ΩΡΑ ΠΑΝΤΟΥ — ΤΟ EMAIL ΜΟΝΟ ΜΕ ΣΥΓΚΑΤΑΘΕΣΗ", async () => {
+  /* Απόφαση Stavros 19/9/2026: ημέρα/ώρα σε κάθε γραμμή. Ο φρουρός που
+     ΜΕΝΕΙ είναι το email — και αυτό ελέγχεται εδώ, σε κάθε εκτέλεση. */
   const C = await account({ source: "link" });
   const jc = await refOf(C);
-  await account({ source: "link", ref: jc.code, ref_share: 1 });   // ναι
-  await account({ source: "link", ref: jc.code });                 // όχι
+  const yes = await account({ source: "link", ref: jc.code, ref_share: 1 });
+  await account({ source: "link", ref: jc.code });
   const j = await refOf(C);
+  eq(j.list.length, 2, "γραμμές:");
   for (const r of j.list) {
-    if (r.email) {
-      if (r.when.length <= 10) throw new Error("με συγκατάθεση λείπει η ώρα: " + r.when);
-    } else {
-      if (r.when.length !== 10) throw new Error("ΔΙΑΡΡΟΗ ώρας σε ανώνυμη: " + r.when);
-    }
+    if (String(r.when).length <= 10) throw new Error("λείπει η ώρα: " + r.when);
   }
+  const shown = j.list.filter((r) => r.email);
+  eq(shown.length, 1, "πόσα email:");
+  eq(shown[0].email, yes.email, "ποιο:");
 });
 
 await check("Σ-17 · σελιδοποίηση: n + off δίνουν ΔΙΑΦΟΡΕΤΙΚΕΣ γραμμές, χωρίς επικάλυψη", async () => {
