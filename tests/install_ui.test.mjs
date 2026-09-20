@@ -22,8 +22,11 @@ const MUTATIONS = [
   /* Μ1 · 🔴 Η ΚΑΡΤΑ ΓΙΝΕΤΑΙ ΟΘΟΝΗ. Το show() κρύβει ό,τι είναι στο SCREENS σε
      κάθε πλοήγηση — η προτροπή θα εξαφανιζόταν ή θα σκέπαζε την πρώτη οθόνη. */
   ["html", '<div id="inst" class="inst" hidden>', '<section id="inst" class="screen setup" hidden>'],
-  // Μ2 · χάνεται το βήμα του Safari — σε Chrome iPhone η οδηγία δεν εκτελείται.
-  ["js", "if (instIosNotSafari()) {", "if (false) {"],
+  /* Μ2 · 🔴 ΕΠΙΣΤΡΕΦΕΙ Η ΞΕΠΕΡΑΣΜΕΝΗ ΟΔΗΓΙΑ: το κείμενο ξαναλέει ότι μόνο το
+     Safari κάνει εγκατάσταση. Από τον iOS 16.4 ΚΑΘΕ browser του iPhone το
+     κάνει — η παλιά οδηγία έστελνε τον μισό κόσμο να αλλάξει browser άδικα. */
+  ["js", "Στο <b>Safari</b> είναι <b>κάτω</b> στην οθόνη, στο <b>Chrome</b> <b>πάνω δεξιά</b> δίπλα στη διεύθυνση.",
+         "Άνοιξέ το στο <b>Safari</b> — μόνο από εκεί γίνεται."],
   // Μ3 · 🔴 ΤΟ iPhone ΠΑΙΡΝΕΙ ΟΔΗΓΙΑ ANDROID — το σφάλμα της v70, ξαναμπαίνει.
   ["js", "    if (p === 'ios') {", "    if (false) {"],
   // Μ4 · το κουμπί βγαίνει ΧΩΡΙΣ αποθηκευμένο συμβάν — πατιέται και δεν κάνει τίποτα.
@@ -90,6 +93,11 @@ const MUTATIONS = [
   ["js", "                !localStorage.getItem(LS.email) &&", ""],
   // Μ26 · η προειδοποίηση έρχεται ΟΡΑΤΗ από το HTML — τη βλέπουν και οι χρήστες Android.
   ["html", '<p class="note warn" id="acc-warn" hidden>', '<p class="note warn" id="acc-warn">'],
+  // Μ27 · 🔴 φεύγει η γραμμή των Όρων — ο χρήστης γράφεται χωρίς να δει τίποτα.
+  ["html", '<p class="fine" id="legal-line">', '<p class="fine" id="legal-XXX">'],
+  /* Μ28 · ο σύνδεσμος των Όρων ανοίγει στην ΙΔΙΑ καρτέλα — ο χρήστης χάνει
+     τη μισοσυμπληρωμένη φόρμα του για να διαβάσει τους Όρους. */
+  ["html", '<a href="/legal/terms" target="_blank" rel="noopener">', '<a href="/legal/terms">'],
 ];
 if (ONLY !== null) {
   const m = MUTATIONS[ONLY - 1];
@@ -134,10 +142,16 @@ check("Ε-2 · 🔴 Το iPhone παίρνει τη ΔΙΚΗ ΤΟΥ οδηγία
   has(IOS, "Safari", "λείπει το Safari");
 });
 
-check("Ε-2β · Το βήμα «άνοιξέ το στο Safari» είναι ΠΡΟΣΒΑΣΙΜΟ, όχι νεκρός κώδικας", () => {
-  has(IOS, "if (instIosNotSafari()) {", "το βήμα Safari δεν κρέμεται από τον έλεγχο browser");
-  has(js, "function instIosNotSafari() { return /CriOS|FxiOS|EdgiOS|OPiOS/.test(navigator.userAgent || \'\'); }",
-      "ο έλεγχος δεν αναγνωρίζει Chrome/Firefox του iPhone");
+check("Ε-2β · 🔴 iOS 16.4+ — το κείμενο δείχνει ΚΑΙ ΤΟΥΣ ΔΥΟ browsers", () => {
+  /* Το πρόβλημα δεν είναι ο browser, είναι ΠΟΥ κάθεται το Κοινοποίηση. */
+  has(IOS, "Στο <b>Safari</b> είναι <b>κάτω</b> στην οθόνη", "δεν λέει πού είναι στο Safari");
+  has(IOS, "<b>Chrome</b> <b>πάνω δεξιά</b>", "δεν λέει πού είναι στο Chrome");
+  /* Και ΔΕΝ στέλνει κανέναν να αλλάξει browser ως προϋπόθεση. */
+  /* ⚠ ΜΟΝΟ ΤΟ ΚΕΙΜΕΝΟ ΠΟΥ ΒΛΕΠΕΙ Ο ΧΡΗΣΤΗΣ — όχι τα σχόλια, που εξηγούν
+     ακριβώς την παλιά διατύπωση και θα έριχναν τον φρουρό για πάντα. */
+  const iosText = (IOS.match(/(?:step|warn)\('(?:[^'\\]|\\.)*'\)/g) || []).join(" ");
+  hasnt(iosText, /μόνο από εκεί|όχι σε Chrome|όχι Chrome/, "ξεπερασμένη οδηγία «μόνο Safari»");
+  hasnt(js, /instIosNotSafari/, "επέζησε ο νεκρός έλεγχος browser");
 });
 
 check("Ε-3 · Στο iPhone ΔΕΝ λέγεται ποτέ «τρεις τελείες» (δεν υπάρχει τέτοιο μενού)", () => {
@@ -283,6 +297,34 @@ check("Ε-24 · Το κείμενο δίνει τη ΔΙΑΔΡΟΜΗ ΔΙΑΣΩ�
   has(p, "δεύτερο", "δεν λέει τι θα πάθει αν το αγνοήσει");
   /* Το κουμπί που δείχνει πρέπει να υπάρχει όντως στην ίδια οθόνη. */
   has(html, 'id="acc-yes">Έχω ήδη λογαριασμό', "το κουμπί που υποδεικνύει δεν υπάρχει");
+});
+
+check("Ε-25 · 🔴 ΟΡΟΙ ΚΑΙ ΠΟΛΙΤΙΚΗ ΦΑΙΝΟΝΤΑΙ ΠΡΙΝ ΤΗΝ ΕΓΓΡΑΦΗ", () => {
+  const i = html.indexOf('id="s-email"');
+  const sec = html.slice(i, html.indexOf("</section>", i));
+  has(sec, 'id="legal-line"', "λείπει η γραμμή από την οθόνη εγγραφής");
+  has(sec, '/legal/terms', "λείπει ο σύνδεσμος των Όρων");
+  has(sec, '/legal/privacy', "λείπει ο σύνδεσμος της Πολιτικής");
+  /* Πρέπει να είναι ΜΕΤΑ το κουμπί — δηλαδή να τη διαβάζει δίπλα στην πράξη. */
+  if (sec.indexOf('id="legal-line"') < sec.indexOf('id="go-email"')) {
+    throw new Error("η γραμμή είναι πριν από το κουμπί «Συνέχεια»");
+  }
+  /* Και οι ΔΥΟ σύνδεσμοι ανοίγουν σε νέα καρτέλα: αλλιώς ο χρήστης χάνει τη
+     μισοσυμπληρωμένη φόρμα του για να διαβάσει τους Όρους. */
+  const links = sec.match(/<a [^>]*href="\/legal\/[^"]*"[^>]*>/g) || [];
+  if (links.length !== 2) throw new Error("σύνδεσμοι /legal/: " + links.length + " αντί για 2");
+  links.forEach((a) => {
+    if (!a.includes('target="_blank"')) throw new Error("χωρίς νέα καρτέλα: " + a);
+    if (!a.includes('rel="noopener"')) throw new Error("χωρίς noopener: " + a);
+  });
+});
+
+check("Ε-26 · Η γραμμή των Όρων ΔΕΝ είναι κουτάκι συγκατάθεσης", () => {
+  const i = html.indexOf('id="legal-line"');
+  const p = html.slice(i, html.indexOf("</p>", i));
+  hasnt(p, /<input/, "μπήκε κουτάκι εκεί που χρειάζεται ενημέρωση");
+  /* Και το ΜΟΝΟ κουτάκι της οθόνης παραμένει ασυμπλήρωτο. */
+  has(html, '<input type="checkbox" id="ref-consent-ok">', "το κουτάκι συγκατάθεσης άλλαξε");
 });
 
 check("Ε-13 · Το SHELL cache ανέβηκε μαζί με την έκδοση", () => {
