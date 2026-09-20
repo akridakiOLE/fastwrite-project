@@ -2021,7 +2021,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v72';
+  var APP_VER = 'φέτα 3 · v73';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -4113,7 +4113,7 @@
   }
 
   /* ══ v72 · Η ΠΡΟΤΡΟΠΗ ΕΓΚΑΤΑΣΤΑΣΗΣ (20/9/2026) ═══════════════
-     KM-INSTALL-PROMPT-v72   ← λατινικός δείκτης για το findstr του deploy .bat
+     KM-INSTALL-PROMPT   ← λατινικός δείκτης για το findstr του deploy .bat
      (το findstr μέσα σε .bat ΔΕΝ διαβάζει ελληνικά — μετρήθηκε 19/9/2026).
 
      ΤΟ ΠΡΟΒΛΗΜΑ: η οδηγία εγκατάστασης υπήρχε μόνο ως 14η/15η ερώτηση στο
@@ -4154,13 +4154,13 @@
   }
   /* Εγκατεστημένη; Τρείς διαφορετικοί τρόποι ανά μηχανή — το iOS
      απαντάει ΜΟΝΟ στο navigator.standalone. */
+  /* 🔴 v73 (20/9/2026) — ΜΟΝΟ `standalone`. Οι καταστάσεις `minimal-ui` και
+     `fullscreen` ΒΓΗΚΑΝ: απαντούν «ναι» σε απλό tab σε μερικούς browsers
+     κινητού (κρυμμένη γραμμή διευθύνσεων), και η προτροπή δεν θα
+     εμφανιζόταν ποτέ σε εκείνες τις συσκευές. */
   function instStandalone() {
     if (navigator.standalone === true) { return true; }
-    try {
-      return window.matchMedia('(display-mode: standalone)').matches ||
-             window.matchMedia('(display-mode: fullscreen)').matches ||
-             window.matchMedia('(display-mode: minimal-ui)').matches;
-    } catch (e) { return false; }
+    try { return window.matchMedia('(display-mode: standalone)').matches; } catch (e) { return false; }
   }
   /* ⚠ Το iPadOS 13+ παρουσιάζεται ως Macintosh. Το ξεχωρίζει η αφή. */
   function instPlatform() {
@@ -4173,15 +4173,19 @@
   function instIosNotSafari() { return /CriOS|FxiOS|EdgiOS|OPiOS/.test(navigator.userAgent || ''); }
 
   function instSteps() {
-    var p = instPlatform(), ol = el('inst-steps'), go = el('inst-go');
+    var p = instPlatform(), ol = el('inst-steps'), go = el('inst-go'), wn = el('inst-warn');
     if (!ol) { return; }
     ol.innerHTML = '';
     go.hidden = true;
+    if (wn) { wn.innerHTML = ''; wn.hidden = true; }
     var step = function (h) {
       var li = document.createElement('li');
       li.innerHTML = h;
       ol.appendChild(li);
     };
+    /* Η προειδοποίηση ΔΕΝ είναι βήμα: αν ήταν νούμερο 4, θα διαβαζόταν
+       ως ενέργεια που πρέπει να κάνει, ενώ είναι αυτό που ΠΡΕΠΕΙ ΝΑ ΑΠΟΦΥΓΕΙ. */
+    var warn = function (h) { if (wn) { wn.innerHTML = h; wn.hidden = false; } };
     if (p === 'ios') {
       if (instIosNotSafari()) {
         step('Άνοιξε αυτή τη σελίδα στο <b>Safari</b> — μόνο από εκεί μπαίνει στην αρχική οθόνη.');
@@ -4196,9 +4200,16 @@
       go.hidden = false;
       return;
     }
+    /* 🔴 Α440 (1/9/2026, μετρήθηκε σε δύο συσκευές με δύο browsers):
+       ΕΓΚΑΤΑΣΤΑΣΗ → αληθινή εφαρμογή (WebAPK), καθαρό εικονίδιο.
+       ΣΥΝΤΟΜΕΥΣΗ  → σήμα του browser πάνω στο εικονίδιο, και ανοίγει ΜΕΣΑ
+                      στον browser. — ΔΕΝ είναι το ίδιο πράγμα.
+       ⚠ Λάθος Claude στη v72: τα έδωσε ως ισοδύναμα, με «ή» — και η κάρτα
+       αντίφασκε με το ίδιο το FAQ της εφαρμογής. Το εντόπισε ο Stavros. */
     step('Πάτα τις <b>τρεις τελείες ⋮</b> πάνω δεξιά στον browser.');
-    step('Διάλεξε <b>«Εγκατάσταση εφαρμογής»</b> ή <b>«Προσθήκη στην αρχική οθόνη»</b>.');
+    step('Διάλεξε <b>«Εγκατάσταση εφαρμογής»</b>. Αν ο browser σου γράφει «Προσθήκη στην αρχική οθόνη», πάτα αυτό και μετά διάλεξε <b>«Εγκατάσταση»</b>.');
     step('Άνοιξέ το μετά <b>από το εικονίδιο</b>.');
+    warn('Μη διαλέξεις <b>«Συντόμευση»</b>: βάζει το σήμα του browser πάνω στο εικονίδιο και η εφαρμογή ανοίγει <b>μέσα στον browser</b>, με γραμμή διευθύνσεων.');
   }
 
   function instClose() { if (el('inst')) { el('inst').hidden = true; } }
@@ -4208,7 +4219,11 @@
      πρόωρα return — το ίδιο σφάλμα με το hook της συγκατάθεσης στη v67. */
   function maybeInstall() {
     if (instPlatform() === 'other') { return; }      /* υπολογιστής: δεν είναι το κοινό */
-    if (instStandalone()) { instState({ done: 1 }); return; }
+    /* 🔴 v73 — ΓΙΑΤΙ ΔΕΝ ΓΡΑΦΕΤΑΙ `done` ΕΔΩ: η ένδειξη του browser είναι
+       ΠΑΡΟΔΙΚΗ. Μία λάθος ανάγνωση δεν επιτρέπεται να σβήσει την προτροπή
+       ΓΙΑ ΠΑΝΤΑ σε εκείνη τη συσκευή. Μόνη πηγή του `done` είναι το
+       πραγματικό συμβάν `appinstalled`. Κόστος λάθους: ένα χαμένο άνοιγμα. */
+    if (instStandalone()) { return; }
     var s = instRead();
     if (s.done) { return; }
     var n = (s.n || 0) + 1;

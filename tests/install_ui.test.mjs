@@ -32,7 +32,7 @@ const MUTATIONS = [
   ["js", "try { e.preventDefault(); } catch (x) {}", ""],
   /* Μ6 · 🔴 Η ΠΡΟΤΡΟΠΗ ΕΜΦΑΝΙΖΕΤΑΙ ΣΕ ΗΔΗ ΕΓΚΑΤΕΣΤΗΜΕΝΗ ΕΦΑΡΜΟΓΗ:
      ο χρήστης που το έκανε ήδη, το ξαναβλέπει σε κάθε άνοιγμα. */
-  ["js", "    if (instStandalone()) { instState({ done: 1 }); return; }", ""],
+  ["js", "    if (instStandalone()) { return; }", ""],
   // Μ7 · το iOS δεν ανιχνεύεται ως εγκατεστημένο (matchMedia μόνο) — ίδιο αποτέλεσμα, μόνο σε iPhone.
   ["js", "    if (navigator.standalone === true) { return true; }", ""],
   /* Μ8 · 🔴 «ΜΙΑ ΦΟΡΑ ΚΑΙ ΠΟΤΕ ΞΑΝΑ»: όποιος πατήσει «Όχι τώρα» στο πρώτο
@@ -58,6 +58,20 @@ const MUTATIONS = [
   ["sw", "var CACHE = 'km-" + VER + "';", "var CACHE = 'km-vPALIA';"],
   // Μ15 · η κάρτα πέφτει κάτω από τις οθόνες — υπάρχει και δεν φαίνεται.
   ["css", ".inst{position:fixed;inset:0;z-index:70;", ".inst{position:fixed;inset:0;z-index:1;"],
+  /* Μ16 · 🔴 ΤΟ ΛΑΘΟΣ ΤΗΣ v72 ΞΑΝΑΜΠΑΙΝΕΙ: «Εγκατάσταση» και «Προσθήκη στην
+     αρχική οθόνη» δοσμένα ως ΙΣΟΔΥΝΑΜΑ, με «ή». Α440 1/9/2026: η δεύτερη
+     διαδρομή δίνει ΣΥΝΤΟΜΕΥΣΗ — σήμα browser πάνω στο εικονίδιο. */
+  ["js", "Αν ο browser σου γράφει «Προσθήκη στην αρχική οθόνη», πάτα αυτό και μετά διάλεξε <b>«Εγκατάσταση»</b>.",
+         "ή <b>«Προσθήκη στην αρχική οθόνη»</b>."],
+  // Μ17 · φεύγει η προειδοποίηση για τη συντόμευση — ο χρήστης δεν προειδοποιείται πουθενά.
+  ["js", "    warn('Μη διαλέξεις", "    (function(){})('Μη διαλέξεις"],
+  /* Μ18 · 🔴 Η ΠΑΛΙΝΔΡΟΜΗΣΗ ΤΗΣ v72: το minimal-ui ξαναμπαίνει στον έλεγχο.
+     Απαντάει «ναι» σε απλό tab σε browsers κινητού — η προτροπή πεθαίνει. */
+  ["js", "    try { return window.matchMedia('(display-mode: standalone)').matches; } catch (e) { return false; }",
+         "    try { return window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: minimal-ui)').matches; } catch (e) { return false; }"],
+  /* Μ19 · 🔴 ΠΑΡΟΔΙΚΗ ΕΝΔΕΙΞΗ ΞΑΝΑΓΡΑΦΕΙ ΜΟΝΙΜΗ ΚΑΤΑΣΤΑΣΗ: μία λάθος
+     ανάγνωση σβήνει την προτροπή για πάντα σε εκείνη τη συσκευή. */
+  ["js", "    if (instStandalone()) { return; }", "    if (instStandalone()) { instState({ done: 1 }); return; }"],
 ];
 if (ONLY !== null) {
   const m = MUTATIONS[ONLY - 1];
@@ -123,7 +137,7 @@ check("Ε-5 · preventDefault στο beforeinstallprompt (αλλιώς δύο π
 });
 
 check("Ε-6 · 🔴 Καμία προτροπή σε ΕΓΚΑΤΕΣΤΗΜΕΝΗ εφαρμογή", () => {
-  has(js, "if (instStandalone()) { instState({ done: 1 }); return; }", "λείπει ο φραγμός standalone");
+  has(js, "if (instStandalone()) { return; }", "λείπει ο φραγμός standalone");
   has(js, "if (navigator.standalone === true) { return true; }", "το iOS δεν ανιχνεύεται ως εγκατεστημένο");
   has(js, "'(display-mode: standalone)'", "λείπει ο έλεγχος display-mode");
 });
@@ -162,6 +176,38 @@ check("Ε-12 · 🔴 Η ΔΕΥΤΕΡΗ ΔΙΑΔΡΟΜΗ ΖΕΙ: το FAQ κρα�
   has(js, "    { id: 'install-android',", "λείπει η οδηγία Android από το FAQ");
   has(js, "    { id: 'install-ios',", "λείπει η οδηγία iPhone από το FAQ");
   has(CARD, "Μενού → Ερωτήσεις", "η κάρτα δεν λέει πού θα το ξαναβρεί");
+});
+
+check("Ε-16 · 🔴 ΕΓΚΑΤΑΣΤΑΣΗ ≠ ΣΥΝΤΟΜΕΥΣΗ (Α440, 1/9/2026 — μετρημένο)", () => {
+  const i = js.indexOf("if (instDefer) {");
+  const and = js.slice(i, js.indexOf("function instClose()", i));
+  has(and, "«Εγκατάσταση εφαρμογής»", "δεν λέει το σωστό όνομα της επιλογής");
+  /* Το «Προσθήκη στην αρχική οθόνη» επιτρέπεται ΜΟΝΟ ως ενδιάμεσο βήμα που
+     καταλήγει στην «Εγκατάσταση» — ΠΟΤΕ ως ισοδύναμη επιλογή με «ή». */
+  hasnt(and, /ή <b>«Προσθήκη στην αρχική οθόνη»<\/b>/, "δοσμένο ως ισοδύναμο");
+  has(and, "διάλεξε <b>«Εγκατάσταση»</b>", "δεν οδηγεί στην Εγκατάσταση");
+  has(and, "warn('Μη διαλέξεις <b>«Συντόμευση»</b>", "λείπει η προειδοποίηση για τη συντόμευση");
+  has(and, "σήμα του browser", "δεν λέει ΤΙ χαλάει η συντόμευση");
+});
+
+check("Ε-17 · 🔴 Ο έλεγχος «εγκατεστημένη;» ρωτάει ΜΟΝΟ standalone", () => {
+  const i = js.indexOf("function instStandalone()");
+  const f = js.slice(i, js.indexOf("function instPlatform()", i));
+  has(f, "'(display-mode: standalone)'", "λείπει ο έλεγχος standalone");
+  hasnt(f, /minimal-ui|fullscreen/, "παροδική κατάσταση μέσα στον έλεγχο");
+});
+
+check("Ε-18 · 🔴 Καμία ΜΟΝΙΜΗ εγγραφή από παροδική ένδειξη", () => {
+  has(js, "    if (instStandalone()) { return; }", "ο φραγμός γράφει μόνιμη κατάσταση");
+  has(js, "window.addEventListener('appinstalled', function () { instState({ done: 1 }); });",
+      "το done δεν έρχεται από το πραγματικό συμβάν εγκατάστασης");
+});
+
+check("Ε-19 · Η προειδοποίηση ΔΕΝ είναι αριθμημένο βήμα", () => {
+  has(html, '<p class="note warn" id="inst-warn" hidden></p>', "η προειδοποίηση δεν έχει δική της θέση");
+  const i = js.indexOf("function instSteps()");
+  const f = js.slice(i, js.indexOf("function instClose()", i));
+  hasnt(f, /step\('Μη διαλέξεις/, "η προειδοποίηση δόθηκε ως βήμα προς εκτέλεση");
 });
 
 check("Ε-13 · Το SHELL cache ανέβηκε μαζί με την έκδοση", () => {
