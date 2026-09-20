@@ -1,0 +1,30 @@
+v71 - odigies egkatastasis gia iPhone sto FAQ
+
+TO EVRIMA
+Os tin v70 to FAQ eixe MIA erotisi egkatastasis kai apantouse mono gia
+Chrome: "pata to menou kai dialexe Egkatastasi efarmogis". Sto iPhone
+ekeino to menou DEN yparxei. Kathe xristis iPhone diavaze odigia pou den
+ektelitai sti syskevi tou - xoris kanena sfalma pouthena.
+
+TI ALLAZEI
+- FAQ: i erotisi egkatastasis spaei se DYO, (Android) kai (iPhone).
+  I odigia iPhone: Safari -> Koinopoiisi -> Prosthiki stin othoni Afetirias.
+- Markers id: 'install-android' / 'install-ios' se LATINIKOUS, gia ton
+  elegxo tou .bat (to findstr den diavazei ellinika - metrithike 19/9).
+- Bump v70 -> v71 se APP_VER, version.json, CACHE.
+
+ANTISTROFI APOFASIS TIS 16/9
+I apofasi itan: to keimeno #14 den mpainei mexri na ginei i dokimi se
+pragmatiko iPhone. Afto egguatai DEYTERI dokimi - tha evaze meta keimeno
+pou kaneis den eixe elegxei se syskevi. Tora mpainei PRIN, o dokimastis
+to AKOLOUTHEI, kai i idia i dokimi to epalithevei. Mia fora.
+
+FROUROS
+O-28 - i egkatastasi exei odigia KAI gia Android KAI gia iPhone.
+M16 - i odigia iPhone xanetai.
+Synolo: 28 frourroi sto ref_ui, 16 apodeixeis metallaxis.
+
+DEN ALLAXE: kamia logiki, kamia metavasi vasis, kanena arxeio tou server.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BmzVud1raAHyC5a5q7otN6

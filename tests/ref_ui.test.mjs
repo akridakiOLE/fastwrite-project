@@ -58,6 +58,11 @@ const MUTATIONS = [
   // Μ15 · 🔴 Η ΔΗΛΩΣΗ ΣΥΓΚΑΤΑΘΕΣΗΣ ΠΑΥΕΙ ΝΑ ΛΕΕΙ ΤΗΝ ΑΛΗΘΕΙΑ ΓΙΑ ΤΗ ΣΤΙΓΜΗ.
   ["html", "Την <b>ημέρα και την ώρα</b> της εγγραφής σου τις βλέπει σε κάθε περίπτωση",
            "Την ημερομηνία τη βλέπει σε κάθε περίπτωση"],
+  /* Μ16 · 🔴 ΧΑΝΕΤΑΙ Η ΟΔΗΓΙΑ ΕΓΚΑΤΑΣΤΑΣΗΣ ΓΙΑ iPhone (v71, 19/9/2026).
+     Ως τη v70 υπήρχε ΜΟΝΟ η οδηγία Chrome (⋮ → «Εγκατάσταση εφαρμογής»).
+     Στο iPhone εκείνο το μενού ΔΕΝ ΥΠΑΡΧΕΙ: ο μισός κόσμος διάβαζε οδηγία
+     που δεν εκτελείται στη συσκευή του, χωρίς κανένα σφάλμα πουθενά. */
+  ["js", "    { id: 'install-ios',", "    { id: 'install-XXX',"],
 ];
 if (ONLY !== null) {
   const m = MUTATIONS[ONLY - 1];
@@ -293,6 +298,22 @@ check("Ο-17 · χωρίς ?ref= η παλιά συμπεριφορά μένει
   if (refCaptureSrc("", false, null) !== "link") throw new Error("κενό → link");
   if (refCaptureSrc("", false, "store:ms") !== null) throw new Error("δεν πειράζει υπάρχον");
   if (refCaptureSrc("?src=store:play", false, "link") !== null) throw new Error("δεν ξαναγράφει src");
+});
+
+check("Ο-28 · 🔴 Η ΕΓΚΑΤΑΣΤΑΣΗ ΕΧΕΙ ΟΔΗΓΙΑ ΚΑΙ ΓΙΑ Android ΚΑΙ ΓΙΑ iPhone", () => {
+  /* Το iPhone δεν έχει «Εγκατάσταση εφαρμογής» στο μενού· ο δρόμος είναι
+     Safari → Κοινοποίηση → «Προσθήκη στην οθόνη Αφετηρίας». Μία μόνο οδηγία
+     Chrome αφήνει κάθε χρήστη iPhone χωρίς δρόμο — και δεν βγάζει σφάλμα. */
+  has(js, "{ id: 'install-android',", "η οδηγία Android");
+  has(js, "{ id: 'install-ios',", "η οδηγία iPhone");
+  const i = js.indexOf("{ id: 'install-ios',");
+  const blok = js.slice(i, js.indexOf("' },", i));
+  has(blok, "(iPhone)", "ο τίτλος λέει σε ποια συσκευή απευθύνεται");
+  has(blok, "Safari", "λέει ρητά Safari");
+  has(blok, "Προσθήκη στην οθόνη Αφετηρίας", "λέει τον πραγματικό δρόμο του iOS");
+  hasnt(blok, /πάτα το μενού \(⋮\)/, "δρόμος Chrome δοσμένος ως δρόμος iPhone");
+  const j = js.indexOf("{ id: 'install-android',");
+  has(js.slice(j, js.indexOf("' },", j)), "Chrome", "η Android λέει Chrome");
 });
 
 console.log("\n" + (failed ? "✘ ΑΠΕΤΥΧΑΝ " + failed : "✔ ΟΛΑ ΠΕΡΑΣΑΝ"));
