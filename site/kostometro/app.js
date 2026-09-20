@@ -14,6 +14,10 @@
     skip:  'km_key_skipped',
     id:    'km_install_id',
     perm:  'km_perm_seen',
+    /* v72 · η κατάσταση της προτροπής εγκατάστασης: {n: ανοίγματα,
+       no: φορές «Όχι τώρα», done: 1 όταν εγκαταστάθηκε}. Σβήνεται στον
+       μηδενισμό — καθαρή συσκευή ξαναρωτάει, και έτσι πρέπει. */
+    inst:  'km_inst',
     src:   'km_source',
     /* v65 · ΣΥΣΤΑΣΕΙΣ (17/9/2026) — ο κωδικός ΕΡΧΕΤΑΙ ΑΠΟ ΤΟΝ SERVER και
        απλώς φυλάγεται εδώ για να φαίνεται ο σύνδεσμος χωρίς δίκτυο. ΔΕΝ
@@ -2017,7 +2021,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v71';
+  var APP_VER = 'φέτα 3 · v72';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -4108,6 +4112,131 @@
     } catch (e) {}
   }
 
+  /* ══ v72 · Η ΠΡΟΤΡΟΠΗ ΕΓΚΑΤΑΣΤΑΣΗΣ (20/9/2026) ═══════════════
+     KM-INSTALL-PROMPT-v72   ← λατινικός δείκτης για το findstr του deploy .bat
+     (το findstr μέσα σε .bat ΔΕΝ διαβάζει ελληνικά — μετρήθηκε 19/9/2026).
+
+     ΤΟ ΠΡΟΒΛΗΜΑ: η οδηγία εγκατάστασης υπήρχε μόνο ως 14η/15η ερώτηση στο
+     FAQ. Ο χρήστης που έρχεται από διαφήμιση δεν ανοίγει μενού και δεν
+     κυλάει 17 ερωτήσεις. Θα έφευγε νομίζοντας ότι είναι ιστοσελίδα.
+
+     Ο ΡΥΘΜΟΣ: εμφανίζεται στο 1ο, το 4ο και το 10ο άνοιγμα — μετά ποτέ.
+     Ούτε μία φορά (όποιος πατήσει «Όχι τώρα» δεν ξαναβρίσκει ποτέ την
+     οδηγία), ούτε σε κάθε άνοιγμα (γίνεται εμπόδιο και διώχνει).
+
+     ⚠ ΓΙΑΤΙ ΔΕΝ ΕΙΝΑΙ ΕΝΑ ΚΟΥΜΠΙ ΓΙΑ ΟΛΟΥΣ: το beforeinstallprompt το
+     έχει ΜΟΝΟ το Chromium. Το WebKit του iPhone ΔΕΝ το υλοποιεί καθόλου:
+     εκεί η μόνη διαδρομή είναι χειροκίνητη και ΜΟΝΟ από Safari — σε Chrome
+     ή Firefox του iPhone η επιλογή «Προσθήκη στην οθόνη Αφετηρίας» δεν
+     υπάρχει. Γι' αυτό το κείμενο είναι τρία διαφορετικά κείμενα, όχι ένα. */
+
+  var INST_AT   = [1, 4, 10];   /* σε ποια ανοίγματα εμφανίζεται */
+  var instDefer = null;         /* το beforeinstallprompt του Android, φυλαγμένο */
+
+  /* Χωρίς preventDefault ο Chrome δείχνει ΤΗ ΔΙΚΗ ΤΟΥ μπάρα και θα είχαμε
+     δύο προτροπές μαζί. Το συμβάν μπορεί να φτάσει ΚΑΙ μετά το άνοιγμα
+     της κάρτας — τότε ξαναγράφουμε τα βήματα ώστε να βγει το κουμπί. */
+  window.addEventListener('beforeinstallprompt', function (e) {
+    try { e.preventDefault(); } catch (x) {}
+    instDefer = e;
+    if (el('inst') && !el('inst').hidden) { instSteps(); }
+  });
+  window.addEventListener('appinstalled', function () { instState({ done: 1 }); });
+
+  function instRead() {
+    try { return JSON.parse(localStorage.getItem(LS.inst) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function instState(patch) {
+    var s = instRead(), k;
+    for (k in patch) { if (Object.prototype.hasOwnProperty.call(patch, k)) { s[k] = patch[k]; } }
+    try { localStorage.setItem(LS.inst, JSON.stringify(s)); } catch (e) {}
+    return s;
+  }
+  /* Εγκατεστημένη; Τρείς διαφορετικοί τρόποι ανά μηχανή — το iOS
+     απαντάει ΜΟΝΟ στο navigator.standalone. */
+  function instStandalone() {
+    if (navigator.standalone === true) { return true; }
+    try {
+      return window.matchMedia('(display-mode: standalone)').matches ||
+             window.matchMedia('(display-mode: fullscreen)').matches ||
+             window.matchMedia('(display-mode: minimal-ui)').matches;
+    } catch (e) { return false; }
+  }
+  /* ⚠ Το iPadOS 13+ παρουσιάζεται ως Macintosh. Το ξεχωρίζει η αφή. */
+  function instPlatform() {
+    var ua = navigator.userAgent || '';
+    if (/iPhone|iPod|iPad/.test(ua)) { return 'ios'; }
+    if (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1) { return 'ios'; }
+    if (/Android/.test(ua)) { return 'android'; }
+    return 'other';
+  }
+  function instIosNotSafari() { return /CriOS|FxiOS|EdgiOS|OPiOS/.test(navigator.userAgent || ''); }
+
+  function instSteps() {
+    var p = instPlatform(), ol = el('inst-steps'), go = el('inst-go');
+    if (!ol) { return; }
+    ol.innerHTML = '';
+    go.hidden = true;
+    var step = function (h) {
+      var li = document.createElement('li');
+      li.innerHTML = h;
+      ol.appendChild(li);
+    };
+    if (p === 'ios') {
+      if (instIosNotSafari()) {
+        step('Άνοιξε αυτή τη σελίδα στο <b>Safari</b> — μόνο από εκεί μπαίνει στην αρχική οθόνη.');
+      }
+      step('Πάτα το <b>Κοινοποίηση</b> — το τετράγωνο με το βέλος προς τα πάνω, κάτω στην οθόνη.');
+      step('Κύλησε προς τα κάτω και διάλεξε <b>«Προσθήκη στην οθόνη Αφετηρίας»</b>.');
+      step('Πάτα <b>«Προσθήκη»</b> και μετά άνοιξέ το <b>από το εικονίδιο</b>.');
+      return;
+    }
+    if (instDefer) {
+      step('Πάτα <b>Εγκατάσταση</b> και μετά <b>«Εγκατάσταση»</b> στο παράθυρο που θα βγει.');
+      go.hidden = false;
+      return;
+    }
+    step('Πάτα τις <b>τρεις τελείες ⋮</b> πάνω δεξιά στον browser.');
+    step('Διάλεξε <b>«Εγκατάσταση εφαρμογής»</b> ή <b>«Προσθήκη στην αρχική οθόνη»</b>.');
+    step('Άνοιξέ το μετά <b>από το εικονίδιο</b>.');
+  }
+
+  function instClose() { if (el('inst')) { el('inst').hidden = true; } }
+
+  /* Καλείται από ΕΝΑ σημείο, μετά το boot — όλες οι διαδρομές του boot
+     τελειώνουν εκεί. Αν μπαινε μέσα στο boot θα το έχαναν τα πέντε
+     πρόωρα return — το ίδιο σφάλμα με το hook της συγκατάθεσης στη v67. */
+  function maybeInstall() {
+    if (instPlatform() === 'other') { return; }      /* υπολογιστής: δεν είναι το κοινό */
+    if (instStandalone()) { instState({ done: 1 }); return; }
+    var s = instRead();
+    if (s.done) { return; }
+    var n = (s.n || 0) + 1;
+    instState({ n: n });
+    if (INST_AT.indexOf(n) === -1) { return; }
+    instSteps();
+    if (el('inst')) { el('inst').hidden = false; }
+  }
+
+  if (el('inst-no')) {
+    el('inst-no').onclick = function () {
+      instClose();
+      instState({ no: (instRead().no || 0) + 1 });
+    };
+  }
+  if (el('inst-go')) {
+    el('inst-go').onclick = function () {
+      var d = instDefer;
+      if (!d) { return; }
+      /* Το beforeinstallprompt χρησιμοποιείται ΜΙΑ φορά — το αδειάζουμε
+         ΠΡΙΝ το prompt(), αλλιώς διπλό πάτημα ρίχνει σφάλμα. */
+      instDefer = null;
+      instClose();
+      try { d.prompt(); } catch (e) {}
+      /* Η απάντηση δεν χρειάζεται: αν δεχτεί, το appinstalled γράφει done. */
+    };
+  }
+
   function boot() {
     askPersist();
     if (!localStorage.getItem(LS.id)) {
@@ -4954,7 +5083,7 @@
   window.addEventListener('focus', maybePull);
 
   checkVersion(false);   // v30 — πρώτο πράγμα σε κάθε φόρτωση
-  openDB().then(boot).then(function () { schedule(800); }).catch(function (e) {
+  openDB().then(boot).then(function () { schedule(800); maybeInstall(); }).catch(function (e) {
     document.body.innerHTML = '<div style="padding:40px;color:#e6e8ec">Δεν άνοιξε η τοπική βάση: ' + e + '</div>';
   });
 

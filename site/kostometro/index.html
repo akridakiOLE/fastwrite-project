@@ -586,6 +586,25 @@
   <div class="pg-body" id="shot-body"></div>
 </section>
 
+<!-- ══ v72 · ΠΡΟΤΡΟΠΗ ΕΓΚΑΤΑΣΤΑΣΗΣ (20/9/2026) ════════════════
+     ΓΙΑΤΙ ΥΠΑΡΧΕΙ: ως τη v71 η οδηγία εγκατάστασης ζούσε ΜΟΝΟ στο FAQ,
+     14η από 17 ερωτήσεις, πίσω από Μενού → Ερωτήσεις → κύλιση. Ο lead που
+     πατάει τον σύνδεσμο της καμπάνιας δεν κάνει ποτέ αυτή τη διαδρομή:
+     βλέπει μια ιστοσελίδα μέσα στον browser και φεύγει.
+     ⚠ ΔΕΝ είναι .screen — δεν μπαίνει στο SCREENS. Είναι στρώμα ΠΑΝΩ
+     από την οθόνη: αν ήταν οθόνη θα έκρυβε την πρώτη εικόνα της
+     εφαρμογής, και θα ζητούσαμε εγκατάσταση κάτι που δεν είδε ακόμα. -->
+<div id="inst" class="inst" hidden>
+  <div class="inst-card" role="dialog" aria-labelledby="inst-h" aria-modal="true">
+    <h2 id="inst-h">Βάλ&#39; το στην αρχική οθόνη</h2>
+    <p class="lede">Ανοίγει σαν κανονική εφαρμογή — κάμερα με ένα άγγιγμα, χωρίς γραμμή διευθύνσεων. Καμία εγκατάσταση από Store.</p>
+    <ol class="inst-steps" id="inst-steps"></ol>
+    <button class="btn primary" id="inst-go" hidden>Εγκατάσταση</button>
+    <button class="btn ghost" id="inst-no">Όχι τώρα</button>
+    <p class="fine hint">Θα το ξαναβρεις στο <b>Μενού → Ερωτήσεις</b>.</p>
+  </div>
+</div>
+
 <script src="/km-crypto.js"></script>
 <script src="/kostometro/app.js"></script>
 </body>

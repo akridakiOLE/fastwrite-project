@@ -619,3 +619,18 @@ textarea#fb-text:focus{outline:none;border-color:var(--accent)}
   border: 1px solid rgba(255,255,255,.16); background: #0f1520; color: #e8eef6; font-size: 15px;
 }
 #s-ref #ref-count { margin: 0 0 14px; }
+
+
+/* ── v72 · Προτροπή εγκατάστασης ────────────────────
+   ⚠ z-index πάνω από τις οθόνες: είναι στρώμα, όχι οθόνη.
+   Η κάρτα κάθεται ΚΑΤΩ στο κινητό — εκεί φτάνει ο αντίχειρας,
+   και στο iPhone δείχνει προς το κουμπί Κοινοποίηση που ζητάει. */
+.inst{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;
+      background:rgba(4,8,14,.74);padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+.inst-card{width:100%;max-width:420px;background:var(--bg2);border:1px solid var(--border);
+           border-radius:16px;padding:22px 20px;display:flex;flex-direction:column;gap:14px;
+           max-height:86vh;overflow-y:auto}
+.inst-steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px;
+            color:var(--text2);font-size:15px;line-height:1.5}
+.inst-steps b{color:var(--text)}
+@media (min-width:520px){.inst{align-items:center}}
