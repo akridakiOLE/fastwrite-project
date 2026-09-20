@@ -27,7 +27,7 @@ const MUTATIONS = [
   // Μ3 · 🔴 ΤΟ iPhone ΠΑΙΡΝΕΙ ΟΔΗΓΙΑ ANDROID — το σφάλμα της v70, ξαναμπαίνει.
   ["js", "    if (p === 'ios') {", "    if (false) {"],
   // Μ4 · το κουμπί βγαίνει ΧΩΡΙΣ αποθηκευμένο συμβάν — πατιέται και δεν κάνει τίποτα.
-  ["js", "    if (instDefer) {\n      step(", "    if (true) {\n      step("],
+  ["js", "    if (instDefer) {", "    if (true) {"],
   // Μ5 · φεύγει το preventDefault — ο Chrome δείχνει ΚΑΙ τη δική του μπάρα.
   ["js", "try { e.preventDefault(); } catch (x) {}", ""],
   /* Μ6 · 🔴 Η ΠΡΟΤΡΟΠΗ ΕΜΦΑΝΙΖΕΤΑΙ ΣΕ ΗΔΗ ΕΓΚΑΤΕΣΤΗΜΕΝΗ ΕΦΑΡΜΟΓΗ:
@@ -72,6 +72,24 @@ const MUTATIONS = [
   /* Μ19 · 🔴 ΠΑΡΟΔΙΚΗ ΕΝΔΕΙΞΗ ΞΑΝΑΓΡΑΦΕΙ ΜΟΝΙΜΗ ΚΑΤΑΣΤΑΣΗ: μία λάθος
      ανάγνωση σβήνει την προτροπή για πάντα σε εκείνη τη συσκευή. */
   ["js", "    if (instStandalone()) { return; }", "    if (instStandalone()) { instState({ done: 1 }); return; }"],
+  // Μ20 · ξαναγυρίζει το μονήρες «1.» — αρίθμηση που υπόσχεται βήμα 2 που δεν υπάρχει.
+  ["js", "      ol.className = 'inst-steps one';", ""],
+  /* Μ21 · 🔴 iPhone: το κάτω μέρος των οθονών εγκατάστασης ξαναγίνεται σταθερό.
+     Στην οθόνη των 12 λέξεων το «Συνέχεια» πέφτει κάτω από τη γραμμή αφετηρίας. */
+  ["css", "24px calc(32px + env(safe-area-inset-bottom))}", "24px 32px}"],
+  // Μ22 · 🔴 iPhone: η μπάρα των προμηθευτών ξανακάθεται πάνω στη γραμμή αφετηρίας.
+  ["css", "padding:12px 0 calc(4px + env(safe-area-inset-bottom));", "padding:12px 0 4px;"],
+  /* Μ23 · 🔴 Ο ΦΡΟΥΡΟΣ ΤΟΥ ΔΙΠΛΟΥ ΛΟΓΑΡΙΑΣΜΟΥ ΞΕΚΡΕΜΑΕΙ ΑΠΟ ΤΗ show().
+     Ίδιο σφάλμα με το hook της συγκατάθεσης στη v67: η οθόνη έρχεται από
+     show('s-acc'), άρα η προειδοποίηση δεν εμφανίζεται ΠΟΤΕ σε κανέναν. */
+  ["js", "    if (id === 's-acc')   { accWarn(); }", ""],
+  // Μ24 · η προειδοποίηση βγαίνει και σε συσκευή που ΔΕΝ είναι εγκατεστημένη — σκέτος θόρυβος.
+  ["js", "                instStandalone() &&", ""],
+  /* Μ25 · 🔴 βγαίνει και σε χρήστη που ΕΧΕΙ ήδη τα στοιχεία του τοπικά —
+     δηλαδή λέει «μην ξεκινήσεις από την αρχή» σε κάποιον που δεν κινδυνεύει. */
+  ["js", "                !localStorage.getItem(LS.email) &&", ""],
+  // Μ26 · η προειδοποίηση έρχεται ΟΡΑΤΗ από το HTML — τη βλέπουν και οι χρήστες Android.
+  ["html", '<p class="note warn" id="acc-warn" hidden>', '<p class="note warn" id="acc-warn">'],
 ];
 if (ONLY !== null) {
   const m = MUTATIONS[ONLY - 1];
@@ -127,7 +145,7 @@ check("Ε-3 · Στο iPhone ΔΕΝ λέγεται ποτέ «τρεις τελ�
 });
 
 check("Ε-4 · Το κουμπί «Εγκατάσταση» βγαίνει ΜΟΝΟ με αποθηκευμένο συμβάν", () => {
-  has(js, "    if (instDefer) {\n      step(", "το κουμπί δεν εξαρτάται από το instDefer");
+  has(js, "    if (instDefer) {", "το κουμπί δεν εξαρτάται από το instDefer");
   has(js, "      go.hidden = false;", "το κουμπί δεν ξεκρύβεται εκεί");
   has(js, "    go.hidden = true;", "το κουμπί δεν ξεκινάει κρυμμένο");
 });
@@ -218,6 +236,53 @@ check("Ε-19 · Η προειδοποίηση ΔΕΝ είναι αριθμημέ
   const i = js.indexOf("function instSteps()");
   const f = js.slice(i, js.indexOf("function instClose()", i));
   hasnt(f, /step\('Μη διαλέξεις/, "η προειδοποίηση δόθηκε ως βήμα προς εκτέλεση");
+});
+
+check("Ε-20 · Ένα βήμα ΔΕΝ αριθμείται", () => {
+  /* ΜΟΝΟ το κλαδί του κουμπιού — όχι ό,τι ακολουθεί μετά το return. */
+  const i = js.indexOf("if (instDefer) {");
+  const br = js.slice(i, js.indexOf("\n    }", i));
+  const steps = (br.match(/step\(/g) || []).length;
+  if (steps !== 1) throw new Error("το κλαδί του κουμπιού έχει " + steps + " βήματα, όχι 1");
+  has(br, "ol.className = 'inst-steps one';", "ένα βήμα και όμως αριθμημένο");
+  has(css, ".inst-steps.one{list-style:none;padding-left:0}", "λείπει ο κανόνας της μονήρους");
+  has(js, "    ol.className = 'inst-steps';", "η κλάση δεν καθαρίζει πριν το ξαναζωγράφισμα");
+});
+
+check("Ε-21 · 🔴 iPHONE — κάθε κάτω άκρο σέβεται τη γραμμή αφετηρίας", () => {
+  /* Οι οθόνες εγκατάστασης κυλάνε: εκεί ζει το «Συνέχεια» των 12 λέξεων. */
+  has(css, "24px calc(32px + env(safe-area-inset-bottom))}", ".setup: σταθερό κάτω padding");
+  /* Η μπάρα των προμηθευτών είναι κολλημένη στο κάτω μέρος. */
+  has(css, "padding:12px 0 calc(4px + env(safe-area-inset-bottom));", ".multi-bar: σταθερό κάτω padding");
+  /* Και η ίδια η κάρτα. */
+  has(css, "padding-bottom:max(16px,env(safe-area-inset-bottom))", ".inst: σταθερό κάτω padding");
+});
+
+check("Ε-22 · 🔴 iPHONE — ο φρουρός του ΔΙΠΛΟΥ ΛΟΓΑΡΙΑΣΜΟΥ υπάρχει και κρέμεται από τη show()", () => {
+  has(html, '<p class="note warn" id="acc-warn" hidden>', "λείπει η προειδοποίηση, ή δεν είναι κρυφή εξ αρχής");
+  /* ΕΝΑ σημείο απ' όπου περνάνε ΟΛΕΣ οι διαδρομές προς την πρώτη οθόνη. */
+  has(js, "    if (id === 's-acc')   { accWarn(); }", "δεν κρέμεται από τη show()");
+  has(js, "KM-ACC-WARN-IOS", "λείπει ο δείκτης ελέγχου του deploy");
+});
+
+check("Ε-23 · Η συνθήκη είναι ΚΑΙ ΤΑ ΤΕΣΣΕΡΑ — αλλιώς είναι θόρυβος ή σιωπή", () => {
+  const i = js.indexOf("function accWarn()");
+  const f = js.slice(i, js.indexOf("\n  }", i));
+  has(f, "instPlatform() === 'ios'", "δεν περιορίζεται σε iPhone");
+  has(f, "instStandalone()", "δεν ελέγχει αν είναι εγκατεστημένη");
+  has(f, "!localStorage.getItem(LS.email)", "δεν ελέγχει την απουσία email");
+  has(f, "!localStorage.getItem(LS.words)", "δεν ελέγχει την απουσία 12 λέξεων");
+  has(f, "w.hidden = !risky;", "δεν κρύβεται όταν δεν υπάρχει κίνδυνος");
+});
+
+check("Ε-24 · Το κείμενο δίνει τη ΔΙΑΔΡΟΜΗ ΔΙΑΣΩΣΗΣ, όχι μόνο φόβο", () => {
+  const i = html.indexOf('id="acc-warn"');
+  const p = html.slice(i, html.indexOf("</p>", i));
+  has(p, "Έχω ήδη λογαριασμό", "δεν λέει ΠΟΙΟ κουμπί να πατήσει");
+  has(p, "12 λέξεις", "δεν λέει τι θα χρειαστεί");
+  has(p, "δεύτερο", "δεν λέει τι θα πάθει αν το αγνοήσει");
+  /* Το κουμπί που δείχνει πρέπει να υπάρχει όντως στην ίδια οθόνη. */
+  has(html, 'id="acc-yes">Έχω ήδη λογαριασμό', "το κουμπί που υποδεικνύει δεν υπάρχει");
 });
 
 check("Ε-13 · Το SHELL cache ανέβηκε μαζί με την έκδοση", () => {

@@ -15,7 +15,11 @@ body{
 [hidden]{display:none!important}
 
 /* ── Οθόνες εγκατάστασης ─────────────────────────────── */
-.setup{overflow-y:auto;padding:max(32px,env(safe-area-inset-top)) 24px 32px}
+/* 🔴 v75 — iPhone: το κάτω padding ήταν σταθερό 32px και ΔΕΝ σεβόταν τη
+   γραμμή αφετηρίας (34px). Οι οθόνες εδώ κυλάνε: στην οθόνη των 12
+   λέξεων το κουμπί «Συνέχεια» κατέληγε κάτω από τη γραμμή — και εκεί
+   δεν υπάρχει άλλη διαδρομή μπροστά. Μετρήθηκε στον κώδικα 20/9/2026. */
+.setup{overflow-y:auto;padding:max(32px,env(safe-area-inset-top)) 24px calc(32px + env(safe-area-inset-bottom))}
 .setup-inner{margin:auto;width:100%;max-width:420px;display:flex;flex-direction:column;gap:16px}
 .logo{font-size:32px;font-weight:800;letter-spacing:-.5px}
 .logo span{color:var(--accent)}
@@ -435,7 +439,8 @@ input:focus{outline:none;border-color:var(--accent)}
 .sup-line .row{flex:1 1 auto}
 .sup-cb{width:26px;height:26px;min-width:26px;accent-color:var(--accent);flex:0 0 auto}
 .multi-bar{
-  position:sticky;bottom:0;display:flex;gap:10px;padding:12px 0 4px;
+  /* v75 — iPhone: τα τρία κουμπιά κάθονταν πάνω στη γραμμή αφετηρίας. */
+  position:sticky;bottom:0;display:flex;gap:10px;padding:12px 0 calc(4px + env(safe-area-inset-bottom));
   background:linear-gradient(to top,var(--bg,#0a0e14) 70%,transparent);
 }
 .multi-bar .btn{margin:0;flex:1 1 auto}
@@ -633,4 +638,6 @@ textarea#fb-text:focus{outline:none;border-color:var(--accent)}
 .inst-steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px;
             color:var(--text2);font-size:15px;line-height:1.5}
 .inst-steps b{color:var(--text)}
+/* v75 · με ΕΝΑ βήμα δεν μπαίνει αριθμός — ένα «1.» χωρίς «2.» φαίνεται κουτσό. */
+.inst-steps.one{list-style:none;padding-left:0}
 @media (min-width:520px){.inst{align-items:center}}
