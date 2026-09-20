@@ -98,6 +98,10 @@ const MUTATIONS = [
   /* Μ28 · ο σύνδεσμος των Όρων ανοίγει στην ΙΔΙΑ καρτέλα — ο χρήστης χάνει
      τη μισοσυμπληρωμένη φόρμα του για να διαβάσει τους Όρους. */
   ["html", '<a href="/legal/terms" target="_blank" rel="noopener">', '<a href="/legal/terms">'],
+  /* Μ29 · 🔴 Η ΠΑΛΙΝΔΡΟΜΗΣΗ ΤΗΣ 20/9: η εγγραφή ξαναγίνεται χωρίς έκδοση,
+     η άκρη ξανακολλάει, και ο worker της συσκευής δεν αλλάζει ποτέ. */
+  ["js", "navigator.serviceWorker.register('/kostometro/sw.js?v=' + shortVer(APP_VER))",
+         "navigator.serviceWorker.register('/kostometro/sw.js')"],
 ];
 if (ONLY !== null) {
   const m = MUTATIONS[ONLY - 1];
@@ -325,6 +329,16 @@ check("Ε-26 · Η γραμμή των Όρων ΔΕΝ είναι κουτάκι
   hasnt(p, /<input/, "μπήκε κουτάκι εκεί που χρειάζεται ενημέρωση");
   /* Και το ΜΟΝΟ κουτάκι της οθόνης παραμένει ασυμπλήρωτο. */
   has(html, '<input type="checkbox" id="ref-consent-ok">', "το κουτάκι συγκατάθεσης άλλαξε");
+});
+
+check("Ε-27 · 🔴 Η ΕΓΓΡΑΦΗ ΤΟΥ WORKER ΦΕΡΝΕΙ ΤΗΝ ΕΚΔΟΣΗ ΣΤΗ ΔΙΕΥΘΥΝΣΗ", () => {
+  /* Μετρήθηκε 20/9/2026: η άκρη του Cloudflare κράτησε το sw.js στην παλιά
+     έκδοση παρά το no-cache, ο worker της συσκευής δεν αντικαταστάθηκε ποτέ,
+     και το tablet σέρβιρε ΠΑΛΙΟ index.html — χωρίς τη γραμμή των Όρων. */
+  has(js, "navigator.serviceWorker.register('/kostometro/sw.js?v=' + shortVer(APP_VER))",
+      "η εγγραφή δεν φέρνει την έκδοση στη διεύθυνση");
+  hasnt(js, /register\('\/kostometro\/sw\.js'\)/, "επέζησε η εγγραφή χωρίς έκδοση");
+  has(js, "KM-SW-VERSIONED-URL", "λείπει ο δείκτης ελέγχου του deploy");
 });
 
 check("Ε-13 · Το SHELL cache ανέβηκε μαζί με την έκδοση", () => {
