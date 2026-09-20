@@ -35,15 +35,15 @@ const MUTATIONS = [
   ["js", "    if (instStandalone()) { return; }", ""],
   // Μ7 · το iOS δεν ανιχνεύεται ως εγκατεστημένο (matchMedia μόνο) — ίδιο αποτέλεσμα, μόνο σε iPhone.
   ["js", "    if (navigator.standalone === true) { return true; }", ""],
-  /* Μ8 · 🔴 «ΜΙΑ ΦΟΡΑ ΚΑΙ ΠΟΤΕ ΞΑΝΑ»: όποιος πατήσει «Όχι τώρα» στο πρώτο
-     άνοιγμα δεν ξαναβλέπει ποτέ την οδηγία. */
-  ["js", "var INST_AT   = [1, 4, 10];", "var INST_AT   = [1];"],
-  // Μ9 · η προτροπή σε ΚΑΘΕ άνοιγμα — γίνεται εμπόδιο και διώχνει.
-  ["js", "    if (INST_AT.indexOf(n) === -1) { return; }", ""],
-  /* Μ10 · ο μετρητής γράφεται ΜΕΤΑ τον έλεγχο — κολλάει στο 1 και η κάρτα
-     βγαίνει για πάντα σε κάθε άνοιγμα. */
-  ["js", "    instState({ n: n });\n    if (INST_AT.indexOf(n) === -1) { return; }",
-         "    if (INST_AT.indexOf(n) === -1) { return; }\n    instState({ n: n });"],
+  /* Μ8 · 🔴 Η ΠΑΛΙΝΔΡΟΜΗΣΗ ΤΗΣ v72: ξαναμπαίνει φρένο ανά άνοιγμα. Ο lead που
+     πατάει τον σύνδεσμο της καμπάνιας ΔΕΝ βλέπει την οδηγία. */
+  ["js", "    instSteps();\n    if (el('inst')) { el('inst').hidden = false; }",
+         "    var n = (instRead().n || 0) + 1;\n    instState({ n: n });\n    if (n !== 1) { return; }\n    instSteps();\n    if (el('inst')) { el('inst').hidden = false; }"],
+  /* Μ9 · 🔴 ΤΟ «ΟΧΙ ΤΩΡΑ» ΓΙΝΕΤΑΙ ΜΟΝΙΜΟ: γράφει στον δίσκο και σωπαίνει
+     για πάντα σε εκείνη τη συσκευή. */
+  ["js", "      instClose();\n    };", "      instClose();\n      instState({ done: 1 });\n    };"],
+  // Μ10 · χάνεται ο φραγμός του πραγματικού appinstalled — η κάρτα βγαίνει και μετά την εγκατάσταση.
+  ["js", "    if (instRead().done) { return; }", ""],
   /* Μ11 · 🔴 Η ΚΛΗΣΗ ΜΠΑΙΝΕΙ ΜΕΣΑ ΣΤΟ boot: το boot έχει πέντε πρόωρα return
      (νέος χρήστης, λέξεις, κλειδί, άδεια κάμερας) — ακριβώς οι διαδρομές του
      νέου χρήστη. Ίδιο σφάλμα με το hook συγκατάθεσης της v67. */
@@ -147,18 +147,28 @@ check("Ε-7 · Το iPadOS ανιχνεύεται παρότι λέει «Macint
       "το iPad περνάει ως υπολογιστής");
 });
 
-check("Ε-8 · 🔴 Ο ρυθμός: ΟΥΤΕ μία φορά μόνο, ΟΥΤΕ σε κάθε άνοιγμα", () => {
-  const m = js.match(/var INST_AT\s+=\s+\[([^\]]*)\]/);
-  if (!m) throw new Error("λείπει το INST_AT");
-  const at = m[1].split(",").map((x) => Number(x.trim())).filter((x) => !isNaN(x));
-  if (at.length < 2) throw new Error("μία μόνο εμφάνιση: " + m[1]);
-  if (at[0] !== 1) throw new Error("δεν εμφανίζεται στο πρώτο άνοιγμα");
-  has(js, "    if (INST_AT.indexOf(n) === -1) { return; }", "λείπει το φρένο του ρυθμού");
+check("Ε-8 · 🔴 Η ΚΑΡΤΑ ΒΓΑΙΝΕΙ ΣΕ ΚΑΘΕ ΑΝΟΙΓΜΑ — κανένα φρένο ανά άνοιγμα", () => {
+  const i = js.indexOf("function maybeInstall()");
+  const f = js.slice(i, js.indexOf("if (el('inst-no'))", i));
+  hasnt(f, /INST_AT|\.n \|\| 0|indexOf\(n\)/, "επέζησε μετρητής ανοιγμάτων");
+  /* Οι ΜΟΝΟΙ επιτρεπτοί φραγμοί: υπολογιστής · ήδη εγκατεστημένη · appinstalled. */
+  const gates = (f.match(/if \(.*?\) \{ return; \}/g) || []);
+  if (gates.length !== 3) throw new Error("φραγμοί: " + gates.length + " αντί για 3 — " + gates.join(" | "));
+  has(f, "instSteps();", "δεν ζωγραφίζει τα βήματα");
 });
 
-check("Ε-9 · Ο μετρητής γράφεται ΠΡΙΝ τον έλεγχο (αλλιώς κολλάει στο 1)", () => {
-  has(js, "    instState({ n: n });\n    if (INST_AT.indexOf(n) === -1) { return; }",
-      "λάθος σειρά: έλεγχος πριν την εγγραφή");
+check("Ε-8β · 🔴 Το «Όχι τώρα» ΔΕΝ γράφει τίποτα στον δίσκο", () => {
+  const i = js.indexOf("el('inst-no').onclick");
+  const f = js.slice(i, js.indexOf("el('inst-go')", i));
+  hasnt(f, /instState\(/, "το «Όχι τώρα» γράφει μόνιμη κατάσταση");
+  has(f, "instClose();", "δεν κλείνει την κάρτα");
+});
+
+check("Ε-9 · Μόνη πηγή σιωπής: το πραγματικό συμβάν εγκατάστασης", () => {
+  has(js, "    if (instRead().done) { return; }", "λείπει ο φραγμός του appinstalled");
+  /* Το `done` γράφεται ΜΟΝΟ από το appinstalled — πουθενά αλλού σε όλο το αρχείο. */
+  const writes = (js.match(/instState\(\{ done: 1 \}\)/g) || []);
+  if (writes.length !== 1) throw new Error("το done γράφεται " + writes.length + " φορές, όχι 1");
 });
 
 check("Ε-10 · 🔴 Η κλήση είναι ΕΞΩ από το boot (το boot έχει 5 πρόωρα return)", () => {
