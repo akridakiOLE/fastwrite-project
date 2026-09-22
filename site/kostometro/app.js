@@ -35,6 +35,9 @@
        22/9/2026 το σφάλμα της 8:07 είχε σβηστεί ως τις 8:18. */
     aiErr: 'km_ai_err',
     aiMs:  'km_ai_ms',
+    /* v81 · Η ΑΥΤΟΛΕΞΕΙ ΑΠΑΝΤΗΣΗ ΤΗΣ GOOGLE (πρώτοι 300 χαρακτήρες) —
+       χωρίς αυτήν το «δεν βρέθηκαν ποσά» είναι αδιάγνωστο (22/9/2026). */
+    aiRaw: 'km_ai_raw',
     /* v26 · Η.2β-1 — ο λογαριασμός. Οι 12 λέξεις ΜΕΝΟΥΝ στη συσκευή:
        από αυτές βγαίνουν folder/auth (πάνε στον server) και το κλειδί
        κρυπτογράφησης (ΔΕΝ φεύγει ποτέ). */
@@ -2033,6 +2036,7 @@
     el('st-diag').textContent = localStorage.getItem(LS.diag) || '—';
     el('st-aims').textContent = localStorage.getItem(LS.aiMs) || '—';
     el('st-aierr').textContent = localStorage.getItem(LS.aiErr) || 'κανένα';
+    el('st-airaw').textContent = localStorage.getItem(LS.aiRaw) || '—';
     /* v30 — τι τρέχει ΕΔΩ, τι έχει ο server, ποιος worker σερβίρει.
        Χωρίς αυτά, «δεν ενημερώθηκε» είναι εντύπωση, όχι μέτρηση. */
     el('st-srvver').textContent = 'ελέγχεται…';
@@ -2059,7 +2063,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v80';
+  var APP_VER = 'φέτα 3 · v81';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2277,10 +2281,28 @@
         });
       });
     }).then(function (j) {
-      var txt = '';
-      try { txt = j.candidates[0].content.parts[0].text; } catch (e) {}
+      /* v81 · KM-AI-RAW — ΤΟ ΚΕΙΜΕΝΟ ΜΑΖΕΥΕΤΑΙ ΑΠΟ ΟΛΑ ΤΑ ΜΕΡΗ ΤΗΣ ΑΠΑΝΤΗΣΗΣ.
+         Ως τη v80 διαβαζόταν ΜΟΝΟ το parts[0]. Τα μοντέλα με σκέψη μπορούν να
+         βάλουν πρώτο ένα μέρος χωρίς κείμενο (σκέψη / υπογραφή σκέψης) — τότε
+         το txt έμενε άδειο και η απάντηση μετρούσε ως αποτυχία, ενώ τα ποσά
+         ήταν στο επόμενο μέρος. Και: η αυτολεξεί απάντηση + ο λόγος τερματισμού
+         γράφονται στις Ρυθμίσεις, ώστε το «δεν βρέθηκαν ποσά» να είναι μετρήσιμο. */
+      var txt = '', fin = '';
+      try {
+        var cand = j.candidates[0];
+        fin = cand.finishReason || '';
+        txt = (cand.content.parts || []).filter(function (pt) {
+          return pt && !pt.thought && typeof pt.text === 'string';
+        }).map(function (pt) { return pt.text; }).join('');
+      } catch (e) {}
+      try {
+        localStorage.setItem(LS.aiRaw, aiStamp() + ' · ' + model + (bare ? ' · σκέψη κανονική' : ' · σκέψη χαμηλή') +
+          (fin ? ' · ' + fin : '') + ' · ' + (txt ? String(txt).slice(0, 300) : '(κενό κείμενο)'));
+      } catch (e) {}
       var o = null;
       try { o = JSON.parse(txt); } catch (e) {}
+      /* Μερικές φορές το JSON έρχεται ως λίστα με ένα στοιχείο: [{...}] */
+      if (Array.isArray(o)) { o = o[0] || null; }
       if (!o || typeof o !== 'object') {
         var pe = new Error('parse'); pe.soft = true;
         pe.msg = 'δεν γύρισε JSON: ' + String(txt).slice(0, 60);

@@ -59,6 +59,16 @@ const MUTATIONS = [
   ["js", "var deep = ((rec && rec.aiTry) || 0) >= 1;", "var deep = true;"],
   // Μ20 · v80 η «Διάρκεια ανάγνωσης» δεν λέει ποια σκέψη διάβασε — δεν μετριέται η υπόθεση.
   ["js", "' · σκέψη κανονική' : ' · σκέψη χαμηλή'", "'' : ''"],
+  // Μ21 · v81 🔴 πίσω στο parts[0] — ένα μέρος σκέψης μπροστά σβήνει τα ποσά.
+  ["js", "        txt = (cand.content.parts || []).filter(function (pt) {", "        txt = (cand.content.parts || []).slice(0, 1).filter(function (pt) {"],
+  // Μ22 · v81 το κείμενο της σκέψης μπαίνει στο JSON — χαλάει την ανάλυση.
+  ["js", "return pt && !pt.thought && typeof pt.text === 'string';", "return pt && typeof pt.text === 'string';"],
+  // Μ23 · v81 η αυτολεξεί απάντηση δεν γράφεται — ξανά αδιάγνωστο.
+  ["js", "localStorage.setItem(LS.aiRaw,", "localStorage.setItem('km_x',"],
+  // Μ24 · v81 η λίστα [{...}] μετράει ως «κανένα ποσό».
+  ["js", "      if (Array.isArray(o)) { o = o[0] || null; }\n", ""],
+  // Μ25 · v81 η γραμμή «Απάντηση Google» φεύγει από τις Ρυθμίσεις.
+  ["html", '<b id="st-airaw">', '<b id="st-yy">'],
 ];
 
 if (ONLY) {
@@ -86,7 +96,7 @@ function world(responses) {
   const calls = [];
   const env = {
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } },
-    LS: { model: "km_ai_model", diag: "km_ai_diag", aiErr: "km_ai_err", aiMs: "km_ai_ms" },
+    LS: { model: "km_ai_model", diag: "km_ai_diag", aiErr: "km_ai_err", aiMs: "km_ai_ms", aiRaw: "km_ai_raw" },
     el: () => ({ hidden: true }),
     renderSettings: () => {},
     pagesOf: () => ["BLOB"],
@@ -95,7 +105,7 @@ function world(responses) {
     fetch: async (url, opt) => {
       calls.push({ url, body: JSON.parse(opt.body) });
       const r = responses.shift() || { status: 200 };
-      if (r.status === 200) return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"net":10,"vat":1.9,"total":11.9,"date":null}' }] } }] }) };
+      if (r.status === 200) return { ok: true, json: async () => (r.body || { candidates: [{ finishReason: "STOP", content: { parts: [{ text: '{"net":10,"vat":1.9,"total":11.9,"date":null}' }] } }] }) };
       return { ok: false, status: r.status, text: async () => JSON.stringify({ error: { message: r.msg || "x" } }) };
     },
   };
@@ -192,6 +202,28 @@ await check("Β-17 · v80 · 400 σε κανονική σκέψη ΔΕΝ ξαν�
   eq(w.calls.length, 1, "έκαψε δεύτερη κλήση χωρίς λόγο");
 });
 
+await check("Β-18 · 🔴 v81 · μέρος σκέψης ΠΡΩΤΟ — τα ποσά διαβάζονται από το επόμενο", async () => {
+  const w = world([{ status: 200, body: { candidates: [{ finishReason: "STOP", content: { parts: [
+    { thought: true, text: "σκέφτομαι… 37.50" }, { thoughtSignature: "abc" }, { text: '{"net":34.4,"vat":3.1,"total":37.5,"date":null}' }] } }] } }]);
+  const out = await w.api.aiRead({}, "K");
+  eq(out.total, 37.5, "δεν βρέθηκε το σύνολο πίσω από το μέρος σκέψης");
+});
+
+await check("Β-19 · v81 · η αυτολεξεί απάντηση + λόγος τερματισμού γράφονται", async () => {
+  const w = world([{ status: 200, body: { candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: '{"net":null' }] } }] } }]);
+  let err = null;
+  try { await w.api.aiRead({}, "K"); } catch (e) { err = e; }
+  eq(err && err.soft, true, "το μισό JSON δεν μέτρησε ως ακατάλληλο");
+  const v = w.store["km_ai_raw"] || "";
+  if (!/MAX_TOKENS/.test(v) || !/\{"net":null/.test(v) || !/σκέψη χαμηλή/.test(v)) throw new Error("λείπουν στοιχεία: " + v);
+});
+
+await check("Β-20 · v81 · JSON ως λίστα [{...}] διαβάζεται", async () => {
+  const w = world([{ status: 200, body: { candidates: [{ content: { parts: [{ text: '[{"net":1,"vat":0.19,"total":1.19,"date":null}]' }] } }] } }]);
+  const out = await w.api.aiRead({}, "K");
+  eq(out.total, 1.19, "η λίστα δεν ξετυλίχτηκε");
+});
+
 await check("Β-15 · v79 · αποσυρμένο (404) → το επόμενο ΓΙΝΕΤΑΙ προτιμώμενο (όπως πριν)", async () => {
   const w = world([{ status: 404 }, { status: 200 }]);
   await w.api.aiRead({}, "K");
@@ -244,6 +276,9 @@ await check("Β-12 · Οι Ρυθμίσεις δείχνουν διάρκεια 
   has(js, "KM-AI-THINK", "λείπει ο δείκτης του deploy");
   has(js, "KM-AI-FALLOVER", "λείπει ο δείκτης του deploy");
   has(js, "KM-AI-DEEP", "λείπει ο δείκτης του deploy");
+  has(js, "KM-AI-RAW", "λείπει ο δείκτης του deploy");
+  has(html, '<b id="st-airaw">', "λείπει η γραμμή «Απάντηση Google»");
+  has(js, "el('st-airaw').textContent = localStorage.getItem(LS.aiRaw)", "η απάντηση δεν ζωγραφίζεται");
 });
 
 if (ONLY) {
@@ -251,4 +286,4 @@ if (ONLY) {
   console.log("Μ" + ONLY + ": ΠΕΡΑΣΕ ΠΡΑΣΙΝΟ — ο φρουρός ΔΕΝ πιάνει τη μετάλλαξη"); process.exit(1);
 }
 if (fails) { console.log("\n" + fails + " ΑΠΕΤΥΧΑΝ"); process.exit(1); }
-console.log("\nΟΛΑ ΠΡΑΣΙΝΑ (17)");
+console.log("\nΟΛΑ ΠΡΑΣΙΝΑ (20)");
