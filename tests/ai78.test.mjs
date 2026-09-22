@@ -28,7 +28,7 @@ const MUTATIONS = [
   // Μ4 · «minimal»: το 3.7/3.8 το απορρίπτει με σφάλμα (τεκμηρίωση Google 22/9).
   ["js", "thinking_level: 'low'", "thinking_level: 'minimal'"],
   // Μ5 · 🔴 χάνεται το δίχτυ: 400 λόγω ρύθμισης σκέψης = ανάγνωση νεκρή.
-  ["js", "if (err && err.status === 400 && !AI_NOTHINK[list[i]]) {", "if (false) {"],
+  ["js", "if (err && err.status === 400 && !deep && !AI_NOTHINK[list[i]]) {", "if (false) {"],
   // Μ6 · η αναμονή μεγαλώνει χωρίς όριο — ώρες ανάμεσα σε δύο προσπάθειες.
   ["js", "Math.max(0, n - 1)), 120000);", "Math.max(0, n - 1)), 1e12);"],
   // Μ7 · η διάρκεια δεν γράφεται — δεν μπορούμε να μετρήσουμε το «αργό».
@@ -53,6 +53,12 @@ const MUTATIONS = [
   ["js", "if (!overErr && localStorage.getItem(LS.model) !== list[i]) {", "if (localStorage.getItem(LS.model) !== list[i]) {"],
   // Μ17 · v79 🔴 όλα υπερφορτωμένα → βγαίνει «κανένα μοντέλο» (404 = κλείδωμα) αντί για 503.
   ["js", "        if (overErr) { return Promise.reject(overErr); }\n", ""],
+  // Μ18 · v80 🔴 η κανονική σκέψη δεν έρχεται ποτέ — τα δύσκολα τιμολόγια μένουν αδιάβαστα.
+  ["js", "var deep = ((rec && rec.aiTry) || 0) >= 1;", "var deep = false;"],
+  // Μ19 · v80 κανονική σκέψη από την ΠΡΩΤΗ — χάνεται η ταχύτητα των εύκολων.
+  ["js", "var deep = ((rec && rec.aiTry) || 0) >= 1;", "var deep = true;"],
+  // Μ20 · v80 η «Διάρκεια ανάγνωσης» δεν λέει ποια σκέψη διάβασε — δεν μετριέται η υπόθεση.
+  ["js", "' · σκέψη κανονική' : ' · σκέψη χαμηλή'", "'' : ''"],
 ];
 
 if (ONLY) {
@@ -164,6 +170,28 @@ await check("Β-14 · v79 · 404 και μετά 503 → 503 (ξαναδοκιμ
   eq(err && err.status, 503, "βγήκε 404 = κλείδωμα αντί για 503");
 });
 
+await check("Β-16 · 🔴 v80 · 1η προσπάθεια χαμηλή σκέψη, από τη 2η κανονική", async () => {
+  const w1 = world([{ status: 200 }]);
+  await w1.api.aiRead({ aiTry: 0 }, "K");
+  eq(w1.calls[0].body.generationConfig.thinking_config, { thinking_level: "low" }, "η 1η δεν είναι χαμηλή");
+  const w2 = world([{ status: 200 }]);
+  await w2.api.aiRead({ aiTry: 1 }, "K");
+  eq("thinking_config" in w2.calls[0].body.generationConfig, false, "η 2η δεν πάει με κανονική σκέψη");
+  const w3 = world([{ status: 200 }]);
+  await w3.api.aiRead({ aiTry: 2 }, "K");
+  eq("thinking_config" in w3.calls[0].body.generationConfig, false, "η 3η δεν πάει με κανονική σκέψη");
+  if (!/σκέψη χαμηλή$/.test(w1.store["km_ai_ms"] || "")) throw new Error("η διάρκεια δεν λέει «σκέψη χαμηλή»: " + w1.store["km_ai_ms"]);
+  if (!/σκέψη κανονική$/.test(w2.store["km_ai_ms"] || "")) throw new Error("η διάρκεια δεν λέει «σκέψη κανονική»: " + w2.store["km_ai_ms"]);
+});
+
+await check("Β-17 · v80 · 400 σε κανονική σκέψη ΔΕΝ ξαναστέλνεται (τίποτα να αφαιρεθεί)", async () => {
+  const w = world([{ status: 400 }, { status: 200 }]);
+  let err = null;
+  try { await w.api.aiRead({ aiTry: 1 }, "K"); } catch (e) { err = e; }
+  eq(err && err.status, 400, "δεν γύρισε το 400");
+  eq(w.calls.length, 1, "έκαψε δεύτερη κλήση χωρίς λόγο");
+});
+
 await check("Β-15 · v79 · αποσυρμένο (404) → το επόμενο ΓΙΝΕΤΑΙ προτιμώμενο (όπως πριν)", async () => {
   const w = world([{ status: 404 }, { status: 200 }]);
   await w.api.aiRead({}, "K");
@@ -215,6 +243,7 @@ await check("Β-12 · Οι Ρυθμίσεις δείχνουν διάρκεια 
   has(js, "KM-AI-TRANSIENT", "λείπει ο δείκτης του deploy");
   has(js, "KM-AI-THINK", "λείπει ο δείκτης του deploy");
   has(js, "KM-AI-FALLOVER", "λείπει ο δείκτης του deploy");
+  has(js, "KM-AI-DEEP", "λείπει ο δείκτης του deploy");
 });
 
 if (ONLY) {
@@ -222,4 +251,4 @@ if (ONLY) {
   console.log("Μ" + ONLY + ": ΠΕΡΑΣΕ ΠΡΑΣΙΝΟ — ο φρουρός ΔΕΝ πιάνει τη μετάλλαξη"); process.exit(1);
 }
 if (fails) { console.log("\n" + fails + " ΑΠΕΤΥΧΑΝ"); process.exit(1); }
-console.log("\nΟΛΑ ΠΡΑΣΙΝΑ (15)");
+console.log("\nΟΛΑ ΠΡΑΣΙΝΑ (17)");
