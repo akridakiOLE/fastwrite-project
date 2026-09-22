@@ -30,6 +30,11 @@
     refShare: 'km_ref_share',
     diag:  'km_ai_diag',
     model: 'km_ai_model',
+    /* v78 · το ΤΕΛΕΥΤΑΙΟ σφάλμα ανάγνωσης και η ΔΙΑΡΚΕΙΑ της τελευταίας
+       ανάγνωσης. Χωριστά από το diag, που γράφεται από πάνω σε κάθε βήμα:
+       22/9/2026 το σφάλμα της 8:07 είχε σβηστεί ως τις 8:18. */
+    aiErr: 'km_ai_err',
+    aiMs:  'km_ai_ms',
     /* v26 · Η.2β-1 — ο λογαριασμός. Οι 12 λέξεις ΜΕΝΟΥΝ στη συσκευή:
        από αυτές βγαίνουν folder/auth (πάνε στον server) και το κλειδί
        κρυπτογράφησης (ΔΕΝ φεύγει ποτέ). */
@@ -2026,6 +2031,8 @@
     el('st-key').textContent = localStorage.getItem(LS.key) ? 'Με κλειδί Gemini' : 'Χειροκίνητα';
     el('st-ver').textContent = APP_VER;
     el('st-diag').textContent = localStorage.getItem(LS.diag) || '—';
+    el('st-aims').textContent = localStorage.getItem(LS.aiMs) || '—';
+    el('st-aierr').textContent = localStorage.getItem(LS.aiErr) || 'κανένα';
     /* v30 — τι τρέχει ΕΔΩ, τι έχει ο server, ποιος worker σερβίρει.
        Χωρίς αυτά, «δεν ενημερώθηκε» είναι εντύπωση, όχι μέτρηση. */
     el('st-srvver').textContent = 'ελέγχεται…';
@@ -2052,7 +2059,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v77';
+  var APP_VER = 'φέτα 3 · v78';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2075,6 +2082,54 @@
     if (!el('s-settings').hidden) { renderSettings(); }
   }
   var AI_MAX_TRY = 3;
+  /* v78 · KM-AI-TRANSIENT — ΤΙ ΚΑΝΟΥΜΕ ΜΕ ΚΑΘΕ ΣΦΑΛΜΑ (22/9/2026).
+     Μετρήθηκε 22/9 στο κινητό του Stavros: «Η ανάγνωση σταμάτησε» στις 8:07,
+     και το ίδιο τιμολόγιο διαβάστηκε μόλις ξανανοίχτηκε η εφαρμογή — ίδιο
+     κλειδί, ίδια φωτογραφία. Το σφάλμα ήταν της Google, όχι του κλειδιού.
+     Ως τη v77 ΚΑΘΕ σφάλμα εκτός 429 κλείδωνε την ανάγνωση ως το επόμενο άνοιγμα.
+       'wait'  = 429 όριο ρυθμού — περιμένουμε όσο λέει η Google
+       'retry' = 5xx / 408 / λήξη χρόνου / δίκτυο — περνάει μόνο του, ξαναδοκιμάζουμε
+       'halt'  = κάθε άλλο 4xx — άκυρο κλειδί ή αίτημα, δεν καίμε κλήσεις
+       'soft'  = απάντησε αλλά όχι JSON — μετράει στις 3 προσπάθειες του τιμολογίου */
+  function aiErrKind(err) {
+    if (err && err.soft) { return 'soft'; }
+    if (err && err.status === 429) { return 'wait'; }
+    if (err && (err.status >= 500 || err.status === 408)) { return 'retry'; }
+    if (err && err.status) { return 'halt'; }
+    return 'retry';
+  }
+  /* Αναμονή που διπλασιάζεται: 15″ → 30″ → 60″ → 120″ και μένει εκεί.
+     Ποτέ «σταματάω για πάντα» — τα αποτυχημένα αιτήματα δεν χρεώνονται. */
+  var aiRetryN = 0;
+  function aiBackoff(n) { return Math.min(15000 * Math.pow(2, Math.max(0, n - 1)), 120000); }
+  function aiStamp() {
+    var d = new Date();
+    return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' +
+           ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function aiErrLog(msg) {
+    try { localStorage.setItem(LS.aiErr, aiStamp() + ' · ' + msg); } catch (e) {}
+  }
+  function aiErrText(err) {
+    return (err && err.status)
+      ? ('σφάλμα ' + err.status + ' · ' + (err.msg || 'άγνωστο'))
+      : ('δεν έφτασε στη Google · ' + (err && err.name ? err.name : 'δίκτυο/CORS'));
+  }
+  /* v78 · KM-AI-THINK — ΤΑ ΜΟΝΤΕΛΑ 3.x «ΣΚΕΦΤΟΝΤΑΙ» ΑΠΟ ΠΡΟΕΠΙΛΟΓΗ (medium).
+     Για τρία ποσά και μία ημερομηνία η σκέψη είναι σκέτη αναμονή. Τεκμηρίωση
+     Google 22/9/2026: 3.x → thinking_level (το «minimal» ΔΕΝ δέχεται το 3.7/3.8
+     — σφάλμα, άρα «low») · 2.5 → thinking_budget 0 = χωρίς σκέψη.
+     Αν ένα μοντέλο απαντήσει 400, ξαναστέλνεται ΜΙΑ φορά ΧΩΡΙΣ τη ρύθμιση
+     και το θυμόμαστε ως το επόμενο άνοιγμα — χειρότερη περίπτωση = v77. */
+  var AI_NOTHINK = {};
+  function aiGen(model, bare) {
+    var g = { response_mime_type: 'application/json', temperature: 0 };
+    if (bare) { return g; }
+    g.thinking_config = /^gemini-2\.5/.test(model)
+      ? { thinking_budget: 0 }
+      : { thinking_level: 'low' };
+    return g;
+  }
   /* ΡΥΘΜΟΣ. Το δωρεάν επίπεδο δίνει 5 αιτήματα/λεπτό (μετρήθηκε 29/8/2026:
      «limit: 5 · retry in 19.2s»). Ο πραγματικός χρήστης βγάζει ΜΙΑ φωτογραφία
      στην πόρτα — δεν αγγίζει ποτέ το όριο. Το έσπασε η δική μας ουρά τρέχοντας
@@ -2124,18 +2179,30 @@
      Κάθε άλλο σφάλμα σταματάει αμέσως (δεν καίμε κλήσεις σε άκυρο κλειδί). */
   function aiRead(rec, key) {
     var list = aiModels(), tried = [];
+    var t0 = Date.now();
     function step(i) {
       if (i >= list.length) {
         var e = new Error('http'); e.status = 404;
         e.msg = 'κανένα διαθέσιμο μοντέλο (' + tried.join(', ') + ')';
         return Promise.reject(e);
       }
-      return aiOnce(rec, key, list[i]).then(function (out) {
+      return aiOnce(rec, key, list[i], !!AI_NOTHINK[list[i]]).then(function (out) {
         if (localStorage.getItem(LS.model) !== list[i]) {
           try { localStorage.setItem(LS.model, list[i]); } catch (e2) {}
         }
+        try {
+          localStorage.setItem(LS.aiMs, aiStamp() + ' · ' +
+            (Math.round((Date.now() - t0) / 100) / 10).toString().replace('.', ',') + '″ · ' + list[i]);
+        } catch (e3) {}
         return out;
       }).catch(function (err) {
+        /* ΟΠΟΙΟ 400 κι αν έρθει με ρύθμιση σκέψης, ξαναστέλνεται ΜΙΑ φορά χωρίς
+           αυτήν — δεν στηριζόμαστε στη διατύπωση του μηνύματος της Google.
+           Κόστος στη χειρότερη περίπτωση (άκυρο κλειδί): μία κλήση ακόμα. */
+        if (err && err.status === 400 && !AI_NOTHINK[list[i]]) {
+          AI_NOTHINK[list[i]] = 1;       // ως το επόμενο άνοιγμα
+          return step(i);                // ίδιο μοντέλο, χωρίς ρύθμιση σκέψης
+        }
         if (err && err.status === 404) { tried.push(list[i]); return step(i + 1); }
         throw err;
       });
@@ -2143,13 +2210,13 @@
     return step(0);
   }
 
-  function aiOnce(rec, key, model) {
+  function aiOnce(rec, key, model, bare) {
     /* v9 — ΕΠΙΛΟΓΗ Β (απόφαση Stavros 30/8): φεύγουν ΟΛΕΣ οι σελίδες
        σε ΕΝΑ αίτημα. Το σύνολο συχνά είναι στην τελευταία σελίδα.
        Μία κλήση όσες σελίδες κι αν έχει — το όριο των 5/λεπτό μένει άθικτο. */
     return Promise.all(pagesOf(rec).map(blobB64)).then(function (b64s) {
       var ctrl = ('AbortController' in window) ? new AbortController() : null;
-      var tmr = ctrl ? setTimeout(function () { ctrl.abort(); }, 30000) : null;
+      var tmr = ctrl ? setTimeout(function () { ctrl.abort(); }, 60000) : null;
       return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
@@ -2165,7 +2232,7 @@
               'ΠΡΟΣΟΧΗ ΣΤΟΥΣ ΑΡΙΘΜΟΥΣ: το χαρτί μπορεί να γράφει 1.234,56 (ελληνικά) ή 1,234.56 (αγγλικά) — και τα δύο σημαίνουν χίλια διακόσια τριάντα τέσσερα και 56 λεπτά. Κατάλαβε ποιο σύστημα χρησιμοποιεί το ΣΥΓΚΕΚΡΙΜΕΝΟ χαρτί και δώσε τον αριθμό ΠΑΝΤΑ με τελεία δεκαδικών και ΧΩΡΙΣ διαχωριστή χιλιάδων: 1234.56. ' +
               'Χωρίς σύμβολα, χωρίς κείμενο. Αν κάτι δεν διαβάζεται ΚΑΘΑΡΑ, βάλε null — ποτέ μην μαντεύεις.' }
           ]) }],
-          generationConfig: { response_mime_type: 'application/json', temperature: 0 }
+          generationConfig: aiGen(model, bare)
         })
       }).then(function (res) {
         if (tmr) { clearTimeout(tmr); }
@@ -2247,6 +2314,7 @@
       aiLast = Date.now();   // ΜΟΝΟ όταν όντως φεύγει αίτημα
       diag('διαβάζω…');
       aiRead(rec, key).then(function (sug) {
+        aiRetryN = 0;   // η Google απάντησε — η σειρά των προσωρινών σφαλμάτων έληξε
         if (sug.total === null && sug.vat === null && sug.net === null) {
           rec.aiTry = (rec.aiTry || 0) + 1; // διάβασε αλλά δεν είδε τίποτα
           diag('απάντησε αλλά δεν διάβασε ποσά (' + rec.aiTry + '/3)');
@@ -2261,21 +2329,37 @@
           schedule(AI_GAP);           // επόμενο της ουράς, με σεβασμό στο όριο
         });
       }).catch(function (err) {
-        if (err && err.soft) {
+        var kind = aiErrKind(err);
+        if (kind === 'soft') {
+          aiRetryN = 0;
           rec.aiTry = (rec.aiTry || 0) + 1; put(rec);
           diag('ακατάλληλη απάντηση · ' + (err.msg || ''));
-        } else if (err && err.status === 429) {
+          aiBusy = false;
+          schedule(AI_GAP);   // v78 — ως τη v77 η ουρά σταματούσε εδώ ως την επόμενη ανανέωση οθόνης
+          return;
+        } else if (kind === 'retry') {
+          /* v78 · KM-AI-TRANSIENT — προσωρινό: ΔΕΝ κλειδώνει, ξαναδοκιμάζει μόνο του */
+          aiRetryN++;
+          var back = aiBackoff(aiRetryN);
+          aiWait = Date.now() + back;
+          aiErrLog(aiErrText(err));
+          diag('προσωρινό · ' + aiErrText(err) + ' · ξανά σε ' + Math.ceil(back / 1000) + 'ς');
+          aiBusy = false;
+          schedule(back + 500);
+          if (!el('s-pend').hidden) { renderPending(); }
+          return;
+        } else if (kind === 'wait') {
           /* Όριο ρυθμού: ΔΕΝ είναι βλάβη. Περιμένουμε όσο λέει η Google και συνεχίζουμε. */
           aiWait = Date.now() + (err.retryAfter || 32000);
           diag('όριο ρυθμού · συνεχίζω σε ' + Math.ceil((err.retryAfter || 32000) / 1000) + 'ς');
           aiBusy = false;
           schedule((err.retryAfter || 32000) + 500);
           return;
-        } else if (err && err.status) {
-          aiHalt = true;
-          diag('σφάλμα ' + err.status + ' · ' + (err.msg || 'άγνωστο'));
         } else {
-          diag('δεν έφτασε στη Google · ' + (err && err.name ? err.name : 'δίκτυο/CORS'));
+          aiHalt = true;   // 'halt': 4xx — άκυρο κλειδί ή αίτημα
+          aiErrLog(aiErrText(err));
+          diag(aiErrText(err));
+          if (!el('s-pend').hidden) { renderPending(); }
         }
         aiBusy = false;
       });
@@ -4720,9 +4804,8 @@
         if (err && err.status === 429) {
           aiWait = Date.now() + (err.retryAfter || 32000);
           diag('όριο ρυθμού · ξανά σε ' + Math.ceil((err.retryAfter || 32000) / 1000) + 'ς');
-        } else if (err && err.status) { diag('σφάλμα ' + err.status + ' · ' + (err.msg || '')); }
-        else if (err && err.soft) { diag('ακατάλληλη απάντηση · ' + (err.msg || '')); }
-        else { diag('δεν έφτασε στη Google · ' + (err && err.name ? err.name : 'δίκτυο/CORS')); }
+        } else if (err && err.soft) { diag('ακατάλληλη απάντηση · ' + (err.msg || '')); }
+        else { aiErrLog(aiErrText(err)); diag(aiErrText(err)); }
       });
     });
   };
