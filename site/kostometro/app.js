@@ -2063,7 +2063,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v81';
+  var APP_VER = 'φέτα 3 · v82';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2117,7 +2117,11 @@
   function aiErrText(err) {
     return (err && err.status)
       ? ('σφάλμα ' + err.status + ' · ' + (err.msg || 'άγνωστο'))
-      : ('δεν έφτασε στη Google · ' + (err && err.name ? err.name : 'δίκτυο/CORS'));
+      : ('δεν έφτασε στη Google · ' + (err && err.name ? err.name : 'δίκτυο/CORS') +
+         /* v82 · KM-AI-ERRMSG — 22/9 21:21 γράφτηκε σκέτο «TypeError»: δεν
+            ξεχωρίζει το «έπεσε το δίκτυο» (Failed to fetch) από σφάλμα ΔΙΚΟΥ
+            ΜΑΣ κώδικα πριν φύγει η κλήση. Το μήνυμα το ξεχωρίζει. */
+         (err && err.message && err.message !== 'http' ? ': ' + String(err.message).slice(0, 120) : ''));
   }
   /* v78 · KM-AI-THINK — ΤΑ ΜΟΝΤΕΛΑ 3.x «ΣΚΕΦΤΟΝΤΑΙ» ΑΠΟ ΠΡΟΕΠΙΛΟΓΗ (medium).
      Για τρία ποσά και μία ημερομηνία η σκέψη είναι σκέτη αναμονή. Τεκμηρίωση
@@ -2231,7 +2235,10 @@
           return step(i);                // ίδιο μοντέλο, χωρίς ρύθμιση σκέψης
         }
         if (err && err.status === 404) { tried.push(list[i]); return step(i + 1); }
-        if (err && err.status >= 500) {
+        /* v82 · KM-AI-QUOTA-FALLOVER — και το 429 πάει στο επόμενο μοντέλο: τα όρια
+           του δωρεάν κλειδιού είναι ΑΝΑ ΜΟΝΤΕΛΟ (22/9 21:26: «αναμονή ορίου» ξανά
+           στο gemini-3.6-flash). Όλα στο όριο → επιστρέφεται το 429 ως έχει. */
+        if (err && (err.status >= 500 || err.status === 429)) {
           err.msg = (err.msg || '') + ' [' + list[i] + ']';
           overErr = err;                    // θυμόμαστε το πραγματικό σφάλμα
           return step(i + 1);            // το επόμενο μοντέλο, τώρα
@@ -2401,6 +2408,7 @@
         } else if (kind === 'wait') {
           /* Όριο ρυθμού: ΔΕΝ είναι βλάβη. Περιμένουμε όσο λέει η Google και συνεχίζουμε. */
           aiWait = Date.now() + (err.retryAfter || 32000);
+          aiErrLog('όριο 429 · ' + (err.msg || ''));   // v82: ανά λεπτό ή ανά ημέρα — το λέει η Google
           diag('όριο ρυθμού · συνεχίζω σε ' + Math.ceil((err.retryAfter || 32000) / 1000) + 'ς');
           aiBusy = false;
           schedule((err.retryAfter || 32000) + 500);
@@ -4853,6 +4861,7 @@
       }).catch(function (err) {
         if (err && err.status === 429) {
           aiWait = Date.now() + (err.retryAfter || 32000);
+          aiErrLog('όριο 429 · ' + (err.msg || ''));
           diag('όριο ρυθμού · ξανά σε ' + Math.ceil((err.retryAfter || 32000) / 1000) + 'ς');
         } else if (err && err.soft) { diag('ακατάλληλη απάντηση · ' + (err.msg || '')); }
         else { aiErrLog(aiErrText(err)); diag(aiErrText(err)); }

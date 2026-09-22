@@ -48,7 +48,7 @@ const MUTATIONS = [
   // Μ14 · το 2.5 παίρνει thinking_level — δεν το ξέρει.
   ["js", "/^gemini-2\\.5/.test(model)", "false"],
   // Μ15 · v79 🔴 υπερφορτωμένο μοντέλο → περιμένουμε το ίδιο αντί για το επόμενο.
-  ["js", "        if (err && err.status >= 500) {\n          err.msg", "        if (false) {\n          err.msg"],
+  ["js", "        if (err && (err.status >= 500 || err.status === 429)) {\n          err.msg", "        if (false) {\n          err.msg"],
   // Μ16 · v79 το εφεδρικό μοντέλο γίνεται μόνιμα προτιμώμενο μετά από μια στιγμή φορτίου.
   ["js", "if (!overErr && localStorage.getItem(LS.model) !== list[i]) {", "if (localStorage.getItem(LS.model) !== list[i]) {"],
   // Μ17 · v79 🔴 όλα υπερφορτωμένα → βγαίνει «κανένα μοντέλο» (404 = κλείδωμα) αντί για 503.
@@ -69,6 +69,12 @@ const MUTATIONS = [
   ["js", "      if (Array.isArray(o)) { o = o[0] || null; }\n", ""],
   // Μ25 · v81 η γραμμή «Απάντηση Google» φεύγει από τις Ρυθμίσεις.
   ["html", '<b id="st-airaw">', '<b id="st-yy">'],
+  // Μ26 · v82 🔴 το 429 δεν πάει στο επόμενο μοντέλο.
+  ["js", "if (err && (err.status >= 500 || err.status === 429)) {", "if (err && err.status >= 500) {"],
+  // Μ27 · v82 το μήνυμα του 429 δεν γράφεται — δεν ξέρουμε αν είναι ημερήσιο.
+  ["js", "          aiErrLog('όριο 429 · ' + (err.msg || ''));   // v82", "          // v82"],
+  // Μ28 · v82 ξανά σκέτο «TypeError».
+  ["js", "(err && err.message && err.message !== 'http' ? ': ' + String(err.message).slice(0, 120) : '')", "''"],
 ];
 
 if (ONLY) {
@@ -224,6 +230,30 @@ await check("Β-20 · v81 · JSON ως λίστα [{...}] διαβάζεται",
   eq(out.total, 1.19, "η λίστα δεν ξετυλίχτηκε");
 });
 
+await check("Β-21 · 🔴 v82 · 429 στο πρώτο → το επόμενο μοντέλο διαβάζει", async () => {
+  const w = world([{ status: 429, msg: "Quota exceeded per day" }, { status: 200 }]);
+  const out = await w.api.aiRead({}, "K");
+  eq(out.total, 11.9, "δεν διάβασε από το δεύτερο μοντέλο");
+  eq(w.calls[0].url !== w.calls[1].url, true, "ξαναχτύπησε το ίδιο μοντέλο");
+});
+
+await check("Β-22 · v82 · όλα 429 → επιστρέφεται 429 (αναμονή, όχι κλείδωμα)", async () => {
+  const w = world([{ status: 429 }, { status: 429 }, { status: 429 }]);
+  let err = null;
+  try { await w.api.aiRead({}, "K"); } catch (e) { err = e; }
+  eq(err && err.status, 429, "χάθηκε το 429");
+  eq(w.api.aiErrKind(err), "wait", "το 429 άλλαξε κατηγορία");
+});
+
+await check("Β-23 · v82 · το TypeError γράφεται με το μήνυμά του", () => {
+  const a = js.indexOf("  function aiErrText(err) {");
+  const f = new Function(js.slice(a, js.indexOf("\n  }", a) + 4) + "\nreturn aiErrText;")();
+  const t = f({ name: "TypeError", message: "Failed to fetch" });
+  if (!/TypeError: Failed to fetch/.test(t)) throw new Error("λείπει το μήνυμα: " + t);
+  const sw = js.slice(js.indexOf("  function aiSweep() {"), js.indexOf("  /* ── Κάμερα ── */"));
+  has(sw, "aiErrLog('όριο 429 · ' + (err.msg || ''));   // v82", "το 429 δεν γράφεται στο «Τελευταίο σφάλμα»");
+});
+
 await check("Β-15 · v79 · αποσυρμένο (404) → το επόμενο ΓΙΝΕΤΑΙ προτιμώμενο (όπως πριν)", async () => {
   const w = world([{ status: 404 }, { status: 200 }]);
   await w.api.aiRead({}, "K");
@@ -277,6 +307,7 @@ await check("Β-12 · Οι Ρυθμίσεις δείχνουν διάρκεια 
   has(js, "KM-AI-FALLOVER", "λείπει ο δείκτης του deploy");
   has(js, "KM-AI-DEEP", "λείπει ο δείκτης του deploy");
   has(js, "KM-AI-RAW", "λείπει ο δείκτης του deploy");
+  has(js, "KM-AI-QUOTA-FALLOVER", "λείπει ο δείκτης του deploy");
   has(html, '<b id="st-airaw">', "λείπει η γραμμή «Απάντηση Google»");
   has(js, "el('st-airaw').textContent = localStorage.getItem(LS.aiRaw)", "η απάντηση δεν ζωγραφίζεται");
 });
@@ -286,4 +317,4 @@ if (ONLY) {
   console.log("Μ" + ONLY + ": ΠΕΡΑΣΕ ΠΡΑΣΙΝΟ — ο φρουρός ΔΕΝ πιάνει τη μετάλλαξη"); process.exit(1);
 }
 if (fails) { console.log("\n" + fails + " ΑΠΕΤΥΧΑΝ"); process.exit(1); }
-console.log("\nΟΛΑ ΠΡΑΣΙΝΑ (20)");
+console.log("\nΟΛΑ ΠΡΑΣΙΝΑ (23)");
