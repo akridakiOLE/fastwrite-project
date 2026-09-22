@@ -2059,7 +2059,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v78';
+  var APP_VER = 'φέτα 3 · v79';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2180,14 +2180,27 @@
   function aiRead(rec, key) {
     var list = aiModels(), tried = [];
     var t0 = Date.now();
+    /* v79 · KM-AI-FALLOVER — ΥΠΕΡΦΟΡΤΩΜΕΝΟ ΜΟΝΤΕΛΟ → ΤΟ ΕΠΟΜΕΝΟ, ΑΜΕΣΩΣ.
+       Μετρήθηκε 22/9/2026 20:34 στο κινητό του Stavros, με τη v78: 503 «This
+       model is currently experiencing high demand» στο gemini-3.6-flash, ένα
+       λεπτό αφού το ίδιο κλειδί διάβασε σε 2,7″. Το φορτίο είναι ΑΝΑ ΜΟΝΤΕΛΟ,
+       όχι ανά κλειδί — άρα δοκιμάζουμε το επόμενο της λίστας, με το ίδιο κλειδί,
+       αντί να περιμένουμε το ίδιο. Τα όρια του δωρεάν επιπέδου είναι επίσης
+       ανά μοντέλο: η δεύτερη κλήση δεν τρώει το όριο της πρώτης.
+       ⚠ Το μοντέλο που απάντησε ΔΕΝ γίνεται προτιμώμενο όταν το πρώτο ήταν
+       απλώς υπερφορτωμένο — στο επόμενο τιμολόγιο ξαναπροσπαθούμε το πρώτο.
+       Αν ΟΛΑ είναι υπερφορτωμένα, επιστρέφεται το 5xx και η v78 ξαναδοκιμάζει
+       μόνη της (15″ → 120″). */
+    var overErr = null;
     function step(i) {
       if (i >= list.length) {
+        if (overErr) { return Promise.reject(overErr); }
         var e = new Error('http'); e.status = 404;
         e.msg = 'κανένα διαθέσιμο μοντέλο (' + tried.join(', ') + ')';
         return Promise.reject(e);
       }
       return aiOnce(rec, key, list[i], !!AI_NOTHINK[list[i]]).then(function (out) {
-        if (localStorage.getItem(LS.model) !== list[i]) {
+        if (!overErr && localStorage.getItem(LS.model) !== list[i]) {
           try { localStorage.setItem(LS.model, list[i]); } catch (e2) {}
         }
         try {
@@ -2204,6 +2217,11 @@
           return step(i);                // ίδιο μοντέλο, χωρίς ρύθμιση σκέψης
         }
         if (err && err.status === 404) { tried.push(list[i]); return step(i + 1); }
+        if (err && err.status >= 500) {
+          err.msg = (err.msg || '') + ' [' + list[i] + ']';
+          overErr = err;                    // θυμόμαστε το πραγματικό σφάλμα
+          return step(i + 1);            // το επόμενο μοντέλο, τώρα
+        }
         throw err;
       });
     }

@@ -47,6 +47,12 @@ const MUTATIONS = [
   ["js", "          aiHalt = true;   // 'halt': 4xx — άκυρο κλειδί ή αίτημα\n          aiErrLog(aiErrText(err));", "          aiHalt = true;   // 'halt': 4xx — άκυρο κλειδί ή αίτημα"],
   // Μ14 · το 2.5 παίρνει thinking_level — δεν το ξέρει.
   ["js", "/^gemini-2\\.5/.test(model)", "false"],
+  // Μ15 · v79 🔴 υπερφορτωμένο μοντέλο → περιμένουμε το ίδιο αντί για το επόμενο.
+  ["js", "        if (err && err.status >= 500) {\n          err.msg", "        if (false) {\n          err.msg"],
+  // Μ16 · v79 το εφεδρικό μοντέλο γίνεται μόνιμα προτιμώμενο μετά από μια στιγμή φορτίου.
+  ["js", "if (!overErr && localStorage.getItem(LS.model) !== list[i]) {", "if (localStorage.getItem(LS.model) !== list[i]) {"],
+  // Μ17 · v79 🔴 όλα υπερφορτωμένα → βγαίνει «κανένα μοντέλο» (404 = κλείδωμα) αντί για 503.
+  ["js", "        if (overErr) { return Promise.reject(overErr); }\n", ""],
 ];
 
 if (ONLY) {
@@ -133,13 +139,35 @@ await check("Β-5 · Διπλό 400 (άκυρο κλειδί) → σταματά
   eq(w.calls.length, 2, "έκαψε παραπάνω κλήσεις");
 });
 
-await check("Β-6 · 🔴 Το 503 φτάνει ως 503 — όχι ως «κανένα μοντέλο»", async () => {
-  const w = world([{ status: 503, msg: "The model is overloaded" }]);
+await check("Β-6 · 🔴 ΟΛΑ υπερφορτωμένα → 503 (ξαναδοκιμάζει), όχι «κανένα μοντέλο»", async () => {
+  const w = world([{ status: 503, msg: "high demand" }, { status: 503, msg: "high demand" }, { status: 503, msg: "high demand" }]);
   let err = null;
   try { await w.api.aiRead({}, "K"); } catch (e) { err = e; }
   eq(err && err.status, 503, "το 503 χάθηκε");
-  eq(w.api.aiErrKind(err), "retry", "το 503 της πράξης δεν ξαναδοκιμάζει");
-  eq(w.calls.length, 1, "δοκίμασε άλλα μοντέλα με προσωρινό σφάλμα");
+  eq(w.api.aiErrKind(err), "retry", "το 503 δεν ξαναδοκιμάζει");
+  eq(w.calls.length, 3, "δεν δοκίμασε όλα τα μοντέλα");
+});
+
+await check("Β-13 · 🔴 v79 · 503 στο πρώτο → το ΕΠΟΜΕΝΟ μοντέλο διαβάζει, αμέσως", async () => {
+  const w = world([{ status: 503, msg: "high demand" }, { status: 200 }]);
+  const out = await w.api.aiRead({}, "K");
+  eq(out.total, 11.9, "δεν διάβασε από το δεύτερο μοντέλο");
+  eq(w.calls.length, 2, "λάθος αριθμός κλήσεων");
+  eq(w.calls[0].url !== w.calls[1].url, true, "ξαναχτύπησε το ίδιο υπερφορτωμένο μοντέλο");
+  eq(w.store["km_ai_model"] === undefined, true, "το εφεδρικό έγινε μόνιμα προτιμώμενο");
+});
+
+await check("Β-14 · v79 · 404 και μετά 503 → 503 (ξαναδοκιμάζει), όχι κλείδωμα", async () => {
+  const w = world([{ status: 404 }, { status: 503 }, { status: 404 }]);
+  let err = null;
+  try { await w.api.aiRead({}, "K"); } catch (e) { err = e; }
+  eq(err && err.status, 503, "βγήκε 404 = κλείδωμα αντί για 503");
+});
+
+await check("Β-15 · v79 · αποσυρμένο (404) → το επόμενο ΓΙΝΕΤΑΙ προτιμώμενο (όπως πριν)", async () => {
+  const w = world([{ status: 404 }, { status: 200 }]);
+  await w.api.aiRead({}, "K");
+  eq(w.store["km_ai_model"], "gemini-2.5-flash", "το 404 δεν μετακινεί την προτίμηση");
 });
 
 await check("Β-7 · Η διάρκεια γράφεται μετά από κάθε επιτυχία", async () => {
@@ -186,6 +214,7 @@ await check("Β-12 · Οι Ρυθμίσεις δείχνουν διάρκεια 
   has(js, "    aiMs:  'km_ai_ms',", "λείπει το κλειδί aiMs");
   has(js, "KM-AI-TRANSIENT", "λείπει ο δείκτης του deploy");
   has(js, "KM-AI-THINK", "λείπει ο δείκτης του deploy");
+  has(js, "KM-AI-FALLOVER", "λείπει ο δείκτης του deploy");
 });
 
 if (ONLY) {
@@ -193,4 +222,4 @@ if (ONLY) {
   console.log("Μ" + ONLY + ": ΠΕΡΑΣΕ ΠΡΑΣΙΝΟ — ο φρουρός ΔΕΝ πιάνει τη μετάλλαξη"); process.exit(1);
 }
 if (fails) { console.log("\n" + fails + " ΑΠΕΤΥΧΑΝ"); process.exit(1); }
-console.log("\nΟΛΑ ΠΡΑΣΙΝΑ (12)");
+console.log("\nΟΛΑ ΠΡΑΣΙΝΑ (15)");
