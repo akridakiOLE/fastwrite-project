@@ -38,6 +38,9 @@
     /* v81 · Η ΑΥΤΟΛΕΞΕΙ ΑΠΑΝΤΗΣΗ ΤΗΣ GOOGLE (πρώτοι 300 χαρακτήρες) —
        χωρίς αυτήν το «δεν βρέθηκαν ποσά» είναι αδιάγνωστο (22/9/2026). */
     aiRaw: 'km_ai_raw',
+    /* v83 · αθροιστικά tokens {n, inp, out, think} — για να ΜΕΤΡΗΘΕΙ το κόστος
+       ανά τιμολόγιο πριν γραφτεί νούμερο σε κείμενο για χρήστες. */
+    aiTok: 'km_ai_tok',
     /* v26 · Η.2β-1 — ο λογαριασμός. Οι 12 λέξεις ΜΕΝΟΥΝ στη συσκευή:
        από αυτές βγαίνουν folder/auth (πάνε στον server) και το κλειδί
        κρυπτογράφησης (ΔΕΝ φεύγει ποτέ). */
@@ -549,12 +552,12 @@
         qb.className = 'btn ghost queue-btn';
         qb.textContent = '📖 Διάβασε τα υπόλοιπα (' + waiting.length + ')';
         qb.onclick = function () {
-          var secs = waiting.length * Math.round(AI_GAP / 1000) + 3;
+          var secs = waiting.length * (aiSlow ? Math.round(AI_GAP / 1000) : 4) + 3;
           var mins = Math.floor(secs / 60), rest = secs % 60;
           var t = mins ? (mins + ' λεπτ. ' + (rest ? rest + ' δευτ.' : '')) : (secs + ' δευτερόλεπτα');
           if (!confirm('Ανάγνωση ' + waiting.length + ' τιμολογίων.\n\n' +
                        'Εκτιμώμενος χρόνος: περίπου ' + t + '.\n\n' +
-                       'Το δωρεάν κλειδί επιτρέπει 5 αναγνώσεις το λεπτό — γι\' αυτό χρειάζεται χρόνος. ' +
+                       (aiSlow ? 'Το κλειδί σου έφτασε το όριο της Google (δωρεάν κλειδί: 5 αναγνώσεις το λεπτό) — γι\' αυτό χρειάζεται χρόνος. ' : '') +
                        'Μπορείς να κλείσεις την οθόνη, η ανάγνωση συνεχίζει.\n\nΝα ξεκινήσω;')) { return; }
           manualRun = true;
           aiSweep();
@@ -767,7 +770,7 @@
         /* Δεν είναι στην ουρά και δεν πρόκειται να μπει μόνο του */
         busy.textContent = '📖 Δεν έχει διαβαστεί — πάτα «Διάβασε τα υπόλοιπα» πάνω, ή γράψ\' τα μόνος σου';
       } else {
-        var w = Math.max(aiWait - Date.now(), aiLast + AI_GAP - Date.now());
+        var w = Math.max(aiWait - Date.now(), aiSlow ? aiLast + AI_GAP - Date.now() : 0);
         /* Και στις δύο περιπτώσεις λέγεται ΠΑΝΤΑ ότι δεν είναι υποχρεωμένος
            να περιμένει — αλλιώς κάθεται και κοιτάει την οθόνη. */
         busy.textContent = (w > 1000)
@@ -2037,6 +2040,7 @@
     el('st-aims').textContent = localStorage.getItem(LS.aiMs) || '—';
     el('st-aierr').textContent = localStorage.getItem(LS.aiErr) || 'κανένα';
     el('st-airaw').textContent = localStorage.getItem(LS.aiRaw) || '—';
+    el('st-aitok').textContent = aiTokLine();
     /* v30 — τι τρέχει ΕΔΩ, τι έχει ο server, ποιος worker σερβίρει.
        Χωρίς αυτά, «δεν ενημερώθηκε» είναι εντύπωση, όχι μέτρηση. */
     el('st-srvver').textContent = 'ελέγχεται…';
@@ -2063,7 +2067,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v82';
+  var APP_VER = 'φέτα 3 · v83';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2111,6 +2115,14 @@
     return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' +
            ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
   }
+  function aiTokLine() {
+    try {
+      var tk = JSON.parse(localStorage.getItem(LS.aiTok) || '{}');
+      if (!tk.n) { return '—'; }
+      return tk.n + ' κλήσεις · μ.ό. εισόδου ' + Math.round(tk.inp / tk.n) +
+             ' · εξόδου ' + Math.round(tk.out / tk.n) + ' · σκέψης ' + Math.round(tk.think / tk.n);
+    } catch (e) { return '—'; }
+  }
   function aiErrLog(msg) {
     try { localStorage.setItem(LS.aiErr, aiStamp() + ' · ' + msg); } catch (e) {}
   }
@@ -2143,6 +2155,15 @@
      στην πόρτα — δεν αγγίζει ποτέ το όριο. Το έσπασε η δική μας ουρά τρέχοντας
      15 κλήσεις στη σειρά. 13 δευτ. μεταξύ κλήσεων = 4,6/λεπτό, μέσα στο όριο. */
   var AI_GAP = 13000;
+  /* v83 · KM-AI-ADAPTIVE — ΤΟ ΦΡΕΝΟ ΜΠΑΙΝΕΙ ΜΟΝΟ ΑΝ ΤΟ ΚΛΕΙΔΙ ΠΕΙ «ΦΤΑΝΕΙ».
+     Μετρήθηκε 22/9/2026 21:59: με πληρωμένο κλειδί η ανάγνωση κρατάει 3,5″ —
+     και το φρένο των 13″, φτιαγμένο για το δωρεάν όριο των 5/λεπτό, έβαζε
+     13″ αναμονή ανάμεσα σε ΚΑΘΕ τιμολόγιο χωρίς κανέναν λόγο. Τώρα οι
+     αναγνώσεις τρέχουν η μία μετά την άλλη· με το ΠΡΩΤΟ 429 η συνεδρία
+     «μαθαίνει» ότι το κλειδί είναι περιορισμένο και ξαναμπαίνει το φρένο.
+     Μηδενίζεται όταν αλλάξει κλειδί. */
+  var aiSlow = false;
+  var AI_NEXT = 300;   // ms ανάμεσα σε δύο αναγνώσεις χωρίς φρένο
   var aiBusy = false, aiHalt = false; // aiHalt: άκυρο κλειδί — στοπ ως το επόμενο άνοιγμα
   var aiWait = 0;                     // 429: ώρα (ms) πριν την οποία δεν ξαναδοκιμάζουμε
   /* ⚠ ΜΕΤΡΗΘΗΚΕ 30/8: το aiBusy εμποδίζει μόνο ΤΑΥΤΟΧΡΟΝΕΣ κλήσεις. Η aiSweep
@@ -2306,6 +2327,16 @@
         localStorage.setItem(LS.aiRaw, aiStamp() + ' · ' + model + (bare ? ' · σκέψη κανονική' : ' · σκέψη χαμηλή') +
           (fin ? ' · ' + fin : '') + ' · ' + (txt ? String(txt).slice(0, 300) : '(κενό κείμενο)'));
       } catch (e) {}
+      /* v83 · KM-AI-TOKENS — τα πραγματικά tokens της κλήσης (usageMetadata). */
+      try {
+        var u = j.usageMetadata || {};
+        var tk = JSON.parse(localStorage.getItem(LS.aiTok) || '{}');
+        tk.n = (tk.n || 0) + 1;
+        tk.inp = (tk.inp || 0) + (u.promptTokenCount || 0);
+        tk.out = (tk.out || 0) + (u.candidatesTokenCount || 0);
+        tk.think = (tk.think || 0) + (u.thoughtsTokenCount || 0);
+        localStorage.setItem(LS.aiTok, JSON.stringify(tk));
+      } catch (e) {}
       var o = null;
       try { o = JSON.parse(txt); } catch (e) {}
       /* Μερικές φορές το JSON έρχεται ως λίστα με ένα στοιχείο: [{...}] */
@@ -2343,7 +2374,7 @@
     }
     /* Το φρένο του ρυθμού — ισχύει για ΚΑΘΕ κλήση, όχι μόνο για την ουρά */
     var since = Date.now() - aiLast;
-    if (aiLast && since < AI_GAP) {
+    if (aiSlow && aiLast && since < AI_GAP) {
       diag('στη σειρά · επόμενη ανάγνωση σε ' + Math.ceil((AI_GAP - since) / 1000) + 'ς');
       schedule(AI_GAP - since + 200);
       return;
@@ -2383,7 +2414,7 @@
         return put(rec).then(function () {
           if (!el('s-pend').hidden) { renderPending(); }
           aiBusy = false;
-          schedule(AI_GAP);           // επόμενο της ουράς, με σεβασμό στο όριο
+          schedule(aiSlow ? AI_GAP : AI_NEXT);   // v83: φρένο μόνο αν το κλειδί είπε «φτάνει»
         });
       }).catch(function (err) {
         var kind = aiErrKind(err);
@@ -2392,7 +2423,7 @@
           rec.aiTry = (rec.aiTry || 0) + 1; put(rec);
           diag('ακατάλληλη απάντηση · ' + (err.msg || ''));
           aiBusy = false;
-          schedule(AI_GAP);   // v78 — ως τη v77 η ουρά σταματούσε εδώ ως την επόμενη ανανέωση οθόνης
+          schedule(aiSlow ? AI_GAP : AI_NEXT);   // v78 — ως τη v77 η ουρά σταματούσε εδώ ως την επόμενη ανανέωση οθόνης
           return;
         } else if (kind === 'retry') {
           /* v78 · KM-AI-TRANSIENT — προσωρινό: ΔΕΝ κλειδώνει, ξαναδοκιμάζει μόνο του */
@@ -2408,6 +2439,7 @@
         } else if (kind === 'wait') {
           /* Όριο ρυθμού: ΔΕΝ είναι βλάβη. Περιμένουμε όσο λέει η Google και συνεχίζουμε. */
           aiWait = Date.now() + (err.retryAfter || 32000);
+          aiSlow = true;   // v83: το κλειδί είναι περιορισμένο — το φρένο μπαίνει
           aiErrLog('όριο 429 · ' + (err.msg || ''));   // v82: ανά λεπτό ή ανά ημέρα — το λέει η Google
           diag('όριο ρυθμού · συνεχίζω σε ' + Math.ceil((err.retryAfter || 32000) / 1000) + 'ς');
           aiBusy = false;
@@ -4641,7 +4673,7 @@
   };
   el('go-key').onclick = function () {
     var v = el('in-key').value.trim();
-    if (v) { localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); aiHalt = false; }
+    if (v) { localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); aiHalt = false; aiSlow = false; }
     else { localStorage.setItem(LS.skip, '1'); }
     show('s-perm');
   };
@@ -4861,6 +4893,7 @@
       }).catch(function (err) {
         if (err && err.status === 429) {
           aiWait = Date.now() + (err.retryAfter || 32000);
+          aiSlow = true;
           aiErrLog('όριο 429 · ' + (err.msg || ''));
           diag('όριο ρυθμού · ξανά σε ' + Math.ceil((err.retryAfter || 32000) / 1000) + 'ς');
         } else if (err && err.soft) { diag('ακατάλληλη απάντηση · ' + (err.msg || '')); }

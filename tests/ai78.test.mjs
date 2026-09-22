@@ -42,7 +42,7 @@ const MUTATIONS = [
   // Μ11 · ο χρόνος λήξης ξαναπέφτει στα 30″.
   ["js", "ctrl.abort(); }, 60000)", "ctrl.abort(); }, 30000)"],
   // Μ12 · η «ακατάλληλη απάντηση» σταματάει ξανά την ουρά.
-  ["js", "          schedule(AI_GAP);   // v78", "          // v78"],
+  ["js", "          schedule(aiSlow ? AI_GAP : AI_NEXT);   // v78", "          // v78"],
   // Μ13 · το σφάλμα δεν γράφεται μόνιμα στο κλείδωμα (άκυρο κλειδί).
   ["js", "          aiHalt = true;   // 'halt': 4xx — άκυρο κλειδί ή αίτημα\n          aiErrLog(aiErrText(err));", "          aiHalt = true;   // 'halt': 4xx — άκυρο κλειδί ή αίτημα"],
   // Μ14 · το 2.5 παίρνει thinking_level — δεν το ξέρει.
@@ -75,6 +75,16 @@ const MUTATIONS = [
   ["js", "          aiErrLog('όριο 429 · ' + (err.msg || ''));   // v82", "          // v82"],
   // Μ28 · v82 ξανά σκέτο «TypeError».
   ["js", "(err && err.message && err.message !== 'http' ? ': ' + String(err.message).slice(0, 120) : '')", "''"],
+  // Μ29 · v83 🔴 το φρένο των 13″ ξαναμπαίνει και για πληρωμένο κλειδί.
+  ["js", "    if (aiSlow && aiLast && since < AI_GAP) {", "    if (aiLast && since < AI_GAP) {"],
+  // Μ30 · v83 🔴 το 429 δεν ξαναβάζει το φρένο — το δωρεάν κλειδί καίγεται σε 429.
+  ["js", "          aiSlow = true;   // v83", "          // v83"],
+  // Μ31 · v83 τα tokens σκέψης δεν μετριούνται — το κόστος βγαίνει μικρότερο απ' το πραγματικό.
+  ["js", "        tk.think = (tk.think || 0) + (u.thoughtsTokenCount || 0);\n", ""],
+  // Μ32 · v83 η γραμμή tokens φεύγει από τις Ρυθμίσεις.
+  ["html", '<b id="st-aitok">', '<b id="st-zz">'],
+  // Μ33 · v83 η αλλαγή κλειδιού κρατάει το φρένο του παλιού (δωρεάν) κλειδιού.
+  ["js", "aiHalt = false; aiSlow = false; }", "aiHalt = false; }"],
 ];
 
 if (ONLY) {
@@ -102,7 +112,7 @@ function world(responses) {
   const calls = [];
   const env = {
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } },
-    LS: { model: "km_ai_model", diag: "km_ai_diag", aiErr: "km_ai_err", aiMs: "km_ai_ms", aiRaw: "km_ai_raw" },
+    LS: { model: "km_ai_model", diag: "km_ai_diag", aiErr: "km_ai_err", aiMs: "km_ai_ms", aiRaw: "km_ai_raw", aiTok: "km_ai_tok" },
     el: () => ({ hidden: true }),
     renderSettings: () => {},
     pagesOf: () => ["BLOB"],
@@ -116,7 +126,7 @@ function world(responses) {
     },
   };
   const names = Object.keys(env);
-  const f = new Function(...names, js.slice(a, b) + "\nreturn { aiErrKind, aiBackoff, aiRead, aiGen, AI_NOTHINK };");
+  const f = new Function(...names, js.slice(a, b) + "\nreturn { aiErrKind, aiBackoff, aiRead, aiGen, AI_NOTHINK, aiTokLine };");
   return { api: f(...names.map((n) => env[n])), calls, store };
 }
 
@@ -254,6 +264,26 @@ await check("Β-23 · v82 · το TypeError γράφεται με το μήνυ�
   has(sw, "aiErrLog('όριο 429 · ' + (err.msg || ''));   // v82", "το 429 δεν γράφεται στο «Τελευταίο σφάλμα»");
 });
 
+await check("Β-24 · v83 · τα tokens αθροίζονται από το usageMetadata (και της σκέψης)", async () => {
+  const body = { usageMetadata: { promptTokenCount: 1500, candidatesTokenCount: 40, thoughtsTokenCount: 300 },
+                 candidates: [{ finishReason: "STOP", content: { parts: [{ text: '{"net":1,"vat":0.19,"total":1.19,"date":null}' }] } }] };
+  const w = world([{ status: 200, body }, { status: 200, body }]);
+  await w.api.aiRead({}, "K"); await w.api.aiRead({}, "K");
+  eq(JSON.parse(w.store["km_ai_tok"]), { n: 2, inp: 3000, out: 80, think: 600 }, "λάθος άθροισμα");
+  eq(w.api.aiTokLine(), "2 κλήσεις · μ.ό. εισόδου 1500 · εξόδου 40 · σκέψης 300", "λάθος γραμμή");
+});
+
+await check("Β-25 · 🔴 v83 · φρένο 13″ ΜΟΝΟ μετά από 429 · μηδενίζεται με νέο κλειδί", () => {
+  const SW = js.slice(js.indexOf("  function aiSweep() {"), js.indexOf("  /* ── Κάμερα ── */"));
+  has(SW, "    if (aiSlow && aiLast && since < AI_GAP) {", "το φρένο δεν εξαρτάται από το aiSlow");
+  has(SW, "          aiSlow = true;   // v83", "το 429 δεν ενεργοποιεί το φρένο");
+  has(js, "aiHalt = false; aiSlow = false; }", "η αλλαγή κλειδιού δεν μηδενίζει το φρένο");
+  has(js, "var aiSlow = false;", "το φρένο δεν ξεκινάει κλειστό");
+  has(html, '<b id="st-aitok">', "λείπει η γραμμή tokens");
+  has(js, "KM-AI-ADAPTIVE", "λείπει ο δείκτης του deploy");
+  has(js, "KM-AI-TOKENS", "λείπει ο δείκτης του deploy");
+});
+
 await check("Β-15 · v79 · αποσυρμένο (404) → το επόμενο ΓΙΝΕΤΑΙ προτιμώμενο (όπως πριν)", async () => {
   const w = world([{ status: 404 }, { status: 200 }]);
   await w.api.aiRead({}, "K");
@@ -288,7 +318,7 @@ await check("Β-9 · Κλείδωμα ΜΟΝΟ στον κλάδο halt, με τ
 
 await check("Β-10 · Η ακατάλληλη απάντηση δεν σταματάει την ουρά", () => {
   const i = SW.indexOf("if (kind === 'soft') {");
-  has(SW.slice(i, SW.indexOf("} else if (kind === 'retry')", i)), "          schedule(AI_GAP);   // v78", "λείπει το schedule");
+  has(SW.slice(i, SW.indexOf("} else if (kind === 'retry')", i)), "          schedule(aiSlow ? AI_GAP : AI_NEXT);   // v78", "λείπει το schedule");
 });
 
 await check("Β-11 · Λήξη χρόνου 60″ (όχι 30″)", () => {
@@ -317,4 +347,4 @@ if (ONLY) {
   console.log("Μ" + ONLY + ": ΠΕΡΑΣΕ ΠΡΑΣΙΝΟ — ο φρουρός ΔΕΝ πιάνει τη μετάλλαξη"); process.exit(1);
 }
 if (fails) { console.log("\n" + fails + " ΑΠΕΤΥΧΑΝ"); process.exit(1); }
-console.log("\nΟΛΑ ΠΡΑΣΙΝΑ (23)");
+console.log("\nΟΛΑ ΠΡΑΣΙΝΑ (25)");
