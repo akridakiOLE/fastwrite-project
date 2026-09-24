@@ -59,7 +59,10 @@ ol.plain{list-style:decimal;padding-left:22px}ol.plain li{margin:6px 0}.fine{col
 <li>Αν νομίζεις ότι το είδε κάποιος: AI Studio → API Keys → ⋮ → <b>Delete</b>, φτιάξε νέο και βάλ' το στο Kostometro.</li></ul></div>
 <p style="margin-top:32px"><a class="back" href="/kostometro/" onclick="return kmBack()">‹ Πίσω στο Kostometro</a></p>
 </main><script>
-/* KM-KLEIDI-BACK — ανοίγει σε νέα καρτέλα/φύλλο από την εφαρμογή: κλείνει αν μπορεί, αλλιώς γυρίζει πίσω. */
-function kmBack(){ if (history.length > 1) { history.back(); return false; } try { window.close(); } catch (e) {} return true; }
+/* v87 · KM-KLEIDI-BACK2 — 24/9 στο Android του Stavros το κλείσιμο παραθύρου ΕΚΛΕΙΣΕ ΤΗΝ ΕΦΑΡΜΟΓΗ.
+   Ο οδηγός ανοίγει πλέον στο ΙΔΙΟ παράθυρο: αν ήρθαμε από το Kostometro, πίσω στο
+   ιστορικό (η εφαρμογή ξαναβρίσκει την οθόνη της από τη μνήμη της)· αλλιώς κανονικός
+   σύνδεσμος στο /kostometro/. ΠΟΤΕ κλείσιμο παραθύρου. */
+function kmBack(){ var r = document.referrer || ''; if (history.length > 1 && r.indexOf(location.origin + '/kostometro/') === 0) { history.back(); return false; } return true; }
 document.getElementById('back').onclick = kmBack;
 </script></body></html>

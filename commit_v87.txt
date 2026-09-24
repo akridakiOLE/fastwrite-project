@@ -1,0 +1,13 @@
+v87 — το «‹ Πίσω» του οδηγού δεν κλείνει πια την εφαρμογή
+
+24/9, Android του Stavros (v86): Ρυθμίσεις → οδηγός → «‹ Πίσω» = η εφαρμογή
+έκλεινε απότομα. Ο σύνδεσμος άνοιγε με target=_blank μέσα στο παράθυρο της
+εγκατεστημένης εφαρμογής· history.length = 1, και το window.close() έκλεινε όλο
+το παράθυρο.
+- Οι σύνδεσμοι προς τον οδηγό ανοίγουν στο ίδιο παράθυρο.
+- «‹ Πίσω»: history.back() αν ήρθαμε από το Kostometro, αλλιώς /kostometro/.
+  Κανένα window.close.
+- tests/v87.test.mjs: 4 έλεγχοι, 4 αποδείξεις μετάλλαξης.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CiYY6x2fX1CFmzbMHDp9bn

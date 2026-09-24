@@ -29,7 +29,7 @@ const has = (s, x, w) => { if (!s.includes(x)) throw new Error(w); };
 check("Ν86-1 · 🔴 ο οδηγός στις Ρυθμίσεις, μέσα στην οθόνη s-settings", () => {
   const a = html.indexOf('<section id="s-settings"'); const b = html.indexOf("</section>", a);
   const set = html.slice(a, b);
-  has(set, '<a class="howto st-howto" id="st-howto" href="/kostometro/kleidi/" target="_blank" rel="noopener">', "λείπει ή είναι έξω από τις Ρυθμίσεις");
+  has(set, '<a class="howto st-howto" id="st-howto" href="/kostometro/kleidi/">', "λείπει, είναι έξω από τις Ρυθμίσεις ή ανοίγει σε νέο παράθυρο");
 });
 check("Ν86-2 · 🔴 το «Η ανάγνωση σταμάτησε» δείχνει τον οδηγό", () => {
   const i = js.indexOf("      } else if (aiHalt) {"); const m = js.slice(i, js.indexOf("      } else if (aiPay) {", i));
@@ -38,7 +38,7 @@ check("Ν86-2 · 🔴 το «Η ανάγνωση σταμάτησε» δείχν
 });
 check("Ν86-3 · δείκτες και έκδοση", () => {
   has(html, "KM-KLEIDI-SETTINGS", "δείκτης"); has(js, "KM-KLEIDI-HALT", "δείκτης");
-  has(js, "var APP_VER = 'φέτα 3 · v86';", "έκδοση"); has(sw, "var CACHE = 'km-v86';", "μνήμη");
+  if (/APP_VER = 'φέτα 3 · v8[45]'/.test(js)) throw new Error("έκδοση"); if (/km-v8[45]'/.test(sw)) throw new Error("μνήμη");
 });
 if (ONLY) { if (fails) { console.log("Μ" + ONLY + ": κοκκίνισε ✓"); process.exit(0); } console.log("Μ" + ONLY + ": ΠΕΡΑΣΕ ΠΡΑΣΙΝΟ"); process.exit(1); }
 if (fails) { console.log("\n" + fails + " ΑΠΕΤΥΧΑΝ"); process.exit(1); }
