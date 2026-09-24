@@ -641,3 +641,6 @@ textarea#fb-text:focus{outline:none;border-color:var(--accent)}
 /* v75 · με ΕΝΑ βήμα δεν μπαίνει αριθμός — ένα «1.» χωρίς «2.» φαίνεται κουτσό. */
 .inst-steps.one{list-style:none;padding-left:0}
 @media (min-width:520px){.inst{align-items:center}}
+
+/* v85 · KM-AI-PREPAY-402 — ο σύνδεσμος «Γέμισε ξανά» μέσα στο μήνυμα */
+.ai-busy .pay-link{color:var(--accent);font-weight:700;text-decoration:underline;white-space:nowrap}

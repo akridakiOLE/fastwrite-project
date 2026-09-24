@@ -1,0 +1,65 @@
+<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Κλειδί Gemini · Kostometro</title><meta name="robots" content="noindex"><style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b35;--tx:#e8eaee;--mut:#9aa3b2;--acc:#00e0a4;--warn:#ff6b6b;--rev:#ffb020}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:26px;margin:0 0 6px}h2{font-size:20px;margin:36px 0 4px;color:var(--acc)}.sub{color:var(--mut);margin:0 0 12px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:14px 0}
+table{width:100%;border-collapse:collapse;font-size:15px}td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--mut);font-weight:600}
+ol{list-style:none;padding:0;margin:0}.step{display:flex;gap:12px;margin:18px 0}
+.num{flex:0 0 38px;height:38px;border-radius:50%;background:var(--acc);color:#04130d;font-weight:800;display:grid;place-items:center;font-size:14px}
+.body{flex:1;min-width:0}.body p{margin:4px 0 10px}.body img{width:100%;height:auto;border-radius:10px;border:1px solid var(--line);background:#fff}
+a{color:var(--acc)}.warn{color:var(--warn);font-weight:600}.rev{color:var(--rev);font-size:14px}.back{font-size:15px;text-decoration:none}.alert{border-color:#5a4410;background:#221b0b}
+ol.plain{list-style:decimal;padding-left:22px}ol.plain li{margin:6px 0}.fine{color:var(--mut);font-size:14px}
+</style></head><body><main>
+<p><a class="back" id="back" href="/kostometro/">‹ Πίσω στο Kostometro</a></p>
+<h1>Κλειδί Gemini για το Kostometro</h1>
+<p class="sub">Για να διαβάζει μόνο του τα ποσά από τη φωτογραφία. Α και Β από υπολογιστή (~5 λεπτά), Γ από το κινητό (1 λεπτό).</p>
+
+<div class="box"><b>Σου συνιστούμε πληρωμένο κλειδί.</b>
+<table><tr><th></th><th>Πληρωμένο</th><th>Δωρεάν</th></tr>
+<tr><td>Ταχύτητα</td><td>~3–4″ ανά τιμολόγιο</td><td>αργό, με αναμονές</td></tr>
+<tr><td>Όταν η Google έχει φόρτο</td><td>συνεχίζει κανονικά</td><td>συχνά «δοκίμασε αργότερα»</td></tr>
+<tr><td>Κόστος</td><td><b>περίπου 0,50 € για 100 τιμολόγια</b></td><td>0 €</td></tr></table>
+<p class="fine" style="margin:8px 0 0">Ενδεικτικό κόστος — εξαρτάται από τις τιμές της Google, που μπορεί να αλλάξουν.</p>
+<p style="margin:10px 0 0">Με δωρεάν κλειδί η ανάγνωση θα είναι αργή και κάποιες ώρες δεν θα λειτουργεί. Η επιλογή είναι δική σου.</p></div>
+
+<h2>Α · Φτιάξε το κλειδί</h2><p class="sub">Υπολογιστής · 2 λεπτά</p>
+<ol><li class="step"><div class="num">Α1</div><div class="body"><p>Στον υπολογιστή άνοιξε <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a> και συνδέσου με τον λογαριασμό Google σου. Πάτα <b>«Create API key»</b> πάνω δεξιά.</p><img loading="lazy" src="a1.png" alt="Βήμα Α1"></div></li>
+<li class="step"><div class="num">Α2</div><div class="body"><p>Στο όνομα γράψε <b>Kostometro</b> (ή άφησε ό,τι γράφει). Το έργο (project) <b>μην το αλλάξεις</b>. Πάτα <b>«Create key»</b>.</p><img loading="lazy" src="a2.png" alt="Βήμα Α2"></div></li>
+<li class="step"><div class="num">Α3</div><div class="body"><p>Το κλειδί σου φτιάχτηκε. <b>Δεν χρειάζεται να το αντιγράψεις ή να το φυλάξεις κάπου</b> — μένει πάντα εδώ, στον λογαριασμό Google σου. Θα το πάρεις από το κινητό στο βήμα Γ. Κλείσε το παράθυρο.</p><img loading="lazy" src="a3.png" alt="Βήμα Α3"></div></li>
+</ol>
+
+<h2>Β · Ενεργοποίησε την πληρωμή</h2><p class="sub">Υπολογιστής · 3 λεπτά · το κλειδί που έφτιαξες δεν αλλάζει</p>
+<ol><li class="step"><div class="num">Β1</div><div class="body"><p>Στη γραμμή του κλειδιού, στη στήλη «Billing Tier», πάτα <b>«Set up billing»</b>.</p><img loading="lazy" src="b1.png" alt="Βήμα Β1"></div></li>
+<li class="step"><div class="num">Β2</div><div class="body"><p>Διάλεξε το ίδιο έργο (project) με το κλειδί σου και συνέχισε.</p><img loading="lazy" src="b2.png" alt="Βήμα Β2"></div></li>
+<li class="step"><div class="num">Β3</div><div class="body"><p>Χώρα: <b>Cyprus</b>. Το κουτάκι για διαφημιστικά email άφησέ το <b>κενό</b>. Πάτα <b>«Agree &amp; continue»</b>.</p><img loading="lazy" src="b3.png" alt="Βήμα Β3"></div></li>
+<li class="step"><div class="num">Β4</div><div class="body"><p>Πρόσθεσε την κάρτα σου στο <b>«Card details»</b> και πάτα <b>«Save»</b>.</p><img loading="lazy" src="b4.png" alt="Βήμα Β4"></div></li>
+<li class="step"><div class="num">Β5</div><div class="body"><p>Έλεγξε τα στοιχεία σου και πάτα <b>«Submit»</b>. Η τράπεζά σου μπορεί να ζητήσει έγκριση στην εφαρμογή της — είναι επαλήθευση της κάρτας.</p><img loading="lazy" src="b5.png" alt="Βήμα Β5"></div></li>
+<li class="step"><div class="num">Β6</div><div class="body"><p>Αν η Google δεν σου ζήτησε ήδη να αγοράσεις credits: στη σελίδα <b>Billing</b> πάτα <b>«Switch to prepay»</b> πάνω δεξιά.</p><img loading="lazy" src="b6.png" alt="Βήμα Β6"></div></li>
+<li class="step"><div class="num">Β7</div><div class="body"><p>Πάτα <b>«Confirm and continue»</b> και αγόρασε credits — <b>προτείνουμε 10 $</b>. Πληρώνεις μία φορά και δεν χρεώνεσαι ποτέ παραπάνω.</p><img loading="lazy" src="b7.png" alt="Βήμα Β7"></div></li>
+</ol>
+<div class="box alert"><b>Καλό να ξέρεις για την προπληρωμή:</b><ul>
+<li>Τα 10 $ φτάνουν ενδεικτικά για <b>1.500–2.000 τιμολόγια</b>.</li>
+<li>Τα credits <b>λήγουν σε 12 μήνες</b> και δεν επιστρέφονται.</li>
+<li>Όταν τελειώσουν, <b>η ανάγνωση σταματάει</b> μέχρι να ξαναγεμίσεις (Billing → Buy credits).</li></ul></div>
+
+<h2>Γ · Βάλ' το στο Kostometro</h2><p class="sub">Κινητό · 1 λεπτό</p>
+<div class="box"><ol class="plain">
+<li>Στο <b>κινητό</b> άνοιξε <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a> και συνδέσου με <b>τον ίδιο</b> λογαριασμό Google.</li>
+<li>Δίπλα στο κλειδί σου πάτα το εικονίδιο <b>αντιγραφής</b> (⧉) — το κλειδί αντιγράφηκε.<br><img loading="lazy" src="c1.png" alt="Αντιγραφή κλειδιού από κινητό" style="width:100%;max-width:360px;border-radius:10px;border:1px solid var(--line);margin-top:8px"></li>
+<li>Άνοιξε το Kostometro και επικόλλησε το κλειδί στο πεδίο <b>«Κλειδί Gemini»</b>:
+<ul><li><b>Κάνεις εγγραφή τώρα;</b> Το πεδίο είναι στην οθόνη «Να διαβάζει μόνο του τα ποσά;».</li>
+<li><b>Είσαι ήδη μέσα στην εφαρμογή;</b> ☰ → Ρυθμίσεις → «Κλειδί Gemini».</li></ul></li>
+<li>Πάτα <b>Αποθήκευση</b>. Τέλος.</li></ol>
+<p class="warn" style="margin:10px 0 0">Μη στείλεις το κλειδί στον εαυτό σου με email, Viber, WhatsApp ή Messenger — εκεί μένει αποθηκευμένο και μπορεί να το δει κάποιος άλλος.</p></div>
+
+<h2>Ασφάλεια</h2>
+<div class="box"><ul style="margin:0"><li>Εμείς <b>δεν σου ζητάμε ποτέ</b> το κλειδί.</li>
+<li>Αν νομίζεις ότι το είδε κάποιος: AI Studio → API Keys → ⋮ → <b>Delete</b>, φτιάξε νέο και βάλ' το στο Kostometro.</li></ul></div>
+<p style="margin-top:32px"><a class="back" href="/kostometro/" onclick="return kmBack()">‹ Πίσω στο Kostometro</a></p>
+</main><script>
+/* KM-KLEIDI-BACK — ανοίγει σε νέα καρτέλα/φύλλο από την εφαρμογή: κλείνει αν μπορεί, αλλιώς γυρίζει πίσω. */
+function kmBack(){ if (history.length > 1) { history.back(); return false; } try { window.close(); } catch (e) {} return true; }
+document.getElementById('back').onclick = kmBack;
+</script></body></html>

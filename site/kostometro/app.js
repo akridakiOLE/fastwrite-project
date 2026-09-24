@@ -748,6 +748,15 @@
       } else if (aiHalt) {
         busy.classList.add('off');
         busy.textContent = '⚠ Η ανάγνωση σταμάτησε — δες ☰ Ρυθμίσεις · μπορείς να τα γράψεις μόνος σου';
+      } else if (aiPay) {
+        /* v85 · KM-AI-PREPAY-402 — λέμε ΤΙ έγινε και ΠΟΥ διορθώνεται */
+        busy.classList.add('off');
+        busy.textContent = '💳 Τελείωσε η προπληρωμή του κλειδιού Gemini. Μόλις τη γεμίσεις, η ανάγνωση συνεχίζει μόνη της · μπορείς να τα γράψεις και μόνος σου. ';
+        var topUp = document.createElement('a');
+        topUp.className = 'pay-link';
+        topUp.href = AI_BILLING_URL; topUp.target = '_blank'; topUp.rel = 'noopener';
+        topUp.textContent = 'Γέμισε ξανά ›';
+        busy.appendChild(topUp);
       } else if ((r.aiTry || 0) >= AI_MAX_TRY) {
         busy.classList.add('off');
         busy.textContent = '⚠ Δεν διαβάστηκαν ποσά μετά από ' + AI_MAX_TRY +
@@ -2097,7 +2106,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v84';
+  var APP_VER = 'φέτα 3 · v85';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -2131,6 +2140,11 @@
        'soft'  = απάντησε αλλά όχι JSON — μετράει στις 3 προσπάθειες του τιμολογίου */
   function aiErrKind(err) {
     if (err && err.soft) { return 'soft'; }
+    /* v85 · KM-AI-PREPAY-402 — από 12/10/2026 η Google περνάει ΟΛΟΥΣ τους πληρωμένους
+       λογαριασμούς σε προπληρωμή· όταν τα credits τελειώσουν, ΚΑΘΕ κλειδί του
+       λογαριασμού χρέωσης απαντάει 402. Δεν είναι άκυρο κλειδί (δεν κλειδώνει)
+       ούτε φόρτος (άλλο μοντέλο δεν βοηθάει): ο χρήστης πρέπει να γεμίσει. */
+    if (err && err.status === 402) { return 'pay'; }
     if (err && err.status === 429) { return 'wait'; }
     if (err && (err.status >= 500 || err.status === 408)) { return 'retry'; }
     if (err && err.status) { return 'halt'; }
@@ -2196,6 +2210,12 @@
   var AI_NEXT = 300;   // ms ανάμεσα σε δύο αναγνώσεις χωρίς φρένο
   var aiBusy = false, aiHalt = false; // aiHalt: άκυρο κλειδί — στοπ ως το επόμενο άνοιγμα
   var aiWait = 0;                     // 429: ώρα (ms) πριν την οποία δεν ξαναδοκιμάζουμε
+  /* v85 · KM-AI-PREPAY-402 — τελείωσε η προπληρωμή. Ξαναδοκιμάζουμε ΜΟΝΑ ΜΑΣ κάθε
+     10′ (τα αποτυχημένα αιτήματα δεν χρεώνονται): μόλις ο χρήστης γεμίσει, η
+     ανάγνωση συνεχίζει χωρίς να χρειαστεί να κάνει τίποτα άλλο. */
+  var aiPay = false;
+  var AI_PAY_WAIT = 600000;
+  var AI_BILLING_URL = 'https://aistudio.google.com/billing';
   /* ⚠ ΜΕΤΡΗΘΗΚΕ 30/8: το aiBusy εμποδίζει μόνο ΤΑΥΤΟΧΡΟΝΕΣ κλήσεις. Η aiSweep
      καλείται από ΤΕΣΣΕΡΑ σημεία (renderPending, assign, boot, η ίδια η ουρά) —
      άρα κάθε ανανέωση οθόνης έστελνε αίτημα ΕΚΤΟΣ ρυθμού και έτρωγε 429.
@@ -2433,6 +2453,7 @@
       diag('διαβάζω…');
       aiRead(rec, key).then(function (sug) {
         aiRetryN = 0;   // η Google απάντησε — η σειρά των προσωρινών σφαλμάτων έληξε
+        aiPay = false;  // v85: αφού διάβασε, υπάρχουν credits
         if (sug.total === null && sug.vat === null && sug.net === null) {
           rec.aiTry = (rec.aiTry || 0) + 1; // διάβασε αλλά δεν είδε τίποτα
           diag('απάντησε αλλά δεν διάβασε ποσά (' + rec.aiTry + '/3)');
@@ -2474,6 +2495,16 @@
           diag('όριο ρυθμού · συνεχίζω σε ' + Math.ceil((err.retryAfter || 32000) / 1000) + 'ς');
           aiBusy = false;
           schedule((err.retryAfter || 32000) + 500);
+          return;
+        } else if (kind === 'pay') {
+          /* v85 · KM-AI-PREPAY-402 — ΟΧΙ κλείδωμα: ξαναδοκιμάζει μόνο του σε 10′ */
+          aiPay = true;
+          aiWait = Date.now() + AI_PAY_WAIT;
+          aiErrLog('τελείωσε η προπληρωμή · 402 · ' + (err.msg || ''));
+          diag('τελείωσε η προπληρωμή Gemini · ξανά σε ' + Math.round(AI_PAY_WAIT / 60000) + '′');
+          aiBusy = false;
+          schedule(AI_PAY_WAIT + 500);
+          if (!el('s-pend').hidden) { renderPending(); }
           return;
         } else {
           aiHalt = true;   // 'halt': 4xx — άκυρο κλειδί ή αίτημα
@@ -4808,7 +4839,7 @@
   el('code-back').onclick = function () { show('s-email'); };
   el('go-key').onclick = function () {
     var v = el('in-key').value.trim();
-    if (v) { localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); aiHalt = false; aiSlow = false; }
+    if (v) { localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); aiPay = false; aiWait = 0; aiHalt = false; aiSlow = false; }
     else { localStorage.setItem(LS.skip, '1'); }
     show('s-perm');
   };
@@ -5003,7 +5034,7 @@
     v = v.trim();
     if (v) { localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); }
     else { localStorage.removeItem(LS.key); localStorage.setItem(LS.skip, '1'); }
-    aiHalt = false;
+    aiHalt = false; aiPay = false; aiWait = 0;   // v85: νέο κλειδί = καθαρό μητρώο
     renderSettings();
     aiSweep();
   };
@@ -5016,6 +5047,8 @@
       if (!key) { diag('χωρίς κλειδί — χειροκίνητα'); return; }
       var target = rows.filter(isPending)[0] || rows[0];
       aiRead(target, key).then(function (s) {
+        aiPay = false;   // v85: απάντησε — υπάρχουν credits
+        if (aiWait > Date.now()) { aiWait = 0; }
         if (s.total !== null || s.vat !== null || s.net !== null) {
           target.sug = s; target.aiAt = Date.now();
           return put(target).then(function () {

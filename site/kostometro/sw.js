@@ -15,7 +15,7 @@
    ⚠ Και το /km-crypto.js μπήκε στο πεδίο: ζει ΕΞΩ από το /kostometro/, άρα
    μέχρι τώρα δεν το έπιανε καθόλου ο worker — χωρίς δίκτυο η οθόνη των 12
    λέξεων θα έσπαγε. */
-var CACHE = 'km-v84';
+var CACHE = 'km-v85';
 var SHELL = [
   '/kostometro/',
   '/kostometro/index.html',
@@ -97,6 +97,10 @@ self.addEventListener('fetch', function (e) {
      μνήμη επιστρέφει το /kostometro/index.html — δηλαδή σέρβιρε ΤΗΝ ΕΦΑΡΜΟΓΗ
      αντί για τη σελίδα ακύρωσης, χωρίς να ρωτήσει ποτέ το δίκτυο. */
   if (u.pathname.indexOf('/kostometro/akyrosi') === 0) { return; }
+  /* v85 · KM-SW-KLEIDI — ο οδηγός κλειδιού δεν περνάει από τη μνήμη: πρέπει να
+     είναι ΠΑΝΤΑ ο τελευταίος (οι οθόνες της Google αλλάζουν), και χωρίς δίκτυο
+     το fromCache θα σέρβιρε την ΕΦΑΡΜΟΓΗ στη θέση του (ίδια παγίδα με το akyrosi). */
+  if (u.pathname.indexOf('/kostometro/kleidi') === 0) { return; }
   var mine = u.pathname.indexOf('/kostometro/') === 0 || u.pathname === '/km-crypto.js';
   if (!mine) { return; }
   e.respondWith(FRESH.indexOf(u.pathname) >= 0 ? netFirst(e.request) : cacheFirst(e.request));
