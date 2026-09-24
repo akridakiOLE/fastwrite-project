@@ -644,3 +644,5 @@ textarea#fb-text:focus{outline:none;border-color:var(--accent)}
 
 /* v85 · KM-AI-PREPAY-402 — ο σύνδεσμος «Γέμισε ξανά» μέσα στο μήνυμα */
 .ai-busy .pay-link{color:var(--accent);font-weight:700;text-decoration:underline;white-space:nowrap}
+/* v86 · KM-KLEIDI-SETTINGS */
+.st-howto{display:block;text-align:center;margin:2px 0 10px}

@@ -36,7 +36,7 @@ const MUT = [
   // Μ8 · η αλλαγή κλειδιού από τις Ρυθμίσεις κρατάει την προπληρωμή.
   ["js", "    aiHalt = false; aiPay = false; aiWait = 0;   // v85", "    aiHalt = false;   // v85"],
   // Μ9 · 🔴 ο σύνδεσμος «Πώς βγάζω κλειδί» ξαναδείχνει σκέτη τη Google.
-  ["html", 'href="/kostometro/kleidi/"', 'href="https://aistudio.google.com/apikey"'],
+  ["html", '<a class="howto" href="/kostometro/kleidi/"', '<a class="howto" href="https://aistudio.google.com/apikey"'],
   // Μ10 · παλιό παράδειγμα κλειδιού — ο χρήστης νομίζει ότι το «AQ.» είναι λάθος.
   ["html", 'placeholder="AQ.…"', 'placeholder="AIza…"'],
   // Μ11 · το κουμπί των Ρυθμίσεων δεν λέγεται όπως στον οδηγό.
@@ -124,7 +124,7 @@ await check("Ν-6 · νέο κλειδί = καθαρό μητρώο (οθόνη
   has(js, "    aiHalt = false; aiPay = false; aiWait = 0;   // v85", "st-editkey");
 });
 await check("Ν-7 · η εφαρμογή ταιριάζει με τον οδηγό", () => {
-  has(html, 'href="/kostometro/kleidi/"', "ο σύνδεσμος δεν δείχνει στον οδηγό");
+  has(html, '<a class="howto" href="/kostometro/kleidi/"', "ο σύνδεσμος της οθόνης κλειδιού δεν δείχνει στον οδηγό");
   has(html, 'placeholder="AQ.…"', "παλιό παράδειγμα");
   hasnt(html, "AIza", "έμεινε «AIza» στην οθόνη");
   has(html, 'id="st-editkey">Κλειδί Gemini<', "το κουμπί δεν λέει «Κλειδί Gemini»");
@@ -132,7 +132,7 @@ await check("Ν-7 · η εφαρμογή ταιριάζει με τον οδηγ
 await check("Ν-8 · 🔴 ο οδηγός ΔΕΝ περνάει από τη μνήμη του service worker", () => {
   has(sw, "  if (u.pathname.indexOf('/kostometro/kleidi') === 0) { return; }\n", "ο οδηγός πιάνεται από τον worker");
   if (sw.indexOf("/kostometro/kleidi') === 0) { return; }") > sw.indexOf("var mine =")) throw new Error("η εξαίρεση μπαίνει μετά το «mine»");
-  has(sw, "var CACHE = 'km-v85';", "η μνήμη δεν ανέβηκε");
+  hasnt(sw, "var CACHE = 'km-v84';", "η μνήμη δεν ανέβηκε");
 });
 await check("Ν-9 · 🔴 ο οδηγός: καθαρός, πλήρης, ασφαλής", () => {
   hasnt(guide, "AQ.Ab8RN6", "ΔΙΑΡΡΟΗ του κλειδιού της 24/9");
@@ -147,7 +147,7 @@ await check("Ν-10 · δείκτες του deploy", () => {
   has(js, "KM-AI-PREPAY-402", "λείπει KM-AI-PREPAY-402");
   has(html, "KM-KLEIDI-GUIDE", "λείπει KM-KLEIDI-GUIDE");
   has(sw, "KM-SW-KLEIDI", "λείπει KM-SW-KLEIDI");
-  has(js, "var APP_VER = 'φέτα 3 · v85';", "λάθος έκδοση");
+  hasnt(js, "var APP_VER = 'φέτα 3 · v84';", "λάθος έκδοση");
 });
 if (ONLY) {
   if (fails) { console.log("Μ" + ONLY + ": κοκκίνισε (" + fails + ") ✓"); process.exit(0); }
