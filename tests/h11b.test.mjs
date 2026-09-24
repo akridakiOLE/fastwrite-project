@@ -36,7 +36,7 @@ const mod = await import("data:text/javascript;base64," + Buffer.from(src).toStr
 
 // ── βάση + R2 ──────────────────────────────────────────────────────────────
 const db = new DatabaseSync(":memory:");
-for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_h11b.sql", "km_ref.sql", "km_ref2.sql"]) {
+for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_h11b.sql", "km_ref.sql", "km_ref2.sql", "km_verify.sql"]) {
   // ⚠ Οι γραμμές σχολίων φεύγουν ΠΡΙΝ το σπάσιμο σε εντολές. Πρώτη γραφή:
   // split(";") και μετά «πέτα ό,τι αρχίζει με --» — που πετούσε ΟΛΟΚΛΗΡΟ το
   // πρώτο κομμάτι, σχόλιο ΚΑΙ το CREATE TABLE μαζί («no such table»).
@@ -87,7 +87,7 @@ const post = (path, headers, body) =>
 
 async function account() {
   const id = { folder: hex(32), auth: hex(32), device: "km_" + hex(6), email: "u" + hex(4) + "@example.com" };
-  const r = await post("/api/km/register", H(id), { email: id.email, source: "store:play", ref: "REF7" });
+  const r = await post("/api/km/register", H(id), { email: id.email, email_token: await mod.issueEmailToken(env, id.email), source: "store:play", ref: "REF7" });
   if (r.status !== 200) throw new Error("register " + r.status + " " + await r.text());
   // πραγματικό περιεχόμενο: διαγραφή άδειου φακέλου δεν αποδεικνύει τίποτα
   await call("/api/km/folder", { method: "PUT", headers: H(id), body: Buffer.alloc(400, 7) });

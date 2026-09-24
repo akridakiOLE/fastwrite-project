@@ -41,6 +41,9 @@
     /* v83 · αθροιστικά tokens {n, inp, out, think} — για να ΜΕΤΡΗΘΕΙ το κόστος
        ανά τιμολόγιο πριν γραφτεί νούμερο σε κείμενο για χρήστες. */
     aiTok: 'km_ai_tok',
+    /* Brief ΣΤ · το token του επιβεβαιωμένου email. Φεύγει με την εγγραφή
+       και σβήνεται μόλις ο server φτιάξει τον λογαριασμό. */
+    emailTok: 'km_email_tok',
     /* v26 · Η.2β-1 — ο λογαριασμός. Οι 12 λέξεις ΜΕΝΟΥΝ στη συσκευή:
        από αυτές βγαίνουν folder/auth (πάνε στον server) και το κλειδί
        κρυπτογράφησης (ΔΕΝ φεύγει ποτέ). */
@@ -311,7 +314,7 @@
      αυτή τη λίστα και ξεκρύβει τη ζητούμενη — οθόνη εκτός λίστας μένει
      αόρατη για πάντα, σιωπηλά, χωρίς κανένα σφάλμα. (Το έπιασε το τεστ α1
      στις 5/9· με ανάγνωση δεν φαινόταν.) */
-  var SCREENS = ['s-acc','s-email','s-words','s-signin','s-key','s-perm','s-cam','s-who',
+  var SCREENS = ['s-acc','s-email','s-code','s-words','s-signin','s-key','s-perm','s-cam','s-who',
                  's-menu','s-pend','s-sup','s-ref','s-settings','s-shot','s-mywords',
                  's-del','s-gone','s-dpend','s-faq','s-help','s-fb'];
   function show(id) {
@@ -1871,6 +1874,24 @@
     return null;
   }
 
+  /* Brief ΣΤ · KM-MANIFEST-REF — ΤΟ iPHONE ΑΝΟΙΓΕΙ ΤΟ ΕΙΚΟΝΙΔΙΟ ΣΤΟ start_url.
+     Μετρήθηκε 23/9/2026: η σελίδα είχε ?ref=, το «Add to Home Screen» έδειξε
+     σκέτο /kostometro/, και η εγκατεστημένη εφαρμογή (ΧΩΡΙΣΤΗ μνήμη από το
+     Safari) δεν έμαθε ποτέ τη σύσταση. Εδώ, ΠΡΙΝ την εγγραφή, το manifest
+     δείχνει σε εκδοχή που ΚΡΑΤΑΕΙ ref/src στο start_url. Μετά την εγγραφή
+     δεν αγγίζεται τίποτα: η σύσταση γράφεται μία φορά (Α400 §Δ, 4/9). */
+  function manifestFollow() {
+    if (localStorage.getItem(LS.reg)) { return; }
+    var r = /[?&]ref=([A-Za-z0-9]+)/.exec(location.search);
+    var s = /[?&]src=([A-Za-z0-9:_-]+)/.exec(location.search);
+    if (!r && !s) { return; }
+    var link = document.querySelector('link[rel="manifest"]');
+    if (!link) { return; }
+    var q = [];
+    if (r) { q.push('ref=' + encodeURIComponent(r[1].toUpperCase())); }
+    if (s) { q.push('src=' + encodeURIComponent(s[1])); }
+    link.setAttribute('href', '/api/km/manifest?' + q.join('&'));
+  }
   function refCode() { return localStorage.getItem(LS.refCode) || ''; }
   function refUrl()  { var c = refCode(); return c ? (location.origin + '/kostometro/?ref=' + c) : ''; }
 
@@ -1888,11 +1909,20 @@
      αφορά κανέναν είναι θόρυβος πάνω στην πρώτη οθόνη του προϊόντος. */
   function renderConsent(){
     var src = localStorage.getItem(LS.src) || '';
-    var isRef = /^ref:/.test(src);
+    var m = /^ref:(.+)$/.exec(src);
+    /* Brief ΣΤ — το πεδίο προσυμπληρώνεται ΜΙΑ φορά από τον σύνδεσμο· μετά
+       κυβερνά ό,τι γράψει ή σβήσει ο χρήστης. */
+    var inp = el('in-ref');
+    if (inp && m && !inp.value && !inp.getAttribute('data-touched')) { inp.value = m[1]; }
+    var isRef = inp ? !!refNorm(inp.value) : !!m;
     var box = el('ref-consent');
     if (!box) { return; }
     box.hidden = !isRef;
     if (!isRef) { return; }
+  }
+  function refNorm(v) {
+    var c = String(v || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    return c.length ? c : '';
   }
 
   /* Η λίστα «ποιος γράφτηκε». Ο server στέλνει email ΜΟΝΟ όπου δόθηκε
@@ -2067,7 +2097,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v83';
+  var APP_VER = 'φέτα 3 · v84';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -3102,11 +3132,15 @@
            ίδια κλήση με την εγγραφή: μία πράξη, όχι δύο που μπορεί να
            χωρίσουν από χαμένο δίκτυο και να αφήσουν λογαριασμό χωρίς
            κλειδαριά (= φάκελο που δεν ξανανοίγει από άλλη συσκευή). */
-        wrapped_k: localStorage.getItem(LS.wrapped) || null
+        wrapped_k: localStorage.getItem(LS.wrapped) || null,
+        /* Brief ΣΤ — χωρίς αυτό ο server δεν φτιάχνει ΝΕΟ λογαριασμό. Για
+           είσοδο σε υπάρχοντα (12 λέξεις) αγνοείται. */
+        email_token: localStorage.getItem(LS.emailTok) || null
       })
     }).then(function (r) {
       if (!r.ok) { return false; }
       localStorage.setItem(LS.reg, '1');
+      localStorage.removeItem(LS.emailTok);   // καμένο στον server — δεν ξαναχρησιμεύει
       localStorage.removeItem(LS.wrapped);   // v47 — η κλειδαριά γράφτηκε μαζί με τον λογαριασμό
       /* Το register ΚΑΝΕΙ αυτή τη συσκευή ενεργή στον server (Η.3: όποια
          βάλει τις 12 λέξεις γίνεται η ενεργή). Το γράφουμε ρητά, τη στιγμή
@@ -4486,6 +4520,7 @@
     var newSrc = refCaptureSrc(location.search, !!localStorage.getItem(LS.reg),
                                localStorage.getItem(LS.src));
     if (newSrc !== null) { localStorage.setItem(LS.src, newSrc); }
+    manifestFollow();
     /* v65 — το άνοιγμα μετριέται ΑΝΕΞΑΡΤΗΤΑ από το αν θα γίνει εγγραφή.
        Μπαίνει ΕΞΩ από το «if (!LS.src)» πιο πάνω: εκείνο τρέχει μόνο στην
        πρώτη εγκατάσταση, ενώ ο σύνδεσμος μπορεί να ανοιχτεί και από κάποιον
@@ -4656,21 +4691,121 @@
      ΔΕΝ μπλοκάρεται — καμία web τεχνολογία δεν το μπορεί (το FLAG_SECURE
      είναι native). Άρα λέμε την αλήθεια αντί να προσποιούμαστε ότι φυλάμε. */
 
+  /* ══ Brief ΣΤ (24/9/2026) · KM-EMAIL-CODE ═════════════════════════
+     Ένα email = ένας λογαριασμός. Η σειρά: (1) ο κωδικός πρόσκλησης, αν
+     γράφτηκε, ελέγχεται · (2) ο server στέλνει 6 ψηφία — ή λέει «πιασμένο» ·
+     (3) με τον σωστό κωδικό παίρνουμε token → οι 12 λέξεις όπως πριν.
+     ⚠ Το LS.email γράφεται ΜΟΝΟ μετά την επιβεβαίωση: αλλιώς το boot()
+     (κλάδος «email χωρίς λέξεις») θα προσπερνούσε τον κωδικό σε ξαναάνοιγμα. */
+  var codeEmail = '', codeWait = 0;
+  function emailMsg(text, have) {
+    el('email-msg').textContent = text || '';
+    el('email-msg').hidden = !text;
+    el('email-have').hidden = !have;
+  }
+  function sendCode(email) {
+    return kmFetch('email/code', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (r.ok) { codeWait = Date.now() + 30000; return 'ok'; }
+        var e = j && j.error;
+        if (e === 'taken') { return 'taken'; }
+        if (e === 'pending_delete') { return 'pending_delete'; }
+        if (e === 'too_many') { return 'too_many'; }
+        if (e === 'mail_failed') { return 'mail_failed'; }
+        return 'error';
+      });
+    }, function () { return 'offline'; });
+  }
+  var CODE_TEXT = {
+    taken: 'Αυτό το email έχει ήδη λογαριασμό. Πάτα «Έχω ήδη λογαριασμό» και βάλε τις 12 λέξεις σου.',
+    pending_delete: 'Για τον λογαριασμό με αυτό το email εκκρεμεί διαγραφή. Αν θες να τον κρατήσεις: fastwrite.tech/akyrosi με τις 12 λέξεις σου.',
+    too_many: 'Πολλές προσπάθειες σε λίγη ώρα — δοκίμασε ξανά σε λίγο.',
+    mail_failed: 'Δεν μπορέσαμε να στείλουμε email αυτή τη στιγμή — δοκίμασε ξανά σε λίγο.',
+    offline: 'Χωρίς σύνδεση: η εγγραφή θέλει ίντερνετ για να σου στείλουμε τον κωδικό.',
+    error: 'Κάτι πήγε στραβά — δοκίμασε ξανά.'
+  };
+  el('in-ref').oninput = function () { this.setAttribute('data-touched', '1'); el('err-ref').hidden = true; renderConsent(); };
+  el('email-have').onclick = function () { el('acc-yes').click(); };
   el('go-email').onclick = function () {
     var v = el('in-email').value.trim();
     if (!validEmail(v)) { el('err-email').hidden = false; return; }
     el('err-email').hidden = true;
-    localStorage.setItem(LS.email, v);
-    /* Κρατιέται ΜΟΝΟ αν δόθηκε. Η απουσία του κλειδιού = όχι. */
-    /* ⚠ ΟΧΙ 'ref-share': το id το κρατάει ΗΔΗ το κουμπί «Στείλ' τον» της
-       οθόνης «Κάλεσε». Η οθόνη email είναι πιο πάνω στο HTML, άρα το
-       el('ref-share') θα γύριζε το κουτάκι αντί για το κουμπί και θα
-       έσπαγαν και τα δύο. Μετρήθηκε 19/9/2026 πριν ανέβει. */
-    var ck = el('ref-consent-ok');
-    if (ck && ck.checked) { localStorage.setItem(LS.refShare, '1'); }
-    else { localStorage.removeItem(LS.refShare); }
-    startWords(false);
+    el('err-ref').hidden = true;
+    emailMsg('');
+    var refIn = refNorm(el('in-ref').value);
+    var btn = el('go-email');
+    btn.disabled = true;
+    var chk = refIn
+      ? kmFetch('ref/check?code=' + encodeURIComponent(refIn)).then(function (r) { return r.json(); })
+          .then(function (j) { return !!(j && j.exists); })
+      : Promise.resolve(true);
+    chk.then(function (exists) {
+      if (!exists) { el('err-ref').hidden = false; btn.disabled = false; return; }
+      /* Ο κωδικός του πεδίου ΚΥΒΕΡΝΑ: αν ο χρήστης τον έσβησε, σέβεται. */
+      var src = localStorage.getItem(LS.src) || '';
+      if (refIn) { localStorage.setItem(LS.src, 'ref:' + refIn); }
+      else if (/^ref:/.test(src)) { localStorage.setItem(LS.src, 'link'); }
+      /* ⚠ ΟΧΙ 'ref-share': το id το κρατάει ΗΔΗ το κουμπί «Στείλ' τον» της
+         οθόνης «Κάλεσε» (μετρήθηκε 19/9/2026). */
+      var ck = el('ref-consent-ok');
+      if (refIn && ck && ck.checked) { localStorage.setItem(LS.refShare, '1'); }
+      else { localStorage.removeItem(LS.refShare); }
+      return sendCode(v).then(function (res) {
+        btn.disabled = false;
+        if (res !== 'ok') { emailMsg(CODE_TEXT[res] || CODE_TEXT.error, res === 'taken'); return; }
+        codeEmail = v;
+        el('code-to').textContent = v;
+        el('in-code').value = '';
+        el('err-code').hidden = true;
+        show('s-code');
+      });
+    }).catch(function () { btn.disabled = false; emailMsg(CODE_TEXT.offline); });
   };
+  function codeErr(text) { el('err-code').textContent = text; el('err-code').hidden = !text; }
+  el('go-code').onclick = function () {
+    var c = String(el('in-code').value || '').replace(/\D/g, '');
+    if (c.length !== 6) { codeErr('Ο κωδικός έχει 6 ψηφία.'); return; }
+    var btn = el('go-code');
+    btn.disabled = true;
+    kmFetch('email/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: codeEmail, code: c })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        btn.disabled = false;
+        if (r.ok && j && j.email_token) {
+          localStorage.setItem(LS.emailTok, j.email_token);
+          localStorage.setItem(LS.email, codeEmail);
+          codeErr('');
+          startWords(false);
+          return;
+        }
+        var e = j && j.error;
+        if (e === 'bad_code') {
+          codeErr('Λάθος κωδικός.' + (typeof j.left === 'number' ? ' Απομένουν ' + j.left + ' προσπάθειες.' : ''));
+        } else if (e === 'code_expired' || e === 'no_code') {
+          codeErr('Ο κωδικός έληξε — πάτα «Στείλε ξανά».');
+        } else if (e === 'too_many') {
+          codeErr('Πολλές λάθος προσπάθειες — πάτα «Στείλε ξανά» για νέο κωδικό.');
+        } else if (e === 'taken' || e === 'pending_delete') {
+          show('s-email'); emailMsg(CODE_TEXT[e], e === 'taken');
+        } else { codeErr(CODE_TEXT.error); }
+      });
+    }, function () { btn.disabled = false; codeErr(CODE_TEXT.offline); });
+  };
+  el('code-resend').onclick = function () {
+    var left = Math.ceil((codeWait - Date.now()) / 1000);
+    if (left > 0) { codeErr('Περίμενε ' + left + 'ς πριν ζητήσεις νέο κωδικό.'); return; }
+    sendCode(codeEmail).then(function (res) {
+      if (res === 'ok') { codeErr(''); el('in-code').value = ''; alertLite('Στάλθηκε νέος κωδικός.'); return; }
+      codeErr(CODE_TEXT[res] || CODE_TEXT.error);
+    });
+  };
+  function alertLite(text) { codeErr(''); var p = el('err-code'); p.textContent = text; p.hidden = false; }
+  el('code-back').onclick = function () { show('s-email'); };
   el('go-key').onclick = function () {
     var v = el('in-key').value.trim();
     if (v) { localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); aiHalt = false; aiSlow = false; }

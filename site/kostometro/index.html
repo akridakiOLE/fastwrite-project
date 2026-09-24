@@ -96,6 +96,17 @@
       <input type="email" id="in-email" inputmode="email" autocomplete="email" placeholder="onoma@example.com">
     </label>
     <p class="err" id="err-email" hidden>Γράψε μια σωστή διεύθυνση email.</p>
+    <!-- Brief ΣΤ (24/9/2026) · KM-REF-FIELD — ΠΑΝΤΑ ΟΡΑΤΟ, ΠΡΟΑΙΡΕΤΙΚΟ.
+         Διατύπωση Stavros: θα υπάρχουν πολλοί χρήστες ΧΩΡΙΣ πρόσκληση
+         (καμπάνιες, ιστοσελίδα) — το κενό είναι κανονικό, ΠΟΤΕ σφάλμα.
+         Προσυμπληρώνεται όταν ο κωδικός ήρθε από σύνδεσμο. Είναι και το δίχτυ
+         ασφαλείας του iPhone, όπου η εγκατεστημένη εφαρμογή δεν βλέπει τη
+         μνήμη του Safari (μετρήθηκε 23/9). -->
+    <label class="fld" id="ref-fld">
+      <span>Κωδικός πρόσκλησης <small>(αν έχεις)</small></span>
+      <input type="text" id="in-ref" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="προαιρετικό">
+    </label>
+    <p class="err" id="err-ref" hidden>Αυτός ο κωδικός δεν βρέθηκε — έλεγξέ τον ή άφησέ το κενό.</p>
     <!-- v67 · ΣΥΓΚΑΤΑΘΕΣΗ ΓΙΑ ΤΟ ΟΝΟΜΑ (19/9/2026).
          Φαίνεται ΜΟΝΟ σε όποιον ήρθε από πρόσκληση. Το κουτάκι είναι
          ΑΣΥΜΠΛΗΡΩΤΟ: προεπιλεγμένο «ναι» δεν είναι συγκατάθεση, είναι
@@ -118,6 +129,8 @@
       <p class="fine">Η σύστασή του <b>μετράει έτσι κι αλλιώς</b> — αυτό αφορά μόνο αν θα δει <b>ποιος</b> είσαι. Την <b>ημέρα και την ώρα</b> της εγγραφής σου τις βλέπει σε κάθε περίπτωση· χωρίς το κουτάκι εμφανίζεσαι ως «Εγγραφή #2».</p>
     </div>
     <button class="btn primary" id="go-email">Συνέχεια</button>
+    <p class="err" id="email-msg" hidden></p>
+    <button class="btn ghost" id="email-have" hidden>Έχω ήδη λογαριασμό</button>
     <!-- v76 · ΟΡΟΙ ΚΑΙ ΠΟΛΙΤΙΚΗ, ΠΡΙΝ ΤΗΝ ΕΓΓΡΑΦΗ (20/9/2026, ερώτημα Stavros).
          Ως τη v75 οι σύνδεσμοι υπήρχαν ΜΟΝΟ στο υποσέλιδο του Μενού —
          που είναι ΜΕΣΑ στην εφαρμογή, δηλαδή ΜΕΤΑ την εγγραφή.
@@ -131,6 +144,25 @@
 </section>
 
 <!-- ══ ΟΘΟΝΗ Β · ΚΛΕΙΔΙ GEMINI ═════════════════════════════════ -->
+<!-- ══ Brief ΣΤ · Ο ΚΩΔΙΚΟΣ 6 ΨΗΦΙΩΝ (24/9/2026) ════════════════
+     KM-EMAIL-CODE — ένα email = ένας λογαριασμός. Χωρίς επιβεβαιωμένο email
+     ο server ΔΕΝ φτιάχνει νέο λογαριασμό. -->
+<section id="s-code" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h2>Γράψε τον κωδικό</h2>
+    <p class="lede">Σου στείλαμε έναν κωδικό <b>6 ψηφίων</b> στο <b id="code-to"></b>. Ισχύει <b>15 λεπτά</b>.</p>
+    <label class="fld">
+      <span>Κωδικός</span>
+      <input type="text" id="in-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+    </label>
+    <p class="err" id="err-code" hidden></p>
+    <button class="btn primary" id="go-code">Επιβεβαίωση</button>
+    <button class="btn ghost" id="code-resend">Στείλε ξανά</button>
+    <button class="btn ghost" id="code-back">‹ Άλλο email</button>
+    <p class="fine">Δεν ήρθε σε ένα λεπτό; Κοίτα και στα <b>Ανεπιθύμητα</b>.</p>
+  </div>
+</section>
+
 <section id="s-key" class="screen setup" hidden>
   <div class="setup-inner">
     <h2>Να διαβάζει μόνο του τα ποσά;</h2>

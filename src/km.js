@@ -1,10 +1,15 @@
 // KM-SERVER-V60-H11B  ← σημάδι έκδοσης· το ψάχνει το deploy_km_h11b.bat
+// KM-SERVER-V84-VERIFY ← Brief ΣΤ (24/9/2026): ένα email = ένας λογαριασμός · κωδικός 6 ψηφίων
 // Kostometro — μητρώο + σφραγισμένος φάκελος (Brief Α, Α350 §9.8 Η.1)
 // ---------------------------------------------------------------------------
 // Routes (όλα κάτω από /api/km/ — run_worker_first = ["/api/*"]):
 //
 //   GET  /api/km/lookup?email=      -> { exists: true|false }   (Γ.5: μόνο ναι/όχι)
 //   POST /api/km/register           -> νέος λογαριασμός Ή είσοδος σε υπάρχοντα
+//   POST /api/km/email/code         -> Brief ΣΤ: στέλνει κωδικό 6 ψηφίων (ή taken / pending_delete)
+//   POST /api/km/email/verify       -> Brief ΣΤ: κωδικός → email_token (χωρίς αυτό, κανένας ΝΕΟΣ λογαριασμός)
+//   GET  /api/km/ref/check?code=    -> Brief ΣΤ: υπάρχει ζωντανός λογαριασμός με αυτόν τον κωδικό;
+//   GET  /api/km/manifest?ref=&src= -> Brief ΣΤ: manifest με start_url που ΚΡΑΤΑΕΙ ref/src (iPhone)
 //   GET  /api/km/status             -> έκδοση, μέγεθος, ενεργή συσκευή, συσκευές
 //   GET  /api/km/folder             -> το κρυπτογραφημένο μπλοκ (όποια συσκευή έχει auth)
 //   PUT  /api/km/folder             -> ανέβασμα μπλοκ (ΜΟΝΟ η ενεργή συσκευή)
@@ -100,6 +105,10 @@ export async function handleKm(request, env, ctx, path) {
 
   if (path === "/api/km/lookup" && method === "GET") return lookup(request, env);
   if (path === "/api/km/register" && method === "POST") return register(request, env);
+  if (path === "/api/km/email/code" && method === "POST") return emailCode(request, env);
+  if (path === "/api/km/email/verify" && method === "POST") return emailVerify(request, env);
+  if (path === "/api/km/ref/check" && method === "GET") return refCheck(request, env);
+  if (path === "/api/km/manifest" && method === "GET") return manifestFor(request);
   if (path === "/api/km/status" && method === "GET") return status(request, env);
   if (path === "/api/km/folder" && method === "GET") return getFolder(request, env);
   if (path === "/api/km/folder" && method === "PUT") return putFolder(request, env);
@@ -461,6 +470,149 @@ async function lookup(request, env) {
   return json({ ok: true, exists: !!row });
 }
 
+// ══ Brief ΣΤ (24/9/2026) — ΕΠΙΒΕΒΑΙΩΣΗ EMAIL · ΕΝΑ EMAIL = ΕΝΑΣ ΛΟΓΑΡΙΑΣΜΟΣ ══
+const CODE_TTL_MS = 15 * 60 * 1000;          // ο κωδικός ζει 15′
+const TOKEN_TTL_MS = 7 * 24 * 3600 * 1000;   // το token 7 μέρες: η εγγραφή μπορεί να γίνει χωρίς δίκτυο αργότερα
+const CODE_MAX_TRIES = 5;                    // λάθη ανά κωδικό
+const CODE_PER_EMAIL_HOUR = 3;               // αποστολές ανά email/ώρα
+const CODE_PER_IP_HOUR = 10;                 // αποστολές ανά IP/ώρα (μόνο hash, ποτέ η IP)
+
+// «Είναι πιασμένο;» — null = ελεύθερο · 'taken' · 'pending_delete'.
+// Ο λογαριασμός σε αίτημα διαγραφής ΚΡΑΤΑΕΙ το email ως τη λήξη των 72 ωρών.
+async function emailBusy(env, email) {
+  const row = await env.DB.prepare(
+    "SELECT delete_due_at FROM km_accounts WHERE email = ? AND deleted IS NULL LIMIT 1"
+  ).bind(email).first();
+  if (!row) return null;
+  return row.delete_due_at ? "pending_delete" : "taken";
+}
+
+function sixDigits() {
+  const a = new Uint32Array(1);
+  crypto.getRandomValues(a);
+  return String(a[0] % 1000000).padStart(6, "0");
+}
+
+// Εκδίδει token επιβεβαιωμένου email. Επιστρέφει το ΚΑΘΑΡΟ token (φεύγει μία
+// φορά προς τη συσκευή)· η βάση κρατάει μόνο το hash. Εξάγεται για τα τεστ.
+export async function issueEmailToken(env, email) {
+  const raw = Array.from(crypto.getRandomValues(new Uint8Array(32))).map((x) => x.toString(16).padStart(2, "0")).join("");
+  const t = Date.now();
+  await env.DB.prepare(
+    "INSERT INTO km_email_tokens (token_hash, email, created, expires, used) VALUES (?, ?, ?, ?, NULL)"
+  ).bind(await sha256hex(raw), email, new Date(t).toISOString(), new Date(t + TOKEN_TTL_MS).toISOString()).run();
+  return raw;
+}
+
+// Έγκυρο, αχρησιμοποίητο, ίδιο email, όχι ληγμένο → επιστρέφει το hash. Αλλιώς null.
+async function tokenFor(env, raw, email) {
+  const r = String(raw || "").toLowerCase();
+  if (!HEX64.test(r)) return null;
+  const h = await sha256hex(r);
+  const row = await env.DB.prepare("SELECT * FROM km_email_tokens WHERE token_hash = ?").bind(h).first();
+  if (!row || row.used || row.email !== email) return null;
+  if (row.expires < now()) return null;
+  return h;
+}
+
+async function emailCode(request, env) {
+  const b = (await safeJson(request)) || {};
+  const email = normEmail(b.email);
+  if (!email) return json({ ok: false, error: "bad_email" }, 400);
+  const busy = await emailBusy(env, email);
+  if (busy) return json({ ok: false, error: busy }, 409);
+
+  const t = Date.now();
+  const hourAgo = new Date(t - 3600 * 1000).toISOString();
+  // Καθάρισμα: τίποτα δεν ζει πάνω από 24 ώρες εδώ μέσα.
+  await env.DB.prepare("DELETE FROM km_email_codes WHERE created < ?").bind(new Date(t - 24 * 3600 * 1000).toISOString()).run();
+
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  const ipH = ip ? await sha256hex(ip + "|" + new Date(t).toISOString().slice(0, 10) + "|" + (env.KM_ADMIN_KEY || "km")) : null;
+  const nEmail = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_email_codes WHERE email = ? AND created >= ?").bind(email, hourAgo).first();
+  if (nEmail && nEmail.n >= CODE_PER_EMAIL_HOUR) return json({ ok: false, error: "too_many" }, 429);
+  if (ipH) {
+    const nIp = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_email_codes WHERE ip_h = ? AND created >= ?").bind(ipH, hourAgo).first();
+    if (nIp && nIp.n >= CODE_PER_IP_HOUR) return json({ ok: false, error: "too_many" }, 429);
+  }
+
+  const code = sixDigits();
+  await env.DB.prepare(
+    "INSERT INTO km_email_codes (email, code_hash, created, expires, attempts, ip_h) VALUES (?, ?, ?, ?, 0, ?)"
+  ).bind(email, await sha256hex(email + ":" + code), new Date(t).toISOString(), new Date(t + CODE_TTL_MS).toISOString(), ipH).run();
+  // Εδώ ΠΕΡΙΜΕΝΟΥΜΕ την αποστολή: χωρίς email ο χρήστης δεν προχωρά, άρα
+  // πρέπει να ξέρει ΤΩΡΑ ότι απέτυχε — όχι να κοιτάει άδειο inbox.
+  const sent = await mailSend(env, "code", email, { code });
+  if (!sent) return json({ ok: false, error: "mail_failed" }, 502);
+  return json({ ok: true, sent: true, ttl_min: CODE_TTL_MS / 60000 });
+}
+
+async function emailVerify(request, env) {
+  const b = (await safeJson(request)) || {};
+  const email = normEmail(b.email);
+  const code = String(b.code || "").replace(/\D/g, "");
+  if (!email || code.length !== 6) return json({ ok: false, error: "bad_code" }, 400);
+  const row = await env.DB.prepare(
+    "SELECT * FROM km_email_codes WHERE email = ? ORDER BY id DESC LIMIT 1"
+  ).bind(email).first();
+  if (!row) return json({ ok: false, error: "no_code" }, 400);
+  if (row.expires < now()) return json({ ok: false, error: "code_expired" }, 400);
+  if (row.attempts >= CODE_MAX_TRIES) return json({ ok: false, error: "too_many" }, 429);
+  if ((await sha256hex(email + ":" + code)) !== row.code_hash) {
+    await env.DB.prepare("UPDATE km_email_codes SET attempts = attempts + 1 WHERE id = ?").bind(row.id).run();
+    return json({ ok: false, error: "bad_code", left: Math.max(0, CODE_MAX_TRIES - row.attempts - 1) }, 400);
+  }
+  // Ξαναελέγχεται: στο μεταξύ κάποιος μπορεί να γράφτηκε με το ίδιο email.
+  const busy = await emailBusy(env, email);
+  if (busy) return json({ ok: false, error: busy }, 409);
+  await env.DB.prepare("DELETE FROM km_email_codes WHERE email = ?").bind(email).run();
+  return json({ ok: true, email_token: await issueEmailToken(env, email) });
+}
+
+// «Υπάρχει αυτός ο κωδικός πρόσκλησης;» — ΜΟΝΟ ναι/όχι, κανένα στοιχείο του κατόχου.
+async function refCheck(request, env) {
+  const code = normRef(new URL(request.url).searchParams.get("code"));
+  if (!code || !/^[A-Z0-9]{4,40}$/.test(code)) return json({ ok: true, exists: false });
+  const row = await env.DB.prepare(
+    "SELECT 1 AS x FROM km_accounts WHERE ref_code = ? AND deleted IS NULL LIMIT 1"
+  ).bind(code).first();
+  return json({ ok: true, exists: !!row });
+}
+
+// KM-MANIFEST-REF — Το iPhone ανοίγει το εικονίδιο στο start_url του manifest,
+// με ΞΕΧΩΡΙΣΤΗ μνήμη από το Safari. Μετρήθηκε 23/9: το «Add to Home Screen»
+// έδειξε σκέτο /kostometro/ ενώ η σελίδα είχε ?ref= → η σύσταση χάθηκε.
+// Εδώ το start_url ΚΟΥΒΑΛΑΕΙ ref/src. Το "id" μένει σταθερό, ώστε η εφαρμογή
+// να είναι ΜΙΑ για το λειτουργικό, όποιος κι αν ήταν ο σύνδεσμος.
+function manifestFor(request) {
+  const q = new URL(request.url).searchParams;
+  const ref = (q.get("ref") || "").toUpperCase();
+  const src = q.get("src") || "";
+  const parts = [];
+  if (/^[A-Z0-9]{4,40}$/.test(ref)) parts.push("ref=" + ref);
+  if (/^[A-Za-z0-9:_-]{1,40}$/.test(src)) parts.push("src=" + src);
+  const body = {
+    id: "/kostometro/",
+    name: "Kostometro",
+    short_name: "Kostometro",
+    description: "Φωτογραφίζεις το τιμολόγιο στην παραλαβή. Κρατάς τι πλήρωσες, ανά προμηθευτή.",
+    lang: "el", dir: "ltr",
+    start_url: "/kostometro/" + (parts.length ? "?" + parts.join("&") : ""),
+    scope: "/kostometro/",
+    display: "standalone",
+    background_color: "#0a0e14", theme_color: "#0a0e14",
+    icons: [
+      { src: "/kostometro/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/kostometro/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/kostometro/icons/icon-512-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
+  };
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/manifest+json; charset=utf-8", "Cache-Control": "no-store" },
+  });
+}
+
 // Εγγραφή ΚΑΙ είσοδος: το ίδιο route.
 //  - folder_id άγνωστο  -> νέος λογαριασμός, αυτή η συσκευή ενεργή.
 //  - folder_id γνωστό + σωστό auth -> προστίθεται η συσκευή και ΓΙΝΕΤΑΙ ενεργή
@@ -482,6 +634,14 @@ async function register(request, env) {
   const ts = now();
 
   if (!acc) {
+    /* Brief ΣΤ · KM-ONE-EMAIL — ΝΕΟΣ λογαριασμός ΜΟΝΟ με επιβεβαιωμένο email
+       και ΜΟΝΟ αν το email δεν έχει ήδη ζωντανό λογαριασμό. Ο υπάρχων
+       λογαριασμός (κάτω) δεν αγγίζεται: η είσοδος με τις 12 λέξεις δουλεύει
+       όπως πάντα. Μετρήθηκε 23–24/9: το ίδιο email έφτιαξε 3 λογαριασμούς. */
+    const tok = await tokenFor(env, b.email_token, email);
+    if (!tok) return json({ ok: false, error: "email_unverified" }, 403);
+    const busy = await emailBusy(env, email);
+    if (busy) return json({ ok: false, error: busy }, 409);
     const wrapped = (clean(b.wrapped_k, 130) || "").toLowerCase();
     if (id.lock && !HEX120.test(wrapped)) return json({ ok: false, error: "bad_wrapped_k" }, 400);
     if (id.lock) {
@@ -515,7 +675,15 @@ async function register(request, env) {
          VALUES (?, ?, 'words', ?, ?, ?, ?, ?)`
       ).bind(id.lock, id.folder, h, wrapped, ts, id.device, clean(b.lock_label, 40)));
     }
-    await env.DB.batch(stmts);
+    // Το token καίγεται ΜΑΖΙ με τη δημιουργία — ένα token, ένας λογαριασμός.
+    stmts.push(env.DB.prepare("UPDATE km_email_tokens SET used = ? WHERE token_hash = ?").bind(ts, tok));
+    try {
+      await env.DB.batch(stmts);
+    } catch (e) {
+      // Ταυτόχρονη εγγραφή του ίδιου email: το μοναδικό index είναι ο τελικός φρουρός.
+      if (/unique|constraint/i.test(String((e && e.message) || e))) return json({ ok: false, error: "taken" }, 409);
+      throw e;
+    }
     await touchDevice(env, request, id, b.device_name);
     const fresh = await env.DB.prepare("SELECT * FROM km_accounts WHERE folder_id = ?").bind(id.folder).first();
     return json({ ok: true, account: "new", state: pub(fresh), has_lock: !!id.lock });
@@ -1899,6 +2067,19 @@ function mailBody(kind, extra) {
     };
   }
 
+  // Brief ΣΤ · ο κωδικός επιβεβαίωσης. Κανένας σύνδεσμος: μόνο τα 6 ψηφία.
+  if (kind === "code") {
+    return {
+      subject: "Ο κωδικός σου για το Kostometro: " + x.code + " · Your Kostometro code",
+      el: "Ο κωδικός σου για το Kostometro είναι: " + x.code + "." +
+          " Γράψ' τον στην εφαρμογή μέσα σε 15 λεπτά." +
+          " Αν δεν ζήτησες εσύ εγγραφή, αγνόησε αυτό το μήνυμα — δεν γίνεται τίποτα χωρίς τον κωδικό.",
+      en: "Your Kostometro code is: " + x.code + "." +
+          " Enter it in the app within 15 minutes." +
+          " If you did not try to sign up, ignore this message — nothing happens without the code.",
+    };
+  }
+
   if (kind === "deleted") {
     return {
       subject: "Ο λογαριασμός σου στο Kostometro διαγράφηκε · Your Kostometro account was deleted",
@@ -1929,6 +2110,7 @@ export async function mailSend(env, kind, to, extra) {
         "INSERT INTO km_mail_log (kind, ok, err, msg_id, at) VALUES (?, ?, ?, ?, ?)"
       ).bind(kind, ok ? 1 : 0, err || null, msgId || null, t).run();
     } catch (e) { /* ούτε η καταγραφή επιτρέπεται να ρίξει την πράξη */ }
+    return !!ok;   // Brief ΣΤ: ο κωδικός email χρειάζεται να ξέρει αν έφυγε
   };
 
   const dest = normEmail(to);
