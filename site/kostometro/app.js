@@ -9,6 +9,8 @@
   'use strict';
 
   var LS = {
+    /* v89 · KM-UPD-TOAST — ποια έκδοση είδε ο χρήστης τελευταία στην κάμερα */
+    seenVer: 'km_seen_ver',
     email: 'km_email',
     key:   'km_key',
     skip:  'km_key_skipped',
@@ -330,6 +332,7 @@
        ΚΑΘΕ διαδρομή μπαίνει στο ΕΝΑ σημείο απ' όπου περνάνε όλες. */
     if (id === 's-email') { renderConsent(); }
     if (id === 's-acc')   { accWarn(); }
+    if (id === 's-cam')   { updToast(); }
   }
   /* ══ v75 · Ο ΦΡΟΥΡΟΣ ΤΟΥ ΔΙΠΛΟΥ ΛΟΓΑΡΙΑΣΜΟΥ ΣΤΟ iPHONE (20/9/2026) ════
      KM-ACC-WARN-IOS   ← λατινικός δείκτης για το findstr του deploy .bat
@@ -2115,7 +2118,15 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v88';
+  var APP_VER = 'φέτα 3 · v89';
+  /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
+     εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
+     χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
+  try {
+    if (!localStorage.getItem(LS.seenVer) && !localStorage.getItem(LS.folder) && !localStorage.getItem(LS.reg)) {
+      localStorage.setItem(LS.seenVer, shortVer(APP_VER));
+    }
+  } catch (e) {}
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -5516,14 +5527,62 @@
      ζητάει ενημέρωση και ξαναφορτώνει ΜΙΑ φορά. Το «μία φορά» φυλάγεται σε
      sessionStorage: αν κάτι πάει στραβά, χάνεται μία ανανέωση, όχι ο χρήστης
      σε ατέρμονο βρόχο. */
-  var srvVer = null;
+  var srvVer = null, srvNote = '';
   function shortVer(v) { var m = /v\d+/.exec(v || ''); return m ? m[0] : (v || '—'); }
   function serverVersion() {
     return fetch('/kostometro/version.json?nc=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { srvVer = (j && j.v) || null; return srvVer; })
+      .then(function (j) {
+        srvVer = (j && j.v) || null;
+        srvNote = (j && typeof j.note === 'string') ? j.note.slice(0, 90) : '';   // v89
+        return srvVer;
+      })
       .catch(function () { return null; });
   }
+  /* ══ v89 · KM-UPD-TOAST — «ΕΝΗΜΕΡΩΘΗΚΕ · vNN» ΣΤΗΝ ΚΑΜΕΡΑ (πρόταση Stavros 25/9/2026) ══
+     Σήμερα η ενημέρωση γίνεται ΑΟΡΑΤΑ (ρολόι έκδοσης v30 + reload). Ο χρήστης
+     δεν μαθαίνει ποτέ ότι κάτι άλλαξε. Εδώ: ΜΙΑ φορά ανά έκδοση, την πρώτη
+     φορά που φτάνει στην κάμερα, 3″, φεύγει και με άγγιγμα.
+     🔴 ΠΟΤΕ στην πρώτη εγκατάσταση: ο καινούργιος χρήστης δεν «ενημέρωσε» τίποτα.
+        Πρώτη εγκατάσταση = δεν υπάρχει ούτε σημάδι έκδοσης ούτε λογαριασμός/φάκελος.
+     ⚠ Η γραμμή «τι νέο» έρχεται από το version.json (πεδίο note). Κενή = σκέτο «Ενημερώθηκε · vNN». */
+  var updDone = false;
+  function updDecide(seen, cur, existing) {
+    if (seen === cur) { return false; }
+    if (!seen && !existing) { return false; }
+    return true;
+  }
+  function updToast() {
+    if (updDone) { return; }
+    updDone = true;
+    var cur = shortVer(APP_VER), seen = null, existing = false;
+    try {
+      seen = localStorage.getItem(LS.seenVer);
+      existing = !!(localStorage.getItem(LS.reg) || localStorage.getItem(LS.folder));
+      localStorage.setItem(LS.seenVer, cur);
+    } catch (e) { return; }
+    if (!updDecide(seen, cur, existing)) { return; }
+    var box = el('upd-toast');
+    if (!box) { return; }
+    var wait = srvVer ? Promise.resolve() : Promise.race([serverVersion(), new Promise(function (r) { setTimeout(r, 1500); })]);
+    wait.then(function () {
+      el('upd-ver').textContent = 'Ενημερώθηκε · ' + cur;
+      var note = (srvVer === cur) ? srvNote : '';
+      el('upd-note').textContent = note;
+      el('upd-note').hidden = !note;
+      box.hidden = false;
+      requestAnimationFrame(function () { box.classList.add('on'); });
+      var gone = false;
+      var hide = function () {
+        if (gone) { return; } gone = true;
+        box.classList.remove('on');
+        setTimeout(function () { box.hidden = true; }, 350);
+      };
+      box.onclick = hide;
+      setTimeout(hide, 3000);
+    });
+  }
+
   function checkVersion(force) {
     return serverVersion().then(function (v) {
       if (!v || v === shortVer(APP_VER)) { return false; }
