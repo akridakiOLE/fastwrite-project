@@ -656,7 +656,7 @@ async function register(request, env) {
       ).bind(
         id.folder, h, email, ts,
         (request.cf && request.cf.country) || null,
-        clean(b.source, 20) || "link",
+        clean(b.source, 20) || "direct",   // KM-SRC-DIRECT 25/9: όχι «link»
         normRef(b.ref),
         b.has_key ? 1 : 0,
         id.device, ts,
@@ -1711,6 +1711,27 @@ async function adminDue(request, env, doIt) {
 // από το κινητό, όπως το Kostometro (αίτημα 16/9/2026).
 // ═══════════════════════════════════════════════════════════════════════════
 
+/* KM-PK-CALDAY — 25/9/2026 (απόφαση Stavros): τα κουτιά του Πίνακα μετράνε
+   ΗΜΕΡΟΛΟΓΙΑΚΕΣ μέρες ΩΡΑ ΚΥΠΡΟΥ. «Σήμερα» = από τα μεσάνυχτα Κύπρου, όχι
+   «24 ώρες πίσω» — αυτό έδειχνε «1 σήμερα» για λογαριασμό της χθεσινής
+   νύχτας. «7 ημέρες» = σήμερα + 6 προηγούμενες. Η θερινή/χειμερινή ώρα
+   (UTC+3/UTC+2) λύνεται από το Intl, όχι από καρφωμένη διαφορά. */
+const CY_TZ = "Asia/Nicosia";
+const CY_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: CY_TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+function cyDate(iso) { return CY_FMT.format(new Date(iso)); }
+function cyShift(ymd, n) {
+  const d = new Date(ymd + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function cyMidnightUtc(ymd) {
+  const base = new Date(ymd + "T00:00:00Z").getTime();
+  for (let off = -14; off <= 14; off++) {
+    const t = base - off * 3600e3;
+    if (cyDate(t) === ymd && cyDate(t - 1) !== ymd) return new Date(t).toISOString();
+  }
+  return new Date(base).toISOString();
+}
+
 function daysAgo(n, from) {
   const d = from ? new Date(from) : new Date();
   d.setUTCDate(d.getUTCDate() - n);
@@ -1752,7 +1773,8 @@ async function adminPinakas(request, env) {
   const params = new URL(request.url).searchParams;
   const only = (params.get("only") || "").slice(0, 4);
   const nowIso = params.get("now") || now();
-  const d7 = daysAgo(7, nowIso), d30 = daysAgo(30, nowIso), d1 = daysAgo(1, nowIso);
+  const today = cyDate(nowIso);
+  const d1 = cyMidnightUtc(today), d7 = cyMidnightUtc(cyShift(today, -6)), d30 = cyMidnightUtc(cyShift(today, -29));
   const one = async (sql, ...args) => ((await env.DB.prepare(sql).bind(...args).first()) || {});
   const all = async (sql, ...args) => (await env.DB.prepare(sql).bind(...args).all()).results || [];
 
@@ -1798,9 +1820,21 @@ async function adminPinakas(request, env) {
      WHERE deleted IS NULL AND ref IS NOT NULL AND ref <> '' GROUP BY ref ORDER BY n DESC LIMIT 50`);
 
   // ── ανά ημέρα, 30 ημέρες ──────────────────────────────────────────────
-  const perDay = await all(
-    `SELECT substr(created, 1, 10) AS day, COUNT(*) AS n
-     FROM km_accounts WHERE created >= ? GROUP BY day ORDER BY day`, d30);
+  /* KM-PK-CALDAY — ανά ΩΡΑ από τη βάση (το πολύ 720 γραμμές, όσοι κι αν
+     γραφτούν), ανά ΜΕΡΑ ΚΥΠΡΟΥ εδώ. Η Κύπρος έχει ακέραιη διαφορά ωρών, άρα η
+     ώρα UTC πέφτει ολόκληρη σε μία μέρα Κύπρου. Μετράει ΟΛΕΣ τις εγγραφές και
+     χωριστά όσες διαγράφηκαν μετά (gone) — τα δύο σύνολα λένε την ίδια αλήθεια. */
+  const perHour = await all(
+    `SELECT substr(created, 1, 13) AS h, COUNT(*) AS n,
+            SUM(CASE WHEN deleted IS NOT NULL THEN 1 ELSE 0 END) AS gone
+     FROM km_accounts WHERE created >= ? GROUP BY h`, d30);
+  const perDay = [], dayIdx = {};
+  for (let i = 29; i >= 0; i--) { const day = cyShift(today, -i); dayIdx[day] = perDay.length; perDay.push({ day, n: 0, gone: 0 }); }
+  for (const r of perHour) {
+    const k = dayIdx[cyDate(r.h + ":00:00Z")];
+    if (k === undefined) continue;
+    perDay[k].n += Number(r.n) || 0; perDay[k].gone += Number(r.gone) || 0;
+  }
 
   // ── χώρες ─────────────────────────────────────────────────────────────
   const byCountry = await all(
@@ -1844,6 +1878,7 @@ async function adminPinakas(request, env) {
   return json({
     ok: true,
     at: nowIso,
+    today: today,
     fastwrite,
     totals: {
       live: tot.live || 0, tombstones: tot.tombstones || 0, pending_delete: tot.pending_delete || 0,

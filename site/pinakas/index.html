@@ -66,6 +66,13 @@
   .days .d{flex:1;background:var(--accent);opacity:.75;border-radius:2px 2px 0 0;min-height:2px}
   .days .d.zero{background:var(--bg3);opacity:1}
   .days-lab{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:4px}
+  .days .d{cursor:pointer;position:relative}
+  .days .d.on{opacity:1;outline:2px solid var(--text);outline-offset:1px}
+  .days .d.zero.on{background:var(--text3)}
+  .days-sel{font-size:13px;margin:2px 0 6px;min-height:18px}
+  .days-ax{display:flex;gap:2px;margin-top:4px}
+  .days-ax span{flex:1;text-align:center;font-size:10px;color:var(--text3);white-space:nowrap;overflow:visible;border-top:2px solid transparent;padding-top:2px}
+  .days-ax span.mon{border-top-color:var(--text3)}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--border);vertical-align:top}
   th{color:var(--text3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
@@ -197,21 +204,26 @@ html:not([data-gate]) #s-data  { display: none !important; }
     <div class="grid">
       <div class="kpi acc"><div class="n" id="k-live">—</div><div class="l">ζωντανοί</div></div>
       <div class="kpi"><div class="n" id="k-new1">—</div><div class="l">νέοι σήμερα</div></div>
-      <div class="kpi"><div class="n" id="k-new7">—</div><div class="l">νέοι 7 ημ.</div></div>
-      <div class="kpi"><div class="n" id="k-new30">—</div><div class="l">νέοι 30 ημ.</div></div>
-      <div class="kpi"><div class="n" id="k-act7">—</div><div class="l">ενεργοί 7 ημ.</div></div>
+      <div class="kpi"><div class="n" id="k-new7">—</div><div class="l">νέοι 7 ημέρες</div></div>
+      <div class="kpi"><div class="n" id="k-new30">—</div><div class="l">νέοι 30 ημέρες</div></div>
+      <div class="kpi"><div class="n" id="k-act7">—</div><div class="l">ανέβασαν κάτι · 7 ημέρες</div></div>
       <div class="kpi"><div class="n" id="k-data">—</div><div class="l">με δεδομένα</div></div>
       <div class="kpi warn"><div class="n" id="k-pend">—</div><div class="l">εκκρεμείς διαγραφές</div></div>
       <div class="kpi"><div class="n" id="k-tomb">—</div><div class="l">διαγραμμένοι</div></div>
     </div>
-    <p class="fine hint" style="margin-top:10px">Χώρος στον server: <b id="k-bytes">—</b> · με κλειδί Gemini: <b id="k-gem">—</b></p>
+    <p class="fine hint" style="margin-top:10px">Χώρος στον server (φάκελοι, χωρίς φωτογραφίες): <b id="k-bytes">—</b> · δήλωσαν κλειδί Gemini: <b id="k-gem">—</b></p>
+    <!-- KM-PK-CALDAY · 25/9/2026 -->
+    <p class="fine hint">Ημερολογιακές μέρες, ώρα Κύπρου: «σήμερα» από τα μεσάνυχτα · «7 ημέρες» = σήμερα και οι 6 προηγούμενες.</p>
   </section>
 
   <!-- ΑΝΑ ΗΜΕΡΑ -->
   <section class="card">
-    <h2>Νέες εγγραφές — 30 ημέρες</h2>
-    <div class="days" id="days"></div>
-    <div class="days-lab"><span id="days-from"></span><span id="days-to"></span></div>
+    <h2>Νέες εγγραφές ανά ημέρα — 30 ημέρες</h2>
+    <!-- KM-PK-DAYTAP · 25/9/2026: πάτημα (δάχτυλο ή ποντίκι) → ημέρα + αριθμός.
+         Το title="" έδειχνε αριθμό ΜΟΝΟ με ποντίκι· στο κινητό τίποτα. -->
+    <p class="days-sel" id="days-sel">πάτα μια μπάρα</p>
+    <div class="days" id="days" role="list"></div>
+    <div class="days-ax" id="days-ax"></div>
   </section>
 
   <!-- (α) ΑΠΟ ΠΟΥ -->
@@ -316,15 +328,35 @@ html:not([data-gate]) #s-data  { display: none !important; }
     <h2>Χρήστες</h2>
     <div class="grid">
       <div class="kpi acc"><div class="n" id="f-users">—</div><div class="l">λογαριασμοί</div></div>
-      <div class="kpi"><div class="n" id="f-active">—</div><div class="l">ενεργοί</div></div>
+      <div class="kpi"><div class="n" id="f-active">—</div><div class="l">ενεργοποιημένοι</div></div>
       <div class="kpi"><div class="n" id="f-new7">—</div><div class="l">νέοι 7 ημ.</div></div>
       <div class="kpi"><div class="n" id="f-new30">—</div><div class="l">νέοι 30 ημ.</div></div>
       <div class="kpi"><div class="n" id="f-inst">—</div><div class="l">εγκαταστάσεις</div></div>
-      <div class="kpi"><div class="n" id="f-seen7">—</div><div class="l">είδαμε 7 ημ.</div></div>
-      <div class="kpi"><div class="n" id="f-docs">—</div><div class="l">έγγραφα</div></div>
+      <div class="kpi"><div class="n" id="f-seen7">—</div><div class="l">άνοιξαν · 7 ημ.</div></div>
+      <div class="kpi"><div class="n" id="f-docs">—</div><div class="l">έγγραφα τοπικά (εγκαταστάσεις)</div></div>
       <div class="kpi acc"><div class="n" id="f-pay">—</div><div class="l">πληρώνουν</div></div>
     </div>
     <p class="fine hint" style="margin-top:10px" id="f-more"></p>
+  </section>
+
+  <!-- KM-PK-FWLINKS · 25/9/2026 (απόφαση Stavros): το FastWrite είναι ΚΟΜΒΟΣ
+       ανάμεσα σε πολλές επιχειρήσεις. Τα κουτιά υπάρχουν από σήμερα και λένε
+       «—» μέχρι να χτιστεί η σύνδεση PRO ↔ FastWrite· τότε γεμίζουν από το
+       πεδίο fastwrite.links, χωρίς αλλαγή στην οθόνη. -->
+  <section class="card" id="fw-links">
+    <h2>Ανά FastWrite — συνδεδεμένες επιχειρήσεις <span class="pill" id="fl-state">συνδέεται με το PRO</span></h2>
+    <div class="grid">
+      <div class="kpi acc"><div class="n" id="fl-fw">—</div><div class="l">FastWrite με ≥1 επιχείρηση</div></div>
+      <div class="kpi"><div class="n" id="fl-biz">—</div><div class="l">συνδεδεμένες επιχειρήσεις</div></div>
+      <div class="kpi"><div class="n" id="fl-avg">—</div><div class="l">μέσος όρος ανά FastWrite</div></div>
+      <div class="kpi"><div class="n" id="fl-max">—</div><div class="l">μέγιστο ανά FastWrite</div></div>
+      <div class="kpi"><div class="n" id="fl-users">—</div><div class="l">χρήστες Boss · Admin · User</div></div>
+      <div class="kpi"><div class="n" id="fl-km7">—</div><div class="l">έγγραφα από Kostometro · 7 ημ.</div></div>
+      <div class="kpi"><div class="n" id="fl-km30">—</div><div class="l">έγγραφα από Kostometro · 30 ημ.</div></div>
+      <div class="kpi"><div class="n" id="fl-oth30">—</div><div class="l">έγγραφα PDF / χειροκίνητα · 30 ημ.</div></div>
+    </div>
+    <div class="scroll" style="margin-top:10px"><table><thead><tr><th>FastWrite</th><th>επιχειρήσεις</th><th>χρήστες</th><th>Kostometro 30 ημ.</th><th>PDF/χειρ. 30 ημ.</th><th>τελευταία λήψη</th></tr></thead>
+      <tbody id="fl-rows"><tr><td colspan="6" class="muted">Η σύνδεση PRO ↔ FastWrite δεν έχει χτιστεί ακόμα — τα κουτιά γεμίζουν μόλις χτιστεί.</td></tr></tbody></table></div>
   </section>
 
   <section class="card" id="fw-c2">

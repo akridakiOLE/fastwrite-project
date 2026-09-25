@@ -36,7 +36,7 @@ check("Ν87-3 · το «πίσω» γυρίζει στο ιστορικό ΜΟΝ
   if (!guide.includes("r.indexOf(location.origin + '/kostometro/') === 0")) throw new Error("χωρίς έλεγχο προέλευσης");
   if (!guide.includes('id="back" href="/kostometro/"')) throw new Error("χωρίς εφεδρικό σύνδεσμο");
 });
-check("Ν87-4 · δείκτης", () => { if (!guide.includes("KM-KLEIDI-BACK2")) throw new Error("δείκτης"); if (!js.includes("φέτα 3 · v87")) throw new Error("έκδοση"); });
+check("Ν87-4 · δείκτης", () => { if (!guide.includes("KM-KLEIDI-BACK2")) throw new Error("δείκτης"); if (!/φέτα 3 · v(8[7-9]|9\d)/.test(js)) throw new Error("έκδοση"); });
 if (ONLY) { if (fails) { console.log("Μ" + ONLY + ": κοκκίνισε ✓"); process.exit(0); } console.log("Μ" + ONLY + ": ΠΕΡΑΣΕ ΠΡΑΣΙΝΟ"); process.exit(1); }
 if (fails) { console.log("\n" + fails + " ΑΠΕΤΥΧΑΝ"); process.exit(1); }
 console.log("\n✔ ΟΛΑ ΠΕΡΑΣΑΝ (4)");

@@ -119,6 +119,72 @@
     return Math.floor(h / 24) + ' ημ.';
   }
   function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  /* KM-SRC-DIRECT · 25/9/2026 — τα ονόματα προέλευσης στα ελληνικά. Άγνωστη
+     τιμή φαίνεται ωμή: δεν κρύβεται ποτέ κανάλι επειδή δεν το περιμέναμε. */
+  var SRC_LAB = { direct: 'Άμεση επίσκεψη', ref: 'Σύσταση', leads: 'Leads καμπάνιας', fasi3: 'Fasi3',
+    fb: 'Facebook', li: 'LinkedIn', ig: 'Instagram', 'store:play': 'Google Play', 'store:ms': 'Microsoft Store',
+    link: 'link (παλιό, πριν τη v88)' };
+  function srcLab(v) { return SRC_LAB[v] || v; }
+
+  var WD = ['Κυρ', 'Δευ', 'Τρί', 'Τετ', 'Πέμ', 'Παρ', 'Σάβ'];
+  var daysNow = [], daySel = -1;
+  function dayWd(ymd) { return new Date(ymd + 'T12:00:00Z').getUTCDay(); }
+  function dayTxt(x) {
+    var p = x.day.split('-');
+    var t = WD[dayWd(x.day)] + ' ' + p[2] + '/' + p[1] + ' · <b>' + x.n + '</b> ' + (x.n === 1 ? 'εγγραφή' : 'εγγραφές');
+    if (x.gone) { t += ' · ' + x.gone + ' ' + (x.gone === 1 ? 'διαγράφηκε' : 'διαγράφηκαν') + ' αργότερα'; }
+    return t;
+  }
+  function daySelect(i) {
+    daySel = i;
+    var ds = el('days').children;
+    for (var k = 0; k < ds.length; k++) { ds[k].classList.toggle('on', k === i); }
+    el('days-sel').innerHTML = daysNow[i] ? dayTxt(daysNow[i]) : 'πάτα μια μπάρα';
+  }
+  function daysPaint(days) {
+    daysNow = days;
+    var mx = Math.max.apply(null, days.map(function (x) { return x.n; }).concat([1]));
+    el('days').innerHTML = days.map(function (x, i) {
+      return '<div class="d' + (x.n ? '' : ' zero') + '" role="listitem" data-i="' + i + '" style="height:' +
+        (x.n ? Math.max(6, Math.round(100 * x.n / mx)) : 3) + '%"></div>';
+    }).join('');
+    /* ημερομηνία κάθε 5 μέρες, μετρώντας από το σήμερα· γραμμή πάνω από κάθε Δευτέρα */
+    var L = days.length;
+    el('days-ax').innerHTML = days.map(function (x, i) {
+      var show = (L - 1 - i) % 5 === 0;
+      var p = x.day.split('-');
+      return '<span' + (dayWd(x.day) === 1 ? ' class="mon"' : '') + '>' + (show ? (i === L - 1 ? 'σήμ.' : p[2] + '/' + p[1]) : '') + '</span>';
+    }).join('');
+    daySelect(daySel >= 0 && daySel < L ? daySel : L - 1);
+  }
+
+  /* KM-PK-FWLINKS · 25/9/2026 — η ζώνη «ανά FastWrite». Χωρίς πεδίο links
+     από τον server = η σύνδεση PRO ↔ FastWrite δεν υπάρχει ακόμα: «—», όχι 0.
+     Το 0 θα έλεγε ψέματα («μετρήσαμε και δεν βρήκαμε»). */
+  function fwLinks(L) {
+    var ids = ['fl-fw', 'fl-biz', 'fl-avg', 'fl-max', 'fl-users', 'fl-km7', 'fl-km30', 'fl-oth30'];
+    if (!L) {
+      ids.forEach(function (id) { el(id).textContent = '—'; });
+      el('fl-state').hidden = false;
+      return;
+    }
+    el('fl-state').hidden = true;
+    var u = L.users || {};
+    el('fl-fw').textContent = L.fw_with_biz || 0;
+    el('fl-biz').textContent = L.biz_total || 0;
+    el('fl-avg').textContent = L.biz_avg === null || L.biz_avg === undefined ? '—' : Number(L.biz_avg).toFixed(1);
+    el('fl-max').textContent = L.biz_max || 0;
+    el('fl-users').textContent = (u.boss || 0) + ' · ' + (u.admin || 0) + ' · ' + (u.user || 0);
+    el('fl-km7').textContent = L.docs_km_7d || 0;
+    el('fl-km30').textContent = L.docs_km_30d || 0;
+    el('fl-oth30').textContent = L.docs_other_30d || 0;
+    var rows = L.per_fw || [];
+    el('fl-rows').innerHTML = rows.length ? rows.map(function (r) {
+      return '<tr><td class="mono">' + esc(r.fw_id) + '</td><td><b>' + (r.biz || 0) + '</b></td><td>' + (r.users || 0) +
+        '</td><td>' + (r.docs_km_30d || 0) + '</td><td>' + (r.docs_other_30d || 0) + '</td><td>' + (r.last_pull ? fmtDate(r.last_pull) : '—') + '</td></tr>';
+    }).join('') : '<tr><td colspan="6" class="muted">κανένα FastWrite με συνδεδεμένη επιχείρηση ακόμα</td></tr>';
+  }
+
   function bars(host, rows, labKey) {
     if (!rows || !rows.length) { host.innerHTML = '<p class="fine muted">τίποτα ακόμα</p>'; return; }
     var max = Math.max.apply(null, rows.map(function (r) { return r.n; })) || 1;
@@ -156,24 +222,14 @@
     el('k-bytes').textContent = fmtBytes(t.bytes);
     el('k-gem').textContent = t.with_gemini_key;
 
-    /* 30 ημέρες — γεμίζουμε ΚΑΙ τις άδειες μέρες, αλλιώς το γράφημα λέει ψέματα
-       (τρεις εγγραφές σε τρεις διαδοχικές στήλες μοιάζουν με τρεις συνεχόμενες
-       μέρες ακόμα κι αν είναι 1/9, 12/9, 15/9). */
-    var byDay = {}; (j.per_day || []).forEach(function (r) { byDay[r.day] = r.n; });
-    var days = [], today = new Date(j.at);
-    for (var i = 29; i >= 0; i--) {
-      var d = new Date(today); d.setUTCDate(d.getUTCDate() - i);
-      var k = d.toISOString().slice(0, 10);
-      days.push({ day: k, n: byDay[k] || 0 });
-    }
-    var mx = Math.max.apply(null, days.map(function (x) { return x.n; })) || 1;
-    el('days').innerHTML = days.map(function (x) {
-      return '<div class="d' + (x.n ? '' : ' zero') + '" style="height:' + (x.n ? Math.max(6, Math.round(100 * x.n / mx)) : 3) + '%" title="' + x.day + ': ' + x.n + '"></div>';
-    }).join('');
-    el('days-from').textContent = days[0].day.slice(5).split('-').reverse().join('/');
-    el('days-to').textContent = 'σήμερα';
+    /* KM-PK-DAYTAP · 25/9/2026 — οι 30 μέρες έρχονται ΕΤΟΙΜΕΣ από τον server,
+       ημερολογιακές ώρα Κύπρου, με τις άδειες μέρες μέσα (αλλιώς τρεις εγγραφές
+       σε 1/9, 12/9, 15/9 μοιάζουν με τρεις συνεχόμενες μέρες). Πάτημα σε μπάρα
+       = ημέρα + αριθμός, με δάχτυλο ΚΑΙ με ποντίκι. */
+    var days = (j.per_day || []).map(function (r) { return { day: r.day, n: Number(r.n) || 0, gone: Number(r.gone) || 0 }; });
+    daysPaint(days);
 
-    bars(el('src'), j.by_source, 'source');
+    bars(el('src'), (j.by_source || []).map(function (r) { return { source: srcLab(r.source), n: r.n }; }), 'source');
     bars(el('ref'), j.by_ref, 'ref');
 
     el('k-dev').textContent = j.devices.distinct;
@@ -269,10 +325,13 @@
     el('f-inst').textContent = i.total || 0;
     el('f-seen7').textContent = i.seen_7d || 0;
     /* έγγραφα στον server / έγγραφα που μέτρησαν οι εγκαταστάσεις (τοπικά) */
-    el('f-docs').innerHTML = (Number(d.total) || 0) +
-      (Number(i.docs_total) ? ' <span class="muted" style="font-size:14px">/ ' + Number(i.docs_total) + '</span>' : '');
+    /* 25/9/2026: το «321 / 30» ήταν ΔΥΟ πράγματα σε ένα κουτί. Εδώ μόνο τα
+       τοπικά των εγκαταστάσεων· του server (παλιό web /ui) πάνε στη γραμμή κάτω. */
+    el('f-docs').textContent = Number(i.docs_total) || 0;
     el('f-pay').textContent = sb.paying || 0;
+    fwLinks(f.links);
     el('f-more').innerHTML =
+      'Έγγραφα στον server (παλιό web /ui): <b>' + (Number(d.total) || 0) + '</b> · ' +
       'Νέοι σήμερα: <b>' + (u.new_1d || 0) + '</b> · ' +
       'Με 2FA: <b>' + (u.with_2fa || 0) + '</b> · ' +
       'Διαχειριστές: <b>' + (u.admins || 0) + '</b> · ' +
@@ -381,6 +440,11 @@
   el('g-go').onclick = function () { loadFw(false); };
   el('g-clr').onclick = function () { clearF(FW_F); loadFw(false); };
   el('f-acc-more').onclick = function () { loadFw(true); };
+  /* KM-PK-DAYTAP — ΕΝΑΣ ακροατής στο δοχείο, όχι 30 (οι μπάρες ξαναχτίζονται σε κάθε ανανέωση). */
+  el('days').addEventListener('click', function (e) {
+    var t = e.target && e.target.closest ? e.target.closest('.d') : null;
+    if (t && t.getAttribute('data-i') !== null) { daySelect(Number(t.getAttribute('data-i'))); }
+  });
   el('f-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); loadKm(false); } });
   el('g-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); loadFw(false); } });
 

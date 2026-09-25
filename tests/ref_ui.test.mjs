@@ -300,7 +300,7 @@ check("Ο-16 · πεζά στον σύνδεσμο γίνονται κεφαλα
 
 check("Ο-17 · χωρίς ?ref= η παλιά συμπεριφορά μένει ακριβώς ίδια", () => {
   if (refCaptureSrc("?src=store:play", false, null) !== "store:play") throw new Error("src");
-  if (refCaptureSrc("", false, null) !== "link") throw new Error("κενό → link");
+  if (refCaptureSrc("", false, null) !== "direct") throw new Error("κενό → direct (v88)");
   if (refCaptureSrc("", false, "store:ms") !== null) throw new Error("δεν πειράζει υπάρχον");
   if (refCaptureSrc("?src=store:play", false, "link") !== null) throw new Error("δεν ξαναγράφει src");
 });

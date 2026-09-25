@@ -20,7 +20,7 @@ const MUTATIONS = [
   // Μ3 · 🔴 το showPicker χωρίς try/catch: σφάλμα σε ΚΑΘΕ πάτημα εικονιδίου.
   ["js", "        try { inp.showPicker(); } catch (err) {}", "        inp.showPicker();"],
   // Μ4 · το cache δεν ανεβαίνει — το PWA σερβίρει την παλιά οθόνη για πάντα.
-  ["sw", "var CACHE = 'pk-v4';", "var CACHE = 'pk-v3';"],
+  ["sw", "var CACHE = 'pk-v5';", "var CACHE = 'pk-v4';"],
   // Μ5 · Δ1: φεύγει ο κανόνας «καμία οθόνη πριν αποφασιστεί» — ξαναναβοσβήνει.
   ["html", "html:not([data-gate]) #s-key,", "html[never] #s-key,"],
   // Μ6 · 🔴 Δ1: η showKeyScreen δεν γυρίζει τον διακόπτη. Με CSS !important
@@ -82,7 +82,7 @@ check("Π-Ο4 · 🔴 ΤΟ showPicker ΕΙΝΑΙ ΤΥΛΙΓΜΕΝΟ — ΡΙΧΝ
 });
 
 check("Π-Ο5 · το SHELL cache ανέβηκε — αλλιώς το PWA σερβίρει την παλιά οθόνη", () => {
-  has(sw, "var CACHE = 'pk-v4';", "νέα έκδοση cache");
+  has(sw, "var CACHE = 'pk-v5';", "νέα έκδοση cache");
 });
 
 check("Π-Ο6 · 🔴 Δ1 · Η ΑΠΟΦΑΣΗ ΓΙΝΕΤΑΙ ΠΡΙΝ ΤΗΝ ΠΡΩΤΗ ΖΩΓΡΑΦΙΑ", () => {

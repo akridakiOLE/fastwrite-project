@@ -1886,7 +1886,9 @@
     var qRef = /[?&]ref=([A-Za-z0-9]+)/.exec(search);
     var qSrc = /[?&]src=([A-Za-z0-9:_-]+)/.exec(search);
     if (qRef && !registered) { return 'ref:' + qRef[1].toUpperCase(); }
-    if (!current) { return qSrc ? qSrc[1] : 'link'; }
+    /* KM-SRC-DIRECT · v88 (25/9): σύνδεσμος χωρίς ?src= = «direct» (άμεση επίσκεψη),
+       όχι «link» — το «link» έμπαινε σε ΟΛΟΥΣ και ο Πίνακας δεν ξεχώριζε τίποτα. */
+    if (!current) { return qSrc ? qSrc[1] : 'direct'; }
     return null;
   }
 
@@ -2113,7 +2115,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v87';
+  var APP_VER = 'φέτα 3 · v88';
   /* ΣΕΙΡΑ ΜΟΝΤΕΛΩΝ, νεότερο πρώτα. Η Google αποσύρει μοντέλα χωρίς προειδοποίηση:
      29/8/2026 το gemini-2.5-flash έπαψε να δίνεται σε νέους λογαριασμούς και η
      ανάγνωση γύριζε 404. Σκληρά κωδικοποιημένο όνομα = εφαρμογή που σπάει μόνη της
@@ -3154,14 +3156,14 @@
   function kmRegister() {
     var email = localStorage.getItem(LS.email);
     if (!email || !localStorage.getItem(LS.folder)) { return Promise.resolve(false); }
-    var src = localStorage.getItem(LS.src) || 'link';
+    var src = localStorage.getItem(LS.src) || 'direct';
     var ref = /^ref:(.+)$/.exec(src);
     return kmFetch('register', {
       method: 'POST',
       headers: kmHead(),
       body: JSON.stringify({
         email: email,
-        source: ref ? 'link' : src,
+        source: ref ? 'ref' : src,   // KM-SRC-DIRECT · v88: η σύσταση φαίνεται στο (α)
         ref: ref ? ref[1] : null,
         ref_share: (ref && localStorage.getItem(LS.refShare)) ? 1 : 0,
         has_key: !!localStorage.getItem(LS.key),
@@ -4785,7 +4787,7 @@
       /* Ο κωδικός του πεδίου ΚΥΒΕΡΝΑ: αν ο χρήστης τον έσβησε, σέβεται. */
       var src = localStorage.getItem(LS.src) || '';
       if (refIn) { localStorage.setItem(LS.src, 'ref:' + refIn); }
-      else if (/^ref:/.test(src)) { localStorage.setItem(LS.src, 'link'); }
+      else if (/^ref:/.test(src)) { localStorage.setItem(LS.src, 'direct'); }
       /* ⚠ ΟΧΙ 'ref-share': το id το κρατάει ΗΔΗ το κουμπί «Στείλ' τον» της
          οθόνης «Κάλεσε» (μετρήθηκε 19/9/2026). */
       var ck = el('ref-consent-ok');

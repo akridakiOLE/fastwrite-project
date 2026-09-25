@@ -22,7 +22,7 @@ const MUT = [
   // Μ6 · το manifest αλλάζει και ΜΕΤΑ την εγγραφή — η σύσταση «ξαναγράφεται».
   ["js", "    if (localStorage.getItem(LS.reg)) { return; }\n    var r = /[?&]ref=", "    var r = /[?&]ref="],
   // Μ7 · σβησμένος κωδικός δεν σέβεται — η σύσταση μένει ενώ ο χρήστης την έσβησε.
-  ["js", "      else if (/^ref:/.test(src)) { localStorage.setItem(LS.src, 'link'); }", ""],
+  ["js", "      else if (/^ref:/.test(src)) { localStorage.setItem(LS.src, 'direct'); }", ""],
   // Μ8 · το στατικό manifest χάνει το id — δύο «εφαρμογές» για το λειτουργικό.
   ["man", '"id": "/kostometro/",', '"x": 1,'],
 ];
@@ -69,7 +69,7 @@ check("Π-5 · 🔴 το manifest ακολουθεί ref/src ΜΟΝΟ πριν �
   has(f, "'/api/km/manifest?'", "δεν δείχνει στο δυναμικό manifest");
 });
 check("Π-6 · ο σβησμένος κωδικός ΣΕΒΕΤΑΙ", () => {
-  has(js, "      else if (/^ref:/.test(src)) { localStorage.setItem(LS.src, 'link'); }", "δεν καθαρίζει τη σύσταση");
+  has(js, "      else if (/^ref:/.test(src)) { localStorage.setItem(LS.src, 'direct'); }", "δεν καθαρίζει τη σύσταση");
 });
 check("Π-7 · στατικό manifest με σταθερό id", () => {
   const m = JSON.parse(man);
