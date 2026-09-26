@@ -70,7 +70,9 @@ input:focus{outline:none;border-color:var(--accent)}
 .upd-toast{position:absolute;z-index:3;left:50%;top:calc(max(14px,env(safe-area-inset-top)) + 52px);
   transform:translate(-50%,-6px);opacity:0;transition:opacity .3s,transform .3s;
   max-width:calc(100% - 32px);background:rgba(10,14,20,.88);border:1px solid var(--accent);border-radius:12px;
-  padding:7px 14px;color:#fff;font-size:13px;text-align:center;display:flex;flex-direction:column;gap:1px;cursor:pointer}
+  padding:8px 40px 8px 16px;color:#fff;font-size:13px;text-align:center;display:flex;flex-direction:column;gap:1px;cursor:pointer}
+.upd-x{position:absolute;top:50%;right:6px;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-size:14px;line-height:1;cursor:pointer}
 .upd-toast b{color:var(--accent);font-weight:600}
 .upd-toast span{color:var(--text2);font-size:12px}
 .upd-toast.on{opacity:1;transform:translate(-50%,0)}

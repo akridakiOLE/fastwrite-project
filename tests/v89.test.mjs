@@ -13,13 +13,17 @@ const MUT = [
   // 2 · βγαίνει σε ΚΑΘΕ άνοιγμα (δεν γράφεται η έκδοση που είδε)
   ["js", "      localStorage.setItem(LS.seenVer, cur);\n    } catch (e) { return; }", "    } catch (e) { return; }"],
   // 3 · δεν φεύγει ποτέ μόνο του
-  ["js", "      setTimeout(hide, 3000);", ""],
+  ["js", "      setTimeout(hide, UPD_MS);", ""],
   // 4 · δεν δένεται στην κάμερα
   ["js", "    if (id === 's-cam')   { updToast(); }\n", ""],
   // 5 · 🔴 το σημάδι πρώτης εγκατάστασης φεύγει → ο νέος χρήστης το βλέπει στην πρώτη φωτογραφία
   ["js", "      localStorage.setItem(LS.seenVer, shortVer(APP_VER));\n    }\n  } catch (e) {}", "    }\n  } catch (e) {}"],
   // 6 · η γραμμή «τι νέο» δεν διαβάζεται
   ["js", "srvNote = (j && typeof j.note === 'string') ? j.note.slice(0, 90) : '';", "srvNote = '';"],
+  // 7 · v90 · το ✕ δεν κλείνει
+  ["js", "if (x) { x.onclick = function (e) { e.stopPropagation(); hide(); }; }", ""],
+  // 8 · v90 · το λάθος κείμενο επιστρέφει στο «Τι έρχεται»
+  ["html", "Κανείς δεν το πληκτρολογεί ξανά", "Κανείς δεν το ξαναπληκτρολογεί"],
 ];
 if (ONLY) {
   const m = MUT[ONLY - 1]; if (!m) process.exit(2);
@@ -35,7 +39,7 @@ function world(ls, verJson) {
   const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
   const nodes = {}; const mk = (id) => (nodes[id] = { id, hidden: true, textContent: "", onclick: null, cls: new Set(),
     classList: { add(c) { nodes[id].cls.add(c); }, remove(c) { nodes[id].cls.delete(c); } } });
-  ["upd-toast", "upd-ver", "upd-note"].forEach(mk);
+  ["upd-toast", "upd-ver", "upd-note", "upd-x"].forEach(mk);
   const timers = []; const setTimeout = (f, ms) => timers.push({ f, ms });
   const fetch = async () => ({ ok: true, json: async () => verJson });
   const LS = { seenVer: "km_seen_ver", reg: "km_registered", folder: "km_folder" };
@@ -75,10 +79,10 @@ await check("Ν89-4 · ΜΙΑ φορά ανά έκδοση: δεύτερο άν�
   const w2 = world(w.store, VER); w2.api.updToast(); await w2.flush();
   if (!w2.nodes["upd-toast"].hidden) throw new Error("ξαναβγήκε");
 });
-await check("Ν89-5 · φεύγει μόνο του σε 3″", async () => {
+await check("Ν89-5 · φεύγει μόνο του σε 7″ (v90· όχι 3″ — δεν προλάβαινε να διαβαστεί)", async () => {
   const w = world({ km_folder: "f", km_seen_ver: "v88" }, VER);
   w.api.updToast(); await w.flush();
-  const t = w.timers.find((x) => x.ms === 3000); if (!t) throw new Error("χωρίς χρονόμετρο 3″");
+  const t = w.timers.find((x) => x.ms === 7000); if (!t) throw new Error("χωρίς χρονόμετρο 7″");
   t.f(); if (w.nodes["upd-toast"].cls.has("on")) throw new Error("έμεινε");
 });
 await check("Ν89-6 · χωρίς «τι νέο» στο version.json → σκέτο «Ενημερώθηκε · vNN»", async () => {
@@ -93,11 +97,22 @@ await check("Ν89-8 · δεύτερη ασφάλεια: χωρίς σημάδι 
 });
 await check("Ν89-7 · δεμένο στην κάμερα · στοιχεία στο HTML · δεν κάθεται στο κουμπί λήψης", async () => {
   if (!js.includes("if (id === 's-cam')   { updToast(); }")) throw new Error("δεν καλείται στην κάμερα");
-  for (const id of ["upd-toast", "upd-ver", "upd-note"]) if (!html.includes('id="' + id + '"')) throw new Error("#" + id);
+  for (const id of ["upd-toast", "upd-ver", "upd-note", "upd-x"]) if (!html.includes('id="' + id + '"')) throw new Error("#" + id);
   const i = html.indexOf('id="upd-toast"'), c = html.indexOf('class="cam-bottom"');
   if (!(i > 0 && i < c)) throw new Error("λάθος θέση");
   if (!/\.upd-toast\{[^}]*top:/.test(css)) throw new Error("χωρίς θέση πάνω");
 });
+await check("Ν90-1 · το ✕ κλείνει το μήνυμα αμέσως", async () => {
+  const w = world({ km_folder: "f", km_seen_ver: "v88" }, VER);
+  w.api.updToast(); await w.flush();
+  if (!w.nodes["upd-x"].onclick) throw new Error("το ✕ δεν έχει ενέργεια");
+  w.nodes["upd-x"].onclick({ stopPropagation() {} });
+  if (w.nodes["upd-toast"].cls.has("on")) throw new Error("δεν έκλεισε");
+});
+await check("Ν90-2 · «Τι έρχεται»: «πληκτρολογεί ξανά», όχι «ξαναπληκτρολογεί» (διόρθωση Stavros 26/9)", async () => {
+  if (html.includes("ξαναπληκτρολογεί")) throw new Error("το λάθος κείμενο υπάρχει ακόμα");
+  if (!html.includes("Κανείς δεν το πληκτρολογεί ξανά")) throw new Error("λείπει η σωστή φράση");
+});
 if (ONLY) { if (fails) { console.log("Μ" + ONLY + ": κοκκίνισε ✓"); process.exit(0); } console.log("Μ" + ONLY + ": ΠΕΡΑΣΕ ΠΡΑΣΙΝΟ"); process.exit(1); }
 if (fails) { console.log("\n" + fails + " ΑΠΕΤΥΧΑΝ"); process.exit(1); }
-console.log("\n✔ ΟΛΑ ΠΕΡΑΣΑΝ (8)");
+console.log("\n✔ ΟΛΑ ΠΕΡΑΣΑΝ (10)");
