@@ -12,7 +12,7 @@ let src = readFileSync("src/km.js", "utf8");
 let js = readFileSync("site/kostometro/app.js", "utf8");
 const MUT = [
   // 1 · 🔴 ο μετρητής δεν ανεβαίνει — ο ίδιος αριθμός δύο φορές
-  ["src", 'return json({ ok: true, code: "KM-" + ref + "-" + n });', 'return json({ ok: true, code: "KM-" + ref + "-1" });'],
+  ["src", 'const code = "KM-" + ref + "-" + n;', 'const code = "KM-" + ref + "-1";'],
   // 2 · 🔴 η διαδρομή των email χωρίς μυστικό
   ["src", '  if (!supportKeyOk(request, env)) return new Response("Not found", { status: 404 });\n  const n = await supportNext(env, "E");', '  const n = await supportNext(env, "E");'],
   // 3 · 🔴 το σκριπτ δέχεται και το KM_ADMIN_KEY (ή το αντίστροφο: μπερδεύονται τα μυστικά)
@@ -22,7 +22,7 @@ const MUT = [
   // 5 · όποιος ζήτησε διαγραφή δεν μπορεί να μας γράψει
   ["src", "const a = await authed(request, env, { allowPending: true });\n  if (a.err) return a.err;\n  const ref = await ensureRefCode", "const a = await authed(request, env);\n  if (a.err) return a.err;\n  const ref = await ensureRefCode"],
   // 6 · ο αριθμός email χάνει τη σταθερή μορφή (6 ψηφία)
-  ["src", 'code: "KM-E-" + String(n).padStart(6, "0")', 'code: "KM-E-" + n'],
+  ["src", 'const code = "KM-E-" + String(n).padStart(6, "0");', 'const code = "KM-E-" + n;'],
   // 7 · 🔴 η εφαρμογή δέχεται ό,τι αριθμό της δώσουν
   ["js", "return (j && j.ok && SUP_RE.test(j.code || '')) ? j.code : '';", "return (j && j.code) || '';"],
   // 8 · 🔴 δεύτερο πάτημα = δεύτερη υπόθεση
@@ -190,9 +190,9 @@ await check("Ε-5 · 🔴 ο server στέλνει σκουπίδι (παλιά 
 });
 const day = (n) => new Date(Date.now() - n * 864e5).toISOString();
 const seven = JSON.stringify([
-  { c: "KM-2222222222-7", d: day(1), t: "α" }, { c: "KM-E-000009", d: day(2), t: "β" }, { c: "KM-XXXX", d: day(3), t: "κακό" },
-  { c: "KM-3333333333-1", d: day(70), t: "παλιό" }, { c: "KM-4444444444-2", d: day(4), t: "<b>x</b>" },
-  { c: "KM-5555555555-3", d: day(5) }, { c: "KM-6666666666-4", d: day(6) }, { c: "KM-7777777777-5", d: day(7) },
+  { c: "KM-2222222222-7", d: day(1), t: "α", ok: 1 }, { c: "KM-E-000009", d: day(2), t: "β", ok: 1 }, { c: "KM-XXXX", d: day(3), t: "κακό", ok: 1 },
+  { c: "KM-3333333333-1", d: day(70), t: "παλιό", ok: 1 }, { c: "KM-4444444444-2", d: day(4), t: "<b>x</b>", ok: 1 },
+  { c: "KM-5555555555-3", d: day(5), ok: 1 }, { c: "KM-6666666666-4", d: day(6), ok: 1 }, { c: "KM-7777777777-5", d: day(7), ok: 1 },
 ]);
 await check("Ε-6 · «Πρόσφατα»: ≤5, ≤60 ημέρες, μόνο έγκυρες μορφές, με textContent", async () => {
   const w = world({ account: true, ls: { km_sup_cases: seven } });

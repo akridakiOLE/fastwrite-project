@@ -20,7 +20,7 @@
 // GDPR: δεν αποθηκεύεται IP. Μόνο χώρα (Cloudflare) και user-agent.
 // ---------------------------------------------------------------------------
 
-import { handleKm, kmCleanup, kmDeleteDue } from "./km.js";
+import { handleKm, kmCleanup, kmDeleteDue, kmSupportPrune } from "./km.js";
 
 const V = 3; // έκδοση ερωτηματολογίου
 
@@ -53,6 +53,11 @@ export default {
     ctx.waitUntil(kmDeleteDue(env).then(
       (r) => console.log("km delete-due:", JSON.stringify(r)),
       (e) => console.error("km delete-due failed:", e)
+    ));
+    // v93 · KM-SUP-ARRIVED — αριθμοί αιτημάτων που δεν έφτασαν ποτέ, μετά από 24 ώρες
+    ctx.waitUntil(kmSupportPrune(env).then(
+      (r) => console.log("km support-prune:", JSON.stringify(r)),
+      (e) => console.error("km support-prune failed:", e)
     ));
   },
 

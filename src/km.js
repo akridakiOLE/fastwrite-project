@@ -148,6 +148,9 @@ export async function handleKm(request, env, ctx, path) {
   // v92 · KM-SUP-CASE (26/9/2026) — αριθμός αιτήματος υποστήριξης. schema/km_support.sql
   if (path === "/api/km/support/ticket" && method === "POST") return supportTicket(request, env);
   if (path === "/api/km/support/email-ticket" && method === "POST") return supportEmailTicket(request, env);
+  // v93 · KM-SUP-ARRIVED — «έφτασε στο support@» (Apps Script) · «ποιοι δικοί μου έφτασαν;» (εφαρμογή)
+  if (path === "/api/km/support/arrived" && method === "POST") return supportArrived(request, env);
+  if (path === "/api/km/support/status" && method === "POST") return supportStatus(request, env);
   // Η.11β: GET = ποιοι ΘΑ σβήνονταν τώρα · POST = σβήνει. Ιδιο μοτίβο με το
   // admin/cleanup, και για τον ίδιο λόγο: δεν εμπιστεύεσαι αυτόματη διαγραφή
   // που δεν μπορείς να δεις πρώτα. Το ?now= επιτρέπει στα τεστ να «γεράσουν»
@@ -199,7 +202,11 @@ async function supportTicket(request, env) {
   if (!ref) return json({ ok: false, error: "ref_code" }, 500);
   const n = await supportNext(env, a.id.folder);
   if (!n) return json({ ok: false, error: "seq" }, 500);
-  return json({ ok: true, code: "KM-" + ref + "-" + n });
+  const code = "KM-" + ref + "-" + n;
+  // v93 · KM-SUP-ARRIVED — γράφεται ΑΝΕΠΙΒΕΒΑΙΩΤΟΣ· γίνεται «έφτασε» μόνο από το support@.
+  await env.DB.prepare("INSERT OR IGNORE INTO km_support_tickets (code, scope, issued_at, arrived_at) VALUES (?, ?, ?, NULL)")
+    .bind(code, a.id.folder, now()).run();
+  return json({ ok: true, code: code });
 }
 
 // POST /api/km/support/email-ticket — ΜΟΝΟ για το Apps Script του support@.
@@ -214,7 +221,71 @@ async function supportEmailTicket(request, env) {
   if (!supportKeyOk(request, env)) return new Response("Not found", { status: 404 });
   const n = await supportNext(env, "E");
   if (!n) return json({ ok: false, error: "seq" }, 500);
-  return json({ ok: true, code: "KM-E-" + String(n).padStart(6, "0") });
+  const code = "KM-E-" + String(n).padStart(6, "0");
+  // Γεννιέται ΑΠΟ email — άρα έχει ήδη φτάσει.
+  const t = now();
+  await env.DB.prepare("INSERT OR IGNORE INTO km_support_tickets (code, scope, issued_at, arrived_at) VALUES (?, 'E', ?, ?)")
+    .bind(code, t, t).run();
+  return json({ ok: true, code: code });
+}
+
+// ── v93 · KM-SUP-ARRIVED (26/9/2026, πρόταση Stavros) ─────────────────────────
+// Η εφαρμογή ΔΕΝ ξέρει αν το email στάλθηκε — ξέρει μόνο ότι πήρε αριθμό. Το
+// support@ ξέρει. Άρα: το Apps Script λέει «έφτασε» μέσα σε 1′ από την άφιξη,
+// και η εφαρμογή δείχνει «Συνέχεια σε…» ΜΟΝΟ για όσους έφτασαν. Όσοι δεν
+// έφτασαν ποτέ σβήνονται μετά από 24 ώρες (kmSupportPrune, ωριαίο ρολόι).
+const SUP_APP_RE = /^KM-([23456789ABCDEFGHJKMNPQRSTVWXYZ]{10})-(\d{1,9})$/;
+const SUP_E_RE = /^KM-E-\d{6,}$/;
+const SUP_PENDING_HOURS = 24;
+
+// POST /api/km/support/arrived {code} — ΜΟΝΟ με KM_SUPPORT_KEY.
+// Αν ο αριθμός έχει ήδη σβηστεί (το email στάλθηκε μετά από 24 ώρες), ξαναγράφεται
+// ως «έφτασε» — ο λογαριασμός βρίσκεται από τον κωδικό affiliate. Αριθμός που ο
+// server ΔΕΝ έχει εκδώσει ποτέ (n πάνω από τον μετρητή) δεν γράφεται: αλλιώς
+// οποιοσδήποτε θα μπορούσε να «φυτέψει» αιτήματα σε ξένο λογαριασμό.
+async function supportArrived(request, env) {
+  if (!supportKeyOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const code = (clean(b.code, 40) || "").toUpperCase();
+  const t = now();
+  if (SUP_E_RE.test(code)) {
+    const r = await env.DB.prepare("UPDATE km_support_tickets SET arrived_at = COALESCE(arrived_at, ?) WHERE code = ?").bind(t, code).run();
+    return json({ ok: true, known: !!(r && r.meta && r.meta.changes) });
+  }
+  const m = SUP_APP_RE.exec(code);
+  if (!m) return json({ ok: false, error: "bad_code" }, 400);
+  const acc = await env.DB.prepare("SELECT folder_id FROM km_accounts WHERE ref_code = ? AND deleted IS NULL").bind(m[1]).first();
+  if (!acc) return json({ ok: true, known: false });
+  const seq = await env.DB.prepare("SELECT n FROM km_support_seq WHERE scope = ?").bind(acc.folder_id).first();
+  if (!seq || Number(m[2]) < 1 || Number(m[2]) > Number(seq.n)) return json({ ok: true, known: false });
+  await env.DB.prepare(
+    `INSERT INTO km_support_tickets (code, scope, issued_at, arrived_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(code) DO UPDATE SET arrived_at = COALESCE(km_support_tickets.arrived_at, excluded.arrived_at)`
+  ).bind(code, acc.folder_id, t, t).run();
+  return json({ ok: true, known: true });
+}
+
+// POST /api/km/support/status {codes:[…]} — από την εφαρμογή. Απαντάει ΜΟΝΟ για
+// αριθμούς ΑΥΤΟΥ του λογαριασμού: ξένος αριθμός δεν επιβεβαιώνεται ποτέ.
+async function supportStatus(request, env) {
+  const a = await authed(request, env, { allowPending: true });
+  if (a.err) return a.err;
+  const b = (await safeJson(request)) || {};
+  const codes = (Array.isArray(b.codes) ? b.codes : []).slice(0, 20)
+    .map((c) => (clean(c, 40) || "").toUpperCase()).filter((c) => SUP_APP_RE.test(c));
+  if (!codes.length) return json({ ok: true, arrived: [] });
+  const q = "SELECT code FROM km_support_tickets WHERE scope = ? AND arrived_at IS NOT NULL AND code IN (" + codes.map(() => "?").join(",") + ")";
+  const rows = (await env.DB.prepare(q).bind(a.id.folder, ...codes).all()).results || [];
+  return json({ ok: true, arrived: rows.map((r) => r.code) });
+}
+
+// Ωριαίο: σβήνει όσους ΔΕΝ έφτασαν σε 24 ώρες. Με όριο γραμμών ανά γύρο.
+export async function kmSupportPrune(env, nowIso) {
+  const cut = new Date(new Date(nowIso || now()).getTime() - SUP_PENDING_HOURS * 3600 * 1000).toISOString();
+  const r = await env.DB.prepare(
+    "DELETE FROM km_support_tickets WHERE rowid IN (SELECT rowid FROM km_support_tickets WHERE arrived_at IS NULL AND issued_at < ? LIMIT ?)"
+  ).bind(cut, CLEANUP_BATCH).run();
+  return { pending_deleted: (r && r.meta && r.meta.changes) || 0, cutoff: cut };
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -1209,6 +1280,7 @@ async function wipeFolder(env, folderId) {
     env.DB.prepare("DELETE FROM km_devices WHERE folder_id = ?").bind(folderId),
     // v92 · KM-SUP-CASE — ο μετρητής αιτημάτων φεύγει με τον λογαριασμό
     env.DB.prepare("DELETE FROM km_support_seq WHERE scope = ?").bind(folderId),
+    env.DB.prepare("DELETE FROM km_support_tickets WHERE scope = ?").bind(folderId),
     env.DB.prepare(
       `UPDATE km_accounts SET email = '', auth_hash = '', active_device_id = NULL,
               active_since = NULL, folder_bytes = 0, folder_version = 0, last_sync = NULL,
@@ -1664,6 +1736,8 @@ const RETENTION = {
   // KM-LEADS-RETENTION · 26/9/2026, απόφαση Stavros: 24 μήνες (όχι 12). Από την ημερομηνία
   // της φόρμας (consent_at) — και μαζί ό,τι κρατάμε για τις αποστολές τους.
   leads_months: 24,
+  // v93 · KM-SUP-ARRIVED — αριθμοί αιτημάτων που έφτασαν (μόνο αριθμός + ώρες)
+  support_months: 24,
 };
 const CLEANUP_BATCH = 500;
 
@@ -1686,6 +1760,7 @@ async function cleanupCounts(env, nowIso) {
     gnomi_responses: await one("SELECT COUNT(*) AS n FROM gnomi_responses WHERE ts < ?", gn),
     gnomi_events:    await one("SELECT COUNT(*) AS n FROM gnomi_events WHERE ts < ?", gn),
     leads:           await one("SELECT COUNT(*) AS n FROM km_leads WHERE consent_at < ?", monthsAgo(RETENTION.leads_months, nowIso)),
+    support_tickets: await one("SELECT COUNT(*) AS n FROM km_support_tickets WHERE issued_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
   };
 }
 
@@ -1713,6 +1788,7 @@ export async function kmCleanup(env, nowIso) {
     // πρώτα οι αποστολές (βρίσκονται μέσω του lead), μετά το ίδιο το lead
     lead_sends:      await wipe("km_lead_sends", "email IN (SELECT email FROM km_leads WHERE consent_at < ?)", monthsAgo(RETENTION.leads_months, nowIso)),
     leads:           await wipe("km_leads", "consent_at < ?", monthsAgo(RETENTION.leads_months, nowIso)),
+    support_tickets: await wipe("km_support_tickets", "issued_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
   };
   done.batch_limit = CLEANUP_BATCH;
   done.more = Object.keys(done).some((k) => k !== "batch_limit" && done[k] === CLEANUP_BATCH);

@@ -2121,7 +2121,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v92';
+  var APP_VER = 'φέτα 3 · v93';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5391,8 +5391,14 @@
          Ποτέ αριθμός φτιαγμένος στη συσκευή.
        · τα πρόσφατα αιτήματα (≤5, ≤60 ημέρες) ζουν ΜΟΝΟ σε αυτή τη συσκευή·
          «πρόσφατα», ΟΧΙ «ανοιχτά» — η εφαρμογή δεν ξέρει αν απαντήσαμε.
-     ⚠ PRO: η Υποστήριξη και η Γνώμη φαίνονται ΜΟΝΟ στο Boss (απόφαση 26/9). */
-  var SUP_KEEP_DAYS = 60, SUP_SHOW = 5, SUP_STORE = 20, SUP_WAIT_MS = 4000;
+     ⚠ PRO: η Υποστήριξη και η Γνώμη φαίνονται ΜΟΝΟ στο Boss (απόφαση 26/9).
+     🔴 v93 · KM-SUP-ARRIVED (πρόταση Stavros 26/9): η εφαρμογή ΔΕΝ ξέρει αν το
+     email στάλθηκε — ξέρει μόνο ότι πήρε αριθμό. Γι' αυτό η «Συνέχεια σε…»
+     δείχνει ΜΟΝΟ αριθμούς που ο server επιβεβαίωσε ότι ΕΦΤΑΣΑΝ στο support@
+     (ok: 1). Οι ανεπιβεβαίωτοι μένουν κρυφοί· ρωτιούνται σε κάθε άνοιγμα της
+     οθόνης για 7 ημέρες (για όποιον το στέλνει αργότερα από τα πρόχειρα) και
+     μετά φεύγουν. */
+  var SUP_KEEP_DAYS = 60, SUP_SHOW = 5, SUP_STORE = 20, SUP_WAIT_MS = 4000, SUP_PENDING_DAYS = 7;
   var SUP_RE = /^KM-(?:E-\d{6,}|[2-9A-Z]{10}-\d{1,9})$/;
   function supRead() {
     try { var a = JSON.parse(localStorage.getItem(LS.sup) || '[]'); return Array.isArray(a) ? a : []; }
@@ -5402,13 +5408,46 @@
   function supRecent(list, nowMs) {
     var lim = nowMs - SUP_KEEP_DAYS * 864e5;
     return list.filter(function (x) {
-      return x && SUP_RE.test(x.c || '') && (Date.parse(x.d) || 0) >= lim;
+      return x && x.ok === 1 && SUP_RE.test(x.c || '') && (Date.parse(x.d) || 0) >= lim;
     }).slice(0, SUP_SHOW);
+  }
+  /* Οι ανεπιβεβαίωτοι των τελευταίων 7 ημερών — αυτούς ρωτάμε τον server. */
+  function supPending(list, nowMs) {
+    var lim = nowMs - SUP_PENDING_DAYS * 864e5;
+    return list.filter(function (x) {
+      return x && x.ok !== 1 && SUP_RE.test(x.c || '') && (Date.parse(x.d) || 0) >= lim;
+    }).map(function (x) { return x.c; });
+  }
+  /* Πετάει ανεπιβεβαίωτους πάνω από 7 ημέρες· ρωτάει για τους υπόλοιπους.
+     Επιστρέφει true αν άλλαξε κάτι που φαίνεται στην οθόνη. */
+  function supCheck() {
+    var nowMs = Date.now(), all = supRead();
+    var lim = nowMs - SUP_PENDING_DAYS * 864e5;
+    var keep = all.filter(function (x) { return x && (x.ok === 1 || (Date.parse(x.d) || 0) >= lim); });
+    if (keep.length !== all.length) { supWrite(keep); }
+    var pend = supPending(keep, nowMs);
+    if (!pend.length || !hasAccount()) { return Promise.resolve(false); }
+    return kmFetch('support/status', { method: 'POST', headers: kmHead(), body: JSON.stringify({ codes: pend }) })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var got = (j && j.ok && Array.isArray(j.arrived)) ? j.arrived : [];
+        if (!got.length) { return false; }
+        var set = {};
+        got.forEach(function (c) { set[c] = 1; });
+        supWrite(supRead().map(function (x) { if (x && set[x.c]) { x.ok = 1; } return x; }));
+        return true;
+      })
+      .catch(function () { return false; });
   }
   /* Το πιο πρόσφατο πάει πάνω· ο ίδιος κωδικός δεν γράφεται δύο φορές. */
   function supRemember(code, topic) {
-    var a = supRead().filter(function (x) { return x && x.c !== code; });
-    a.unshift({ c: code, d: new Date().toISOString(), t: topic || '' });
+    var was = 0;
+    var a = supRead().filter(function (x) {
+      if (x && x.c === code) { was = x.ok === 1 ? 1 : 0; return false; }
+      return !!x;
+    });
+    /* νέος αριθμός = ok 0 (δεν έχει φτάσει ακόμα)· η «συνέχεια» κρατάει το ok */
+    a.unshift({ c: code, d: new Date().toISOString(), t: topic || '', ok: was });
     supWrite(a);
   }
   function supTopic(v) { return String(v || '').replace(/\s+/g, ' ').trim().slice(0, 60); }
@@ -5441,6 +5480,14 @@
     el('hp-ticket').textContent = '—';
     el('hp-note').hidden = true;
     el('hp-mail').disabled = false;
+    hpCases();
+    /* Όσοι έφτασαν στο μεταξύ εμφανίζονται μόλις απαντήσει ο server — χωρίς
+       να χαθεί ό,τι έγραψε ή διάλεξε ο χρήστης. */
+    supCheck().then(function (changed) {
+      if (changed && !el('s-help').hidden && !hpBusy) { hpCases(); }
+    });
+  }
+  function hpCases() {
     var box = el('hp-cases');
     box.textContent = '';
     var list = supRecent(supRead(), Date.now());
@@ -5454,8 +5501,9 @@
       var sm = document.createElement('small'); sm.textContent = sub; sp.appendChild(sm);
       lb.appendChild(r); lb.appendChild(sp); box.appendChild(lb);
     };
-    row('', 'Νέο αίτημα', 'παίρνει νέο αριθμό', true);
-    list.forEach(function (x) { row(x.c, 'Συνέχεια σε ' + x.c, supDay(x.d) + (x.t ? ' · ' + x.t : ''), false); });
+    var inList = list.some(function (x) { return x.c === hpSel; });
+    row('', 'Νέο αίτημα', 'παίρνει νέο αριθμό', !inList);
+    list.forEach(function (x) { row(x.c, 'Συνέχεια σε ' + x.c, supDay(x.d) + (x.t ? ' · ' + x.t : ''), x.c === hpSel); });
   }
   /* Επιστρέφει {code, topic}. Μετά τον πρώτο νέο αριθμό, το ίδιο άνοιγμα της
      οθόνης τον ΞΑΝΑΧΡΗΣΙΜΟΠΟΙΕΙ — δεύτερο πάτημα δεν ανοίγει δεύτερη υπόθεση. */

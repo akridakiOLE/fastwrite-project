@@ -17,6 +17,9 @@
  *   · δεν απαντάει σε δικές μας διευθύνσεις (@fastwrite.tech) ούτε σε mailer-daemon/no-reply
  *   · ≤5 απαντήσεις ανά αποστολέα ανά ώρα · «λάβαμε» ≤1 ανά αριθμό ανά 12 ώρες
  *   · κάθε μήνυμα απαντιέται ΜΙΑ φορά (id στα Script Properties, 3 ημέρες)
+ *   · v93 · KM-SUP-ARRIVED: κάθε αριθμός που φτάνει λέγεται στον server («έφτασε»)
+ *     ΑΜΕΣΩΣ — η εφαρμογή δείχνει «Συνέχεια σε…» ΜΟΝΟ για όσους έφτασαν. Γίνεται
+ *     ΠΡΙΝ από τα φρένα απάντησης: η άφιξη μετράει ακόμα κι αν δεν απαντήσουμε.
  * ΤΙ ΔΕΝ ΚΑΝΕΙ: δεν ενώνει αιτήματα (κλειστό 26/9), δεν στέλνει τίποτα στον server
  * εκτός από «δώσε μου αριθμό» — ούτε θέμα, ούτε κείμενο, ούτε διεύθυνση.
  *
@@ -28,6 +31,7 @@
  */
 
 var API = 'https://fastwrite.tech/api/km/support/email-ticket';
+var API_ARRIVED = 'https://fastwrite.tech/api/km/support/arrived';   // v93 · KM-SUP-ARRIVED
 var SUPPORT = 'support@fastwrite.tech';
 var NAME = 'FastWrite Support';
 var SEARCH = '(list:support@fastwrite.tech OR to:support@fastwrite.tech OR cc:support@fastwrite.tech) newer_than:2d';
@@ -85,12 +89,13 @@ function handle_(m) {
   if (!addr || /@(?:[a-z0-9-]+\.)*fastwrite\.tech$/.test(addr)) { return 'skip'; }
   if (/^(mailer-daemon|postmaster|no-?reply|do-?not-?reply)[@+]/.test(addr)) { return 'skip'; }
   if (isAuto_(m)) { return 'skip'; }
+  var subj = m.getSubject() || '';
+  var hit = CODE_RE.exec(subj) || CODE_RE.exec((m.getPlainBody() || '').slice(0, 4000));
+  if (hit) { markArrived_(hit[0]); }
+
   var cache = CacheService.getScriptCache();
   var rk = 'r:' + addr, cnt = Number(cache.get(rk) || 0);
   if (cnt >= 5) { return 'skip'; }
-
-  var subj = m.getSubject() || '';
-  var hit = CODE_RE.exec(subj) || CODE_RE.exec((m.getPlainBody() || '').slice(0, 4000));
   var code, body, outSubj;
   if (hit) {
     code = hit[0];
@@ -124,6 +129,15 @@ function newCode_() {
     var j = JSON.parse(r.getContentText());
     return (j && j.ok && /^KM-E-\d{6,}$/.test(j.code)) ? j.code : '';
   } catch (e) { console.error('server ' + e); return ''; }
+}
+
+function markArrived_(code) {
+  var key = PropertiesService.getScriptProperties().getProperty('KM_SUPPORT_KEY');
+  try {
+    var r = UrlFetchApp.fetch(API_ARRIVED, { method: 'post', contentType: 'application/json',
+      payload: JSON.stringify({ code: code }), headers: { 'X-Km-Support': key }, muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) { console.error('arrived ' + code + ' → ' + r.getResponseCode()); }
+  } catch (e) { console.error('arrived ' + code + ' → ' + e); }
 }
 
 function isAuto_(m) {
