@@ -121,7 +121,7 @@ test('Μ62-7 · Ερωτήσεις: ανοίγει μία τη φορά — η �
   await ctx.close();
 });
 
-test('Μ62-3 · Υποστήριξη: αριθμός εισιτηρίου KM-XXXX, το mailto έχει θέμα, έκδοση και συσκευή — τίποτα στον server', async ({ browser }) => {
+test('Μ62-3 · Υποστήριξη (v92): ο αριθμός έρχεται ΜΟΝΟ από τον server, μία κλήση support/ticket, τίποτα άλλο', async ({ browser }) => {
   const { ctx, p } = await device(browser);
   await onboard(p, mail('m62c-'));
   const calls = [];
@@ -129,12 +129,13 @@ test('Μ62-3 · Υποστήριξη: αριθμός εισιτηρίου KM-XXX
   await toMenu(p);
   await p.locator('[data-go="s-help"]').click();
   await expect(p.locator('#s-help')).toBeVisible({ timeout: 5000 });
-  const ticket = await p.locator('#hp-ticket').textContent();
-  expect(ticket).toMatch(/^KM-[A-HJ-NP-Z2-9]{4}$/);
+  expect(await p.locator('#hp-ticket').textContent()).toBe('—');
+  expect(calls, 'το άνοιγμα της οθόνης δεν ζητάει αριθμό').toEqual([]);
+  await p.locator('#hp-topic').fill('δοκιμή');
   await p.locator('#hp-mail').click();
-  // Σε headless το mailto δεν αλλάζει σελίδα· αρκεί ότι ΔΕΝ έγινε κλήση στον server
-  await p.waitForTimeout(600);
-  expect(calls, 'η Υποστήριξη δεν μιλάει στον server').toEqual([]);
+  await expect(p.locator('#hp-ticket')).toHaveText(/^KM-[2-9A-Z]{10}-\d+$/, { timeout: 6000 });
+  expect(calls.length, 'ακριβώς μία κλήση').toBe(1);
+  expect(calls[0]).toContain('/api/km/support/ticket');
   await ctx.close();
 });
 

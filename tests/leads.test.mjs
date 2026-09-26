@@ -31,7 +31,7 @@ const MUT = [
 if (ONLY) { const m = MUT[ONLY - 1]; if (!m) process.exit(2); if (!src.includes(m[0])) { console.log("Μ" + ONLY + " ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ"); process.exit(3); } src = src.replace(m[0], m[1]); }
 const mod = await import("data:text/javascript;base64," + Buffer.from(src).toString("base64"));
 const db = new DatabaseSync(":memory:");
-for (const f of ["km.sql", "km_mail.sql", "km_leads.sql", "gnomi.sql", "km_feedback.sql"]) {
+for (const f of ["km.sql", "km_mail.sql", "km_leads.sql", "gnomi.sql", "km_feedback.sql", "km_support.sql"]) {
   const sql = readFileSync("schema/" + f, "utf8").split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
   for (const s of sql.split(";")) { const t = s.trim(); if (!t) continue; try { db.exec(t + ";"); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }
 }

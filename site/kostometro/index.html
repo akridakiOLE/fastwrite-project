@@ -330,24 +330,32 @@
 </section>
 
 <!-- ══ v62 · Brief Ε §2 — ΥΠΟΣΤΗΡΙΞΗ ═══════════════════════════════
-     Ανοίγει το email του κινητού προς support@ με αριθμό εισιτηρίου KM-XXXX
-     στο θέμα και έκδοση/συσκευή στο σώμα — ο χρήστης τα βλέπει και μπορεί να
-     τα σβήσει. Τίποτα δεν πάει στον server. -->
+     Ανοίγει το email του κινητού προς support@ με αριθμό αιτήματος στο θέμα
+     και έκδοση/συσκευή στο σώμα — ο χρήστης τα βλέπει και μπορεί να τα σβήσει.
+     Από τη v92 ο ΑΡΙΘΜΟΣ έρχεται από τον server (KM-<affiliate>-<n>)· το
+     θέμα και το κείμενο ΔΕΝ πάνε ποτέ στον server. -->
 <section id="s-help" class="screen page" hidden>
+  <!-- v92 · KM-SUP-CASE (26/9/2026) — αριθμός αιτήματος από τον server, «Συνέχεια σε…».
+       ⚠ PRO (απόφαση Stavros 26/9): η οθόνη φαίνεται ΜΟΝΟ στη συσκευή του Boss. -->
   <header class="pg-head">
     <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
     <h2>Υποστήριξη</h2>
   </header>
   <div class="pg-body">
     <p class="lede">Γράψε μας τι συμβαίνει — απαντάμε στο email σου.</p>
-    <p class="fine">Το email ανοίγει με έτοιμο αριθμό εισιτηρίου, την έκδοση και τη συσκευή σου, για να σε βοηθήσουμε πιο γρήγορα. Τα βλέπεις πριν στείλεις και μπορείς να τα σβήσεις.</p>
+    <div id="hp-cases-wrap" hidden>
+      <h3 class="sec">ΤΟ ΑΙΤΗΜΑ</h3>
+      <div id="hp-cases" class="hp-cases" role="radiogroup" aria-label="Νέο αίτημα ή συνέχεια"></div>
+    </div>
+    <label class="fld"><span>Για τι αφορά; (προαιρετικό)</span><input type="text" id="hp-topic" maxlength="60" autocomplete="off" placeholder="π.χ. δεν διαβάζει το τιμολόγιο"></label>
+    <p class="fine">Το email ανοίγει με έτοιμο αριθμό αιτήματος, την έκδοση και τη συσκευή σου, για να σε βοηθήσουμε πιο γρήγορα. Τα βλέπεις πριν στείλεις. <b>Κράτα τον αριθμό στο θέμα</b> αν μας ξαναγράψεις.</p>
     <button class="btn primary" id="hp-mail">Γράψε μας</button>
+    <p class="fine" id="hp-note" hidden></p>
     <div class="sep"></div>
     <p class="fine hint">Αν το κινητό σου δεν έχει ρυθμισμένο email:</p>
     <div class="kv"><span>Διεύθυνση</span><b>support@fastwrite.tech</b></div>
-    <div class="kv"><span>Αριθμός εισιτηρίου</span><b id="hp-ticket">—</b></div>
+    <div class="kv"><span>Αριθμός αιτήματος</span><b id="hp-ticket">—</b></div>
     <button class="btn ghost" id="hp-copy">Αντιγραφή διεύθυνσης και αριθμού</button>
-    <p class="fine" id="hp-note" hidden></p>
   </div>
 </section>
 

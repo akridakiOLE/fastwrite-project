@@ -145,6 +145,9 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/admin/leads/import" && method === "POST") return adminLeadsImport(request, env);
   if (path === "/api/km/admin/leads/send" && method === "POST") return adminLeadsSend(request, env);
   if (path === "/api/km/lista" && (method === "GET" || method === "POST")) return leadsLista(request, env);
+  // v92 · KM-SUP-CASE (26/9/2026) — αριθμός αιτήματος υποστήριξης. schema/km_support.sql
+  if (path === "/api/km/support/ticket" && method === "POST") return supportTicket(request, env);
+  if (path === "/api/km/support/email-ticket" && method === "POST") return supportEmailTicket(request, env);
   // Η.11β: GET = ποιοι ΘΑ σβήνονταν τώρα · POST = σβήνει. Ιδιο μοτίβο με το
   // admin/cleanup, και για τον ίδιο λόγο: δεν εμπιστεύεσαι αυτόματη διαγραφή
   // που δεν μπορείς να δεις πρώτα. Το ?now= επιτρέπει στα τεστ να «γεράσουν»
@@ -166,6 +169,52 @@ export async function handleKm(request, env, ctx, path) {
   }
 
   return json({ ok: false, error: "not_found" }, 404);
+}
+
+// ── v92 · KM-SUP-CASE — ΑΡΙΘΜΟΣ ΑΙΤΗΜΑΤΟΣ ΥΠΟΣΤΗΡΙΞΗΣ (26/9/2026, απόφαση Stavros) ──
+// Ως τη v91 ο αριθμός ήταν τυχαίος 4 χαρακτήρων και φτιαχνόταν στη συσκευή:
+// από ~1.200 αιτήματα δύο χρήστες είχαν 50% πιθανότητα να πάρουν τον ίδιο.
+// Τώρα ο αριθμός είναι <μοναδικό πρόθεμα>-<μετρητής>, και ο μετρητής ζει ΕΔΩ:
+//   · εφαρμογή:  KM-<κωδικός affiliate>-<n>  (ο κωδικός έχει μοναδικό δείκτη)
+//   · email έξω από την εφαρμογή: KM-E-<nnnnnn> (ένας μετρητής για όλους)
+// Άρα κανένας αριθμός δεν επαναλαμβάνεται — ούτε με αλλαγή κινητού, ούτε με
+// δύο συσκευές, ούτε ανάμεσα στις δύο πηγές (άλλη μορφή).
+// Ο server ΔΕΝ μαθαίνει θέμα, κείμενο ή διεύθυνση — μόνο ότι ζητήθηκε αριθμός.
+async function supportNext(env, scope) {
+  const r = await env.DB.prepare(
+    `INSERT INTO km_support_seq (scope, n) VALUES (?, 1)
+     ON CONFLICT(scope) DO UPDATE SET n = n + 1
+     RETURNING n`
+  ).bind(scope).first();
+  return r ? Number(r.n) : 0;
+}
+
+// POST /api/km/support/ticket — από την εφαρμογή, με την ταυτότητα του λογαριασμού.
+// ⚠ allowPending: όποιος έχει ζητήσει διαγραφή ΠΡΕΠΕΙ να μπορεί να μας γράψει
+// (π.χ. «θέλω να την ακυρώσω») — ο αριθμός δεν αγγίζει δεδομένα.
+async function supportTicket(request, env) {
+  const a = await authed(request, env, { allowPending: true });
+  if (a.err) return a.err;
+  const ref = await ensureRefCode(env, a.id.folder, a.acc.ref_code);
+  if (!ref) return json({ ok: false, error: "ref_code" }, 500);
+  const n = await supportNext(env, a.id.folder);
+  if (!n) return json({ ok: false, error: "seq" }, 500);
+  return json({ ok: true, code: "KM-" + ref + "-" + n });
+}
+
+// POST /api/km/support/email-ticket — ΜΟΝΟ για το Apps Script του support@.
+// Δικό του μυστικό (KM_SUPPORT_KEY), ΟΧΙ το KM_ADMIN_KEY: το σκριπτ ζει σε
+// λογαριασμό Google και δεν πρέπει να μπορεί να σβήσει ή να στείλει τίποτα.
+// Χωρίς μυστικό η διαδρομή ΔΕΝ ΥΠΑΡΧΕΙ (404) — ίδιο μοτίβο με το adminOk.
+function supportKeyOk(request, env) {
+  const k = request.headers.get("X-Km-Support") || "";
+  return !!env.KM_SUPPORT_KEY && k === env.KM_SUPPORT_KEY;
+}
+async function supportEmailTicket(request, env) {
+  if (!supportKeyOk(request, env)) return new Response("Not found", { status: 404 });
+  const n = await supportNext(env, "E");
+  if (!n) return json({ ok: false, error: "seq" }, 500);
+  return json({ ok: true, code: "KM-E-" + String(n).padStart(6, "0") });
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -1158,6 +1207,8 @@ async function wipeFolder(env, folderId) {
     env.DB.prepare("DELETE FROM km_locks WHERE folder_id = ?").bind(folderId),
     env.DB.prepare("DELETE FROM km_device_links WHERE folder_id = ?").bind(folderId),
     env.DB.prepare("DELETE FROM km_devices WHERE folder_id = ?").bind(folderId),
+    // v92 · KM-SUP-CASE — ο μετρητής αιτημάτων φεύγει με τον λογαριασμό
+    env.DB.prepare("DELETE FROM km_support_seq WHERE scope = ?").bind(folderId),
     env.DB.prepare(
       `UPDATE km_accounts SET email = '', auth_hash = '', active_device_id = NULL,
               active_since = NULL, folder_bytes = 0, folder_version = 0, last_sync = NULL,

@@ -18,7 +18,7 @@ if (MUTATE) {
 const mod = await import("data:text/javascript;base64," + Buffer.from(src).toString("base64"));
 
 const db = new DatabaseSync(":memory:");
-for (const f of ["schema/km.sql", "schema/gnomi.sql", "schema/km_feedback.sql", "schema/km_leads.sql"]) {
+for (const f of ["schema/km.sql", "schema/gnomi.sql", "schema/km_feedback.sql", "schema/km_leads.sql", "schema/km_support.sql"]) {
   db.exec(readFileSync(f, "utf8"));
 }
 const stmt = (sql, args) => {

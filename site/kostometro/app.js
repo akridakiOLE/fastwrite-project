@@ -26,6 +26,9 @@
        παράγεται ποτέ στη συσκευή: ως τη v63 παραγόταν, και κάθε αλλαγή
        κινητού έσβηνε τις συστάσεις όποιου είχε ήδη καλέσει επιχειρήσεις. */
     refCode: 'km_ref_code',
+    /* v92 · KM-SUP-CASE — τα πρόσφατα αιτήματα υποστήριξης ΑΥΤΗΣ της συσκευής:
+       [{c: κωδικός, d: ISO ημερομηνία, t: θέμα}]. Το θέμα ΔΕΝ πάει ποτέ στον server. */
+    sup: 'km_sup_cases',
     refHit:  'km_ref_hit',
     /* v67 — η συγκατάθεση του ΣΥΣΤΗΜΕΝΟΥ να φανεί το email του σε αυτόν
        που τον κάλεσε. Κρατιέται ως την εγγραφή και στέλνεται μία φορά. */
@@ -2118,7 +2121,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v91';
+  var APP_VER = 'φέτα 3 · v92';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5371,31 +5374,134 @@
     });
   }
 
-  /* ══ v62 · Brief Ε §2 — ΥΠΟΣΤΗΡΙΞΗ ══════════════════════════════════
-     Τίποτα δεν πάει στον server. Ο αριθμός εισιτηρίου είναι τυχαίος, 4
-     χαρακτήρες, νέος σε κάθε άνοιγμα της οθόνης — μπαίνει στο θέμα ώστε η
-     συζήτηση να βρίσκεται με αναζήτηση σε οποιοδήποτε γραμματοκιβώτιο. */
-  var hpTicket = '';
-  function newTicket() {
-    var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', o = '';   // χωρίς I/O/0/1 — διαβάζονται λάθος στο τηλέφωνο
-    var r = new Uint8Array(4); crypto.getRandomValues(r);
-    for (var i = 0; i < 4; i++) { o += A[r[i] % A.length]; }
-    return 'KM-' + o;
+  /* ══ v92 · KM-SUP-CASE — ΑΡΙΘΜΟΣ ΑΙΤΗΜΑΤΟΣ ΚΑΙ «ΣΥΝΕΧΕΙΑ ΣΕ…» (26/9/2026) ══════
+     Ως τη v91 ο αριθμός ήταν τυχαίος, 4 χαρακτήρες (~1 εκ. συνδυασμοί), νέος σε
+     ΚΑΘΕ άνοιγμα της οθόνης: (α) ο ίδιος χρήστης που ξαναέγραφε για το ίδιο
+     θέμα άνοιγε νέα υπόθεση, (β) από ~1.200 αιτήματα και πάνω δύο χρήστες είχαν
+     50% πιθανότητα να πάρουν τον ίδιο αριθμό — ΣΧΕΔΙΑΖΟΥΜΕ ΓΙΑ ΤΟ ΜΕΓΑΛΟ.
+     ΤΩΡΑ (απόφαση Stavros 26/9):
+       · νέος αριθμός = KM-<κωδικός affiliate>-<n>, ΜΟΝΟ από τον server
+         (POST /api/km/support/ticket). Ο κωδικός affiliate είναι μοναδικός στη
+         βάση και ο μετρητής ζει στον server ανά λογαριασμό — άρα ΚΑΝΕΝΑΣ
+         αριθμός δεν επαναλαμβάνεται, ούτε με αλλαγή κινητού, ούτε με δύο
+         συσκευές. Ο server μαθαίνει ΜΟΝΟ ότι ζητήθηκε αριθμός — όχι θέμα, όχι
+         κείμενο.
+       · χωρίς λογαριασμό ή χωρίς δίκτυο: το email φεύγει ΧΩΡΙΣ αριθμό και ο
+         αριθμός (KM-E-nnnnnn) έρχεται με την αυτόματη απάντηση του support@.
+         Ποτέ αριθμός φτιαγμένος στη συσκευή.
+       · τα πρόσφατα αιτήματα (≤5, ≤60 ημέρες) ζουν ΜΟΝΟ σε αυτή τη συσκευή·
+         «πρόσφατα», ΟΧΙ «ανοιχτά» — η εφαρμογή δεν ξέρει αν απαντήσαμε.
+     ⚠ PRO: η Υποστήριξη και η Γνώμη φαίνονται ΜΟΝΟ στο Boss (απόφαση 26/9). */
+  var SUP_KEEP_DAYS = 60, SUP_SHOW = 5, SUP_STORE = 20, SUP_WAIT_MS = 4000;
+  var SUP_RE = /^KM-(?:E-\d{6,}|[2-9A-Z]{10}-\d{1,9})$/;
+  function supRead() {
+    try { var a = JSON.parse(localStorage.getItem(LS.sup) || '[]'); return Array.isArray(a) ? a : []; }
+    catch (e) { return []; }
   }
+  function supWrite(a) { try { localStorage.setItem(LS.sup, JSON.stringify(a.slice(0, SUP_STORE))); } catch (e) {} }
+  function supRecent(list, nowMs) {
+    var lim = nowMs - SUP_KEEP_DAYS * 864e5;
+    return list.filter(function (x) {
+      return x && SUP_RE.test(x.c || '') && (Date.parse(x.d) || 0) >= lim;
+    }).slice(0, SUP_SHOW);
+  }
+  /* Το πιο πρόσφατο πάει πάνω· ο ίδιος κωδικός δεν γράφεται δύο φορές. */
+  function supRemember(code, topic) {
+    var a = supRead().filter(function (x) { return x && x.c !== code; });
+    a.unshift({ c: code, d: new Date().toISOString(), t: topic || '' });
+    supWrite(a);
+  }
+  function supTopic(v) { return String(v || '').replace(/\s+/g, ' ').trim().slice(0, 60); }
+  function supSubject(code, topic) {
+    return 'Kostometro' + (code ? ' · ' + code : '') + (topic ? ' · ' + topic : '');
+  }
+  /* 🔴 Ο ΝΕΟΣ ΑΡΙΘΜΟΣ ΕΡΧΕΤΑΙ ΜΟΝΟ ΑΠΟ ΤΟΝ SERVER. Κενό = «χωρίς αριθμό»:
+     το email φεύγει κανονικά και ο αριθμός έρχεται με την αυτόματη απάντηση.
+     Το όριο των 4″ υπάρχει επειδή το mailto θέλει το πάτημα του χρήστη ακόμα
+     «ζεστό» — μετά από πολύ αναμονή ο browser μπορεί να μην ανοίξει το email. */
+  function supNewCode() {
+    if (!hasAccount()) { return Promise.resolve(''); }
+    var late = new Promise(function (res) { setTimeout(function () { res(''); }, SUP_WAIT_MS); });
+    var ask = kmFetch('support/ticket', { method: 'POST', headers: kmHead(), body: '{}' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { return (j && j.ok && SUP_RE.test(j.code || '')) ? j.code : ''; })
+      .catch(function () { return ''; });
+    return Promise.race([ask, late]);
+  }
+  function supDay(iso) {
+    var d = new Date(iso); if (isNaN(d)) { return ''; }
+    return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
+  }
+
+  var hpSel = '';      // '' = νέο αίτημα · αλλιώς ο αριθμός που συνεχίζεται
+  var hpBusy = false;
   function renderHelp() {
-    hpTicket = newTicket();
-    el('hp-ticket').textContent = hpTicket;
+    hpSel = ''; hpBusy = false;
+    el('hp-topic').value = '';
+    el('hp-ticket').textContent = '—';
     el('hp-note').hidden = true;
+    el('hp-mail').disabled = false;
+    var box = el('hp-cases');
+    box.textContent = '';
+    var list = supRecent(supRead(), Date.now());
+    el('hp-cases-wrap').hidden = !list.length;
+    /* Όλα με textContent: το θέμα το έγραψε ο χρήστης. */
+    var row = function (code, title, sub, on) {
+      var lb = document.createElement('label'); lb.className = 'hp-case';
+      var r = document.createElement('input'); r.type = 'radio'; r.name = 'hp-case'; r.value = code; r.checked = on;
+      r.onchange = function () { if (r.checked) { hpSel = code; el('hp-ticket').textContent = code || '—'; } };
+      var sp = document.createElement('span'); sp.textContent = title;
+      var sm = document.createElement('small'); sm.textContent = sub; sp.appendChild(sm);
+      lb.appendChild(r); lb.appendChild(sp); box.appendChild(lb);
+    };
+    row('', 'Νέο αίτημα', 'παίρνει νέο αριθμό', true);
+    list.forEach(function (x) { row(x.c, 'Συνέχεια σε ' + x.c, supDay(x.d) + (x.t ? ' · ' + x.t : ''), false); });
+  }
+  /* Επιστρέφει {code, topic}. Μετά τον πρώτο νέο αριθμό, το ίδιο άνοιγμα της
+     οθόνης τον ΞΑΝΑΧΡΗΣΙΜΟΠΟΙΕΙ — δεύτερο πάτημα δεν ανοίγει δεύτερη υπόθεση. */
+  function hpPrepare() {
+    var topic = supTopic(el('hp-topic').value);
+    if (hpSel) {
+      var old = supRead().filter(function (x) { return x && x.c === hpSel; })[0];
+      if (!topic && old) { topic = old.t || ''; }
+      supRemember(hpSel, topic);
+      return Promise.resolve({ code: hpSel, topic: topic });
+    }
+    return supNewCode().then(function (code) {
+      if (code) { hpSel = code; supRemember(code, topic); }
+      return { code: code, topic: topic };
+    });
+  }
+  function hpShow(p) {
+    el('hp-ticket').textContent = p.code || 'με την απάντησή μας';
+    var n = el('hp-note');
+    if (p.code) { n.hidden = true; }
+    else {
+      n.textContent = 'Ο αριθμός αιτήματος θα σου έρθει με την αυτόματη απάντησή μας. Κράτα τον στο θέμα αν μας ξαναγράψεις.';
+      n.hidden = false;
+    }
+  }
+  function hpRun(then) {
+    if (hpBusy) { return; }
+    hpBusy = true; el('hp-mail').disabled = true; el('hp-copy').disabled = true;
+    hpPrepare().then(function (p) {
+      hpBusy = false; el('hp-mail').disabled = false; el('hp-copy').disabled = false;
+      hpShow(p); then(p);
+    });
   }
   el('hp-mail').onclick = function () {
-    var subj = 'Kostometro · ' + hpTicket;
-    var body = '\n\n\n— — —\nΈκδοση: ' + shortVer(APP_VER) + '\nΣυσκευή: ' + devName() + '\nBrowser: ' + (navigator.userAgent || '').slice(0, 120);
-    location.href = 'mailto:support@fastwrite.tech?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(body);
+    hpRun(function (p) {
+      var body = '\n\n\n— — —\n' + (p.code ? 'Αριθμός αιτήματος: ' + p.code + '\n' : '') +
+                 'Έκδοση: ' + shortVer(APP_VER) + '\nΣυσκευή: ' + devName() + '\nBrowser: ' + (navigator.userAgent || '').slice(0, 120);
+      location.href = 'mailto:support@fastwrite.tech?subject=' + encodeURIComponent(supSubject(p.code, p.topic)) + '&body=' + encodeURIComponent(body);
+    });
   };
   el('hp-copy').onclick = function () {
-    var t = 'support@fastwrite.tech — ' + hpTicket;
-    var done = function () { el('hp-note').textContent = 'Αντιγράφηκε: ' + t; el('hp-note').hidden = false; };
-    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done, done); } else { done(); }
+    hpRun(function (p) {
+      var t = 'support@fastwrite.tech — ' + supSubject(p.code, p.topic);
+      var done = function () { el('hp-note').textContent = 'Αντιγράφηκε: ' + t; el('hp-note').hidden = false; };
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done, done); } else { done(); }
+    });
   };
 
   /* ══ v62 · Brief Ε §3 — Η ΓΝΩΜΗ ΣΟΥ ═════════════════════════════════
