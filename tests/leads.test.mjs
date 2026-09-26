@@ -12,22 +12,26 @@ const MUT = [
   // 2 · 🔴 η εισαγωγή ξαναβάζει διαγραμμένους
   ["ON CONFLICT(email) DO NOTHING", "ON CONFLICT(email) DO UPDATE SET unsub_at = NULL"],
   // 3 · 🔴 διπλή αποστολή στην ίδια εκστρατεία
-  ["AND s.campaign = ? AND s.ok = 1)", "AND s.campaign = ? AND 0)"],
+  ["AND s.campaign = ? AND s.ok = 1))", "AND s.campaign = ? AND 0))"],
   // 4 · 🔴 στέλνει σε διαγραμμένους
   ["             WHERE l.unsub_at IS NULL\n", "             WHERE 1=1\n"],
   // 5 · η αποστολή χωρίς dry_run στέλνει κατευθείαν
   ["const dryRun = b.dry_run === false ? false : true;   // ⚠ default: ΔΕΝ στέλνει", "const dryRun = b.dry_run === true;"],
   // 6 · χωρίς κλειδί διαχειριστή
   ["async function adminLeadsSend(request, env) {\n  if (!adminOk(request, env)) return new Response(\"Not found\", { status: 404 });", "async function adminLeadsSend(request, env) {"],
-  // 7 · το «όνομα» δεν φιλτράρεται — ό,τι έγραψε κάποιος στη φόρμα μπαίνει στον χαιρετισμό
-  ["return /^[\\p{L}][\\p{L}'’.-]{0,39}$/u.test(s) ? s : \"\";", "return s;"],
+  // 7 · το όνομα ξαναμπαίνει στον χαιρετισμό
+  ['const hi = "Γεια σου,";', 'const hi = "Γεια σου " + (lead.name || "") + ",";'],
+  // 9 · 🔴 η αυτόματη διαγραφή των 24 μηνών δεν σβήνει leads
+  ['    leads:           await wipe("km_leads", "consent_at < ?", monthsAgo(RETENTION.leads_months, nowIso)),', ""],
+  // 10 · το resend χωρίς only_email ξαναστέλνει σε όλους
+  ["const resend = !!(b.resend === true && only);", "const resend = b.resend === true;"],
   // 8 · ο σύνδεσμος της εφαρμογής χάνει το ?src=leads
   ['const app = LEAD_SITE + "/kostometro/?src=leads";', 'const app = LEAD_SITE + "/kostometro/";'],
 ];
 if (ONLY) { const m = MUT[ONLY - 1]; if (!m) process.exit(2); if (!src.includes(m[0])) { console.log("Μ" + ONLY + " ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ"); process.exit(3); } src = src.replace(m[0], m[1]); }
 const mod = await import("data:text/javascript;base64," + Buffer.from(src).toString("base64"));
 const db = new DatabaseSync(":memory:");
-for (const f of ["km.sql", "km_mail.sql", "km_leads.sql"]) {
+for (const f of ["km.sql", "km_mail.sql", "km_leads.sql", "gnomi.sql", "km_feedback.sql"]) {
   const sql = readFileSync("schema/" + f, "utf8").split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
   for (const s of sql.split(";")) { const t = s.trim(); if (!t) continue; try { db.exec(t + ";"); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }
 }
@@ -72,7 +76,7 @@ await check("Λ-5 · δοκιμή σε ένα email (only_email): φεύγει �
 });
 await check("Λ-6 · το περιεχόμενο: όνομα, ?src=leads, προσωπικός σύνδεσμος διαγραφής, αποστολέας", async () => {
   const m = outbox[0];
-  if (!m.html.includes("Γεια σου Μαρία,")) throw new Error("όνομα");
+  if (!m.html.includes("Γεια σου,") || m.html.includes("Μαρία")) throw new Error("χαιρετισμός χωρίς όνομα (26/9)");
   if (!m.html.includes("https://fastwrite.tech/kostometro/?src=leads")) throw new Error("?src=leads");
   if (!m.html.includes("/api/km/lista?t=" + tokenOf("maria@example.com"))) throw new Error("σύνδεσμος διαγραφής");
   if (!m.text.includes("/api/km/lista?t=" + tokenOf("maria@example.com"))) throw new Error("διαγραφή στο κείμενο");
@@ -113,6 +117,21 @@ await check("Λ-11 · «Μένω» καταγράφεται · άκυρος σύ
   const h = await (await call("/api/km/lista?t=deadbeef", { method: "GET" })).text();
   if (!h.includes("δεν ισχύει")) throw new Error("άκυρος");
 });
+await check("Λ-12 · resend ΜΟΝΟ για ένα email · χωρίς only_email αγνοείται", async () => {
+  await admin("/api/km/admin/leads/send", { campaign: "dianomi-1", dry_run: false, limit: 40 });   // ό,τι εκκρεμεί, φεύγει πρώτα
+  const n0 = outbox.length;
+  const r = await (await admin("/api/km/admin/leads/send", { campaign: "dianomi-1", dry_run: false, resend: true })).json();
+  if (r.sent !== 0) throw new Error("το resend έστειλε σε όλους: " + r.sent);
+  const r2 = await (await admin("/api/km/admin/leads/send", { campaign: "dianomi-1", dry_run: false, resend: true, only_email: "maria@example.com" })).json();
+  eq([r2.sent, outbox.length - n0], [1, 1]);
+});
+await check("Λ-13 · 24 μήνες: το παλιό lead και οι αποστολές του σβήνονται, τα νέα μένουν", async () => {
+  await admin("/api/km/admin/leads/import", { rows: [{ email: "old@example.com", consent_at: "2024-01-01T00:00:00Z" }] });
+  db.prepare("INSERT INTO km_lead_sends (email, campaign, at, ok) VALUES ('old@example.com','dianomi-1','2024-02-01',1)").run();
+  const d = await mod.kmCleanup(env, "2026-09-26T00:00:00Z");
+  eq([d.leads, d.lead_sends], [1, 1]);
+  if (!db.prepare("SELECT 1 FROM km_leads WHERE email='maria@example.com'").get()) throw new Error("έσβησε νέο lead");
+});
 if (ONLY) { if (fails) { console.log("Μ" + ONLY + ": κοκκίνισε ✓"); process.exit(0); } console.log("Μ" + ONLY + ": ΠΕΡΑΣΕ ΠΡΑΣΙΝΟ"); process.exit(1); }
 if (fails) { console.log("\n" + fails + " ΑΠΕΤΥΧΑΝ"); process.exit(1); }
-console.log("\n✔ ΟΛΑ ΠΕΡΑΣΑΝ (11)");
+console.log("\n✔ ΟΛΑ ΠΕΡΑΣΑΝ (13)");

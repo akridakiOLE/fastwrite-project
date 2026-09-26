@@ -20,7 +20,11 @@ function split(line) {
   out.push(cur); return out.map((s) => s.trim());
 }
 const head = split(lines[0]).map((h) => h.toLowerCase());
-const col = (...names) => head.findIndex((h) => names.some((n) => h === n || h.includes(n)));
+// Πρώτα ακριβές όνομα στήλης, μετά «περιέχει» — αλλιώς το «name» πιάνει το ad_name (μετρήθηκε 26/9).
+const col = (...names) => {
+  const ex = head.findIndex((h) => names.includes(h));
+  return ex >= 0 ? ex : head.findIndex((h) => names.some((n) => h.includes(n)));
+};
 const ie = col("email", "e-mail", "ηλεκτρονικό ταχυδρομείο");
 const iname = col("full_name", "full name", "ονοματεπώνυμο", "όνομα", "name");
 const itime = col("created_time", "created time", "ημερομηνία");

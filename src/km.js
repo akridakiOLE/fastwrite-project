@@ -1610,6 +1610,9 @@ const RETENTION = {
   tombstone_months: 36,
   feedback_months: 24,
   gnomi_months: 24,
+  // KM-LEADS-RETENTION · 26/9/2026, απόφαση Stavros: 24 μήνες (όχι 12). Από την ημερομηνία
+  // της φόρμας (consent_at) — και μαζί ό,τι κρατάμε για τις αποστολές τους.
+  leads_months: 24,
 };
 const CLEANUP_BATCH = 500;
 
@@ -1631,6 +1634,7 @@ async function cleanupCounts(env, nowIso) {
     feedback:   await one("SELECT COUNT(*) AS n FROM km_feedback WHERE month < ?", fb),
     gnomi_responses: await one("SELECT COUNT(*) AS n FROM gnomi_responses WHERE ts < ?", gn),
     gnomi_events:    await one("SELECT COUNT(*) AS n FROM gnomi_events WHERE ts < ?", gn),
+    leads:           await one("SELECT COUNT(*) AS n FROM km_leads WHERE consent_at < ?", monthsAgo(RETENTION.leads_months, nowIso)),
   };
 }
 
@@ -1655,6 +1659,9 @@ export async function kmCleanup(env, nowIso) {
     feedback:        await wipe("km_feedback", "month < ?", fb),
     gnomi_responses: await wipe("gnomi_responses", "ts < ?", gn),
     gnomi_events:    await wipe("gnomi_events", "ts < ?", gn),
+    // πρώτα οι αποστολές (βρίσκονται μέσω του lead), μετά το ίδιο το lead
+    lead_sends:      await wipe("km_lead_sends", "email IN (SELECT email FROM km_leads WHERE consent_at < ?)", monthsAgo(RETENTION.leads_months, nowIso)),
+    leads:           await wipe("km_leads", "consent_at < ?", monthsAgo(RETENTION.leads_months, nowIso)),
   };
   done.batch_limit = CLEANUP_BATCH;
   done.more = Object.keys(done).some((k) => k !== "batch_limit" && done[k] === CLEANUP_BATCH);
@@ -2264,8 +2271,9 @@ async function adminLeadsImport(request, env) {
 // Το κείμενο εγκρίθηκε από τον Stavros 26/9/2026 (Α250). Κάθε αλλαγή = νέα εκστρατεία.
 function leadMail(campaign, lead) {
   if (campaign !== "dianomi-1") return null;
-  const fn = leadFirstName(lead.name);
-  const hi = fn ? "Γεια σου " + fn + "," : "Γεια σου,";
+  // 26/9, απόφαση Stavros: ΧΩΡΙΣ όνομα. 74/89 ονόματα σε λατινικά, και η κλητική
+  // («Σταύρο», όχι «Σταύρος») δεν βγαίνει αξιόπιστα με κανόνα. «Γεια σου,» = πάντα σωστό.
+  const hi = "Γεια σου,";
   const app = LEAD_SITE + "/kostometro/?src=leads";
   const key = LEAD_SITE + "/kostometro/kleidi/";
   const out = LEAD_SITE + "/api/km/lista?t=" + lead.token;
@@ -2335,10 +2343,12 @@ async function adminLeadsSend(request, env) {
   const limit = Math.max(1, Math.min(LEAD_SEND_MAX, Number(b.limit) || 10));
   const only = b.only_email ? normEmail(b.only_email) : null;
   if (b.only_email && !only) return json({ ok: false, error: "bad_only_email" }, 400);
-  const args = [campaign];
+  // Ξαναστέλνει ΜΟΝΟ σε ένα email, ΜΟΝΟ ρητά — για δοκιμή μετά από αλλαγή κειμένου.
+  const resend = !!(b.resend === true && only);
+  const args = [resend ? 1 : 0, campaign];
   let sql = `SELECT l.email, l.name, l.token FROM km_leads l
              WHERE l.unsub_at IS NULL
-               AND NOT EXISTS (SELECT 1 FROM km_lead_sends s WHERE s.email = l.email AND s.campaign = ? AND s.ok = 1)`;
+               AND (? OR NOT EXISTS (SELECT 1 FROM km_lead_sends s WHERE s.email = l.email AND s.campaign = ? AND s.ok = 1))`;
   if (only) { sql += " AND l.email = ?"; args.push(only); }
   const pending = (await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM (${sql})`).bind(...args).first() || {}).n || 0;
