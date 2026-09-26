@@ -141,6 +141,10 @@ export async function handleKm(request, env, ctx, path) {
   // Brief Β (4/9/2026, (α)-(δ) του Stavros) — ο Πίνακας Ελέγχου. JSON μόνο· η
   // οθόνη ζει στο /pinakas/ (PWA, ΕΞΩ από το /kostometro/ — μάθημα 15/9).
   if (path === "/api/km/admin/pinakas" && method === "GET") return adminPinakas(request, env);
+  // KM-LEADS (26/9/2026) — λίστα leads, αποστολή, σελίδα «μένω / φεύγω». schema/km_leads.sql
+  if (path === "/api/km/admin/leads/import" && method === "POST") return adminLeadsImport(request, env);
+  if (path === "/api/km/admin/leads/send" && method === "POST") return adminLeadsSend(request, env);
+  if (path === "/api/km/lista" && (method === "GET" || method === "POST")) return leadsLista(request, env);
   // Η.11β: GET = ποιοι ΘΑ σβήνονταν τώρα · POST = σβήνει. Ιδιο μοτίβο με το
   // admin/cleanup, και για τον ίδιο λόγο: δεν εμπιστεύεσαι αυτόματη διαγραφή
   // που δεν μπορείς να δεις πρώτα. Το ?now= επιτρέπει στα τεστ να «γεράσουν»
@@ -2203,4 +2207,205 @@ async function adminMail(request, env) {
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KM-LEADS · ΛΙΣΤΑ LEADS ΚΑΙ ΑΠΟΣΤΟΛΗ (26/9/2026) — η πρώτη διανομή στους leads
+//
+// Σχήμα: schema/km_leads.sql. Τρεις διαδρομές:
+//   POST /api/km/admin/leads/import  -> εισαγωγή από το CSV της Meta (admin)
+//   POST /api/km/admin/leads/send    -> αποστολή εκστρατείας (admin, dry_run εξ ορισμού)
+//   GET|POST /api/km/lista?t=<token> -> η σελίδα «μένω / φεύγω» του συνδέσμου στο email
+//
+// 🔴 ΤΡΙΑ ΠΟΥ ΔΕΝ ΣΠΑΝΕ:
+//  (1) Ο διαγραμμένος ΔΕΝ ξαναμπαίνει ποτέ: η εισαγωγή δεν αγγίζει unsub_at.
+//  (2) Κανείς δεν παίρνει δύο φορές την ίδια εκστρατεία (km_lead_sends, PK email+campaign).
+//  (3) Το GET της σελίδας ΔΕΝ διαγράφει. Τα φίλτρα ασφαλείας των email ανοίγουν
+//      τους συνδέσμους αυτόματα — αν το GET διέγραφε, θα έσβηνε όλη η λίστα μόνη της.
+//      Η διαγραφή γίνεται ΜΟΝΟ με το κουμπί (POST).
+// ═══════════════════════════════════════════════════════════════════════════
+const LEAD_FROM = "Kostometro <noreply@notify.fastwrite.tech>";
+const LEAD_SITE = "https://fastwrite.tech";
+const LEAD_IMPORT_MAX = 2000;
+const LEAD_SEND_MAX = 40;          // ανά κλήση: μένουμε μακριά από το όριο υποαιτημάτων του Worker
+
+function leadToken() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16))).map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+// Από το «Γιώργος Παπαδόπουλος» κρατάμε «Γιώργος». Σκουπίδια → κανένα όνομα.
+function leadFirstName(n) {
+  const s = String(n || "").trim().split(/\s+/)[0] || "";
+  return /^[\p{L}][\p{L}'’.-]{0,39}$/u.test(s) ? s : "";
+}
+
+async function adminLeadsImport(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const rows = Array.isArray(b.rows) ? b.rows.slice(0, LEAD_IMPORT_MAX) : [];
+  const source = (clean(b.source, 30) || "fb-form").replace(/[^a-z0-9:_-]/gi, "") || "fb-form";
+  const t = now();
+  let inserted = 0, known = 0;
+  const invalid = [];
+  for (const r of rows) {
+    const email = normEmail(r && r.email);
+    if (!email) { invalid.push(clean(r && r.email, 80)); continue; }
+    const c = clean(r.consent_at, 40);
+    const consent = c && !isNaN(Date.parse(c)) ? new Date(c).toISOString() : t;
+    const name = clean(r.name, 80);
+    const res = await env.DB.prepare(
+      `INSERT INTO km_leads (email, name, source, consent_at, imported_at, token)
+       VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(email) DO NOTHING`
+    ).bind(email, name, source, consent, t, leadToken()).run();
+    if (res && res.meta && res.meta.changes) inserted++; else known++;
+  }
+  return json({ ok: true, received: rows.length, inserted, known, invalid });
+}
+
+// Το κείμενο εγκρίθηκε από τον Stavros 26/9/2026 (Α250). Κάθε αλλαγή = νέα εκστρατεία.
+function leadMail(campaign, lead) {
+  if (campaign !== "dianomi-1") return null;
+  const fn = leadFirstName(lead.name);
+  const hi = fn ? "Γεια σου " + fn + "," : "Γεια σου,";
+  const app = LEAD_SITE + "/kostometro/?src=leads";
+  const key = LEAD_SITE + "/kostometro/kleidi/";
+  const out = LEAD_SITE + "/api/km/lista?t=" + lead.token;
+  const pol = LEAD_SITE + "/legal/privacy.html";
+  const H = (s) => '<h2 style="font-size:17px;margin:26px 0 8px;color:#0a0e14">' + s + "</h2>";
+  const P = (s) => '<p style="margin:0 0 12px">' + s + "</p>";
+  const L = (items) => '<ul style="margin:0 0 12px;padding-left:20px">' + items.map((i) => '<li style="margin:0 0 6px">' + i + "</li>").join("") + "</ul>";
+  const A = (u, t) => '<a href="' + u + '" style="color:#00996b;font-weight:600">' + t + "</a>";
+  const html = '<!doctype html><html lang="el"><body style="margin:0;padding:0;background:#f4f5f7">' +
+    '<div style="max-width:600px;margin:0 auto;padding:24px 20px;background:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#1a1f29">' +
+    P(escHtml(hi)) +
+    P("Άφησες το email σου στο Facebook για να είσαι από τους πρώτους. Κρατάμε την υπόσχεση, και θέλουμε να ξέρεις ακριβώς πού βρίσκεσαι.") +
+    P("<b>Αυτό που σου δίνουμε σήμερα είναι το πρώτο βήμα, όχι το τελικό προϊόν.</b> Σήμερα βλέπεις πόσο πλήρωσες συνολικά σε κάθε προμηθευτή. Το τελικό θα σου δείχνει <b>πόσο πληρώνεις για κάθε κωδικό ξεχωριστά</b>, και θα σου το λέει <b>τη στιγμή της παραλαβής, πριν υπογράψεις το δελτίο</b>, όχι σε αναφορά την επόμενη μέρα. Όσοι χρησιμοποιούν το πρώτο βήμα τώρα, το σχεδιάζουν μαζί μας και <b>θα το πάρουν πρώτοι</b>.") +
+    H("Το πρώτο βήμα: Kostometro") +
+    P("Δωρεάν, για το κινητό. Φωτογραφίζεις το τιμολόγιο τη στιγμή που παραλαμβάνεις, και κρατάς τι πλήρωσες σε κάθε προμηθευτή, με πλήρες ιστορικό καταγραφής.") +
+    '<p style="margin:18px 0"><a href="' + app + '" style="display:inline-block;background:#00E5A0;color:#0a0e14;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px">Άνοιξε το Kostometro</a></p>' +
+    P("Δουλεύει σε Android (Chrome) και σε iPhone (Safari). Η σελίδα σού δείχνει πώς να το βάλεις στην αρχική οθόνη.") +
+    P("<b>Το κλειδί Google Gemini.</b> Για να διαβάζονται τα ποσά αυτόματα χρειάζεται ένα προσωπικό κλειδί Google Gemini. Είναι ο δικός σου λογαριασμός στην Google για την τεχνολογία που διαβάζει τη φωτογραφία. Το κλειδί είναι δικό σου: εμείς δεν βλέπουμε ούτε τις φωτογραφίες ούτε τη χρέωση. Συστήνουμε το <b>πληρωμένο</b> κλειδί, γιατί το δωρεάν συχνά αργεί ή αρνείται τις ώρες αιχμής. Το κόστος είναι μικρό, ενδεικτικά <b>~0,50 € για 100 τιμολόγια</b>. " + A(key, "Οδηγός με εικόνες") + ".") +
+    P("Χωρίς κλειδί, η εφαρμογή δουλεύει μόνο χειροκίνητα: τα ποσά τα γράφεις εσύ, με περιορισμένη εμπειρία. Για το πλήρες αποτέλεσμα, βάλε το κλειδί.") +
+    H("Τι έρχεται: Kostometro PRO") +
+    L([
+      "<b>Κάθε κωδικός χωριστά, από το κινητό.</b> Φωτογραφίζεις το τιμολόγιο παραλαβής και το PRO το διαβάζει γραμμή-γραμμή: ποιο προϊόν, πόσα τεμάχια, τι τιμή.",
+      "<b>Η προηγούμενη τιμή, πάνω στην παραλαβή.</b> Κάθε κωδικός εμφανίζεται μαζί με το τι πλήρωσες την τελευταία φορά στον ίδιο προμηθευτή. Την αύξηση τη βλέπεις ενώ ο προμηθευτής είναι ακόμα μπροστά σου.",
+      "<b>Ο μέσος όρος σου ανά κωδικό:</b> η πραγματική σου μέση τιμή αγοράς για κάθε προϊόν, όχι μία μεμονωμένη τιμή.",
+      "<b>Έως 6 συσκευές στο ίδιο σημείο:</b> ο ιδιοκτήτης, ο υπεύθυνος και έως τέσσερις υπάλληλοι.",
+    ]) +
+    P("<b>Ποιος βλέπει τι.</b> Ο <b>ιδιοκτήτης</b> βλέπει τα πάντα, και από το δικό του κινητό, χωρίς να βρίσκεται στο κατάστημα. Ο <b>υπεύθυνος</b> βλέπει σύνολα και μέσους όρους, και το πλήρες ιστορικό μόνο αν το επιτρέψει ο ιδιοκτήτης. Ο <b>υπάλληλος</b> βλέπει μόνο την τελευταία τιμή του κωδικού. Η πρόσβαση δίνεται και παίρνεται πίσω, και ο ιδιοκτήτης δεν αποκλείεται ποτέ από τη δική του επιχείρηση.") +
+    H("Και το FastWrite, δωρεάν με τη συνδρομή σου") +
+    P("Το FastWrite είναι δικό μας πρόγραμμα για υπολογιστή (Windows). Σου παραχωρείται δωρεάν με το PRO, και εσύ αποφασίζεις σε ποιον το δίνεις: στον λογιστή σου ή στο δικό σου λογιστήριο.") +
+    L([
+      "<b>Κάθε τιμολόγιο που σαρώνεις στην παραλαβή φτάνει εκεί αμέσως, καταχωρημένο.</b> Κανείς δεν το πληκτρολογεί ξανά, και κανείς δεν κουβαλάει φάκελο στο τέλος του μήνα.",
+      "<b>Κόστος αγορών ανά σημείο πώλησης</b> και συγκεντρωτικά, αν έχεις περισσότερα από ένα καταστήματα.",
+      "<b>Σύνδεση με λογιστικά προγράμματα:</b> η σύνδεση με Xero υπάρχει ήδη και ακολουθεί το QuickBooks.",
+      "<b>Τα δεδομένα μένουν δικά σου.</b> Ο λογιστής τα διαβάζει αλλά δεν τα αλλάζει. Αν βρει λάθος, σου στέλνει πρόταση διόρθωσης και την εγκρίνεις εσύ με ένα πάτημα. Μπαίνει με πρόσκληση και του την παίρνεις πίσω όποτε θέλεις.",
+    ]) +
+    H("Η επιβράβευση: οι προσκλήσεις σου μετράνε από σήμερα") +
+    P("Κάθε επιχείρηση που θα καλέσεις και θα πάρει το PRO <b>σού επιστρέφει το 20% της συνδρομής σου</b>, για όσο ανανεώνει τη δική της. <b>Με 5 ενεργές συστάσεις η συνδρομή σου επιστρέφεται ολόκληρη</b>, και πάνω από 5 παίρνεις τη διαφορά.") +
+    P("Μόλις γραφτείς, θα βρεις τον δικό σου σύνδεσμο στο μενού <b>«Κάλεσε»</b>. Όποιος γραφτεί μέσα από αυτόν μετράει για σένα από την ίδια στιγμή, και η σύσταση <b>δεν λήγει</b>. Όλοι οι όροι βρίσκονται μέσα στην εφαρμογή.") +
+    H("Η γνώμη σου χτίζει το επόμενο βήμα") +
+    P("Αν θέλεις να κάνεις δικές σου εισηγήσεις, σχόλια ή βελτιώσεις που θεωρείς ότι θα βοηθήσουν σε μια καλύτερη εμπειρία, θα χαρούμε να ακούσουμε την άποψή σου από το μενού <b>«Η γνώμη σου»</b> ή στο " + A("mailto:support@fastwrite.tech", "support@fastwrite.tech") + ". Διαβάζουμε κάθε μήνυμα.") +
+    P("Η ομάδα του Kostometro") +
+    '<hr style="border:0;border-top:1px solid #e3e5ea;margin:26px 0 14px">' +
+    '<p style="margin:0 0 8px;font-size:12px;color:#6b7385">Οι δυνατότητες του PRO και του FastWrite που περιγράφονται αφορούν την έκδοση που σχεδιάζεται.</p>' +
+    '<p style="margin:0;font-size:12px;color:#6b7385">Λαμβάνεις αυτό το μήνυμα γιατί άφησες το email σου στη φόρμα μας στο Facebook, για να μαθαίνεις πρώτος τα βήματα μέχρι το τελικό προϊόν. Αν, τώρα που ξέρεις τι έρχεται, δεν θέλεις να μείνεις συνδεδεμένος μέχρι το τελικό: <a href="' + out + '" style="color:#6b7385;font-weight:700">Διαγραφή από τη λίστα</a> (ένα πάτημα). · <a href="' + pol + '" style="color:#6b7385">Πολιτική απορρήτου</a></p>' +
+    "</div></body></html>";
+  const text = [
+    hi, "",
+    "Άφησες το email σου στο Facebook για να είσαι από τους πρώτους. Κρατάμε την υπόσχεση, και θέλουμε να ξέρεις ακριβώς πού βρίσκεσαι.", "",
+    "ΑΥΤΟ ΠΟΥ ΣΟΥ ΔΙΝΟΥΜΕ ΣΗΜΕΡΑ ΕΙΝΑΙ ΤΟ ΠΡΩΤΟ ΒΗΜΑ, ΟΧΙ ΤΟ ΤΕΛΙΚΟ ΠΡΟΪΟΝ. Σήμερα βλέπεις πόσο πλήρωσες συνολικά σε κάθε προμηθευτή. Το τελικό θα σου δείχνει πόσο πληρώνεις για κάθε κωδικό ξεχωριστά, και θα σου το λέει τη στιγμή της παραλαβής, πριν υπογράψεις το δελτίο. Όσοι χρησιμοποιούν το πρώτο βήμα τώρα, το σχεδιάζουν μαζί μας και θα το πάρουν πρώτοι.", "",
+    "Άνοιξε το Kostometro: " + app, "",
+    "Το κλειδί Google Gemini (οδηγός με εικόνες): " + key, "",
+    "Όλες οι δυνατότητες του PRO και του FastWrite, η επιβράβευση και η γνώμη σου: μέσα στην εφαρμογή, μενού «Τι έρχεται».", "",
+    "Η ομάδα του Kostometro", "",
+    "---",
+    "Λαμβάνεις αυτό το μήνυμα γιατί άφησες το email σου στη φόρμα μας στο Facebook. Διαγραφή από τη λίστα: " + out,
+    "Πολιτική απορρήτου: " + pol,
+  ].join("\n");
+  return { subject: "Το πρώτο βήμα είναι έτοιμο — και είσαι μέσα από την αρχή", html, text };
+}
+
+async function adminLeadsSend(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const campaign = clean(b.campaign, 40) || "";
+  if (!leadMail(campaign, { token: "x", name: "" })) return json({ ok: false, error: "unknown_campaign" }, 400);
+  const dryRun = b.dry_run === false ? false : true;   // ⚠ default: ΔΕΝ στέλνει
+  const limit = Math.max(1, Math.min(LEAD_SEND_MAX, Number(b.limit) || 10));
+  const only = b.only_email ? normEmail(b.only_email) : null;
+  if (b.only_email && !only) return json({ ok: false, error: "bad_only_email" }, 400);
+  const args = [campaign];
+  let sql = `SELECT l.email, l.name, l.token FROM km_leads l
+             WHERE l.unsub_at IS NULL
+               AND NOT EXISTS (SELECT 1 FROM km_lead_sends s WHERE s.email = l.email AND s.campaign = ? AND s.ok = 1)`;
+  if (only) { sql += " AND l.email = ?"; args.push(only); }
+  const pending = (await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM (${sql})`).bind(...args).first() || {}).n || 0;
+  sql += " ORDER BY l.consent_at, l.email LIMIT ?"; args.push(limit);
+  const batch = (await env.DB.prepare(sql).bind(...args).all()).results || [];
+  if (dryRun) {
+    return json({ ok: true, dry_run: true, campaign, pending, would_send: batch.map((r) => r.email),
+                  note: "Τίποτα ΔΕΝ στάλθηκε. Ξανακάλεσε με dry_run:false." });
+  }
+  if (!env.EMAIL || typeof env.EMAIL.send !== "function") return json({ ok: false, error: "no_binding" }, 500);
+  let sent = 0; const failed = [];
+  for (const r of batch) {
+    const m = leadMail(campaign, r);
+    let ok = false, err = null, id = null;
+    try {
+      const x = await env.EMAIL.send({ to: r.email, from: LEAD_FROM, subject: m.subject, text: m.text, html: m.html });
+      ok = true; id = x && x.messageId ? String(x.messageId) : null;
+    } catch (e) { err = String((e && e.message) || e).slice(0, 300); }
+    await env.DB.prepare(
+      `INSERT INTO km_lead_sends (email, campaign, at, ok, err, msg_id) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(email, campaign) DO UPDATE SET at = excluded.at, ok = excluded.ok, err = excluded.err, msg_id = excluded.msg_id`
+    ).bind(r.email, campaign, now(), ok ? 1 : 0, err, id).run();
+    if (ok) sent++; else failed.push({ email: r.email, err });
+  }
+  return json({ ok: true, dry_run: false, campaign, sent, failed, remaining: Math.max(0, pending - sent) });
+}
+
+function leadPage(title, body) {
+  const html = '<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="robots" content="noindex"><title>' + escHtml(title) + '</title><style>' +
+    'body{margin:0;background:#0a0e14;color:#e6e8ec;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.55}' +
+    '.w{max-width:480px;margin:0 auto;padding:40px 20px}h1{font-size:22px;margin:0 0 14px}p{color:#a8b0bd;margin:0 0 14px}' +
+    'button,a.b{display:block;width:100%;box-sizing:border-box;text-align:center;font-size:16px;font-weight:700;padding:14px;border-radius:12px;margin:10px 0;cursor:pointer;text-decoration:none}' +
+    '.stay{background:#00E5A0;color:#0a0e14;border:0}.leave{background:transparent;color:#e6e8ec;border:1px solid #2a3140}' +
+    '</style></head><body><div class="w">' + body + '</div></body></html>';
+  return new Response(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
+}
+
+async function leadsLista(request, env) {
+  const url = new URL(request.url);
+  const tok = (url.searchParams.get("t") || "").toLowerCase();
+  const lead = /^[0-9a-f]{32}$/.test(tok)
+    ? await env.DB.prepare("SELECT email, unsub_at, stay_at FROM km_leads WHERE token = ?").bind(tok).first()
+    : null;
+  if (!lead) {
+    return leadPage("Kostometro", "<h1>Ο σύνδεσμος δεν ισχύει</h1><p>Αν θέλεις να βγεις από τη λίστα, γράψε μας στο support@fastwrite.tech και θα το κάνουμε εμείς.</p>");
+  }
+  const self = "/api/km/lista?t=" + tok;
+  if (request.method === "POST") {
+    const form = await request.formData().catch(() => null);
+    const choice = form ? String(form.get("c") || "") : "";
+    if (choice === "leave") {
+      await env.DB.prepare("UPDATE km_leads SET unsub_at = COALESCE(unsub_at, ?) WHERE token = ?").bind(now(), tok).run();
+      return leadPage("Kostometro", "<h1>Βγήκες από τη λίστα</h1><p>Δεν θα λάβεις άλλο μήνυμα από εμάς. Αν αλλάξεις γνώμη, το Kostometro θα είναι πάντα στο fastwrite.tech/kostometro.</p>");
+    }
+    if (choice === "stay") {
+      await env.DB.prepare("UPDATE km_leads SET stay_at = ?, unsub_at = NULL WHERE token = ?").bind(now(), tok).run();
+      return leadPage("Kostometro", "<h1>Μένεις στη λίστα</h1><p>Ευχαριστούμε. Θα είσαι από τους πρώτους που θα μάθουν για κάθε βήμα μέχρι το τελικό προϊόν.</p>" +
+        '<a class="b stay" href="/kostometro/?src=leads">Άνοιξε το Kostometro</a>');
+    }
+  }
+  if (lead.unsub_at) {
+    return leadPage("Kostometro", "<h1>Είσαι ήδη εκτός λίστας</h1><p>Δεν θα λάβεις άλλο μήνυμα από εμάς.</p>" +
+      '<form method="post" action="' + self + '"><button class="leave" name="c" value="stay">Θέλω να ξαναμπώ στη λίστα</button></form>');
+  }
+  return leadPage("Kostometro", "<h1>Μένεις ή φεύγεις;</h1>" +
+    "<p>Τώρα που ξέρεις τι έρχεται — το Kostometro PRO, με την τιμή κάθε κωδικού πάνω στην παραλαβή, και το FastWrite για τον λογιστή σου — θέλεις να μείνεις στη λίστα και να μαθαίνεις πρώτος κάθε βήμα μέχρι το τελικό προϊόν;</p>" +
+    '<form method="post" action="' + self + '"><button class="stay" name="c" value="stay">Μένω στη λίστα</button>' +
+    '<button class="leave" name="c" value="leave">Διαγραφή από τη λίστα</button></form>');
 }

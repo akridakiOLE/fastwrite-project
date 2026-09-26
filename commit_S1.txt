@@ -1,0 +1,14 @@
+S1 — λίστα leads, αποστολή εκστρατείας, σελίδα «μένω / φεύγω»
+
+Η πρώτη διανομή του Kostometro στους leads της φόρμας Facebook (προθεσμία 29/9).
+- schema/km_leads.sql: km_leads (email, όνομα, συγκατάθεση, token) + km_lead_sends.
+- /api/km/admin/leads/import · /api/km/admin/leads/send (dry_run εξ ορισμού, ≤40 ανά κλήση,
+  ποτέ δεύτερη φορά στην ίδια εκστρατεία, ποτέ σε διαγραμμένο).
+- /api/km/lista?t=: GET δείχνει «Μένω / Διαγραφή» — ΜΟΝΟ το κουμπί (POST) διαγράφει,
+  γιατί τα φίλτρα ασφαλείας των email ανοίγουν τους συνδέσμους μόνα τους.
+- Το κείμενο «dianomi-1» εγκρίθηκε από τον Stavros 26/9.
+- tools/leads_csv.mjs: CSV της Meta → σώμα εισαγωγής (χωρίς την απάντηση της φόρμας).
+- tests/leads.test.mjs: 11 έλεγχοι, 8 αποδείξεις μετάλλαξης.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Cq2zjx8KV3YMR2U4yQt7CY
