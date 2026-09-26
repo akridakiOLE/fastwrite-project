@@ -24,6 +24,8 @@ const MUT = [
   ["js", "if (x) { x.onclick = function (e) { e.stopPropagation(); hide(); }; }", ""],
   // 8 · v90 · το λάθος κείμενο επιστρέφει στο «Τι έρχεται»
   ["html", "Κανείς δεν το πληκτρολογεί ξανά", "Κανείς δεν το ξαναπληκτρολογεί"],
+  // 9 · v91 · το πάτημα λήψης δεν κλείνει το μήνυμα
+  ["js", "    if (updHide) { updHide(); }\n", ""],
 ];
 if (ONLY) {
   const m = MUT[ONLY - 1]; if (!m) process.exit(2);
@@ -62,11 +64,12 @@ await check("Ν89-1 · 🔴 πρώτη εγκατάσταση: ΚΑΜΙΑ ένδ
   if (!w.nodes["upd-toast"].hidden) throw new Error("βγήκε σε νέο χρήστη");
 });
 await check("Ν89-2 · αναβάθμιση από v88 (χωρίς σημάδι, με λογαριασμό) → «Ενημερώθηκε · v89» + τι νέο", async () => {
-  const w = world({ km_folder: "f", km_registered: "1" }, VER);
+  const W = { v: VER.v, note: "Δοκιμαστικό «τι νέο»" };   // το «τι νέο» είναι προαιρετικό στο version.json
+  const w = world({ km_folder: "f", km_registered: "1" }, W);
   w.api.updToast(); await w.flush();
   if (w.nodes["upd-toast"].hidden) throw new Error("δεν βγήκε");
   if (w.nodes["upd-ver"].textContent !== "Ενημερώθηκε · " + VER.v) throw new Error(w.nodes["upd-ver"].textContent);
-  if (!VER.note || w.nodes["upd-note"].textContent !== VER.note || w.nodes["upd-note"].hidden) throw new Error("λείπει το «τι νέο»");
+  if (w.nodes["upd-note"].textContent !== W.note || w.nodes["upd-note"].hidden) throw new Error("λείπει το «τι νέο»");
 });
 await check("Ν89-3 · αναβάθμιση από παλιότερο σημάδι (v88 → v89) → βγαίνει", async () => {
   const w = world({ km_folder: "f", km_seen_ver: "v88" }, VER);
@@ -113,6 +116,12 @@ await check("Ν90-2 · «Τι έρχεται»: «πληκτρολογεί ξα�
   if (html.includes("ξαναπληκτρολογεί")) throw new Error("το λάθος κείμενο υπάρχει ακόμα");
   if (!html.includes("Κανείς δεν το πληκτρολογεί ξανά")) throw new Error("λείπει η σωστή φράση");
 });
+await check("Ν91-1 · η φωτογραφία βγαίνει μόνο από το βίντεο · το πάτημα λήψης κλείνει το μήνυμα", async () => {
+  const cap = js.slice(js.indexOf("  function capture() {"), js.indexOf("c.toBlob(", js.indexOf("  function capture() {")));
+  if (!cap.includes("drawImage(v, 0, 0)")) throw new Error("η λήψη δεν είναι από το βίντεο");
+  if (/html2canvas|getDisplayMedia/.test(js)) throw new Error("λήψη οθόνης στον κώδικα");
+  if (!cap.includes("if (updHide) { updHide(); }")) throw new Error("το μήνυμα μένει πάνω στη λήψη");
+});
 if (ONLY) { if (fails) { console.log("Μ" + ONLY + ": κοκκίνισε ✓"); process.exit(0); } console.log("Μ" + ONLY + ": ΠΕΡΑΣΕ ΠΡΑΣΙΝΟ"); process.exit(1); }
 if (fails) { console.log("\n" + fails + " ΑΠΕΤΥΧΑΝ"); process.exit(1); }
-console.log("\n✔ ΟΛΑ ΠΕΡΑΣΑΝ (10)");
+console.log("\n✔ ΟΛΑ ΠΕΡΑΣΑΝ (11)");

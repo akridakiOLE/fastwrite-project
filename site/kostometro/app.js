@@ -2118,7 +2118,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v90';
+  var APP_VER = 'φέτα 3 · v91';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -2681,6 +2681,10 @@
     var c = document.createElement('canvas');
     c.width = v.videoWidth; c.height = v.videoHeight;
     c.getContext('2d').drawImage(v, 0, 0);
+    /* v91 · KM-UPD-SHUTTER — η φωτογραφία βγαίνει ΜΟΝΟ από το βίντεο (drawImage), άρα
+       το «Ενημερώθηκε» δεν μπαίνει ποτέ μέσα της. Φεύγει όμως και από την οθόνη
+       με το πάτημα: ο χρήστης κοιτάει πλέον το τιμολόγιο, όχι το μήνυμα. */
+    if (updHide) { updHide(); }
     el('flash').classList.remove('on');
     void el('flash').offsetWidth;
     el('flash').classList.add('on');
@@ -5546,7 +5550,7 @@
      🔴 ΠΟΤΕ στην πρώτη εγκατάσταση: ο καινούργιος χρήστης δεν «ενημέρωσε» τίποτα.
         Πρώτη εγκατάσταση = δεν υπάρχει ούτε σημάδι έκδοσης ούτε λογαριασμός/φάκελος.
      ⚠ Η γραμμή «τι νέο» έρχεται από το version.json (πεδίο note). Κενή = σκέτο «Ενημερώθηκε · vNN». */
-  var updDone = false, UPD_MS = 7000;
+  var updDone = false, UPD_MS = 7000, updHide = null;
   function updDecide(seen, cur, existing) {
     if (seen === cur) { return false; }
     if (!seen && !existing) { return false; }
@@ -5578,6 +5582,7 @@
         box.classList.remove('on');
         setTimeout(function () { box.hidden = true; }, 350);
       };
+      updHide = hide;
       box.onclick = hide;
       var x = el('upd-x'); if (x) { x.onclick = function (e) { e.stopPropagation(); hide(); }; }
       /* v90 · KM-UPD-7S — 26/9, εύρημα Stavros στο κινητό: στα 3″ φαινόταν αλλά
