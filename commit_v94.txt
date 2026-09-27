@@ -1,0 +1,12 @@
+v94 — «Η γνώμη σου, εισηγήσεις»: κάθε γνώμη φτάνει στο support@ · η φόρμα φεύγει μετά την αποστολή
+
+- KM-FB-MAIL: POST /api/km/feedback στέλνει email στο support@ με θέμα [Comments];
+  Reply-To = χρήστης ΜΟΝΟ με «Θέλω απάντηση». Η γνώμη μένει στη βάση ό,τι κι αν γίνει
+  με το email· αποτυχία → km_mail_log kind=feedback ok=0 (χωρίς διεύθυνση).
+- KM-FB-DONE: μετά την επιτυχία η φόρμα κρύβεται, μένει «✔ Ευχαριστούμε, το λάβαμε» + Επιστροφή.
+- Μετονομασία μενού/τίτλου/FAQ + κείμενο dianomi-1 → «Η γνώμη σου, εισηγήσεις».
+- Commit των 3 εκκρεμών αλλαγών του support_autoreply.gs (ζωντανό στο admin@ από 26/9).
+- tests/v94.test.mjs: 9 έλεγχοι, 9 μεταλλάξεις.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CagngWkuhADQbLHB1Yqj2k

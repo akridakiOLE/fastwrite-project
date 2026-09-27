@@ -134,7 +134,7 @@ export async function handleKm(request, env, ctx, path) {
 
   // «Η γνώμη σου» (Brief E §3). Δεν θέλει ταυτότητα λογαριασμού: η γνώμη
   // ΔΕΝ συνδέεται με φάκελο. Το admin/feedback θέλει KM_ADMIN_KEY.
-  if (path === "/api/km/feedback" && method === "POST") return feedback(request, env);
+  if (path === "/api/km/feedback" && method === "POST") return feedback(request, env, ctx);
   if (path === "/api/km/admin/feedback" && method === "GET") return adminFeedback(request, env);
   // Χρόνοι τήρησης (Πολιτική v2.0 §5). GET = ΜΟΝΟ δείχνει, POST = σβήνει.
   if (path === "/api/km/admin/mail" && method === "GET") return adminMail(request, env);
@@ -1618,7 +1618,7 @@ function escHtml(v) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-async function feedback(request, env) {
+async function feedback(request, env, ctx) {
   const b = (await safeJson(request)) || {};
 
   const install = clean(b.install_id, 64);
@@ -1661,7 +1661,53 @@ async function feedback(request, env) {
     "ON CONFLICT(day_hash) DO UPDATE SET n = n + 1"
   ).bind(dh, day).run();
 
+  // v94 · KM-FB-MAIL — η γνώμη ΦΤΑΝΕΙ στο support@ (27/9/2026). Ως τη v93 έμενε
+  // μόνο στη βάση και δεν τη διάβαζε καμία διαδικασία — ενώ η οθόνη υπόσχεται
+  // «Θέλω απάντηση». Η γνώμη ΜΕΝΕΙ στη βάση ό,τι κι αν γίνει με το email.
+  const fm = feedbackMail(env, { stars, text, ver: clean(b.ver, 20), country: (request.cf && request.cf.country) || null, email });
+  if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(fm); else await fm;
+
   return json({ ok: true });
+}
+
+// v94 · KM-FB-MAIL — email προς support@ για κάθε γνώμη. Δεν πετάει ποτέ.
+// Θέμα με [Comments] → φίλτρο Gmail «00 ΠΕΛΑΤΕΣ/Comments».
+// Reply-To = ο χρήστης ΜΟΝΟ αν τσέκαρε «Θέλω απάντηση» — αλλιώς η γνώμη μένει ανώνυμη.
+// Το Apps Script του support@ αγνοεί αποστολείς @fastwrite.tech → καμία αυτόματη απάντηση εδώ.
+// Στο km_mail_log γράφεται ΜΟΝΟ «feedback» + αν πέτυχε — ποτέ η διεύθυνση.
+export async function feedbackMail(env, f) {
+  const t = now();
+  const log = async (ok, err, msgId) => {
+    try {
+      await env.DB.prepare("INSERT INTO km_mail_log (kind, ok, err, msg_id, at) VALUES (?, ?, ?, ?, ?)")
+        .bind("feedback", ok ? 1 : 0, err || null, msgId || null, t).run();
+    } catch (e) { /* η καταγραφή δεν ρίχνει ποτέ την πράξη */ }
+    return !!ok;
+  };
+  if (!env.EMAIL || typeof env.EMAIL.send !== "function") return log(false, "no_binding");
+  const one = String(f.text || "").replace(/\s+/g, " ").trim();
+  const star = f.stars ? "★" + f.stars : "χωρίς αστέρια";
+  const subject = "[Comments] Kostometro · " + star + (one ? " · " + one.slice(0, 50) + (one.length > 50 ? "…" : "") : "");
+  const lines = [
+    "Νέα γνώμη από το Kostometro (μενού «Η γνώμη σου, εισηγήσεις»).",
+    "",
+    "Αστέρια: " + (f.stars ? "★".repeat(f.stars) + " (" + f.stars + "/5)" : "—"),
+    "Κείμενο:",
+    String(f.text || "—"),
+    "",
+    "Έκδοση: " + (f.ver || "—") + " · Χώρα: " + (f.country || "—"),
+    f.email ? "ΖΗΤΑΕΙ ΑΠΑΝΤΗΣΗ → πάτα «Απάντηση»: φεύγει στο " + f.email
+            : "Δεν ζήτησε απάντηση (ανώνυμη γνώμη).",
+  ];
+  const msg = { to: MAIL_SUPPORT, from: MAIL_FROM, subject: subject, text: lines.join("\n"),
+    html: lines.map((l) => escHtml(l)).join("<br>") };
+  if (f.email) msg.replyTo = f.email;
+  try {
+    const r = await env.EMAIL.send(msg);
+    return log(true, null, r && r.messageId ? String(r.messageId) : null);
+  } catch (e) {
+    return log(false, String((e && e.message) || e).slice(0, 300));
+  }
 }
 
 // ΑΝΑΓΝΩΣΗ — κανόνας 14/8/2026: δεν μαζεύουμε δεδομένα που δεν μπορούμε να
@@ -2440,7 +2486,7 @@ function leadMail(campaign, lead) {
     P("Κάθε επιχείρηση που θα καλέσεις και θα πάρει το PRO <b>σού επιστρέφει το 20% της συνδρομής σου</b>, για όσο ανανεώνει τη δική της. <b>Με 5 ενεργές συστάσεις η συνδρομή σου επιστρέφεται ολόκληρη</b>, και πάνω από 5 παίρνεις τη διαφορά.") +
     P("Μόλις γραφτείς, θα βρεις τον δικό σου σύνδεσμο στο μενού <b>«Κάλεσε»</b>. Όποιος γραφτεί μέσα από αυτόν μετράει για σένα από την ίδια στιγμή, και η σύσταση <b>δεν λήγει</b>. Όλοι οι όροι βρίσκονται μέσα στην εφαρμογή.") +
     H("Η γνώμη σου χτίζει το επόμενο βήμα") +
-    P("Αν θέλεις να κάνεις δικές σου εισηγήσεις, σχόλια ή βελτιώσεις που θεωρείς ότι θα βοηθήσουν σε μια καλύτερη εμπειρία, θα χαρούμε να ακούσουμε την άποψή σου από το μενού <b>«Η γνώμη σου»</b> ή στο " + A("mailto:support@fastwrite.tech", "support@fastwrite.tech") + ". Διαβάζουμε κάθε μήνυμα.") +
+    P("Αν θέλεις να κάνεις δικές σου εισηγήσεις, σχόλια ή βελτιώσεις που θεωρείς ότι θα βοηθήσουν σε μια καλύτερη εμπειρία, θα χαρούμε να ακούσουμε την άποψή σου από το μενού <b>«Η γνώμη σου, εισηγήσεις»</b> ή στο " + A("mailto:support@fastwrite.tech", "support@fastwrite.tech") + ". Διαβάζουμε κάθε μήνυμα.") +
     P("Η ομάδα του Kostometro") +
     '<hr style="border:0;border-top:1px solid #e3e5ea;margin:26px 0 14px">' +
     '<p style="margin:0 0 8px;font-size:12px;color:#6b7385">Οι δυνατότητες του PRO και του FastWrite που περιγράφονται αφορούν την έκδοση που σχεδιάζεται.</p>' +

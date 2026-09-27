@@ -662,3 +662,6 @@ textarea#fb-text:focus{outline:none;border-color:var(--accent)}
 .hp-cases .hp-case small{display:block;color:var(--text2);font-size:13px;margin-top:2px;word-break:break-word}
 #s-help .sec{margin:18px 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent,#6ee7b7)}
 #s-help .fld{margin:0 0 12px}
+/* v94 · KM-FB-DONE */
+.fb-done{border:1px solid var(--accent);border-radius:14px;padding:18px 16px;margin:8px 0 18px}
+.fb-done-t{margin:0 0 6px;font-size:1.15rem;font-weight:700;color:var(--accent)}

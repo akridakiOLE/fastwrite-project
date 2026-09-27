@@ -15,7 +15,7 @@
  * ΦΡΕΝΑ (για να μη γίνει ποτέ βρόχος με αυτόματους απαντητές):
  *   · δεν απαντάει σε αυτόματα μηνύματα (Auto-Submitted, Precedence, X-Autoreply…)
  *   · δεν απαντάει σε δικές μας διευθύνσεις (@fastwrite.tech) ούτε σε mailer-daemon/no-reply
- *   · ≤5 απαντήσεις ανά αποστολέα ανά ώρα · «λάβαμε» ≤1 ανά αριθμό ανά 12 ώρες
+ *   · ≤5 απαντήσεις ανά αποστολέα ανά ώρα (κάθε μήνυμα απαντιέται, 26/9)
  *   · κάθε μήνυμα απαντιέται ΜΙΑ φορά (id στα Script Properties, 3 ημέρες)
  *   · v93 · KM-SUP-ARRIVED: κάθε αριθμός που φτάνει λέγεται στον server («έφτασε»)
  *     ΑΜΕΣΩΣ — η εφαρμογή δείχνει «Συνέχεια σε…» ΜΟΝΟ για όσους έφτασαν. Γίνεται
@@ -85,10 +85,14 @@ function processInbox() {
 }
 
 function handle_(m) {
-  var from = m.getFrom(), addr = (/<([^>]+)>/.exec(from) || [null, from])[1].trim().toLowerCase();
-  if (!addr || /@(?:[a-z0-9-]+\.)*fastwrite\.tech$/.test(addr)) { return 'skip'; }
-  if (/^(mailer-daemon|postmaster|no-?reply|do-?not-?reply)[@+]/.test(addr)) { return 'skip'; }
-  if (isAuto_(m)) { return 'skip'; }
+  var addr = addrOf_(m.getFrom());
+  /* 🔴 26/9 (δοκιμή 4α): το Google Group μπορεί να ξαναγράψει το «Από» σε
+     «Χ via FastWrite Support <support@fastwrite.tech>» — ο πραγματικός
+     αποστολέας τότε ζει στο Reply-To. Χωρίς αυτό, κάθε τέτοιο μήνυμα έμοιαζε δικό μας. */
+  if (addr === SUPPORT) { addr = addrOf_(m.getReplyTo()); }
+  if (!addr || /@(?:[a-z0-9-]+\.)*fastwrite\.tech$/.test(addr)) { return skip_(m, 'δική μας διεύθυνση ' + addr); }
+  if (/^(mailer-daemon|postmaster|no-?reply|do-?not-?reply)[@+]/.test(addr)) { return skip_(m, 'αυτόματος αποστολέας ' + addr); }
+  if (isAuto_(m)) { return skip_(m, 'αυτόματο μήνυμα'); }
   var subj = m.getSubject() || '';
   var hit = CODE_RE.exec(subj) || CODE_RE.exec((m.getPlainBody() || '').slice(0, 4000));
   if (hit) { markArrived_(hit[0]); }
@@ -99,11 +103,10 @@ function handle_(m) {
   var code, body, outSubj;
   if (hit) {
     code = hit[0];
-    var ck = 'c:' + code;
-    if (cache.get(ck)) { return 'skip'; }
+    // 26/9 (απόφαση Stavros): ΚΑΘΕ μήνυμα παίρνει απάντηση — το φρένο «1 ανά αριθμό
+    // ανά 12 ώρες» έφυγε: ο χρήστης έγραφε και δεν ήξερε αν έφτασε.
     body = textAck_(code);
     outSubj = /(^|\s)KM-/.test(subj) ? reSubj_(subj) : reSubj_(subj) + ' [' + code + ']';
-    cache.put(ck, '1', 12 * 3600);
   } else {
     code = newCode_();
     if (!code) { return 'fail'; }
@@ -118,6 +121,18 @@ function handle_(m) {
   }
   cache.put(rk, String(cnt + 1), 3600);
   return 'sent';
+}
+
+function addrOf_(s) {
+  s = String(s || '');
+  return ((/<([^>]+)>/.exec(s) || [null, s])[1] || '').trim().toLowerCase();
+}
+
+/* Κάθε παράλειψη γράφεται στο αρχείο εκτελέσεων — αλλιώς «δεν απάντησε» και
+   «δεν είδε» μοιάζουν ίδια (26/9: μία δοκιμή χάθηκε ακριβώς έτσι). */
+function skip_(m, why) {
+  console.log('παράλειψη · ' + why + ' · «' + String(m.getSubject() || '').slice(0, 60) + '»');
+  return 'skip';
 }
 
 function newCode_() {
@@ -144,7 +159,9 @@ function isAuto_(m) {
   var h = function (n) { try { return String(m.getHeader(n) || '').toLowerCase(); } catch (e) { return ''; } };
   var as = h('Auto-Submitted');
   if (as && as !== 'no') { return true; }
-  if (/^(bulk|junk|list|auto_reply)$/.test(h('Precedence'))) { return true; }
+  /* ⚠ ΟΧΙ «list»: το Google Group βάζει Precedence: list σε ΚΑΘΕ μήνυμα που
+     μοιράζει στα μέλη του — με αυτό μέσα το σκριπτ αγνοούσε τα πάντα (26/9, δοκιμή 4α). */
+  if (/^(bulk|junk|auto_reply)$/.test(h('Precedence'))) { return true; }
   if (h('X-Autoreply') || h('X-Autorespond') || h('X-Auto-Response-Suppress')) { return true; }
   return false;
 }
@@ -155,27 +172,27 @@ function reSubj_(s) {
 }
 
 function textNew_(code) {
+  // Κείμενο Stavros 26/9/2026 — «νέο μήνυμα», ΟΧΙ «διαφορετικό email» (δεν υπονοεί άλλη διεύθυνση).
   return 'Γεια σου,\n\n' +
-    'λάβαμε το μήνυμά σου. Ο αριθμός του αιτήματός σου είναι: ' + code + '\n\n' +
-    'Αν μας ξαναγράψεις για το ίδιο θέμα, απάντησε σε αυτό το email ή κράτα τον αριθμό στο θέμα.\n' +
+    'λάβαμε το μήνυμά σου. Ο αριθμός του αιτήματός σου είναι: ' + code + '\n' +
+    'Αν μας ξαναγράψεις για το ίδιο πρόβλημα, πάτα «Απάντηση» σε αυτό το email. Αν μας στείλεις νέο μήνυμα, ' +
+    'γράψε τον αριθμό ' + code + ' στο θέμα, για καλύτερο εντοπισμό και συνέχεια του ιστορικού σου.\n' +
+    'Απόφυγε να ανοίξεις δεύτερο αίτημα για το ίδιο πρόβλημα — αυτό δημιουργεί συνήθως καθυστέρηση.\n' +
     'Θα σου απαντήσουμε το συντομότερο.\n\n' +
     'FastWrite · Kostometro\n\n' +
     '— — —\n\n' +
     'Hi,\n\n' +
-    'we received your message. Your request number is: ' + code + '\n\n' +
-    'If you write again about the same issue, reply to this email or keep the number in the subject.\n' +
+    'we received your message. Your request number is: ' + code + '\n' +
+    'If you write to us again about the same problem, press "Reply" on this email. If you send us a new message, ' +
+    'put the number ' + code + ' in the subject, so we can find it and keep your history together.\n' +
+    'Please avoid opening a second request for the same problem — it usually causes delays.\n' +
     'We will get back to you as soon as possible.\n\n' +
     'FastWrite · Kostometro\n';
 }
 
 function textAck_(code) {
-  return 'Γεια σου,\n\n' +
-    'λάβαμε το μήνυμά σου για το αίτημα ' + code + '. Θα σου απαντήσουμε το συντομότερο.\n\n' +
-    'FastWrite · Kostometro\n\n' +
-    '— — —\n\n' +
-    'Hi,\n\n' +
-    'we received your message about request ' + code + '. We will get back to you as soon as possible.\n\n' +
-    'FastWrite · Kostometro\n';
+  // 26/9 (απόφαση Stavros): ΙΔΙΟ κείμενο με το πρώτο — ο χρήστης βλέπει πάντα το ίδιο μήνυμα.
+  return textNew_(code);
 }
 
 function markAllSeen_() {

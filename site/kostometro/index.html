@@ -305,7 +305,7 @@
     <div class="grp">Βοήθεια</div>
     <button class="row" data-go="s-faq"><span class="row-l"><span class="row-t">Ερωτήσεις &amp; απαντήσεις</span><span class="row-sub">ό,τι ρωτάνε όλοι</span></span><span class="row-b">→</span></button>
     <button class="row" data-go="s-help"><span class="row-l"><span class="row-t">Υποστήριξη</span><span class="row-sub">γράψε μας — απαντάμε με email</span></span><span class="row-b">→</span></button>
-    <button class="row" data-go="s-fb"><span class="row-l"><span class="row-t">Η γνώμη σου</span><span class="row-sub">τι να αλλάξει, τι σου αρέσει</span></span><span class="row-b">→</span></button>
+    <button class="row" data-go="s-fb"><span class="row-l"><span class="row-t">Η γνώμη σου, εισηγήσεις</span><span class="row-sub">τι να αλλάξει, τι σου αρέσει</span></span><span class="row-b">→</span></button>
     <div class="grp">Μοιράσου</div>
     <button class="row" data-go="s-ref"><span class="row-l"><span class="row-t">Κάλεσε</span><span class="row-sub">ο σύνδεσμός σου και η επιβράβευση</span></span><span class="row-b">→</span></button>
     <div class="sep"></div>
@@ -365,9 +365,17 @@
 <section id="s-fb" class="screen page" hidden>
   <header class="pg-head">
     <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
-    <h2>Η γνώμη σου</h2>
+    <h2>Η γνώμη σου, εισηγήσεις</h2>
   </header>
-  <div class="pg-body">
+  <!-- v94 · KM-FB-DONE — μετά την αποστολή η φόρμα ΦΕΥΓΕΙ και μένει μόνο η επιβεβαίωση. -->
+  <div class="pg-body" id="fb-done" hidden>
+    <div class="fb-done">
+      <p class="fb-done-t">✔ Ευχαριστούμε, το λάβαμε.</p>
+      <p class="fine" id="fb-done-sub">Διαβάζουμε κάθε μήνυμα.</p>
+    </div>
+    <button class="btn primary" data-back>Επιστροφή</button>
+  </div>
+  <div class="pg-body" id="fb-form">
     <div class="stars" id="fb-stars" role="radiogroup" aria-label="Αστέρια">
       <button type="button" data-s="1" aria-label="1 αστέρι">★</button><button type="button" data-s="2" aria-label="2 αστέρια">★</button><button type="button" data-s="3" aria-label="3 αστέρια">★</button><button type="button" data-s="4" aria-label="4 αστέρια">★</button><button type="button" data-s="5" aria-label="5 αστέρια">★</button>
     </div>
@@ -376,8 +384,7 @@
     <p class="fine hint">Η γνώμη σου δεν συνδέεται με τον λογαριασμό σου. Το email σου φεύγει <b>μόνο</b> αν τσεκάρεις «Θέλω απάντηση».</p>
     <p class="err" id="fb-err" hidden></p>
     <button class="btn primary" id="fb-send">Στείλε</button>
-    <p class="fine ok" id="fb-ok" hidden>Ευχαριστούμε. Έφτασε.</p>
-  </div>
+      </div>
 </section>
 
 <!-- ══ ΤΑ ΕΚΚΡΕΜΗ ══════════════════════════════════════════════ -->
