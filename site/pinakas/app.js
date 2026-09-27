@@ -236,11 +236,16 @@
     el('k-dev7').textContent = j.devices.seen_7d;
     el('k-mail').textContent = j.mail_30d.ok + (j.mail_30d.failed ? ' / ' + j.mail_30d.failed + '🔴' : '');
     el('k-fb').textContent = j.feedback.n;
+    /* v95 · KM-SUP-THREAD — αιτήματα υποστήριξης */
+    var sp = j.support || {};
+    el('k-sup').textContent = (sp.open || 0);
+    el('k-sup24').textContent = (sp.waiting_24h || 0) + (sp.waiting_24h ? '🔴' : '');
     el('k-more').innerHTML =
       'Συσκευές με ανέβαστα: <b>' + j.devices.with_unsynced + '</b> · ' +
       'Email που απέτυχαν (30 ημ.): <b>' + j.mail_30d.failed + '</b> · ' +
       'Μέσος όρος αστεριών: <b>' + (j.feedback.avg_stars || '—') + '</b> · ' +
-      'Θέλουν απάντηση: <b>' + j.feedback.want_reply + '</b>';
+      'Θέλουν απάντηση: <b>' + j.feedback.want_reply + '</b> · ' +
+      'Αιτήματα απαντημένα: <b>' + (sp.answered || 0) + '</b> · κλειστά 7 ημ.: <b>' + (sp.closed_7d || 0) + '</b>';
 
     var p = j.pending_deletions || [];
     el('c-pend').hidden = !p.length;

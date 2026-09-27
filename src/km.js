@@ -151,6 +151,12 @@ export async function handleKm(request, env, ctx, path) {
   // v93 · KM-SUP-ARRIVED — «έφτασε στο support@» (Apps Script) · «ποιοι δικοί μου έφτασαν;» (εφαρμογή)
   if (path === "/api/km/support/arrived" && method === "POST") return supportArrived(request, env);
   if (path === "/api/km/support/status" && method === "POST") return supportStatus(request, env);
+  // v95 · KM-SUP-THREAD — αιτήματα μέσω server: κείμενο, ιστορικό, κατάσταση, κλείσιμο
+  if (path === "/api/km/support/send" && method === "POST") return supportSend(request, env, ctx);
+  if (path === "/api/km/support/list" && method === "POST") return supportList(request, env);
+  if (path === "/api/km/support/thread" && method === "POST") return supportThread(request, env);
+  if (path === "/api/km/support/close" && method === "POST") return supportClose(request, env);
+  if (path === "/api/km/support/inbound" && method === "POST") return supportInbound(request, env);
   // Η.11β: GET = ποιοι ΘΑ σβήνονταν τώρα · POST = σβήνει. Ιδιο μοτίβο με το
   // admin/cleanup, και για τον ίδιο λόγο: δεν εμπιστεύεσαι αυτόματη διαγραφή
   // που δεν μπορείς να δεις πρώτα. Το ?now= επιτρέπει στα τεστ να «γεράσουν»
@@ -285,7 +291,241 @@ export async function kmSupportPrune(env, nowIso) {
   const r = await env.DB.prepare(
     "DELETE FROM km_support_tickets WHERE rowid IN (SELECT rowid FROM km_support_tickets WHERE arrived_at IS NULL AND issued_at < ? LIMIT ?)"
   ).bind(cut, CLEANUP_BATCH).run();
-  return { pending_deleted: (r && r.meta && r.meta.changes) || 0, cutoff: cut };
+  // v95 · KM-SUP-THREAD — στο ίδιο ωριαίο ρολόι: αυτόματο κλείσιμο 7 ημερών
+  const autoClosed = await kmSupportAutoClose(env, nowIso);
+  return { pending_deleted: (r && r.meta && r.meta.changes) || 0, auto_closed: autoClosed, cutoff: cut };
+}
+
+// ═══ v95 · KM-SUP-THREAD — ΑΙΤΗΜΑΤΑ ΜΕΣΩ SERVER (27/9/2026, brief «Αιτήματα μέσω server») ═══
+// Ως τη v94 το μήνυμα έφευγε με mailto από το κινητό και ο server ήξερε μόνο τον
+// αριθμό. Από τη v95 ΚΑΘΕ μήνυμα, και των δύο πλευρών, περνάει από εδώ:
+//   · εφαρμογή → POST /support/send → αποθήκευση → email στο support@ (Reply-To = support@)
+//   · ο Stavros πατάει «Απάντηση» → support@ → Apps Script → POST /support/inbound
+//     {kind:'out'} → αποθήκευση → ο server δίνει τη διεύθυνση → το Apps Script
+//     στέλνει ΑΠΟ support@ στον πελάτη.
+//   · ο πελάτης απαντάει στο email → support@ → Apps Script → /support/inbound {kind:'in'}
+// Γιατί ΟΧΙ Reply-To = πελάτης: η απάντηση θα πήγαινε κατευθείαν και ο server δεν
+// θα τη μάθαινε ποτέ → ιστορικό με κενά.
+// Κλείσιμο: «Λύθηκε» (χρήστης) · #κλειστό στην απάντηση (εμείς) · αυτόματα 7 ημέρες
+// μετά τη ΔΙΚΗ ΜΑΣ απάντηση χωρίς νέο μήνυμα. Νέο μήνυμα σε κλειστό → ξανανοίγει.
+const SUP_MAX_BODY = 8000, SUP_SEND_PER_HOUR = 10, SUP_LIST_MAX = 50, SUP_THREAD_MAX = 200, SUP_AUTOCLOSE_DAYS = 7;
+const SUP_CLOSE_TAG = /(^|\s)#(κλειστό|κλειστο|closed?)(?=[\s.,!]|$)/i;
+
+// Κρατάει ΜΟΝΟ το νέο μέρος ενός email: κόβει το παράθεμα της προηγούμενης
+// συζήτησης (Gmail/Outlook/Apple, ελληνικά και αγγλικά).
+export function supStripQuote(text) {
+  const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+  let cut = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (/^>/.test(l)) { cut = i; break; }
+    if (/^-{2,}\s*(Original Message|Αρχικό μήνυμα|Forwarded message|Προωθημένο μήνυμα)/i.test(l)) { cut = i; break; }
+    if (/(wrote|έγραψε)\s*:\s*$/i.test(l)) {
+      cut = i;
+      // Το Gmail σπάει συχνά τη γραμμή: «Στις Κυρ …, X <x@y>» ↵ «έγραψε:»
+      if (i > 0 && /^(On |Στις |Την |Le |Am )/.test(lines[i - 1].trim())) cut = i - 1;
+      break;
+    }
+    if (/^(From|Από|Sent|Στάλθηκε)\s*:\s/.test(l) && i + 1 < lines.length &&
+        /^(To|Προς|Sent|Date|Ημερομηνία|Subject|Θέμα|Στάλθηκε)\s*:\s/.test(lines[i + 1].trim())) { cut = i; break; }
+  }
+  return lines.slice(0, cut).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// Πού απαντάμε: λογαριασμός → το ΤΡΕΧΟΝ email του λογαριασμού · 'E' → ο αποστολέας.
+async function supCaseEmail(env, c) {
+  if (c.scope === "E") return normEmail(c.email);
+  const a = await env.DB.prepare("SELECT email FROM km_accounts WHERE folder_id = ? AND deleted IS NULL").bind(c.scope).first();
+  return a ? normEmail(a.email) : null;
+}
+
+// Email μέσω Cloudflare, με καταγραφή στο km_mail_log (χωρίς διεύθυνση). Δεν πετάει ποτέ.
+async function supMail(env, kind, msg) {
+  const t = now();
+  const log = async (ok, err, id) => {
+    try { await env.DB.prepare("INSERT INTO km_mail_log (kind, ok, err, msg_id, at) VALUES (?, ?, ?, ?, ?)").bind(kind, ok ? 1 : 0, err || null, id || null, t).run(); } catch (e) {}
+    return !!ok;
+  };
+  if (!env.EMAIL || typeof env.EMAIL.send !== "function") return log(false, "no_binding");
+  try { const r = await env.EMAIL.send(msg); return log(true, null, r && r.messageId ? String(r.messageId) : null); }
+  catch (e) { return log(false, String((e && e.message) || e).slice(0, 300)); }
+}
+
+function supBody(v) { return String(v || "").replace(/\r\n?/g, "\n").trim().slice(0, SUP_MAX_BODY); }
+
+// POST /api/km/support/send {code?, topic?, text, ver?, dev?} — από την εφαρμογή.
+async function supportSend(request, env, ctx) {
+  const a = await authed(request, env, { allowPending: true });
+  if (a.err) return a.err;
+  const b = (await safeJson(request)) || {};
+  const text = supBody(b.text);
+  if (!text) return json({ ok: false, error: "empty" }, 400);
+  const email = normEmail(a.acc.email);
+  if (!email) return json({ ok: false, error: "no_email" }, 409);
+  const hourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+  const cnt = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM km_support_messages m JOIN km_support_cases c ON c.code = m.code WHERE c.scope = ? AND m.dir = 'in' AND m.at > ?"
+  ).bind(a.id.folder, hourAgo).first();
+  if (cnt && Number(cnt.n) >= SUP_SEND_PER_HOUR) return json({ ok: false, error: "too_many" }, 429);
+
+  const t = now();
+  const topic = String(b.topic || "").replace(/\s+/g, " ").trim().slice(0, 60) || null;
+  let code = (clean(b.code, 40) || "").toUpperCase(), c = null;
+  if (code) {
+    // 🔴 ΜΟΝΟ δικό του αίτημα — ξένος αριθμός δεν συνεχίζεται ποτέ
+    c = await env.DB.prepare("SELECT * FROM km_support_cases WHERE code = ? AND scope = ?").bind(code, a.id.folder).first();
+    if (!c) return json({ ok: false, error: "unknown_case" }, 404);
+  } else {
+    const ref = await ensureRefCode(env, a.id.folder, a.acc.ref_code);
+    if (!ref) return json({ ok: false, error: "ref_code" }, 500);
+    const n = await supportNext(env, a.id.folder);
+    if (!n) return json({ ok: false, error: "seq" }, 500);
+    code = "KM-" + ref + "-" + n;
+    // Περνάει από τον server → έχει φτάσει εξ ορισμού.
+    await env.DB.prepare("INSERT OR IGNORE INTO km_support_tickets (code, scope, issued_at, arrived_at) VALUES (?, ?, ?, ?)").bind(code, a.id.folder, t, t).run();
+    await env.DB.prepare("INSERT INTO km_support_cases (code, scope, topic, status, created_at) VALUES (?, ?, ?, 'open', ?)").bind(code, a.id.folder, topic, t).run();
+  }
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO km_support_messages (code, dir, source, body, at) VALUES (?, 'in', 'app', ?, ?)").bind(code, text, t),
+    env.DB.prepare("UPDATE km_support_cases SET status = 'open', last_in_at = ?, closed_at = NULL, closed_by = NULL WHERE code = ?").bind(t, code),
+  ]);
+
+  const top = (c && c.topic) || topic;
+  const lines = [
+    text, "", "— — —",
+    "Αίτημα: " + code + (c ? " (συνέχεια" + (c.status === "closed" ? ", ΞΑΝΑΝΟΙΞΕ" : "") + ")" : " (νέο)"),
+    "Πελάτης: " + email,
+    "Έκδοση: " + (clean(b.ver, 20) || "—") + " · Συσκευή: " + (clean(b.dev, 80) || "—"),
+    "",
+    "▶ Πάτα «Απάντηση»: η απάντησή σου γράφεται στο ιστορικό και φεύγει στον πελάτη από support@.",
+    "▶ Για κλείσιμο του αιτήματος γράψε #κλειστό μέσα στην απάντηση.",
+  ];
+  const p = supMail(env, "support_in", {
+    to: MAIL_SUPPORT, from: MAIL_FROM, replyTo: MAIL_SUPPORT,
+    subject: "Kostometro · " + code + (top ? " · " + top : ""),
+    text: lines.join("\n"), html: lines.map((l) => escHtml(l)).join("<br>"),
+  });
+  if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(p); else await p;
+  return json({ ok: true, code: code, status: "open" });
+}
+
+// POST /api/km/support/list — τα αιτήματα ΑΥΤΟΥ του λογαριασμού, πιο πρόσφατο πρώτο.
+async function supportList(request, env) {
+  const a = await authed(request, env, { allowPending: true });
+  if (a.err) return a.err;
+  const rows = (await env.DB.prepare(
+    `SELECT code, topic, status, created_at, last_in_at, last_out_at, closed_at, closed_by,
+            CASE WHEN last_out_at IS NOT NULL AND (seen_out_at IS NULL OR seen_out_at < last_out_at) THEN 1 ELSE 0 END AS unread
+     FROM km_support_cases WHERE scope = ?
+     ORDER BY MAX(COALESCE(last_in_at, created_at), COALESCE(last_out_at, created_at)) DESC LIMIT ?`
+  ).bind(a.id.folder, SUP_LIST_MAX).all()).results || [];
+  return json({ ok: true, cases: rows, unread: rows.filter((r) => r.unread).length });
+}
+
+// POST /api/km/support/thread {code} — όλη η συζήτηση· σημαδεύει τις απαντήσεις ως «διαβάστηκαν».
+async function supportThread(request, env) {
+  const a = await authed(request, env, { allowPending: true });
+  if (a.err) return a.err;
+  const b = (await safeJson(request)) || {};
+  const code = (clean(b.code, 40) || "").toUpperCase();
+  const c = await env.DB.prepare(
+    "SELECT code, topic, status, created_at, last_in_at, last_out_at, closed_at, closed_by FROM km_support_cases WHERE code = ? AND scope = ?"
+  ).bind(code, a.id.folder).first();
+  if (!c) return json({ ok: false, error: "unknown_case" }, 404);
+  const msgs = (await env.DB.prepare(
+    "SELECT * FROM (SELECT id, dir, source, body, at FROM km_support_messages WHERE code = ? ORDER BY id DESC LIMIT ?) ORDER BY id"
+  ).bind(code, SUP_THREAD_MAX).all()).results || [];
+  await env.DB.prepare("UPDATE km_support_cases SET seen_out_at = ? WHERE code = ?").bind(now(), code).run();
+  return json({ ok: true, case: c, messages: msgs });
+}
+
+// POST /api/km/support/close {code} — «Λύθηκε» από τον χρήστη.
+async function supportClose(request, env) {
+  const a = await authed(request, env, { allowPending: true });
+  if (a.err) return a.err;
+  const b = (await safeJson(request)) || {};
+  const code = (clean(b.code, 40) || "").toUpperCase();
+  const r = await env.DB.prepare(
+    "UPDATE km_support_cases SET status = 'closed', closed_at = ?, closed_by = 'user' WHERE code = ? AND scope = ?"
+  ).bind(now(), code, a.id.folder).run();
+  if (!(r && r.meta && r.meta.changes)) return json({ ok: false, error: "unknown_case" }, 404);
+  return json({ ok: true, status: "closed" });
+}
+
+// POST /api/km/support/inbound {code, from, text, kind:'in'|'out'} — ΜΟΝΟ το Apps Script (KM_SUPPORT_KEY).
+//   in  = μήνυμα πελάτη από email · out = απάντηση δική μας (το Apps Script ξέρει ποιοι είμαστε).
+//   out → ο server επιστρέφει {to, text}: το Apps Script στέλνει ΜΟΝΟ αυτό, ΜΟΝΟ σε αυτή τη διεύθυνση.
+async function supportInbound(request, env) {
+  if (!supportKeyOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const code = (clean(b.code, 40) || "").toUpperCase();
+  const kind = b.kind === "out" ? "out" : (b.kind === "in" ? "in" : null);
+  if (!kind || !(SUP_E_RE.test(code) || SUP_APP_RE.test(code))) return json({ ok: false, error: "bad_request" }, 400);
+  let body = supStripQuote(b.text);
+  let close = false;
+  if (kind === "out" && SUP_CLOSE_TAG.test(body)) { close = true; body = body.replace(SUP_CLOSE_TAG, " ").replace(/[ \t]{2,}/g, " ").trim(); }
+  body = supBody(body);
+  if (!body && !close) return json({ ok: false, error: "empty" }, 400);
+  const t = now();
+
+  let c = await env.DB.prepare("SELECT * FROM km_support_cases WHERE code = ?").bind(code).first();
+  if (!c) {
+    if (kind === "out") return json({ ok: false, error: "unknown_case" }, 404);
+    // Πρώτο μήνυμα πελάτη με αυτόν τον αριθμό (παλιό mailto ή KM-E από την αυτόματη απάντηση).
+    let scope = null, email = null;
+    if (SUP_E_RE.test(code)) {
+      const tk = await env.DB.prepare("SELECT code FROM km_support_tickets WHERE code = ?").bind(code).first();
+      if (!tk) return json({ ok: true, known: false });
+      // «Maria <maria@shop.cy>» → maria@shop.cy
+      const fm = /<([^>]+)>/.exec(String(b.from || ""));
+      scope = "E"; email = normEmail(fm ? fm[1] : b.from);
+      if (!email) return json({ ok: false, error: "no_address" }, 400);
+    } else {
+      const m = SUP_APP_RE.exec(code);
+      const acc = await env.DB.prepare("SELECT folder_id FROM km_accounts WHERE ref_code = ? AND deleted IS NULL").bind(m[1]).first();
+      if (!acc) return json({ ok: true, known: false });
+      const seq = await env.DB.prepare("SELECT n FROM km_support_seq WHERE scope = ?").bind(acc.folder_id).first();
+      if (!seq || Number(m[2]) < 1 || Number(m[2]) > Number(seq.n)) return json({ ok: true, known: false });
+      scope = acc.folder_id;
+      await env.DB.prepare(
+        `INSERT INTO km_support_tickets (code, scope, issued_at, arrived_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(code) DO UPDATE SET arrived_at = COALESCE(km_support_tickets.arrived_at, excluded.arrived_at)`
+      ).bind(code, scope, t, t).run();
+    }
+    const topic = String(b.subject || "").replace(/^\s*((re|fwd?|απ|σχετ)\s*:\s*)+/i, "").replace(/\[?KM-[A-Z0-9-]+\]?/g, "").replace(/Kostometro\s*·?/g, "").replace(/[·\s]+/g, " ").trim().slice(0, 60) || null;
+    await env.DB.prepare("INSERT INTO km_support_cases (code, scope, topic, email, status, created_at) VALUES (?, ?, ?, ?, 'open', ?)").bind(code, scope, topic, email, t).run();
+    c = { code, scope, email, topic, status: "open" };
+  }
+
+  if (kind === "in") {
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO km_support_messages (code, dir, source, body, at) VALUES (?, 'in', 'email', ?, ?)").bind(code, body, t),
+      env.DB.prepare("UPDATE km_support_cases SET status = 'open', last_in_at = ?, closed_at = NULL, closed_by = NULL WHERE code = ?").bind(t, code),
+    ]);
+    return json({ ok: true, known: true, reopened: c.status === "closed" });
+  }
+
+  // out — ΠΡΩΤΑ η διεύθυνση: αν δεν υπάρχει, τίποτα δεν γράφεται.
+  const to = await supCaseEmail(env, c);
+  if (!to) return json({ ok: false, error: "no_address" }, 409);
+  const stmts = [];
+  if (body) stmts.push(env.DB.prepare("INSERT INTO km_support_messages (code, dir, source, body, at) VALUES (?, 'out', 'email', ?, ?)").bind(code, body, t));
+  stmts.push(close
+    ? env.DB.prepare("UPDATE km_support_cases SET status = 'closed', closed_at = ?, closed_by = 'agent', last_out_at = COALESCE(?, last_out_at) WHERE code = ?").bind(t, body ? t : null, code)
+    : env.DB.prepare("UPDATE km_support_cases SET status = 'answered', last_out_at = ?, closed_at = NULL, closed_by = NULL WHERE code = ?").bind(t, code));
+  await env.DB.batch(stmts);
+  return json({ ok: true, to: to, text: body, closed: close, topic: c.topic || null });
+}
+
+// Ωριαίο: κλείνει όσα ΑΠΑΝΤΗΘΗΚΑΝ πριν από 7 ημέρες χωρίς νέο μήνυμα πελάτη.
+export async function kmSupportAutoClose(env, nowIso) {
+  const t = nowIso || now();
+  const cut = new Date(new Date(t).getTime() - SUP_AUTOCLOSE_DAYS * 864e5).toISOString();
+  const r = await env.DB.prepare(
+    `UPDATE km_support_cases SET status = 'closed', closed_at = ?, closed_by = 'auto'
+     WHERE rowid IN (SELECT rowid FROM km_support_cases WHERE status = 'answered' AND last_out_at < ? LIMIT ?)`
+  ).bind(t, cut, CLEANUP_BATCH).run();
+  return (r && r.meta && r.meta.changes) || 0;
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -1281,6 +1521,9 @@ async function wipeFolder(env, folderId) {
     // v92 · KM-SUP-CASE — ο μετρητής αιτημάτων φεύγει με τον λογαριασμό
     env.DB.prepare("DELETE FROM km_support_seq WHERE scope = ?").bind(folderId),
     env.DB.prepare("DELETE FROM km_support_tickets WHERE scope = ?").bind(folderId),
+    // v95 · KM-SUP-THREAD — τα μηνύματα ΠΡΙΝ από τα αιτήματα (το υποερώτημα τα χρειάζεται)
+    env.DB.prepare("DELETE FROM km_support_messages WHERE code IN (SELECT code FROM km_support_cases WHERE scope = ?)").bind(folderId),
+    env.DB.prepare("DELETE FROM km_support_cases WHERE scope = ?").bind(folderId),
     env.DB.prepare(
       `UPDATE km_accounts SET email = '', auth_hash = '', active_device_id = NULL,
               active_since = NULL, folder_bytes = 0, folder_version = 0, last_sync = NULL,
@@ -1807,6 +2050,8 @@ async function cleanupCounts(env, nowIso) {
     gnomi_events:    await one("SELECT COUNT(*) AS n FROM gnomi_events WHERE ts < ?", gn),
     leads:           await one("SELECT COUNT(*) AS n FROM km_leads WHERE consent_at < ?", monthsAgo(RETENTION.leads_months, nowIso)),
     support_tickets: await one("SELECT COUNT(*) AS n FROM km_support_tickets WHERE issued_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
+    // v95 · KM-SUP-THREAD — αιτήματα ΚΛΕΙΣΤΑ πάνω από 24 μήνες (με τα μηνύματά τους)
+    support_cases: await one("SELECT COUNT(*) AS n FROM km_support_cases WHERE status = 'closed' AND closed_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
   };
 }
 
@@ -1835,6 +2080,9 @@ export async function kmCleanup(env, nowIso) {
     lead_sends:      await wipe("km_lead_sends", "email IN (SELECT email FROM km_leads WHERE consent_at < ?)", monthsAgo(RETENTION.leads_months, nowIso)),
     leads:           await wipe("km_leads", "consent_at < ?", monthsAgo(RETENTION.leads_months, nowIso)),
     support_tickets: await wipe("km_support_tickets", "issued_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
+    // v95 · KM-SUP-THREAD — ΠΡΩΤΑ τα μηνύματα, μετά τα αιτήματα
+    support_messages: await wipe("km_support_messages", "code IN (SELECT code FROM km_support_cases WHERE status = 'closed' AND closed_at < ?)", monthsAgo(RETENTION.support_months, nowIso)),
+    support_cases: await wipe("km_support_cases", "status = 'closed' AND closed_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
   };
   done.batch_limit = CLEANUP_BATCH;
   done.more = Object.keys(done).some((k) => k !== "batch_limit" && done[k] === CLEANUP_BATCH);
@@ -2048,6 +2296,19 @@ async function adminPinakas(request, env) {
             SUM(CASE WHEN email IS NOT NULL THEN 1 ELSE 0 END) AS want_reply
      FROM km_feedback`);
 
+  // v95 · KM-SUP-THREAD — αιτήματα υποστήριξης: τι περιμένει ΕΜΑΣ
+  let sup = { open: 0, waiting_24h: 0, answered: 0, closed_7d: 0 };
+  try {
+    const h24 = new Date(Date.now() - 24 * 3600 * 1000).toISOString(), d7 = new Date(Date.now() - 7 * 864e5).toISOString();
+    const s = await env.DB.prepare(
+      `SELECT SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open,
+              SUM(CASE WHEN status = 'open' AND last_in_at < ? THEN 1 ELSE 0 END) AS waiting_24h,
+              SUM(CASE WHEN status = 'answered' THEN 1 ELSE 0 END) AS answered,
+              SUM(CASE WHEN status = 'closed' AND closed_at >= ? THEN 1 ELSE 0 END) AS closed_7d
+       FROM km_support_cases`).bind(h24, d7).first();
+    sup = { open: Number(s && s.open) || 0, waiting_24h: Number(s && s.waiting_24h) || 0, answered: Number(s && s.answered) || 0, closed_7d: Number(s && s.closed_7d) || 0 };
+  } catch (e) { /* πριν τη μετάβαση της βάσης ο Πίνακας ΔΕΝ πέφτει */ }
+
   // ── (α) Η ΛΙΣΤΑ — ποιος, από πού, πότε, τελευταία δραστηριότητα ───────
   // Το email ΕΙΝΑΙ δεδομένο συνεργασίας (Brief Β (α)): ο Stavros πρέπει να
   // βλέπει ποιος γράφτηκε. Οι ταφόπετρες έχουν κενό email και δεν μπαίνουν.
@@ -2076,6 +2337,7 @@ async function adminPinakas(request, env) {
     pending_deletions: pending,
     mail_30d: { sent: mail.sent || 0, ok: mail.ok || 0, failed: mail.failed || 0 },
     feedback: { n: fb.n || 0, avg_stars: fb.avg_stars ? Number(fb.avg_stars).toFixed(2) : null, want_reply: fb.want_reply || 0 },
+    support: sup,
     accounts: list.rows,
     accounts_total: list.total,
     next: list.next, n: list.n, filters: list.filters,

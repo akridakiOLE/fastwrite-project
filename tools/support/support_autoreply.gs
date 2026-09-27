@@ -20,8 +20,12 @@
  *   · v93 · KM-SUP-ARRIVED: κάθε αριθμός που φτάνει λέγεται στον server («έφτασε»)
  *     ΑΜΕΣΩΣ — η εφαρμογή δείχνει «Συνέχεια σε…» ΜΟΝΟ για όσους έφτασαν. Γίνεται
  *     ΠΡΙΝ από τα φρένα απάντησης: η άφιξη μετράει ακόμα κι αν δεν απαντήσουμε.
- * ΤΙ ΔΕΝ ΚΑΝΕΙ: δεν ενώνει αιτήματα (κλειστό 26/9), δεν στέλνει τίποτα στον server
- * εκτός από «δώσε μου αριθμό» — ούτε θέμα, ούτε κείμενο, ούτε διεύθυνση.
+ * v95 · KM-SUP-THREAD (27/9/2026) — ο server κρατάει ΟΛΟ το ιστορικό:
+ *   · μήνυμα πελάτη με αριθμό → κείμενο (ο server κόβει το παράθεμα) στο /support/inbound {kind:'in'}
+ *   · απάντηση ΔΙΚΟΥ ΜΑΣ (AGENTS) με αριθμό → /support/inbound {kind:'out'} → ο server
+ *     δίνει {to, text} → στέλνεται ΑΠΟ support@ στον πελάτη. #κλειστό = κλείσιμο.
+ *   · ειδοποιήσεις του server (noreply@notify…) και γνώμες [Comments] → ΚΑΜΙΑ απάντηση.
+ * ΤΙ ΔΕΝ ΚΑΝΕΙ: δεν ενώνει αιτήματα (κλειστό 26/9).
  *
  * ΡΥΘΜΙΣΗ (μία φορά): Script Properties → KM_SUPPORT_KEY = το κλειδί από
  * C:\Users\User\fastwrite-project\secrets\km_support_key.txt · μετά εκτέλεση
@@ -32,6 +36,10 @@
 
 var API = 'https://fastwrite.tech/api/km/support/email-ticket';
 var API_ARRIVED = 'https://fastwrite.tech/api/km/support/arrived';   // v93 · KM-SUP-ARRIVED
+var API_INBOUND = 'https://fastwrite.tech/api/km/support/inbound';   // v95 · KM-SUP-THREAD
+/* v95 · KM-SUP-THREAD — «ΔΙΚΟΙ ΜΑΣ»: απάντηση από αυτές τις διευθύνσεις με αριθμό στο θέμα
+   = απάντηση προς τον πελάτη. Γράφεται στο ιστορικό του server και φεύγει ΑΠΟ support@. */
+var AGENTS = ['stavrosfkallenos@gmail.com', 'admin@fastwrite.tech'];
 var SUPPORT = 'support@fastwrite.tech';
 var NAME = 'FastWrite Support';
 var SEARCH = '(list:support@fastwrite.tech OR to:support@fastwrite.tech OR cc:support@fastwrite.tech) newer_than:2d';
@@ -85,17 +93,27 @@ function processInbox() {
 }
 
 function handle_(m) {
-  var addr = addrOf_(m.getFrom());
-  /* 🔴 26/9 (δοκιμή 4α): το Google Group μπορεί να ξαναγράψει το «Από» σε
-     «Χ via FastWrite Support <support@fastwrite.tech>» — ο πραγματικός
-     αποστολέας τότε ζει στο Reply-To. Χωρίς αυτό, κάθε τέτοιο μήνυμα έμοιαζε δικό μας. */
-  if (addr === SUPPORT) { addr = addrOf_(m.getReplyTo()); }
+  var subj0 = m.getSubject() || '';
+  /* v95 · 🔴 γνώμη από την εφαρμογή ([Comments]) ή ειδοποίηση του server: ΠΟΤΕ αριθμός,
+     ΠΟΤΕ αυτόματη απάντηση. 27/9: η γνώμη «ΔΟΚΙΜΗ .v94» πήρε λάθος KM-E-000003, επειδή το
+     Group έγραψε «Από: support@» και έβαλε τον χρήστη στο Reply-To. */
+  if (/^\s*\[Comments\]/i.test(subj0)) { return skip_(m, 'γνώμη [Comments]'); }
+  if (/notify\.fastwrite\.tech/i.test(hdr_(m, 'X-Original-Sender') + ' ' + m.getFrom())) { return skip_(m, 'ειδοποίηση server'); }
+  /* 🔴 26/9 (δοκιμή 4α): το Group μπορεί να ξαναγράψει το «Από» σε support@ — ο
+     πραγματικός αποστολέας ζει στο X-Original-Sender ή στο Reply-To (senderOf_). */
+  var addr = senderOf_(m);
+  /* v95 · απάντηση ΔΙΚΟΥ ΜΑΣ → προς τον πελάτη μέσω server (ΠΡΙΝ από το φίλτρο @fastwrite.tech) */
+  if (AGENTS.indexOf(addr) >= 0) { return agentReply_(m, subj0); }
   if (!addr || /@(?:[a-z0-9-]+\.)*fastwrite\.tech$/.test(addr)) { return skip_(m, 'δική μας διεύθυνση ' + addr); }
   if (/^(mailer-daemon|postmaster|no-?reply|do-?not-?reply)[@+]/.test(addr)) { return skip_(m, 'αυτόματος αποστολέας ' + addr); }
   if (isAuto_(m)) { return skip_(m, 'αυτόματο μήνυμα'); }
   var subj = m.getSubject() || '';
   var hit = CODE_RE.exec(subj) || CODE_RE.exec((m.getPlainBody() || '').slice(0, 4000));
-  if (hit) { markArrived_(hit[0]); }
+  if (hit) {
+    markArrived_(hit[0]);
+    // v95 · το κείμενο του πελάτη στο ιστορικό — ΠΡΙΝ από το φρένο απαντήσεων
+    inbound_({ code: hit[0], kind: 'in', from: addr, subject: subj, text: (m.getPlainBody() || '').slice(0, 20000) });
+  }
 
   var cache = CacheService.getScriptCache();
   var rk = 'r:' + addr, cnt = Number(cache.get(rk) || 0);
@@ -110,6 +128,7 @@ function handle_(m) {
   } else {
     code = newCode_();
     if (!code) { return 'fail'; }
+    inbound_({ code: code, kind: 'in', from: addr, subject: subj, text: (m.getPlainBody() || '').slice(0, 20000) });
     body = textNew_(code);
     outSubj = reSubj_(subj) + ' [' + code + ']';
   }
@@ -121,6 +140,51 @@ function handle_(m) {
   }
   cache.put(rk, String(cnt + 1), 3600);
   return 'sent';
+}
+
+/* v95 · ποιος έγραψε ΠΡΑΓΜΑΤΙΚΑ. Το Group μπορεί να ξαναγράψει το «Από» σε support@
+   (26/9 δοκιμή 4α) — τότε ο αποστολέας είναι στο X-Original-Sender ή στο Reply-To. */
+function senderOf_(m) {
+  var a = addrOf_(m.getFrom());
+  if (a !== SUPPORT) { return a; }
+  var o = addrOf_(hdr_(m, 'X-Original-Sender'));
+  if (o && o !== SUPPORT) { return o; }
+  return addrOf_(m.getReplyTo());
+}
+
+function hdr_(m, n) { try { return String(m.getHeader(n) || ''); } catch (e) { return ''; } }
+
+/* v95 · απάντηση δική μας: ΜΟΝΟ με αριθμό στο θέμα. Ο server γράφει στο ιστορικό και
+   επιστρέφει {to, text}· στέλνουμε ΑΥΤΟ, σε ΑΥΤΗ τη διεύθυνση, ΑΠΟ support@. */
+function agentReply_(m, subj) {
+  var hit = CODE_RE.exec(subj);
+  if (!hit) { return skip_(m, 'δικό μας μήνυμα χωρίς αριθμό'); }
+  var code = hit[0];
+  var j = inbound_({ code: code, kind: 'out', from: senderOf_(m), subject: subj, text: (m.getPlainBody() || '').slice(0, 20000) });
+  if (!j || !j.ok) { console.error('out ' + code + ' → ' + JSON.stringify(j)); return 'fail'; }
+  if (!j.text) { console.log('κλείσιμο χωρίς κείμενο · ' + code); return 'skip'; }
+  var out = 'Re: ' + (j.topic ? j.topic + ' ' : 'Kostometro ') + '[' + code + ']';
+  var body = j.text + '\n\n— — —\n' +
+    'Αριθμός αιτήματος: ' + code + '\n' +
+    'Για να μας απαντήσεις, πάτα «Απάντηση» ή γράψε μας από την εφαρμογή: Μενού → Υποστήριξη.\n' +
+    (j.closed ? 'Το αίτημα έκλεισε. Αν χρειαστείς κάτι ακόμα, απλώς απάντησε — ξανανοίγει μόνο του.\n' : '') +
+    '\nFastWrite · Kostometro';
+  try {
+    GmailApp.sendEmail(j.to, out, body, { from: SUPPORT, name: NAME, replyTo: SUPPORT });
+  } catch (e) { console.error('ΔΕΝ ΣΤΑΛΘΗΚΕ ' + code + ' ' + e); return 'fail'; }
+  console.log('απάντηση → πελάτη · ' + code + (j.closed ? ' · ΚΛΕΙΣΤΟ' : ''));
+  return 'sent';
+}
+
+function inbound_(payload) {
+  var key = PropertiesService.getScriptProperties().getProperty('KM_SUPPORT_KEY');
+  try {
+    var r = UrlFetchApp.fetch(API_INBOUND, { method: 'post', contentType: 'application/json',
+      payload: JSON.stringify(payload), headers: { 'X-Km-Support': key }, muteHttpExceptions: true });
+    var j = null; try { j = JSON.parse(r.getContentText()); } catch (e) {}
+    if (r.getResponseCode() !== 200) { console.error('inbound ' + payload.code + ' → ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 200)); }
+    return j;
+  } catch (e) { console.error('inbound ' + payload.code + ' → ' + e); return null; }
 }
 
 function addrOf_(s) {

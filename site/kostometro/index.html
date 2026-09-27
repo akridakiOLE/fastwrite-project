@@ -304,7 +304,7 @@
     <button class="row" data-go="s-sup"><span class="row-l"><span class="row-t">Προμηθευτές</span><span class="row-sub">όλα τα τιμολόγια ανά προμηθευτή</span></span><span class="row-b" id="m-sup">0</span></button>
     <div class="grp">Βοήθεια</div>
     <button class="row" data-go="s-faq"><span class="row-l"><span class="row-t">Ερωτήσεις &amp; απαντήσεις</span><span class="row-sub">ό,τι ρωτάνε όλοι</span></span><span class="row-b">→</span></button>
-    <button class="row" data-go="s-help"><span class="row-l"><span class="row-t">Υποστήριξη</span><span class="row-sub">γράψε μας — απαντάμε με email</span></span><span class="row-b">→</span></button>
+    <button class="row" data-go="s-help"><span class="row-l"><span class="row-t">Υποστήριξη</span><span class="row-sub">γράψε μας · τα αιτήματά σου</span></span><span class="row-b" id="m-help">→</span></button>
     <button class="row" data-go="s-fb"><span class="row-l"><span class="row-t">Η γνώμη σου, εισηγήσεις</span><span class="row-sub">τι να αλλάξει, τι σου αρέσει</span></span><span class="row-b">→</span></button>
     <div class="grp">Μοιράσου</div>
     <button class="row" data-go="s-ref"><span class="row-l"><span class="row-t">Κάλεσε</span><span class="row-sub">ο σύνδεσμός σου και η επιβράβευση</span></span><span class="row-b">→</span></button>
@@ -342,20 +342,49 @@
     <h2>Υποστήριξη</h2>
   </header>
   <div class="pg-body">
-    <p class="lede">Γράψε μας τι συμβαίνει — απαντάμε στο email σου.</p>
-    <div id="hp-cases-wrap" hidden>
-      <h3 class="sec">ΤΟ ΑΙΤΗΜΑ</h3>
-      <div id="hp-cases" class="hp-cases" role="radiogroup" aria-label="Νέο αίτημα ή συνέχεια"></div>
+    <p class="lede">Γράψε μας τι συμβαίνει — η απάντησή μας έρχεται <b>εδώ</b> και στο email σου.</p>
+    <!-- v95 · KM-SUP-THREAD — τα αιτήματα ζουν στον server: ιστορικό, κατάσταση, «Λύθηκε». -->
+    <div id="hp-mine-wrap" hidden>
+      <h3 class="sec">ΤΑ ΑΙΤΗΜΑΤΑ ΜΟΥ</h3>
+      <div id="hp-mine" class="hp-mine"></div>
     </div>
+    <h3 class="sec">ΝΕΟ ΑΙΤΗΜΑ</h3>
     <label class="fld"><span>Για τι αφορά; (προαιρετικό)</span><input type="text" id="hp-topic" maxlength="60" autocomplete="off" placeholder="π.χ. δεν διαβάζει το τιμολόγιο"></label>
-    <p class="fine">Το email ανοίγει με έτοιμο αριθμό αιτήματος, την έκδοση και τη συσκευή σου, για να σε βοηθήσουμε πιο γρήγορα. Τα βλέπεις πριν στείλεις. <b>Κράτα τον αριθμό στο θέμα</b> αν μας ξαναγράψεις.</p>
-    <button class="btn primary" id="hp-mail">Γράψε μας</button>
-    <p class="fine" id="hp-note" hidden></p>
+    <textarea id="hp-text" class="km-ta" rows="5" maxlength="8000" placeholder="Γράψε μας τι συμβαίνει…"></textarea>
+    <p class="err" id="hp-err" hidden></p>
+    <button class="btn primary" id="hp-send">Στείλε</button>
+    <p class="fine">Μαζί στέλνονται η έκδοση και η συσκευή σου, για να σε βοηθήσουμε πιο γρήγορα.</p>
     <div class="sep"></div>
-    <p class="fine hint">Αν το κινητό σου δεν έχει ρυθμισμένο email:</p>
-    <div class="kv"><span>Διεύθυνση</span><b>support@fastwrite.tech</b></div>
-    <div class="kv"><span>Αριθμός αιτήματος</span><b id="hp-ticket">—</b></div>
-    <button class="btn ghost" id="hp-copy">Αντιγραφή διεύθυνσης και αριθμού</button>
+    <details class="faq" id="hp-email">
+      <summary>Προτιμάς να μας γράψεις με email;</summary>
+      <div id="hp-cases-wrap" hidden>
+        <h3 class="sec">ΤΟ ΑΙΤΗΜΑ</h3>
+        <div id="hp-cases" class="hp-cases" role="radiogroup" aria-label="Νέο αίτημα ή συνέχεια"></div>
+      </div>
+      <p class="fine">Το email ανοίγει με έτοιμο αριθμό αιτήματος. <b>Κράτα τον αριθμό στο θέμα</b> αν μας ξαναγράψεις.</p>
+      <button class="btn ghost" id="hp-mail">Άνοιξε το email μου</button>
+      <p class="fine" id="hp-note" hidden></p>
+      <div class="kv"><span>Διεύθυνση</span><b>support@fastwrite.tech</b></div>
+      <div class="kv"><span>Αριθμός αιτήματος</span><b id="hp-ticket">—</b></div>
+      <button class="btn ghost" id="hp-copy">Αντιγραφή διεύθυνσης και αριθμού</button>
+    </details>
+  </div>
+</section>
+
+<!-- ══ v95 · KM-SUP-THREAD — ΕΝΑ ΑΙΤΗΜΑ: όλη η συζήτηση, «Απάντησε», «Λύθηκε» ══ -->
+<section id="s-case" class="screen page" hidden>
+  <header class="pg-head">
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
+    <h2 id="cs-code">Αίτημα</h2>
+  </header>
+  <div class="pg-body">
+    <p class="cs-top"><b id="cs-topic"></b> <span id="cs-status" class="cs-st"></span></p>
+    <div id="cs-msgs" class="cs-msgs"></div>
+    <p class="fine hint" id="cs-closed-note" hidden>Το αίτημα είναι κλειστό. Αν μας γράψεις ξανά εδώ, ξανανοίγει.</p>
+    <textarea id="cs-text" class="km-ta" rows="4" maxlength="8000" placeholder="Γράψε την απάντησή σου…"></textarea>
+    <p class="err" id="cs-err" hidden></p>
+    <button class="btn primary" id="cs-send">Στείλε</button>
+    <button class="btn ghost" id="cs-close">✔ Λύθηκε — κλείσε το αίτημα</button>
   </div>
 </section>
 

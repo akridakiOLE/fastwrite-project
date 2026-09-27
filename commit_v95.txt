@@ -1,0 +1,19 @@
+v95 — αιτήματα υποστήριξης μέσω server: ιστορικό, κατάσταση, «Λύθηκε», «Τα αιτήματά μου»
+
+Brief «Αιτήματα μέσω server» (Claude outputs/support/Brief_Aitimata_27-09-2026.md), έγκριση Stavros 27/9.
+- KM-SUP-THREAD: km_support_cases + km_support_messages (schema/km_support_v95.sql).
+  /support/send (εφαρμογή) · /list · /thread · /close · /inbound (Apps Script, KM_SUPPORT_KEY).
+  Ειδοποίηση στο support@ με Reply-To = support@ → κάθε απάντηση περνάει από το σύστημα.
+  #κλειστό = κλείσιμο από εμάς · «Λύθηκε» = από τον χρήστη · αυτόματα 7 ημέρες μετά τη δική μας
+  απάντηση (ωριαίο) · νέο μήνυμα σε κλειστό → ξανανοίγει. Παράθεμα email κόβεται στον server.
+  Φρένο 10/ώρα · λίστα ≤50 · συζήτηση ≤200 · τήρηση 24 μήνες από το κλείσιμο · σβήνονται με τον λογαριασμό.
+- Εφαρμογή: «Τα αιτήματά μου», οθόνη s-case (Εσύ/Υποστήριξη, Απάντησε, Λύθηκε), κουκκίδα στο μενού.
+  Το mailto μένει μόνο ως εναλλακτική («Προτιμάς email;»).
+- Apps Script: AGENTS, απάντηση δική μας → /inbound out → email ΑΠΟ support@ στον πελάτη ·
+  μηνύματα πελατών → /inbound in · [Comments] και ειδοποιήσεις server → καμία απάντηση
+  (διόρθωση λάθους 27/9: η γνώμη ΔΟΚΙΜΗ .v94 πήρε KM-E-000003).
+- Πίνακας: αιτήματα ανοιχτά · αναπάντητα >24ω (pk-v6).
+- Τεστ: v95 (17/14 μεταλλάξεις) · v95_ui (8/9) · gs95 (8/7).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CagngWkuhADQbLHB1Yqj2k

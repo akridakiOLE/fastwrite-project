@@ -321,7 +321,7 @@
      στις 5/9· με ανάγνωση δεν φαινόταν.) */
   var SCREENS = ['s-acc','s-email','s-code','s-words','s-signin','s-key','s-perm','s-cam','s-who',
                  's-menu','s-pend','s-sup','s-ref','s-settings','s-shot','s-mywords',
-                 's-del','s-gone','s-dpend','s-faq','s-help','s-fb'];
+                 's-del','s-gone','s-dpend','s-faq','s-help','s-fb','s-case'];
   function show(id) {
     var pv = el('preview');
     if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
@@ -410,7 +410,8 @@
   function render(id) {
     if (id === 's-menu')     { renderMenu(); el('m-ver').textContent = shortVer(APP_VER); }
     if (id === 's-faq')      { renderFaq(); }
-    if (id === 's-help')     { renderHelp(); }
+    if (id === 's-help')     { renderHelp(); hpLoad(); }
+    if (id === 's-case')     { renderCase(); }
     if (id === 's-fb')       { renderFb(); }
     /* v11 — ΚΑΘΕ ΕΙΣΟΔΟΣ στην οθόνη παγώνει τη σειρά. Αλλιώς, μόλις
        διορθώσεις ημερομηνία, η κάρτα πηδάει αλλού και τη χάνεις από τα
@@ -530,6 +531,7 @@
       rows.forEach(function (r) { if (r.supplier) { supNames[r.supplier] = 1; } });
       el('m-sup').textContent = Object.keys(supNames).length;
     });
+    hpLoad();   // v95 · κουκκίδα «νέα απάντηση» στην Υποστήριξη
   }
 
   /* ══ ΤΑ ΕΚΚΡΕΜΗ ══ */
@@ -2121,7 +2123,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v94';
+  var APP_VER = 'φέτα 3 · v95';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5341,7 +5343,7 @@
     { q: 'Μπορεί ο λογιστής μου να βλέπει τα τιμολόγια;',
       a: 'Όχι ακόμα. Η δυνατότητα να βλέπει ο λογιστής σου τα τιμολόγια, πάντα με δική σου άδεια, είναι σε εξέλιξη.' },
     { q: 'Πώς επικοινωνώ μαζί σας;',
-      a: 'Από το Μενού → «Υποστήριξη». Ανοίγει email προς εμάς, με έτοιμο αριθμό εισιτηρίου για να βρίσκουμε γρήγορα τη συζήτησή σας. Για ιδέες και παρατηρήσεις, «Η γνώμη σου, εισηγήσεις».',
+      a: 'Από το Μενού → «Υποστήριξη». Γράφεις το μήνυμά σου εκεί και η απάντησή μας έρχεται στο «Τα αιτήματά μου» και στο email σου — όλη η συζήτηση μένει μαζί. Όταν λυθεί, πατάς «Λύθηκε». Για ιδέες και παρατηρήσεις, «Η γνώμη σου, εισηγήσεις».',
       go: 's-help', gt: 'Υποστήριξη' }
   ];
   var faqDone = false;
@@ -5549,6 +5551,125 @@
       var t = 'support@fastwrite.tech — ' + supSubject(p.code, p.topic);
       var done = function () { el('hp-note').textContent = 'Αντιγράφηκε: ' + t; el('hp-note').hidden = false; };
       if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done, done); } else { done(); }
+    });
+  };
+
+  /* ══ v95 · KM-SUP-THREAD — ΑΙΤΗΜΑΤΑ ΜΕΣΩ SERVER (27/9/2026, brief «Αιτήματα μέσω server») ══
+     Το μήνυμα ΔΕΝ φεύγει πια με mailto: πάει στον server, που το κρατάει και το στέλνει στο
+     support@. Η απάντησή μας γυρίζει εδώ («Τα αιτήματά μου») ΚΑΙ στο email του χρήστη.
+     Κατάσταση: Περιμένει απάντηση · Απαντήθηκε · Κλειστό. «Λύθηκε» = κλείνει ο χρήστης.
+     Το mailto μένει ΜΟΝΟ ως εναλλακτική μέσα στο «Προτιμάς email;». */
+  var ST_LAB = { open: 'Περιμένει απάντηση', answered: 'Απαντήθηκε', closed: 'Κλειστό' };
+  var hpList = [], hpSending = false, csCode = '', csBusy = false;
+  function csPost(path, body) {
+    return kmFetch(path, { method: 'POST', headers: kmHead(), body: JSON.stringify(body || {}) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { s: r.status, j: j || {} }; }); })
+      .catch(function () { return { s: 0, j: {} }; });
+  }
+  function csWhen(iso) {
+    var d = new Date(iso); if (isNaN(d)) { return ''; }
+    return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function helpDot(n) {
+    var m = el('m-help'); if (!m) { return; }
+    m.textContent = '';
+    if (n > 0) { var d = document.createElement('i'); d.className = 'dot'; d.title = 'Νέα απάντηση'; m.appendChild(d); m.className = 'row-b hot'; }
+    else { m.textContent = '→'; m.className = 'row-b'; }
+  }
+  function hpLoad() {
+    if (!hasAccount()) { hpList = []; hpMine(); return Promise.resolve(); }
+    return csPost('support/list').then(function (x) {
+      if (x.s !== 200 || !x.j.ok) { return; }
+      hpList = x.j.cases || []; hpMine(); helpDot(x.j.unread || 0);
+    });
+  }
+  function hpMine() {
+    var box = el('hp-mine'); box.textContent = '';
+    el('hp-mine-wrap').hidden = !hpList.length;
+    hpList.forEach(function (c) {
+      var b = document.createElement('button'); b.type = 'button';
+      b.className = 'hp-item st-' + c.status + (c.unread ? ' unread' : '');
+      /* Όλα με textContent: το θέμα το έγραψε ο χρήστης. */
+      var t = document.createElement('span'); t.textContent = c.topic || 'Αίτημα';
+      var sm = document.createElement('small');
+      sm.textContent = c.code + ' · ' + (c.unread ? 'ΝΕΑ ΑΠΑΝΤΗΣΗ' : (ST_LAB[c.status] || '')) + ' · ' + csWhen(c.last_out_at || c.last_in_at || c.created_at);
+      t.appendChild(sm); b.appendChild(t);
+      if (c.unread) { var d = document.createElement('i'); d.className = 'dot'; b.appendChild(d); }
+      b.onclick = function () { csCode = c.code; goto('s-case'); };
+      box.appendChild(b);
+    });
+  }
+  el('hp-send').onclick = function () {
+    var e = el('hp-err'), b = el('hp-send');
+    e.hidden = true;
+    var text = (el('hp-text').value || '').trim();
+    if (!text) { e.textContent = 'Γράψε μας τι συμβαίνει.'; e.hidden = false; return; }
+    if (!hasAccount()) { e.textContent = 'Για να γράψεις από εδώ χρειάζεσαι λογαριασμό — γράψε μας με email πιο κάτω.'; e.hidden = false; el('hp-email').open = true; return; }
+    if (hpSending) { return; }
+    hpSending = true; b.disabled = true; b.textContent = 'Στέλνεται…';
+    csPost('support/send', { topic: supTopic(el('hp-topic').value), text: text, ver: shortVer(APP_VER), dev: devName() }).then(function (x) {
+      hpSending = false; b.disabled = false; b.textContent = 'Στείλε';
+      if (x.s === 200 && x.j.ok && x.j.code) {
+        /* το κείμενο σβήνεται ΜΟΝΟ όταν ο server πει «το πήρα» */
+        el('hp-text').value = ''; el('hp-topic').value = '';
+        csCode = x.j.code; goto('s-case'); return;
+      }
+      if (x.s === 409) { e.textContent = 'Δεν βρήκαμε email στον λογαριασμό σου — γράψε μας με email πιο κάτω.'; el('hp-email').open = true; }
+      else if (x.s === 429) { e.textContent = 'Πολλά μηνύματα σε λίγη ώρα. Δοκίμασε ξανά σε λίγο.'; }
+      else { e.textContent = 'Δεν στάλθηκε' + (x.s ? ' (σφάλμα ' + x.s + ')' : ' — χωρίς σύνδεση') + '. Το κείμενό σου μένει εδώ· δοκίμασε ξανά.'; }
+      e.hidden = false;
+    });
+  };
+  function renderCase() {
+    el('cs-code').textContent = csCode || 'Αίτημα';
+    el('cs-err').hidden = true; el('cs-text').value = '';
+    el('cs-topic').textContent = ''; el('cs-status').textContent = '';
+    el('cs-msgs').textContent = 'Φορτώνει…';
+    el('cs-close').hidden = true; el('cs-closed-note').hidden = true;
+    var code = csCode;
+    return csPost('support/thread', { code: code }).then(function (x) {
+      if (code !== csCode) { return; }
+      if (x.s !== 200 || !x.j.ok) { el('cs-msgs').textContent = 'Δεν φορτώθηκε. Δοκίμασε ξανά.'; return; }
+      csPaint(x.j);
+    });
+  }
+  function csPaint(j) {
+    var c = j.case || {};
+    el('cs-topic').textContent = c.topic || '';
+    el('cs-status').textContent = ST_LAB[c.status] || '';
+    el('cs-status').className = 'cs-st st-' + c.status;
+    var box = el('cs-msgs'); box.textContent = '';
+    (j.messages || []).forEach(function (m) {
+      var d = document.createElement('div'); d.className = 'cs-msg ' + (m.dir === 'out' ? 'us' : 'me');
+      var h = document.createElement('small'); h.textContent = (m.dir === 'out' ? 'Υποστήριξη' : 'Εσύ') + ' · ' + csWhen(m.at);
+      var p = document.createElement('span'); p.textContent = m.body;
+      d.appendChild(h); d.appendChild(p); box.appendChild(d);
+    });
+    el('cs-close').hidden = c.status === 'closed';
+    el('cs-closed-note').hidden = c.status !== 'closed';
+  }
+  el('cs-send').onclick = function () {
+    var e = el('cs-err'), b = el('cs-send');
+    e.hidden = true;
+    var text = (el('cs-text').value || '').trim();
+    if (!text) { e.textContent = 'Γράψε πρώτα το μήνυμά σου.'; e.hidden = false; return; }
+    if (csBusy) { return; }
+    csBusy = true; b.disabled = true; b.textContent = 'Στέλνεται…';
+    csPost('support/send', { code: csCode, text: text, ver: shortVer(APP_VER), dev: devName() }).then(function (x) {
+      csBusy = false; b.disabled = false; b.textContent = 'Στείλε';
+      if (x.s === 200 && x.j.ok) { renderCase(); return; }
+      e.textContent = x.s === 429 ? 'Πολλά μηνύματα σε λίγη ώρα. Δοκίμασε ξανά σε λίγο.' : 'Δεν στάλθηκε' + (x.s ? ' (σφάλμα ' + x.s + ')' : ' — χωρίς σύνδεση') + '. Δοκίμασε ξανά.';
+      e.hidden = false;
+    });
+  };
+  el('cs-close').onclick = function () {
+    var e = el('cs-err');
+    if (csBusy) { return; }
+    csBusy = true;
+    csPost('support/close', { code: csCode }).then(function (x) {
+      csBusy = false;
+      if (x.s === 200 && x.j.ok) { renderCase(); return; }
+      e.textContent = 'Δεν έκλεισε. Δοκίμασε ξανά.'; e.hidden = false;
     });
   };
 
