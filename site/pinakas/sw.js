@@ -4,7 +4,7 @@
    /api/ δεν περνάει από εδώ — τα νούμερα του πίνακα λένε ΠΑΝΤΑ την αλήθεια του
    server. Χωρίς δίκτυο ο πίνακας ανοίγει και λέει «χωρίς σύνδεση», δεν δείχνει
    χθεσινά νούμερα σαν σημερινά. */
-var CACHE = 'pk-v6';
+var CACHE = 'pk-v7';
 var SHELL = ['/pinakas/', '/pinakas/index.html', '/pinakas/app.js', '/pinakas/manifest.webmanifest'];
 
 self.addEventListener('install', function (e) {

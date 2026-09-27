@@ -117,6 +117,8 @@ export async function handleKm(request, env, ctx, path) {
   // ΣΥΣΤΑΣΕΙΣ (17/9/2026) — ο κωδικός ανήκει στον λογαριασμό. schema/km_ref.sql
   if (path === "/api/km/ref" && method === "GET") return refInfo(request, env);
   if (path === "/api/km/ref/hit" && method === "POST") return refHit(request, env);
+  // v97 · KM-FUNNEL — ανώνυμο χωνί εγγραφής (ανά συσκευή ανά βήμα, μία φορά)
+  if (path === "/api/km/funnel" && method === "POST") return funnelStep(request, env);
 
   if (path === "/api/km/delete" && method === "POST") return requestDelete(request, env, ctx);
   if (path === "/api/km/delete/cancel" && method === "POST") return cancelDelete(request, env, ctx);
@@ -526,6 +528,26 @@ export async function kmSupportAutoClose(env, nowIso) {
      WHERE rowid IN (SELECT rowid FROM km_support_cases WHERE status = 'answered' AND last_out_at < ? LIMIT ?)`
   ).bind(t, cut, CLEANUP_BATCH).run();
   return (r && r.meta && r.meta.changes) || 0;
+}
+
+// ═══ v97 · KM-FUNNEL — ΧΩΝΙ ΕΓΓΡΑΦΗΣ (27/9/2026) ═══
+// Η εφαρμογή λέει «έφτασα στο βήμα Χ» ΜΙΑ φορά ανά βήμα, μόνο πριν ολοκληρωθεί η εγγραφή.
+// Ο server κρατάει ΜΟΝΟ: συσκευή (hash), βήμα, προέλευση, ώρα. Όχι email, όχι IP.
+const FUNNEL_STEPS = { open: 1, email: 1, code: 1, account: 1, key: 1, key_skip: 1 };
+function funnelSrc(v) {
+  let s = String(v || "direct").toLowerCase();
+  if (/^ref:/.test(s)) s = "ref";
+  return /^[a-z0-9:_-]{1,24}$/.test(s) ? s : "other";
+}
+async function funnelStep(request, env) {
+  const b = (await safeJson(request)) || {};
+  const inst = clean(b.install_id, 64);
+  const step = String(b.step || "");
+  if (!inst || !FUNNEL_STEPS[step]) return json({ ok: false, error: "bad_request" }, 400);
+  const dev = await sha256hex(inst + ":" + (env.KM_ADMIN_KEY || ""));
+  await env.DB.prepare("INSERT OR IGNORE INTO km_funnel (dev, step, src, at) VALUES (?, ?, ?, ?)")
+    .bind(dev, step, funnelSrc(b.src), now()).run();
+  return json({ ok: true });
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -2052,6 +2074,7 @@ async function cleanupCounts(env, nowIso) {
     support_tickets: await one("SELECT COUNT(*) AS n FROM km_support_tickets WHERE issued_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
     // v95 · KM-SUP-THREAD — αιτήματα ΚΛΕΙΣΤΑ πάνω από 24 μήνες (με τα μηνύματά τους)
     support_cases: await one("SELECT COUNT(*) AS n FROM km_support_cases WHERE status = 'closed' AND closed_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
+    funnel: await one("SELECT COUNT(*) AS n FROM km_funnel WHERE at < ?", monthsAgo(RETENTION.feedback_months, nowIso)),
   };
 }
 
@@ -2083,6 +2106,8 @@ export async function kmCleanup(env, nowIso) {
     // v95 · KM-SUP-THREAD — ΠΡΩΤΑ τα μηνύματα, μετά τα αιτήματα
     support_messages: await wipe("km_support_messages", "code IN (SELECT code FROM km_support_cases WHERE status = 'closed' AND closed_at < ?)", monthsAgo(RETENTION.support_months, nowIso)),
     support_cases: await wipe("km_support_cases", "status = 'closed' AND closed_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
+    // v97 · KM-FUNNEL — 24 μήνες
+    funnel: await wipe("km_funnel", "at < ?", monthsAgo(RETENTION.feedback_months, nowIso)),
   };
   done.batch_limit = CLEANUP_BATCH;
   done.more = Object.keys(done).some((k) => k !== "batch_limit" && done[k] === CLEANUP_BATCH);
@@ -2309,6 +2334,22 @@ async function adminPinakas(request, env) {
     sup = { open: Number(s && s.open) || 0, waiting_24h: Number(s && s.waiting_24h) || 0, answered: Number(s && s.answered) || 0, closed_7d: Number(s && s.closed_7d) || 0 };
   } catch (e) { /* πριν τη μετάβαση της βάσης ο Πίνακας ΔΕΝ πέφτει */ }
 
+  // v97 · KM-FUNNEL — χωνί 30 ημερών ανά προέλευση + κάρτα leads (διαγραφές από τη λίστα)
+  let funnel = [], leads = null;
+  try {
+    funnel = await all("SELECT src, step, COUNT(*) AS n FROM km_funnel WHERE at >= ? GROUP BY src, step", d30);
+  } catch (e) { funnel = []; }
+  try {
+    const lt = await one(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN unsub_at IS NOT NULL THEN 1 ELSE 0 END) AS unsub,
+              SUM(CASE WHEN stay_at IS NOT NULL THEN 1 ELSE 0 END) AS stay
+       FROM km_leads`);
+    const ls = await all("SELECT campaign, COUNT(*) AS n, SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END) AS ok FROM km_lead_sends GROUP BY campaign");
+    const lu = await all("SELECT email, name, unsub_at FROM km_leads WHERE unsub_at IS NOT NULL ORDER BY unsub_at DESC LIMIT 50");
+    leads = { total: Number(lt.total) || 0, unsub: Number(lt.unsub) || 0, stay: Number(lt.stay) || 0, sends: ls, unsub_list: lu };
+  } catch (e) { leads = null; }
+
   // ── (α) Η ΛΙΣΤΑ — ποιος, από πού, πότε, τελευταία δραστηριότητα ───────
   // Το email ΕΙΝΑΙ δεδομένο συνεργασίας (Brief Β (α)): ο Stavros πρέπει να
   // βλέπει ποιος γράφτηκε. Οι ταφόπετρες έχουν κενό email και δεν μπαίνουν.
@@ -2338,6 +2379,7 @@ async function adminPinakas(request, env) {
     mail_30d: { sent: mail.sent || 0, ok: mail.ok || 0, failed: mail.failed || 0 },
     feedback: { n: fb.n || 0, avg_stars: fb.avg_stars ? Number(fb.avg_stars).toFixed(2) : null, want_reply: fb.want_reply || 0 },
     support: sup,
+    funnel: funnel, leads: leads,
     accounts: list.rows,
     accounts_total: list.total,
     next: list.next, n: list.n, filters: list.filters,

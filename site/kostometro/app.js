@@ -2058,6 +2058,24 @@
      συσκευή που τον άνοιξε. Ο server έχει και δικό του de-duplication
      (πρωτεύον κλειδί ref_code+install_id): εδώ απλώς δεν ξαναχτυπάμε το
      δίκτυο σε κάθε άνοιγμα της εφαρμογής. */
+  /* ══ v97 · KM-FUNNEL — ΧΩΝΙ ΕΓΓΡΑΦΗΣ (27/9/2026) ══════════════════
+     Μία αναφορά ανά βήμα ανά συσκευή (σημάδι στο localStorage), ΜΟΝΟ πριν
+     ολοκληρωθεί η εγγραφή — οι υπάρχοντες χρήστες δεν μετράνε. Καμία πληροφορία
+     για το πρόσωπο: install_id (ο server το κάνει hash), βήμα, προέλευση. */
+  function funnel(step) {
+    try {
+      if (localStorage.getItem(LS.reg) && step !== 'account' && step !== 'key' && step !== 'key_skip') { return; }
+      var k = 'km_fn_' + step;
+      if (localStorage.getItem(k)) { return; }
+      var inst = localStorage.getItem(LS.id) || '';
+      if (!inst) { return; }
+      localStorage.setItem(k, '1');
+      fetch(KM_API + 'funnel', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ install_id: inst, step: step, src: localStorage.getItem(LS.src) || 'direct' }) })
+        .catch(function () { try { localStorage.removeItem(k); } catch (e) {} });
+    } catch (e) {}
+  }
+
   function refReportHit() {
     var m = /[?&]ref=([A-Za-z0-9]+)/.exec(location.search);
     if (!m) { return; }
@@ -2123,7 +2141,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v96';
+  var APP_VER = 'φέτα 3 · v97';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -3200,6 +3218,7 @@
     }).then(function (r) {
       if (!r.ok) { return false; }
       localStorage.setItem(LS.reg, '1');
+      funnel('account');   // v97 · KM-FUNNEL
       localStorage.removeItem(LS.emailTok);   // καμένο στον server — δεν ξαναχρησιμεύει
       localStorage.removeItem(LS.wrapped);   // v47 — η κλειδαριά γράφτηκε μαζί με τον λογαριασμό
       /* Το register ΚΑΝΕΙ αυτή τη συσκευή ενεργή στον server (Η.3: όποια
@@ -4586,6 +4605,7 @@
        πρώτη εγκατάσταση, ενώ ο σύνδεσμος μπορεί να ανοιχτεί και από κάποιον
        που έχει ήδη την εφαρμογή. */
     refReportHit();
+    funnel('open');   // v97 · KM-FUNNEL
     /* v26 · Η.2β-1 — τρεις καταστάσεις, με αυτή τη σειρά:
        (α) ούτε email ούτε λέξεις  -> εντελώς νέος, πρώτη οθόνη
        (β) email αλλά ΟΧΙ λέξεις   -> υπάρχων χρήστης· αποκτά κλειδί τώρα,
@@ -4769,7 +4789,7 @@
       body: JSON.stringify({ email: email })
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
-        if (r.ok) { codeWait = Date.now() + 30000; return 'ok'; }
+        if (r.ok) { codeWait = Date.now() + 30000; funnel('email'); return 'ok'; }
         var e = j && j.error;
         if (e === 'taken') { return 'taken'; }
         if (e === 'pending_delete') { return 'pending_delete'; }
@@ -4839,6 +4859,7 @@
         if (r.ok && j && j.email_token) {
           localStorage.setItem(LS.emailTok, j.email_token);
           localStorage.setItem(LS.email, codeEmail);
+          funnel('code');   // v97 · KM-FUNNEL
           codeErr('');
           startWords(false);
           return;
@@ -4868,12 +4889,13 @@
   el('code-back').onclick = function () { show('s-email'); };
   el('go-key').onclick = function () {
     var v = el('in-key').value.trim();
-    if (v) { localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); aiPay = false; aiWait = 0; aiHalt = false; aiSlow = false; }
-    else { localStorage.setItem(LS.skip, '1'); }
+    if (v) { funnel('key'); localStorage.setItem(LS.key, v); localStorage.removeItem(LS.skip); aiPay = false; aiWait = 0; aiHalt = false; aiSlow = false; }
+    else { localStorage.setItem(LS.skip, '1'); funnel('key_skip'); }
     show('s-perm');
   };
   el('skip-key').onclick = function () {
     localStorage.setItem(LS.skip, '1');
+    funnel('key_skip');   // v97 · KM-FUNNEL
     show('s-perm');
   };
   el('go-perm').onclick = function () {

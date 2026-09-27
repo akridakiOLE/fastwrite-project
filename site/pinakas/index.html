@@ -252,6 +252,23 @@ html:not([data-gate]) #s-data  { display: none !important; }
     <p class="fine hint" style="margin-top:10px" id="k-more"></p>
   </section>
 
+  <!-- v97 · KM-FUNNEL — ΧΩΝΙ ΕΓΓΡΑΦΗΣ + LEADS -->
+  <section class="card">
+    <h2>Χωνί εγγραφής <span class="muted">30 ημέρες · μοναδικές συσκευές</span></h2>
+    <div class="scroll"><table><thead><tr><th>προέλευση</th><th>άνοιξαν</th><th>έβαλαν email</th><th>επιβεβαίωσαν κωδικό</th><th>λογαριασμός</th><th>κλειδί</th><th>χωρίς κλειδί</th></tr></thead><tbody id="fnl"></tbody></table></div>
+    <p class="fine hint" id="fnl-note">Μετράει από τη v97 (27/9/2026) — ό,τι έγινε πριν δεν φαίνεται εδώ.</p>
+  </section>
+  <section class="card">
+    <h2>Λίστα leads</h2>
+    <div class="grid">
+      <div class="kpi"><div class="n" id="k-ld">—</div><div class="l">leads</div></div>
+      <div class="kpi"><div class="n" id="k-ld-sent">—</div><div class="l">έλαβαν email</div></div>
+      <div class="kpi"><div class="n" id="k-ld-un">—</div><div class="l">βγήκαν από τη λίστα</div></div>
+      <div class="kpi"><div class="n" id="k-ld-st">—</div><div class="l">πάτησαν «μένω»</div></div>
+    </div>
+    <div class="scroll" id="ld-un-wrap" hidden><table><thead><tr><th>email</th><th>όνομα</th><th>βγήκε</th></tr></thead><tbody id="ld-un"></tbody></table></div>
+  </section>
+
   <!-- ΕΚΚΡΕΜΕΙΣ ΔΙΑΓΡΑΦΕΣ -->
   <section class="card" id="c-pend" hidden>
     <h2>Εκκρεμείς διαγραφές (72 ώρες)</h2>

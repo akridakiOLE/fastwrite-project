@@ -1,0 +1,11 @@
+v97 — χωνί εγγραφής (KM-FUNNEL) + κάρτα leads στον Πίνακα
+
+Μετά τη διανομή: 0 εγγραφές σε 7 ώρες, χωρίς τρόπο να φανεί πού σταματούν.
+- /api/km/funnel: ανώνυμα βήματα open·email·code·account·key·key_skip, μία φορά ανά συσκευή,
+  hash συσκευής (όχι ωμό install_id), χωρίς email/IP, προέλευση ?src= (ref:X → ref). 24 μήνες.
+- Εφαρμογή: αναφορά βημάτων μόνο πριν την εγγραφή.
+- Πίνακας: «Χωνί εγγραφής» 30 ημερών ανά προέλευση · «Λίστα leads» (έλαβαν, βγήκαν, μένω + ποιοι βγήκαν). pk-v7.
+- tests/v97: 7 έλεγχοι, 9 μεταλλάξεις.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CagngWkuhADQbLHB1Yqj2k

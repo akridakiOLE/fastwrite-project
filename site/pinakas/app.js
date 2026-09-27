@@ -247,6 +247,23 @@
       'Θέλουν απάντηση: <b>' + j.feedback.want_reply + '</b> · ' +
       'Αιτήματα απαντημένα: <b>' + (sp.answered || 0) + '</b> · κλειστά 7 ημ.: <b>' + (sp.closed_7d || 0) + '</b>';
 
+    /* v97 · KM-FUNNEL — χωνί ανά προέλευση · κάρτα leads */
+    var FN = ['open', 'email', 'code', 'account', 'key', 'key_skip'], fm = {};
+    (j.funnel || []).forEach(function (r) { (fm[r.src] = fm[r.src] || {})[r.step] = Number(r.n) || 0; });
+    var fk = Object.keys(fm).sort(function (a, b) { return (fm[b].open || 0) - (fm[a].open || 0); });
+    el('fnl').innerHTML = fk.length ? fk.map(function (s) {
+      return '<tr><td>' + esc(srcLab(s)) + '</td>' + FN.map(function (st) { return '<td>' + (fm[s][st] || 0) + '</td>'; }).join('') + '</tr>';
+    }).join('') : '<tr><td colspan="7" class="muted">Κανείς ακόμα.</td></tr>';
+    var ld = j.leads;
+    if (ld) {
+      var sent = (ld.sends || []).reduce(function (a, r) { return a + (Number(r.ok) || 0); }, 0);
+      el('k-ld').textContent = ld.total; el('k-ld-sent').textContent = sent;
+      el('k-ld-un').textContent = ld.unsub; el('k-ld-st').textContent = ld.stay;
+      var ul = ld.unsub_list || [];
+      el('ld-un-wrap').hidden = !ul.length;
+      el('ld-un').innerHTML = ul.map(function (r) { return '<tr><td>' + esc(r.email) + '</td><td>' + esc(r.name || '') + '</td><td>' + fmtDate(r.unsub_at) + '</td></tr>'; }).join('');
+    }
+
     var p = j.pending_deletions || [];
     el('c-pend').hidden = !p.length;
     el('pend').innerHTML = p.map(function (r) {
