@@ -101,7 +101,7 @@ for %%N in (1 2 3 4 5 6 7 8 9 10) do (
 )
 node tests\gs95.test.mjs
 if errorlevel 1 goto tf
-for %%N in (1 2 3 4 5 6 7) do (
+for %%N in (1 2 3 4 5 6 7 8) do (
   node tests\gs95.test.mjs --mutate=%%N
   if errorlevel 1 goto mf
 )

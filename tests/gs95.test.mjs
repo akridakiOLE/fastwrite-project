@@ -19,6 +19,8 @@ const MUT = [
   ["var AGENTS = ['stavrosfkallenos@gmail.com', 'admin@fastwrite.tech'];", "var AGENTS = ['admin@fastwrite.tech'];"],
   // 7 · απάντηση ΑΠΟ admin@ αντί support@
   ["GmailApp.sendEmail(j.to, out, body, { from: SUPPORT,", "GmailApp.sendEmail(j.to, out, body, { from: 'admin@fastwrite.tech',"],
+  // 8 · v96 · διπλός αριθμός στο θέμα
+  ["    outSubj = CODE_RE.test(subj) ? reSubj_(subj)", "    outSubj = /(^|\\s)KM-/.test(subj) ? reSubj_(subj)"],
 ];
 if (ONLY) { const m = MUT[ONLY - 1]; if (!m) process.exit(2); if (!gs.includes(m[0])) { console.log("Μ" + ONLY + " ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ"); process.exit(3); } gs = gs.replace(m[0], m[1]); }
 
@@ -71,6 +73,8 @@ check("Γ-5 · πελάτης με αριθμό → κείμενο στον serv
   w.api.handle_(msg({ from: "Maria <maria@shop.cy>", subject: "Re: κάμερα [KM-MH8Y9QVNHH-4]", body: "Ευχαριστώ" }));
   const f = w.fetched.find((x) => x.url.endsWith("/inbound")); ok(f && f.p.kind === "in" && f.p.from === "maria@shop.cy", JSON.stringify(f));
   ok(w.sent.length === 1 && w.sent[0].to === "maria@shop.cy", "επιβεβαίωση");
+  // v96 · ο αριθμός ΜΙΑ φορά στο θέμα (27/9: «[KM-…] [KM-…]»)
+  ok((w.sent[0].subj.match(/KM-MH8Y9QVNHH-4/g) || []).length === 1, "διπλός αριθμός: " + w.sent[0].subj);
 });
 check("Γ-6 · πελάτης ΧΩΡΙΣ αριθμό → νέος KM-E + κείμενο στον server", () => {
   const w = world(() => ({ ok: true, known: true }));

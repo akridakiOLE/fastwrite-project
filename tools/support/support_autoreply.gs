@@ -124,7 +124,8 @@ function handle_(m) {
     // 26/9 (απόφαση Stavros): ΚΑΘΕ μήνυμα παίρνει απάντηση — το φρένο «1 ανά αριθμό
     // ανά 12 ώρες» έφυγε: ο χρήστης έγραφε και δεν ήξερε αν έφτασε.
     body = textAck_(code);
-    outSubj = /(^|\s)KM-/.test(subj) ? reSubj_(subj) : reSubj_(subj) + ' [' + code + ']';
+    // v96 · ο αριθμός μπαίνει ΜΙΑ φορά — το «[KM-…]» δεν ταίριαζε στο παλιό /(^|\s)KM-/ (27/9: θέμα με διπλό [KM-…])
+    outSubj = CODE_RE.test(subj) ? reSubj_(subj) : reSubj_(subj) + ' [' + code + ']';
   } else {
     code = newCode_();
     if (!code) { return 'fail'; }
