@@ -25,6 +25,8 @@ const MUT = [
   ["js", "if (x.s === 409) { e.textContent = 'Δεν βρήκαμε email στον λογαριασμό σου — γράψε μας με email πιο κάτω.'; el('hp-email').open = true; }", "if (x.s === 409) { e.textContent = 'x'; }"],
   // 9 · το mailto ξαναγίνεται το κύριο κουμπί
   ["html", '<button class="btn ghost" id="hp-mail">Άνοιξε το email μου</button>', '<button class="btn primary" id="hp-mail">Γράψε μας</button>'],
+  // 10 · v96 · το «Άνοιξε ›» λείπει
+  ["js", "var gt = document.createElement('b'); gt.textContent = 'Άνοιξε ›'; go.appendChild(gt);", "var gt = document.createElement('b');"],
 ];
 if (ONLY) { const m = MUT[ONLY - 1]; if (!m) process.exit(2); const bag = { js, html };
   if (!bag[m[0]].includes(m[1])) { console.log("Μ" + ONLY + " ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ"); process.exit(3); }
@@ -89,6 +91,9 @@ await check("Ω-6 · λίστα + κουκκίδα «νέα απάντηση» �
   await w.api.hpLoad(); await w.flush();
   ok(w.el("hp-mine-wrap").hidden === false && w.el("hp-mine").children.length === 1, "λίστα");
   ok(w.el("m-help").children.length === 1 && w.el("m-help").className === "row-b hot", "κουκκίδα");
+  // v96 · KM-SUP-OPEN — ορατό «Άνοιξε ›» σε κάθε κάρτα
+  const card = w.el("hp-mine").children[0], go = card.children[card.children.length - 1];
+  ok(go.className === "hp-go" && go.children.some((x) => x.textContent === "Άνοιξε ›"), "λείπει το «Άνοιξε ›»");
 });
 await check("Ω-7 · οθόνη s-case στη λίστα SCREENS + στο render + στο index", async () => {
   ok(js.includes("'s-faq','s-help','s-fb','s-case'];"), "SCREENS");

@@ -2123,7 +2123,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v95';
+  var APP_VER = 'φέτα 3 · v96';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5594,7 +5594,11 @@
       var sm = document.createElement('small');
       sm.textContent = c.code + ' · ' + (c.unread ? 'ΝΕΑ ΑΠΑΝΤΗΣΗ' : (ST_LAB[c.status] || '')) + ' · ' + csWhen(c.last_out_at || c.last_in_at || c.created_at);
       t.appendChild(sm); b.appendChild(t);
-      if (c.unread) { var d = document.createElement('i'); d.className = 'dot'; b.appendChild(d); }
+      /* v96 · KM-SUP-OPEN — ορατή ένδειξη ότι η κάρτα ανοίγει (εύρημα Stavros 27/9) */
+      var go = document.createElement('span'); go.className = 'hp-go';
+      if (c.unread) { var d = document.createElement('i'); d.className = 'dot'; go.appendChild(d); }
+      var gt = document.createElement('b'); gt.textContent = 'Άνοιξε ›'; go.appendChild(gt);
+      b.appendChild(go);
       b.onclick = function () { csCode = c.code; goto('s-case'); };
       box.appendChild(b);
     });

@@ -1,0 +1,6 @@
+v96 — «Άνοιξε ›» σε κάθε κάρτα στο «Τα αιτήματά μου» (εύρημα Stavros 27/9)
+
+KM-SUP-OPEN · τεστ v95_ui +1 έλεγχος, +1 μετάλλαξη.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CagngWkuhADQbLHB1Yqj2k

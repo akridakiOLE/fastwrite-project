@@ -684,3 +684,6 @@ textarea.km-ta:focus{outline:none;border-color:var(--accent)}
 .cs-msg.me{align-self:flex-end;background:var(--bg2);border:1px solid var(--border)}
 .cs-msg.us{align-self:flex-start;background:var(--accent-dim);border:1px solid var(--accent)}
 #cs-close{margin-top:8px}
+/* v96 · KM-SUP-OPEN */
+.hp-go{display:flex;align-items:center;gap:8px;flex:none}
+.hp-go b{color:var(--accent);font-size:14px;font-weight:600;white-space:nowrap}
