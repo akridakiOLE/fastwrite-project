@@ -91,6 +91,16 @@
   <div class="setup-inner">
     <h1 class="logo">kosto<svg class="logo-mark" viewBox="0 0 34 46" aria-hidden="true"><path d="M6 30 L17 15 L28 30"/></svg>metro</h1>
     <p class="lede">Φωτογραφίζεις το τιμολόγιο στην παραλαβή.<br>Κρατάς τι πλήρωσες, ανά προμηθευτή.</p>
+    <!-- KM-OAUTH (29/9/2026) · ΣΥΝΔΕΣΗ ΜΕ GOOGLE / MICROSOFT — Brief_Agent_Syndesi Μέρος Α.
+         ΙΔΙΑ ΟΘΟΝΗ ΓΙΑ ΟΛΟΥΣ, από κάθε προέλευση (όχι παράκαμψη για κάποιους —
+         Α320 27/9 «ένας δρόμος για όλους»). Αντικαθιστά ΜΟΝΟ τον κωδικό 6 ψηφίων·
+         οι 12 λέξεις μένουν. Ο κωδικός πρόσκλησης πιο κάτω ισχύει και εδώ. -->
+    <div class="oauth" id="oauth-box" data-oauth="google-microsoft">
+      <button class="btn oauth-btn" id="go-google" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Συνέχεια με Google</span></button>
+      <button class="btn oauth-btn" id="go-microsoft" type="button"><svg viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg><span>Συνέχεια με Microsoft</span></button>
+      <p class="fine oauth-note">Παίρνουμε <b>μόνο το email σου</b> — κανέναν κωδικό, καμία επαφή, κανένα αρχείο.</p>
+      <p class="or"><span>ή με email</span></p>
+    </div>
     <label class="fld">
       <span>Το email σου</span>
       <input type="email" id="in-email" inputmode="email" autocomplete="email" placeholder="onoma@example.com">
@@ -138,7 +148,7 @@
          ⚠ ΔΕΝ είναι κουτάκι συγκατάθεσης: η Πολιτική είναι ΕΝΗΜΕΡΩΣΗ (πρέπει
          να φαίνεται πριν), όχι συγκατάθεση που θέλει τσιμπήμα. Το μοναδικό
          κουτάκι συγκατάθεσης της οθόνης είναι το ref-consent-ok, και μένει ασυμπλήρωτο. -->
-    <p class="fine" id="legal-line">Πατώντας <b>«Συνέχεια»</b> αποδέχεσαι τους <a href="/legal/terms" target="_blank" rel="noopener">Όρους χρήσης</a> και την <a href="/legal/privacy" target="_blank" rel="noopener">Πολιτική απορρήτου</a>.</p>
+    <p class="fine" id="legal-line">Πατώντας <b>«Συνέχεια»</b> (ή Google / Microsoft) αποδέχεσαι τους <a href="/legal/terms" target="_blank" rel="noopener">Όρους χρήσης</a> και την <a href="/legal/privacy" target="_blank" rel="noopener">Πολιτική απορρήτου</a>.</p>
     <p class="fine">Δωρεάν, χωρίς όριο χρόνου. Το email είναι για <b>ειδοποιήσεις ασφαλείας</b> (αν ζητηθεί διαγραφή ή αλλάξουν οι 12 λέξεις) και για ενημερώσεις της εφαρμογής.</p>
   </div>
 </section>

@@ -1,0 +1,16 @@
+v98 — Σύνδεση με Google / Microsoft στην εγγραφή (KM-OAUTH)
+
+Brief_Agent_Syndesi_29-09-2026, Μέρος Α (έγκριση Stavros 29/9).
+- Worker: GET /api/km/auth/{google|microsoft}/start|callback — Authorization Code + PKCE S256,
+  state σε cookie HttpOnly + hash στη βάση (μία χρήση, DELETE … RETURNING), nonce,
+  υπογραφή id_token με JWKS, aud/iss/exp. Έξοδος: ΤΟ ΙΔΙΟ email_token με τον κωδικό 6 ψηφίων.
+- Google: μόνο email_verified. Microsoft: προσωπικός λογαριασμός ή xms_edov, αλλιώς κωδικός 6 ψηφίων.
+- Email με ζωντανό λογαριασμό → «taken» (ένα email = ένας λογαριασμός, αμετάβλητο).
+- Εφαρμογή: κουμπιά Google/Microsoft στην οθόνη email (ίδια για όλους), κωδικός πρόσκλησης
+  γράφεται ΠΡΙΝ το redirect, #km_oauth διαβάζεται και σβήνεται αμέσως.
+- Χωνί: +oauth_google / +oauth_microsoft. Σχήμα: schema/km_oauth.sql (1 νέος πίνακας).
+- wrangler.toml: [vars] GOOGLE_CLIENT_ID / MS_CLIENT_ID (δημόσια) + keep_vars. Secrets μόνο με wrangler secret put.
+- Τεστ: tests/v98.test.mjs — 11 φρουροί, 12 αποδείξεις μετάλλαξης.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018WEr118BCAFDGw3YyxJczg

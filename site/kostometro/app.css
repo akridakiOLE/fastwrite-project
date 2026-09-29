@@ -687,3 +687,11 @@ textarea.km-ta:focus{outline:none;border-color:var(--accent)}
 /* v96 · KM-SUP-OPEN */
 .hp-go{display:flex;align-items:center;gap:8px;flex:none}
 .hp-go b{color:var(--accent);font-size:14px;font-weight:600;white-space:nowrap}
+
+/* KM-OAUTH (29/9/2026) — κουμπιά σύνδεσης Google / Microsoft */
+.oauth{display:flex;flex-direction:column;gap:10px;margin:4px 0 6px}
+.btn.oauth-btn{display:flex;align-items:center;justify-content:center;gap:12px;background:#fff;color:#1f1f1f;border:1px solid #dadce0;font-weight:600}
+.btn.oauth-btn svg{width:20px;height:20px;flex:0 0 20px}
+.oauth-note{margin:0;text-align:center}
+.oauth .or{display:flex;align-items:center;gap:10px;margin:6px 0 0;color:var(--text2);font-size:14px}
+.oauth .or::before,.oauth .or::after{content:"";flex:1;height:1px;background:var(--border)}

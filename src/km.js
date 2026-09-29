@@ -1,4 +1,5 @@
 // KM-SERVER-V60-H11B  ← σημάδι έκδοσης· το ψάχνει το deploy_km_h11b.bat
+// KM-SERVER-V98-OAUTH  ← σημάδι: σύνδεση Google/Microsoft (29/9/2026)
 // KM-SERVER-V84-VERIFY ← Brief ΣΤ (24/9/2026): ένα email = ένας λογαριασμός · κωδικός 6 ψηφίων
 // Kostometro — μητρώο + σφραγισμένος φάκελος (Brief Α, Α350 §9.8 Η.1)
 // ---------------------------------------------------------------------------
@@ -8,6 +9,7 @@
 //   POST /api/km/register           -> νέος λογαριασμός Ή είσοδος σε υπάρχοντα
 //   POST /api/km/email/code         -> Brief ΣΤ: στέλνει κωδικό 6 ψηφίων (ή taken / pending_delete)
 //   POST /api/km/email/verify       -> Brief ΣΤ: κωδικός → email_token (χωρίς αυτό, κανένας ΝΕΟΣ λογαριασμός)
+//   GET  /api/km/auth/{google|microsoft}/start|callback -> KM-OAUTH: το ίδιο email_token μέσω Google/Microsoft
 //   GET  /api/km/ref/check?code=    -> Brief ΣΤ: υπάρχει ζωντανός λογαριασμός με αυτόν τον κωδικό;
 //   GET  /api/km/manifest?ref=&src= -> Brief ΣΤ: manifest με start_url που ΚΡΑΤΑΕΙ ref/src (iPhone)
 //   GET  /api/km/status             -> έκδοση, μέγεθος, ενεργή συσκευή, συσκευές
@@ -107,6 +109,9 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/register" && method === "POST") return register(request, env);
   if (path === "/api/km/email/code" && method === "POST") return emailCode(request, env);
   if (path === "/api/km/email/verify" && method === "POST") return emailVerify(request, env);
+  // KM-OAUTH (29/9/2026) — Σύνδεση με Google / Microsoft
+  { const m = /^\/api\/km\/auth\/(google|microsoft)\/(start|callback)$/.exec(path);
+    if (m && method === "GET") return m[2] === "start" ? oauthStart(request, env, m[1]) : oauthCallback(request, env, m[1]); }
   if (path === "/api/km/ref/check" && method === "GET") return refCheck(request, env);
   if (path === "/api/km/manifest" && method === "GET") return manifestFor(request);
   if (path === "/api/km/status" && method === "GET") return status(request, env);
@@ -533,7 +538,7 @@ export async function kmSupportAutoClose(env, nowIso) {
 // ═══ v97 · KM-FUNNEL — ΧΩΝΙ ΕΓΓΡΑΦΗΣ (27/9/2026) ═══
 // Η εφαρμογή λέει «έφτασα στο βήμα Χ» ΜΙΑ φορά ανά βήμα, μόνο πριν ολοκληρωθεί η εγγραφή.
 // Ο server κρατάει ΜΟΝΟ: συσκευή (hash), βήμα, προέλευση, ώρα. Όχι email, όχι IP.
-const FUNNEL_STEPS = { open: 1, email: 1, code: 1, account: 1, key: 1, key_skip: 1 };
+const FUNNEL_STEPS = { open: 1, email: 1, code: 1, account: 1, key: 1, key_skip: 1, oauth_google: 1, oauth_microsoft: 1 };  // KM-OAUTH: +2
 function funnelSrc(v) {
   let s = String(v || "direct").toLowerCase();
   if (/^ref:/.test(s)) s = "ref";
@@ -953,6 +958,172 @@ async function emailVerify(request, env) {
   if (busy) return json({ ok: false, error: busy }, 409);
   await env.DB.prepare("DELETE FROM km_email_codes WHERE email = ?").bind(email).run();
   return json({ ok: true, email_token: await issueEmailToken(env, email) });
+}
+
+// ═══ KM-OAUTH · ΣΥΝΔΕΣΗ ΜΕ GOOGLE / MICROSOFT (29/9/2026) ═══════════════════
+// Brief_Agent_Syndesi_29-09-2026, Μέρος Α. Αντικαθιστά ΜΟΝΟ την απόδειξη του
+// email (τον 6ψήφιο κωδικό). Η έξοδος είναι ΤΟ ΙΔΙΟ email_token που δίνει το
+// /api/km/email/verify — άρα όλη η ροή μετά (ένα email = ένας λογαριασμός,
+// taken / pending_delete, 12 λέξεις) μένει ανέγγιχτη.
+//
+//   GET /api/km/auth/{google|microsoft}/start     -> 302 στον πάροχο
+//   GET /api/km/auth/{google|microsoft}/callback  -> 302 /kostometro/#km_oauth=…
+//
+// Ασφάλεια: Authorization Code + PKCE (S256) · state σε cookie HttpOnly ΚΑΙ
+// hash στη βάση (μία χρήση, DELETE … RETURNING) · nonce μέσα στο id_token ·
+// υπογραφή id_token ελεγμένη με τα δημόσια κλειδιά (JWKS) του παρόχου ·
+// aud / iss / exp. Τα client secrets ζουν ΜΟΝΟ ως Worker secrets.
+// Δεδομένα: παίρνουμε ΜΟΝΟ email (+ αν είναι επιβεβαιωμένο). Όνομα δεν κρατιέται.
+const OAUTH_TTL_MS = 10 * 60 * 1000;
+const OAUTH_PER_IP_HOUR = 30;
+const MS_CONSUMER_TID = "9188040d-6c67-4c5b-b112-36a304b66dad";
+const OAUTH = {
+  google: {
+    auth: "https://accounts.google.com/o/oauth2/v2/auth",
+    token: "https://oauth2.googleapis.com/token",
+    jwks: "https://www.googleapis.com/oauth2/v3/certs",
+    idVar: "GOOGLE_CLIENT_ID", secVar: "GOOGLE_CLIENT_SECRET",
+    issOk: (c) => c.iss === "https://accounts.google.com" || c.iss === "accounts.google.com",
+    // Google: δεκτό ΜΟΝΟ με email_verified.
+    verified: (c) => c.email_verified === true || c.email_verified === "true",
+  },
+  microsoft: {
+    auth: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    token: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    jwks: "https://login.microsoftonline.com/common/discovery/v2.0/keys",
+    idVar: "MS_CLIENT_ID", secVar: "MS_CLIENT_SECRET",
+    issOk: (c) => typeof c.tid === "string" && /^[0-9a-f-]{36}$/.test(c.tid) &&
+      c.iss === "https://login.microsoftonline.com/" + c.tid + "/v2.0",
+    // Microsoft: το email ΔΕΝ είναι πάντα επιβεβαιωμένο (εταιρικοί κατάλογοι).
+    // Δεκτό χωρίς κωδικό μόνο για προσωπικό λογαριασμό Microsoft ή όταν ο
+    // κατάλογος δηλώνει επιβεβαιωμένο domain (xms_edov). Αλλιώς → κωδικός 6 ψηφίων.
+    verified: (c) => c.tid === MS_CONSUMER_TID || c.xms_edov === true || c.xms_edov === "true" || c.xms_edov === 1,
+  },
+};
+const oauthJwks = {};   // cache ανά isolate: { url: { at, keys } }
+
+function b64url(bytes) {
+  let s = ""; for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64urlDecode(str) {
+  const s = String(str).replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(s + "===".slice((s.length + 3) % 4));
+  return Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+}
+function randHex(n) {
+  return Array.from(crypto.getRandomValues(new Uint8Array(n))).map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+function oauthOrigin(env) { return String((env && env.KM_PUBLIC_ORIGIN) || "https://fastwrite.tech").replace(/\/+$/, ""); }
+function oauthBack(env, frag, clearCookie) {
+  const h = { Location: oauthOrigin(env) + "/kostometro/#" + frag, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
+  if (clearCookie) h["Set-Cookie"] = "km_oauth=; Path=/api/km/auth/; HttpOnly; Secure; SameSite=Lax; Max-Age=0";
+  return new Response(null, { status: 302, headers: h });
+}
+function oauthFrag(kind, fields) {
+  const p = new URLSearchParams(Object.assign({ km_oauth: kind }, fields || {}));
+  return p.toString();
+}
+function cookieVal(request, name) {
+  const raw = request.headers.get("Cookie") || "";
+  for (const part of raw.split(";")) { const i = part.indexOf("="); if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim(); }
+  return "";
+}
+
+async function oauthStart(request, env, prov) {
+  const P = OAUTH[prov];
+  const cid = env[P.idVar], sec = env[P.secVar];
+  if (!cid || !sec) return oauthBack(env, oauthFrag("err", { code: "unavailable" }));
+  const t = Date.now();
+  await env.DB.prepare("DELETE FROM km_oauth_states WHERE created < ?").bind(new Date(t - 3600 * 1000).toISOString()).run();
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  const ipH = ip ? await sha256hex(ip + "|" + new Date(t).toISOString().slice(0, 10) + "|" + (env.KM_ADMIN_KEY || "km")) : null;
+  if (ipH) {
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_oauth_states WHERE ip_h = ? AND created >= ?")
+      .bind(ipH, new Date(t - 3600 * 1000).toISOString()).first();
+    if (n && n.n >= OAUTH_PER_IP_HOUR) return oauthBack(env, oauthFrag("err", { code: "too_many" }));
+  }
+  const state = randHex(32), nonce = randHex(16);
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+  await env.DB.prepare("INSERT INTO km_oauth_states (state_hash, provider, verifier, nonce, ip_h, created) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(await sha256hex(state), prov, verifier, nonce, ipH, new Date(t).toISOString()).run();
+  const q = new URLSearchParams({
+    client_id: cid, response_type: "code", scope: "openid email profile",
+    redirect_uri: oauthOrigin(env) + "/api/km/auth/" + prov + "/callback",
+    state, nonce, code_challenge: challenge, code_challenge_method: "S256", prompt: "select_account",
+  });
+  return new Response(null, { status: 302, headers: {
+    Location: P.auth + "?" + q.toString(), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
+    "Set-Cookie": "km_oauth=" + state + "; Path=/api/km/auth/; HttpOnly; Secure; SameSite=Lax; Max-Age=" + OAUTH_TTL_MS / 1000,
+  } });
+}
+
+async function oauthKeys(url, kid) {
+  const c = oauthJwks[url];
+  if (c && Date.now() - c.at < 3600 * 1000 && c.keys.some((k) => k.kid === kid)) return c.keys;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("jwks_" + r.status);
+  const j = await r.json();
+  oauthJwks[url] = { at: Date.now(), keys: (j && j.keys) || [] };
+  return oauthJwks[url].keys;
+}
+
+// Επαληθεύει id_token (RS256). Επιστρέφει τα claims ή πετάει σφάλμα.
+export async function oauthVerifyIdToken(idToken, P, clientId, nonce) {
+  const parts = String(idToken || "").split(".");
+  if (parts.length !== 3) throw new Error("bad_jwt");
+  const head = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[0])));
+  const claims = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[1])));
+  if (head.alg !== "RS256" || !head.kid) throw new Error("bad_alg");
+  const jwk = (await oauthKeys(P.jwks, head.kid)).find((k) => k.kid === head.kid);
+  if (!jwk) throw new Error("no_key");
+  const key = await crypto.subtle.importKey("jwk", { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true },
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+  const good = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64urlDecode(parts[2]),
+    new TextEncoder().encode(parts[0] + "." + parts[1]));
+  if (!good) throw new Error("bad_sig");
+  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (!aud.includes(clientId)) throw new Error("bad_aud");
+  if (!P.issOk(claims)) throw new Error("bad_iss");
+  if (typeof claims.exp !== "number" || claims.exp * 1000 < Date.now() - 60000) throw new Error("expired");
+  if (claims.nonce !== nonce) throw new Error("bad_nonce");
+  return claims;
+}
+
+async function oauthCallback(request, env, prov) {
+  const P = OAUTH[prov];
+  const u = new URL(request.url);
+  if (u.searchParams.get("error")) return oauthBack(env, oauthFrag("err", { code: "cancelled" }), true);
+  const code = u.searchParams.get("code") || "";
+  const state = u.searchParams.get("state") || "";
+  if (!code || !/^[0-9a-f]{64}$/.test(state) || cookieVal(request, "km_oauth") !== state) {
+    return oauthBack(env, oauthFrag("err", { code: "state" }), true);
+  }
+  // Μία χρήση: η γραμμή σβήνεται ΤΗ ΣΤΙΓΜΗ που διαβάζεται.
+  const row = await env.DB.prepare("DELETE FROM km_oauth_states WHERE state_hash = ? RETURNING *")
+    .bind(await sha256hex(state)).first();
+  if (!row || row.provider !== prov || Date.parse(row.created) < Date.now() - OAUTH_TTL_MS) {
+    return oauthBack(env, oauthFrag("err", { code: "state" }), true);
+  }
+  let claims;
+  try {
+    const r = await fetch(P.token, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: env[P.idVar], client_secret: env[P.secVar], code, code_verifier: row.verifier,
+        grant_type: "authorization_code", redirect_uri: oauthOrigin(env) + "/api/km/auth/" + prov + "/callback" }).toString() });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.id_token) throw new Error("token_" + r.status + "_" + (j && j.error));
+    claims = await oauthVerifyIdToken(j.id_token, P, env[P.idVar], row.nonce);
+  } catch (e) {
+    console.error("oauth " + prov + ":", e && e.message);
+    return oauthBack(env, oauthFrag("err", { code: "provider" }), true);
+  }
+  const email = normEmail(claims.email);
+  if (!email) return oauthBack(env, oauthFrag("err", { code: "no_email" }), true);
+  if (!P.verified(claims)) return oauthBack(env, oauthFrag("verify", { e: email }), true);
+  const busy = await emailBusy(env, email);
+  if (busy) return oauthBack(env, oauthFrag("err", { code: busy, e: email }), true);
+  return oauthBack(env, oauthFrag("ok", { t: await issueEmailToken(env, email), e: email, p: prov }), true);
 }
 
 // «Υπάρχει αυτός ο κωδικός πρόσκλησης;» — ΜΟΝΟ ναι/όχι, κανένα στοιχείο του κατόχου.

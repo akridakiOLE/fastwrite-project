@@ -2141,7 +2141,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v97';
+  var APP_VER = 'φέτα 3 · v98';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -4606,6 +4606,17 @@
        που έχει ήδη την εφαρμογή. */
     refReportHit();
     funnel('open');   // v97 · KM-FUNNEL
+    /* KM-OAUTH (29/9/2026) — ΕΠΙΣΤΡΟΦΗ ΑΠΟ GOOGLE / MICROSOFT (#km_oauth=…).
+       Ο server δίνει ΤΟ ΙΔΙΟ email_token με τον κωδικό 6 ψηφίων, άρα από εδώ
+       η ροή είναι ακριβώς ίδια με το «Επιβεβαίωση» της οθόνης s-code. */
+    var oa = oauthTake();
+    if (oa && oa.kind === 'ok' && !localStorage.getItem(LS.reg)) {
+      localStorage.setItem(LS.emailTok, oa.t);
+      localStorage.setItem(LS.email, oa.e);
+      funnel('code');   // v97 · KM-FUNNEL — email επιβεβαιωμένο (μέσω παρόχου)
+      return startWords(false);
+    }
+    if (oa && oa.kind !== 'ok' && !localStorage.getItem(LS.reg)) { return oauthShow(oa); }
     /* v26 · Η.2β-1 — τρεις καταστάσεις, με αυτή τη σειρά:
        (α) ούτε email ούτε λέξεις  -> εντελώς νέος, πρώτη οθόνη
        (β) email αλλά ΟΧΙ λέξεις   -> υπάρχων χρήστης· αποκτά κλειδί τώρα,
@@ -4844,6 +4855,65 @@
       });
     }).catch(function () { btn.disabled = false; emailMsg(CODE_TEXT.offline); });
   };
+  /* ══ KM-OAUTH (29/9/2026) — «Συνέχεια με Google / Microsoft» ══════════
+     Ο κωδικός πρόσκλησης ελέγχεται και γράφεται ΠΡΙΝ φύγουμε από τη σελίδα,
+     με τον ίδιο κανόνα με το «Συνέχεια» (το πεδίο κυβερνά). Η προέλευση ζει
+     στο localStorage, που ΔΕΝ χάνεται στο redirect (ίδια σελίδα, ίδια καρτέλα).
+     ⚠ Ο κανόνας του ref αντιγράφεται από το go-email ΣΚΟΠΙΜΑ: οι σουίτες
+     ref/verify δένονται στο κείμενο εκείνου του χειριστή — δεν αγγίζεται. */
+  function oauthGo(p) {
+    var refIn = refNorm(el('in-ref').value);
+    el('err-ref').hidden = true;
+    el('err-email').hidden = true;
+    emailMsg('');
+    var chk = refIn
+      ? kmFetch('ref/check?code=' + encodeURIComponent(refIn)).then(function (r) { return r.json(); })
+          .then(function (j) { return !!(j && j.exists); })
+      : Promise.resolve(true);
+    chk.then(function (exists) {
+      if (!exists) { el('err-ref').hidden = false; return; }
+      var src = localStorage.getItem(LS.src) || '';
+      if (refIn) { localStorage.setItem(LS.src, 'ref:' + refIn); }
+      else if (/^ref:/.test(src)) { localStorage.setItem(LS.src, 'direct'); }
+      var ck = el('ref-consent-ok');
+      if (refIn && ck && ck.checked) { localStorage.setItem(LS.refShare, '1'); }
+      else { localStorage.removeItem(LS.refShare); }
+      funnel('oauth_' + p);   // v97 · KM-FUNNEL — πάτημα Google / Microsoft
+      location.assign(KM_API + 'auth/' + p + '/start');
+    }).catch(function () { emailMsg(CODE_TEXT.offline); });
+  }
+  if (el('go-google'))    { el('go-google').onclick    = function () { oauthGo('google'); }; }
+  if (el('go-microsoft')) { el('go-microsoft').onclick = function () { oauthGo('microsoft'); }; }
+  /* Διαβάζει ΚΑΙ ΣΒΗΝΕΙ το #km_oauth=… — το token δεν μένει ούτε στη γραμμή
+     διευθύνσεων ούτε στο ιστορικό. */
+  function oauthTake() {
+    var h = String(location.hash || '');
+    if (h.indexOf('km_oauth=') < 0) { return null; }
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    var q = {};
+    h.replace(/^#/, '').split('&').forEach(function (kv) {
+      var i = kv.indexOf('=');
+      if (i > 0) { try { q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); } catch (e) {} }
+    });
+    var o = { kind: q.km_oauth, t: q.t || '', e: q.e || '', code: q.code || '', p: q.p || '' };
+    if (o.kind === 'ok' && (!/^[0-9a-f]{64}$/.test(o.t) || !validEmail(o.e))) { return { kind: 'err', code: 'provider' }; }
+    return o;
+  }
+  var OAUTH_TEXT = {
+    verify: 'Ο λογαριασμός σου δεν επιβεβαίωσε το email. Πάτα «Συνέχεια» — θα σου στείλουμε κωδικό 6 ψηφίων.',
+    unavailable: 'Η σύνδεση με Google / Microsoft δεν είναι διαθέσιμη αυτή τη στιγμή — συνέχισε με email.',
+    provider: 'Η σύνδεση δεν ολοκληρώθηκε — δοκίμασε ξανά ή συνέχισε με email.',
+    state: 'Η σύνδεση έληξε ή άνοιξε σε άλλο παράθυρο — δοκίμασε ξανά.',
+    no_email: 'Ο λογαριασμός δεν μας έδωσε email — συνέχισε με email.',
+    too_many: CODE_TEXT.too_many
+  };
+  function oauthShow(o) {
+    show('s-email');
+    if (o.e && validEmail(o.e)) { el('in-email').value = o.e; }
+    if (o.code === 'cancelled') { return; }
+    if (o.code === 'taken' || o.code === 'pending_delete') { emailMsg(CODE_TEXT[o.code], o.code === 'taken'); return; }
+    emailMsg(OAUTH_TEXT[o.kind === 'verify' ? 'verify' : o.code] || OAUTH_TEXT.provider);
+  }
   function codeErr(text) { el('err-code').textContent = text; el('err-code').hidden = !text; }
   el('go-code').onclick = function () {
     var c = String(el('in-code').value || '').replace(/\D/g, '');

@@ -19,6 +19,8 @@ compatibility_date = "2024-11-01"
 # Explicit settings (εξαλείφουν warnings από το build log):
 workers_dev = true
 preview_urls = true
+# KM-OAUTH (29/9/2026): μην σβήσει το deploy μεταβλητές που τυχόν ορίστηκαν στο dashboard.
+keep_vars = true
 
 [assets]
 directory = "./site"
@@ -36,6 +38,16 @@ run_worker_first = ["/api/*"]
 
 # D1 — ο ΙΔΙΟΣ λογαριασμός βάσης με τον beta worker, ΞΕΧΩΡΙΣΤΟΙ πίνακες
 # (gnomi_events, gnomi_responses). Σχήμα: schema/gnomi.sql
+# 🔐 KM-OAUTH (29/9/2026) — Σύνδεση με Google / Microsoft (Brief_Agent_Syndesi Μέρος Α).
+# Τα CLIENT ID είναι ΔΗΜΟΣΙΑ (φαίνονται σε κάθε χρήστη στη διεύθυνση του παρόχου)
+# — γι' αυτό ζουν εδώ. Τα SECRETS (GOOGLE_CLIENT_SECRET, MS_CLIENT_SECRET) ΠΟΤΕ
+# εδώ: μπαίνουν με «wrangler secret put» από το SECRETS_OAUTH.bat.
+# Google: project fastwrite-auth (admin@fastwrite.tech), client «Kostometro Web».
+# Microsoft: Entra «Default Directory», εφαρμογή «Kostometro» (όλοι οι λογαριασμοί).
+[vars]
+GOOGLE_CLIENT_ID = "258878753859-cbltmevo6kfg3d77plktomi0u3af2i5a.apps.googleusercontent.com"
+MS_CLIENT_ID = "c7f5b154-1fe6-476b-9c4c-8378bf0bfaa1"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "fastwrite-beta-downloads"
