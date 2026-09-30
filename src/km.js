@@ -1,4 +1,5 @@
 // KM-SERVER-V60-H11B  ← σημάδι έκδοσης· το ψάχνει το deploy_km_h11b.bat
+// KM-SERVER-V100-AGENT  ← σημάδι: θέμα email πελάτη ουδέτερο + καθάρισμα μοναχικού χαρακτήρα (30/9/2026)
 // KM-SERVER-V99-AGENT  ← σημάδι: Βοηθός Kostometro, Φάση 1 (29/9/2026)
 // KM-SERVER-V98-OAUTH  ← σημάδι: σύνδεση Google/Microsoft (29/9/2026)
 // KM-SERVER-V84-VERIFY ← Brief ΣΤ (24/9/2026): ένα email = ένας λογαριασμός · κωδικός 6 ψηφίων
@@ -1155,6 +1156,17 @@ const AGENT_DAILY_USD_DEFAULT = 3;
 const AGENT_PRICE = { in: 2, out: 10, cache_read: 0.2, cache_write: 2.5 };
 const AGENT_SECRET_RE = [/\bAIza[0-9A-Za-z_-]{30,}/, /\bAQ\.[0-9A-Za-z_-]{20,}/, /\bsk-ant-[0-9A-Za-z_-]{20,}/];
 const AGENT_IMG_MIME = { "image/jpeg": 1, "image/png": 1, "image/webp": 1 };
+// v100 · ουδέτερο θέμα αιτήματος: ο πελάτης βλέπει «Re: Βοηθός Kostometro [KM-E-…]». Η περίληψη μένει ΜΟΝΟ στο εσωτερικό email.
+const AGENT_TOPIC = "Βοηθός Kostometro";
+
+// v100 · το μοντέλο άφησε μία φορά μοναχικό «Β» στο τέλος (δοκιμή 30/9) και στον επόμενο γύρο το πέρασε για μήνυμα
+// του χρήστη. Κόβουμε τελικές γραμμές με ΕΝΑΝ χαρακτήρα, ΠΡΙΝ γραφτεί στο ιστορικό — μόνο αν μένει άλλο κείμενο.
+export function agentTidy(reply) {
+  const lines = String(reply || "").replace(/\s+$/, "").split("\n");
+  while (lines.length > 1 && [...lines[lines.length - 1].trim()].length === 1) { lines.pop(); while (lines.length > 1 && !lines[lines.length - 1].trim()) lines.pop(); }
+  return lines.join("\n").trim();
+}
+
 const AGENT_KNOW_URL = "https://fastwrite.tech/kostometro/agent/knowledge_el.md";
 let agentKnow = null;   // cache ανά isolate
 
@@ -1233,7 +1245,7 @@ async function agentHandoff(env, sess, input) {
   await env.DB.batch([
     env.DB.prepare("INSERT OR IGNORE INTO km_support_tickets (code, scope, issued_at, arrived_at) VALUES (?, 'E', ?, ?)").bind(code, t, t),
     env.DB.prepare("INSERT INTO km_support_cases (code, scope, topic, email, status, created_at, last_in_at) VALUES (?, 'E', ?, ?, 'open', ?, ?)")
-      .bind(code, ("Βοηθός · " + summary).slice(0, 60), email, t, t),
+      .bind(code, AGENT_TOPIC, email, t, t),   // v100 · το topic γίνεται ΘΕΜΑ του email προς τον πελάτη — ποτέ η εσωτερική περίληψη
     env.DB.prepare("INSERT INTO km_support_messages (code, dir, source, body, at) VALUES (?, 'in', 'agent', ?, ?)").bind(code, body, t),
     env.DB.prepare("UPDATE km_agent_sessions SET email = ?, ticket = ? WHERE id = ?").bind(email, code, sess.id),
   ]);
@@ -1348,6 +1360,7 @@ async function agentChat(request, env) {
       ).bind(day, calls, inTok, outTok, cacheTok, micro).run();
     }
   }
+  reply = agentTidy(reply);
   if (agentHasSecret(reply)) reply = "Για την ασφάλειά σου δεν μπορώ να γράψω αυτό το κείμενο. Μη στέλνεις τις 12 λέξεις ή το κλειδί σου σε κανέναν.";
   if (!reply) reply = sess.ticket ? "Άνοιξα το αίτημα " + sess.ticket + ". Θα σου απαντήσουμε με email." : "Δεν κατάλαβα — μπορείς να το πεις αλλιώς;";
   await env.DB.batch([

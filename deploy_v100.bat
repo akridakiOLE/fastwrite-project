@@ -1,0 +1,140 @@
+@echo off
+chcp 65001 >nul
+cd /d C:\Users\User\fastwrite-project
+echo.
+echo  v100 = VOITHOS: mikrografia fotografias + X, "plirwmeno kleidi", katharisma monaxikou xaraktira,
+echo         oudetero thema email pros pelati. KAMIA allagi vasis. O voithos MENEI KRYFOS (?chat=1).
+echo.
+if exist ".git\index.lock" del /f /q ".git\index.lock"
+
+echo [0/6] Gnosi tou voithou apo tis piges tis efarmogis...
+python tools\agent\build_knowledge.py
+if errorlevel 1 goto failed
+
+echo [1/6] Deiktes pou PREPEI na yparxoun...
+findstr /c:"KM-SERVER-V100-AGENT" src\km.js >nul
+if errorlevel 1 goto nm
+findstr /c:"reply = agentTidy(reply);" src\km.js >nul
+if errorlevel 1 goto nm
+findstr /c:".bind(code, AGENT_TOPIC, email, t, t)," src\km.js >nul
+if errorlevel 1 goto nm
+findstr /c:"KM-SERVER-V99-AGENT" src\km.js >nul
+if errorlevel 1 goto nm
+findstr /c:"if (agentHasSecret(text)) return json" src\km.js >nul
+if errorlevel 1 goto nm
+findstr /c:"el('ag-imgx').onclick = agDropImg;" site\kostometro\app.js >nul
+if errorlevel 1 goto nm
+findstr /c:"var AG_PUBLIC = false;" site\kostometro\app.js >nul
+if errorlevel 1 goto nm
+findstr /c:"data-agent=\"preview\" hidden" site\kostometro\index.html >nul
+if errorlevel 1 goto nm
+findstr /c:".ag-thumb{" site\kostometro\app.css >nul
+if errorlevel 1 goto nm
+findstr /c:"km-v100" site\kostometro\sw.js >nul
+if errorlevel 1 goto nm
+findstr /c:"\"v\": \"v100\"" site\kostometro\version.json >nul
+if errorlevel 1 goto nm
+findstr /c:"0,50" site\kostometro\agent\knowledge_el.md >nul
+if errorlevel 1 goto nm
+echo    OK
+
+echo [2/6] Deiktes pou PREPEI na leipoun...
+findstr /c:"km-v99'" site\kostometro\sw.js >nul
+if not errorlevel 1 goto lo
+findstr /c:"var AG_PUBLIC = true" site\kostometro\app.js >nul
+if not errorlevel 1 goto lo
+findstr /c:"sk-ant-api03" src\km.js >nul
+if not errorlevel 1 goto lo
+findstr /c:"sk-ant-api03" site\kostometro\app.js >nul
+if not errorlevel 1 goto lo
+findstr /c:"sk-ant-api03" site\kostometro\agent\knowledge_el.md >nul
+if not errorlevel 1 goto lo
+findstr /c:"GOCSPX" src\km.js >nul
+if not errorlevel 1 goto lo
+findstr /c:"ANTHROPIC_API_KEY =" wrangler.toml >nul
+if not errorlevel 1 goto lo
+echo    OK
+
+echo [3/6] Syntaxi...
+node --check src\km.js
+if errorlevel 1 goto failed
+node --check src\worker.js
+if errorlevel 1 goto failed
+node --check site\kostometro\app.js
+if errorlevel 1 goto failed
+node --check site\kostometro\sw.js
+if errorlevel 1 goto failed
+echo    OK
+
+echo [4/6] Souites + apodeixeis metallaxis...
+node --experimental-sqlite tests\v100.test.mjs
+if errorlevel 1 goto tf
+for %%N in (1 2 3 4 5 6 7 8) do (
+  node --experimental-sqlite tests\v100.test.mjs --mutate=%%N
+  if errorlevel 1 goto mf
+)
+node --experimental-sqlite tests\v99.test.mjs
+if errorlevel 1 goto tf
+for %%N in (1 2 3 4 5 6 7 8 9 10 11 12) do (
+  node --experimental-sqlite tests\v99.test.mjs --mutate=%%N
+  if errorlevel 1 goto mf
+)
+node --experimental-sqlite tests\v98.test.mjs
+if errorlevel 1 goto tf
+for %%T in (v97 v95 v94 v93 v92 v88 verify ref pinakas h11b mail cleanup feedback leads) do (
+  node --experimental-sqlite tests\%%T.test.mjs
+  if errorlevel 1 goto tf
+)
+for %%T in (v95_ui gs95 v89 v87 v86 v85 verify_ui ai78 ref_ui pinakas_ui install_ui) do (
+  node tests\%%T.test.mjs
+  if errorlevel 1 goto tf
+)
+echo    OK
+
+echo [5/6] Mystiko sti Cloudflare (onoma mono)...
+call npx --yes wrangler secret list > secrets_list_out.txt 2>&1
+findstr /c:"ANTHROPIC_API_KEY" secrets_list_out.txt >nul
+if errorlevel 1 goto ns
+echo    OK
+
+echo [6/6] Staging kai push...
+git add site\kostometro\app.js site\kostometro\index.html site\kostometro\app.css site\kostometro\sw.js site\kostometro\version.json site\kostometro\agent\knowledge_el.md
+if errorlevel 1 goto failed
+git add src\km.js tests\v100.test.mjs tests\v87.test.mjs tools\agent\flow_el.md
+if errorlevel 1 goto failed
+git add deploy_v100.bat commit_v100.txt
+if errorlevel 1 goto failed
+git commit -F commit_v100.txt
+if errorlevel 1 goto failed
+git push origin master
+if errorlevel 1 goto failed
+echo.
+echo ================================
+echo   OK - Cloudflare ~2 lepta.
+echo ================================
+echo.
+pause
+exit /b 0
+
+:tf
+echo. & echo  ******** TESTS FAILED - tipota den anevike. ******** & echo.
+pause
+exit /b 1
+:mf
+echo. & echo  ******** APODEIXI METALLAXIS APETYXE. ******** & echo.
+pause
+exit /b 1
+:ns
+echo. & echo  ******** LEIPEI TO ANTHROPIC_API_KEY - trexe prota SECRETS_AGENT.bat. Tipota den anevike. ******** & echo.
+pause
+exit /b 1
+:lo
+echo    Epezise PALIOS deiktis i MYSTIKO (km-v99, AG_PUBLIC true, sk-ant, GOCSPX).
+goto failed
+:nm
+echo    Leipei APAITOUMENOS deiktis.
+goto failed
+:failed
+echo. & echo  ******** APETYXE. ******** & echo.
+pause
+exit /b 1

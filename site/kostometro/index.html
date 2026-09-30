@@ -731,7 +731,13 @@
     <button id="ag-ok" class="btn primary" type="button">Ξεκίνα</button>
   </div>
   <div id="ag-log" class="ag-log" aria-live="polite" hidden></div>
-  <p id="ag-imgnote" class="ag-imgnote" hidden></p>
+  <!-- v100 · μικρογραφία ΠΡΙΝ φύγει η φωτογραφία, με ✕ για αφαίρεση: ο χρήστης βλέπει τι στέλνει
+       και προλαβαίνει να δει αν φαίνονται 12 λέξεις ή κλειδί (πρόταση/εύρημα Stavros 30/9). -->
+  <div id="ag-prev" class="ag-prev" data-agent="preview" hidden>
+    <img id="ag-thumb" class="ag-thumb" alt="Η φωτογραφία που θα σταλεί">
+    <p id="ag-imgnote" class="ag-imgnote"></p>
+    <button id="ag-imgx" class="ag-imgx" type="button" aria-label="Αφαίρεση φωτογραφίας">✕</button>
+  </div>
   <form id="ag-form" class="ag-form" hidden>
     <label class="ag-att" title="Φωτογραφία οθόνης">📎<input id="ag-img" type="file" accept="image/*" hidden></label>
     <textarea id="ag-in" rows="1" maxlength="2000" placeholder="Γράψε εδώ…"></textarea>

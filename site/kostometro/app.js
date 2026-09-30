@@ -2141,7 +2141,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v99';
+  var APP_VER = 'φέτα 3 · v100';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5392,10 +5392,10 @@
     { q: 'Τι κάνει το Kostometro;',
       a: 'Φωτογραφίζεις το τιμολόγιο τη στιγμή που παραλαμβάνεις το εμπόρευμα και το βρίσκεις οργανωμένο ανά προμηθευτή. Βλέπεις πόσα πλήρωσες σε κάθε προμηθευτή, σήμερα, αυτόν τον μήνα ή σε όποια περίοδο θέλεις.' },
     { q: 'Πόσο κοστίζει;',
-      a: 'Από εμάς, τίποτα. Είναι δωρεάν, χωρίς όριο χρόνου.<br><br>Για να διαβάζονται τα ποσά αυτόματα χρειάζεται κλειδί Gemini της Google. Με <b>δωρεάν κλειδί</b> δεν πληρώνεις τίποτα, αλλά η Google βάζει όριο στο πόσες αναγνώσεις γίνονται ανά λεπτό. Με <b>πληρωμένο κλειδί</b> δεν υπάρχει αυτό το όριο και η Google χρεώνει ανά ανάγνωση — ενδεικτικά, με τον τιμοκατάλογό της, <b>κάτω από 2 € τον μήνα για 200 τιμολόγια</b>. Η τιμή ορίζεται από την Google και μπορεί να αλλάξει. Η επιλογή είναι της επιχείρησής σου.' },
+      a: 'Από εμάς, τίποτα. Είναι δωρεάν, χωρίς όριο χρόνου.<br><br>Για να διαβάζονται τα ποσά αυτόματα χρειάζεται κλειδί Gemini της Google. <b>Σου συνιστούμε πληρωμένο κλειδί</b>: διαβάζει σε λίγα δευτερόλεπτα και συνεχίζει κανονικά όταν η Google έχει φόρτο. Η Google το χρεώνει ανά ανάγνωση — ενδεικτικά <b>περίπου 0,50 € για 100 τιμολόγια</b>. Η τιμή ορίζεται από την Google και μπορεί να αλλάξει. Υπάρχει και δωρεάν κλειδί, αλλά είναι αργό και κάποιες ώρες δεν λειτουργεί. Η επιλογή είναι της επιχείρησής σου.' },
     { h: 'Ανάγνωση ποσών' },
     { q: 'Τι είναι το «κλειδί Gemini»; Το χρειάζομαι;',
-      a: 'Όχι υποχρεωτικά. Με κλειδί, η εφαρμογή διαβάζει μόνη της καθαρό ποσό, ΦΠΑ και σύνολο από τη φωτογραφία, και εσύ απλώς επιβεβαιώνεις. Χωρίς κλειδί, τα γράφεις εσύ. Το κλειδί το βγάζεις δωρεάν από την Google, σε 4 βήματα με οδηγίες μέσα στην εφαρμογή, και μένει μόνο στο κινητό σου.',
+      a: 'Όχι υποχρεωτικά. Με κλειδί, η εφαρμογή διαβάζει μόνη της καθαρό ποσό, ΦΠΑ και σύνολο από τη φωτογραφία, και εσύ απλώς επιβεβαιώνεις. Χωρίς κλειδί, τα γράφεις εσύ. Το κλειδί το φτιάχνεις από τον λογαριασμό Google σου, με οδηγό βήμα-βήμα με εικόνες (fastwrite.tech/kostometro/kleidi), και μένει μόνο στο κινητό σου. Σου συνιστούμε <b>πληρωμένο</b> κλειδί — δες «Πόσο κοστίζει;».',
       go: 's-settings', gt: 'Ρυθμίσεις → Αλλαγή κλειδιού Gemini' },
     { q: 'Πού πάει η φωτογραφία όταν διαβάζονται τα ποσά;',
       a: 'Απευθείας από το κινητό σου στην Google, με το δικό σου κλειδί. Δεν περνάει από δικό μας διακομιστή. Για χρήστες στην ΕΕ, στην Ελβετία και στο Ηνωμένο Βασίλειο, η Google δηλώνει ότι δεν χρησιμοποιεί τις φωτογραφίες για να βελτιώσει τα προϊόντα της. Τις κρατάει για περιορισμένο χρόνο, μόνο για τον έλεγχο κατάχρησης.' },
@@ -5904,6 +5904,8 @@
   var AG = { on: 'km_agent_on', ok: 'km_agent_ok', sid: 'km_agent_sid', log: 'km_agent_log' };
   var AG_SECRET = [/\bAIza[0-9A-Za-z_-]{30,}/, /\bAQ\.[0-9A-Za-z_-]{20,}/, /\bsk-ant-[0-9A-Za-z_-]{20,}/];
   var agImg = null, agBusy = false;
+  /* v100 · μικρογραφίες ΜΟΝΟ στη μνήμη της σελίδας (κλειδί k στο μήνυμα)· ποτέ σε localStorage/server. */
+  var agThumb = '', agThumbs = {};
   function agSecret(t) {
     t = String(t || '');
     for (var i = 0; i < AG_SECRET.length; i++) { if (AG_SECRET[i].test(t)) { return true; } }
@@ -5920,12 +5922,12 @@
     return AG_PUBLIC || agLS(AG.on) === '1';
   }
   function agLog() { try { return JSON.parse(agLS(AG.log) || '[]') || []; } catch (e) { return []; } }
-  function agPush(r, t) { var l = agLog(); l.push({ r: r, t: String(t || '') }); agLS(AG.log, JSON.stringify(l.slice(-60))); agRender(); }
+  function agPush(r, t, k) { var l = agLog(); var m = { r: r, t: String(t || '') }; if (k) { m.k = k; } l.push(m); agLS(AG.log, JSON.stringify(l.slice(-60))); agRender(); }
   function agEsc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function agRender(wait) {
     var box = el('ag-log'); if (!box) { return; }
     var h = '';
-    agLog().forEach(function (m) { h += '<div class="ag-m ' + (m.r === 'u' ? 'u' : m.r === 's' ? 's' : 'a') + '">' + agEsc(m.t) + '</div>'; });
+    agLog().forEach(function (m) { var th = (m.k && agThumbs[m.k]) ? '<img class="ag-mimg" alt="" src="' + agEsc(agThumbs[m.k]) + '">' : ''; h += '<div class="ag-m ' + (m.r === 'u' ? 'u' : m.r === 's' ? 's' : 'a') + '">' + th + agEsc(m.t) + '</div>'; });
     if (!agLog().length) { h += '<div class="ag-m a">Γεια σου! Είμαι ο Βοηθός του Kostometro (AI). Πες μου πού βρίσκεσαι — π.χ. «θέλω να το βάλω στο κινητό» ή «δεν μου ήρθε ο κωδικός». Αν κολλήσεις σε μια οθόνη, στείλε μου φωτογραφία της με το 📎.</div>'; }
     if (wait) { h += '<div class="ag-m a w">γράφει…</div>'; }
     box.innerHTML = h;
@@ -5957,11 +5959,22 @@
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
       agImg = { mime: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.8).split(',')[1] };
-      el('ag-imgnote').textContent = '📎 Μία φωτογραφία έτοιμη — φεύγει με το επόμενο μήνυμα και δεν αποθηκεύεται. 🔒 Να ΜΗ φαίνονται 12 λέξεις ή κλειδί.';
-      el('ag-imgnote').hidden = false;
+      var s = Math.min(1, 240 / Math.max(c.width, c.height)), t = document.createElement('canvas');
+      t.width = Math.max(1, Math.round(c.width * s)); t.height = Math.max(1, Math.round(c.height * s));
+      t.getContext('2d').drawImage(c, 0, 0, t.width, t.height);
+      agThumb = t.toDataURL('image/jpeg', 0.7);
+      el('ag-thumb').src = agThumb;
+      el('ag-imgnote').textContent = 'Φεύγει με το επόμενο μήνυμα και δεν αποθηκεύεται. 🔒 Κοίτα να ΜΗ φαίνονται 12 λέξεις ή κλειδί — αλλιώς πάτα ✕.';
+      el('ag-prev').hidden = false;
     };
     img.onerror = function () { URL.revokeObjectURL(url); agPush('s', AG_ERR.bad_image); };
     img.src = url;
+  }
+  function agDropImg() {
+    agImg = null; agThumb = '';
+    if (el('ag-prev')) { el('ag-prev').hidden = true; }
+    if (el('ag-thumb')) { el('ag-thumb').removeAttribute('src'); }
+    if (el('ag-img')) { el('ag-img').value = ''; }
   }
   function agSend(e) {
     if (e) { e.preventDefault(); }
@@ -5969,9 +5982,11 @@
     var t = String(el('ag-in').value || '').trim();
     if (!t && !agImg) { return; }
     if (agSecret(t)) { agPush('s', AG_ERR.secret); el('ag-in').value = ''; return; }
-    var img = agImg; agImg = null; el('ag-imgnote').hidden = true; el('ag-img').value = '';
+    var img = agImg, th = agThumb, k = '';
+    agDropImg();
     el('ag-in').value = '';
-    agPush('u', (img ? '📎 ' : '') + (t || '(φωτογραφία οθόνης)'));
+    if (img && th) { k = 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); agThumbs[k] = th; }
+    agPush('u', (img ? '📎 ' : '') + (t || '(φωτογραφία οθόνης)'), k);
     agBusy = true; el('ag-send').disabled = true; agRender(true);
     fetch(KM_API + 'agent/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sid: agLS(AG.sid) || null, install_id: localStorage.getItem(LS.id) || '',
@@ -5992,6 +6007,7 @@
     el('ag-ok').onclick = function () { agLS(AG.ok, '1'); agShowChat(); };
     el('ag-form').onsubmit = agSend;
     el('ag-img').onchange = function () { agPick(this.files && this.files[0]); };
+    el('ag-imgx').onclick = agDropImg;
     el('ag-in').onkeydown = function (ev) { if (ev.key === 'Enter' && !ev.shiftKey) { agSend(ev); } };
     if (/[?&]chat=1(&|$)/.test(location.search)) { agOpen(); }
   }
