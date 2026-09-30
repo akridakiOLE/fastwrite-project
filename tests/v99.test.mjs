@@ -10,7 +10,7 @@ let js = readFileSync("site/kostometro/app.js", "utf8");
 let html = readFileSync("site/kostometro/index.html", "utf8");
 const MUT = [
   ["src", "  if (agentHasSecret(text)) return json({ ok: false, error: \"secret\" }, 400);\n", ""],                           // 1 · 🔴 12 λέξεις φεύγουν στον server/AI
-  ["src", ".bind(sess.id, (img ? \"[εικόνα] \" : \"\") + text, t).run();", ".bind(sess.id, (img ? img.data : \"\") + text, t).run();"], // 2 · 🔴 εικόνα αποθηκεύεται
+  ["src", ".bind(sess.id, (img ? \"[εικόνα] \" : \"\") + text, t),", ".bind(sess.id, (img ? img.data : \"\") + text, t),"],   // v102: η εγγραφή μπήκε σε batch // 2 · 🔴 εικόνα αποθηκεύεται
   ["src", "  const dev = await sha256hex(inst + \":\" + (env.KM_ADMIN_KEY || \"\"));\n  const t = now();\n  const hourAgo", "  const dev = inst;\n  const t = now();\n  const hourAgo"], // 3 · ωμό install_id
   ["src", "SELECT * FROM km_agent_sessions WHERE id = ? AND dev = ?", "SELECT * FROM km_agent_sessions WHERE id = ? AND ? IS NOT NULL"], // 4 · 🔴 ξένη συζήτηση με κλεμμένο sid
   ["src", "if (spent && spent.usd_micro >= cap)", "if (false)"],                                                                // 5 · 🔴 χωρίς ημερήσιο ταβάνι

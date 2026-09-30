@@ -1,4 +1,5 @@
 // KM-SERVER-V60-H11B  ← σημάδι έκδοσης· το ψάχνει το deploy_km_h11b.bat
+// KM-SERVER-V102-AGENT  ← σημάδι: βοηθός ΜΟΝΟ για την εγκατάσταση + όριο 30 μηνυμάτων ανά συσκευή (30/9/2026)
 // KM-SERVER-V100-AGENT  ← σημάδι: θέμα email πελάτη ουδέτερο + καθάρισμα μοναχικού χαρακτήρα (30/9/2026)
 // KM-SERVER-V99-AGENT  ← σημάδι: Βοηθός Kostometro, Φάση 1 (29/9/2026)
 // KM-SERVER-V98-OAUTH  ← σημάδι: σύνδεση Google/Microsoft (29/9/2026)
@@ -1159,6 +1160,28 @@ const AGENT_IMG_MIME = { "image/jpeg": 1, "image/png": 1, "image/webp": 1 };
 // v100 · ουδέτερο θέμα αιτήματος: ο πελάτης βλέπει «Re: Βοηθός Kostometro [KM-E-…]». Η περίληψη μένει ΜΟΝΟ στο εσωτερικό email.
 const AGENT_TOPIC = "Βοηθός Kostometro";
 
+// ═══ v102 · ΒΟΗΘΟΣ ΜΟΝΟ ΓΙΑ ΤΗΝ ΕΓΚΑΤΑΣΤΑΣΗ (απόφαση Stavros 30/9/2026) ═══
+// Ο ρόλος του είναι να φέρει τον χρήστη ως το τέλος της εγγραφής — μετά φεύγει. Ο SERVER το επιβάλλει,
+// όχι μόνο η οθόνη (αλλιώς το ?chat=1 τον ξανανοίγει):
+//   · «ολοκλήρωσε» = η συσκευή έχει λογαριασμό (km_devices / km_device_links) ΚΑΙ κλειδί ή «Παράλειψη»
+//     (km_funnel). Συσκευές πριν το χωνί (v97) δεν έχουν βήμα «account» → θεωρούνται ολοκληρωμένες.
+//   · ανοιχτή συζήτηση ΣΥΝΕΧΙΖΕΙ ως AGENT_GRACE_MS από το τελευταίο μήνυμα — δεν κόβεται στη μέση.
+//   · ΟΡΙΟ ΖΩΗΣ: AGENT_DEV_MAX μηνύματα χρήστη ανά συσκευή, για πάντα (km_agent_devices, δεν σβήνεται με
+//     τις συζητήσεις). Χειρότερο κόστος ανά συσκευή ≈ 30 × 1,5¢.
+// Η μελλοντική «άδεια από την Υποστήριξη» (brief «Βοηθοί μέσα από την Υποστήριξη») μπαίνει ΕΔΩ ως
+// δεύτερη πόρτα με δικό της όριο — όχι ως εξαίρεση σε αυτή.
+const AGENT_DEV_MAX = 30;
+const AGENT_GRACE_MS = 2 * 3600 * 1000;
+export async function agentOnboarded(env, inst, dev) {
+  const acct = await env.DB.prepare(
+    "SELECT 1 AS x FROM km_devices WHERE install_id = ? UNION ALL SELECT 1 AS x FROM km_device_links WHERE install_id = ? LIMIT 1"
+  ).bind(inst, inst).first();
+  if (!acct) return false;
+  const st = ((await env.DB.prepare("SELECT step FROM km_funnel WHERE dev = ?").bind(dev).all()).results || []).map((r) => r.step);
+  if (!st.includes("account")) return true;               // λογαριασμός πριν το χωνί (v97)
+  return st.includes("key") || st.includes("key_skip");
+}
+
 // v100 · το μοντέλο άφησε μία φορά μοναχικό «Β» στο τέλος (δοκιμή 30/9) και στον επόμενο γύρο το πέρασε για μήνυμα
 // του χρήστη. Κόβουμε τελικές γραμμές με ΕΝΑΝ χαρακτήρα, ΠΡΙΝ γραφτεί στο ιστορικό — μόνο αν μένει άλλο κείμενο.
 export function agentTidy(reply) {
@@ -1294,6 +1317,12 @@ async function agentChat(request, env) {
       .bind(sess.id, dev, sess.src, sess.lang, t, t, t).run();
   }
   const done = (reply, extra) => json(Object.assign({ ok: true, sid: sess.id, reply, ticket: sess.ticket || null }, extra || {}));
+  // v102 · πόρτα 1 — μόνο πριν ολοκληρωθεί η εγγραφή (ή ανοιχτή συζήτηση που δεν έχει κρυώσει).
+  const warm = sess.last_at && (Date.now() - new Date(sess.last_at).getTime()) < AGENT_GRACE_MS && sess.turns > 0;
+  if (!warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: "onboarded" }, 403);
+  // v102 · όριο ζωής ανά συσκευή.
+  const life = await env.DB.prepare("SELECT msgs FROM km_agent_devices WHERE dev = ?").bind(dev).first();
+  if (life && life.msgs >= AGENT_DEV_MAX) return done("Έφτασες το όριο του βοηθού εγκατάστασης. Για οτιδήποτε άλλο γράψε μας από ☰ Μενού → «Υποστήριξη» ή στο support@fastwrite.tech — θα σου απαντήσει άνθρωπος.", { limit: true });
   if (sess.turns >= AGENT_MAX_TURNS) return done("Η συζήτηση έγινε πολύ μεγάλη για μένα. Γράψε μας στο support@fastwrite.tech — θα σου απαντήσει άνθρωπος.", { limit: true });
 
   const day = t.slice(0, 10);
@@ -1301,8 +1330,12 @@ async function agentChat(request, env) {
   const cap = Math.round(Number(env.AGENT_DAILY_USD || AGENT_DAILY_USD_DEFAULT) * 1e6);
   if (spent && spent.usd_micro >= cap) return done("Αυτή τη στιγμή δεν μπορώ να απαντήσω. Γράψε μας στο support@fastwrite.tech και θα σου απαντήσει άνθρωπος.", { busy: true });
 
-  await env.DB.prepare("INSERT INTO km_agent_messages (session_id, role, body, at) VALUES (?, 'user', ?, ?)")
-    .bind(sess.id, (img ? "[εικόνα] " : "") + text, t).run();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO km_agent_messages (session_id, role, body, at) VALUES (?, 'user', ?, ?)")
+      .bind(sess.id, (img ? "[εικόνα] " : "") + text, t),
+    env.DB.prepare("INSERT INTO km_agent_devices (dev, msgs, first_at, last_at) VALUES (?, 1, ?, ?) ON CONFLICT(dev) DO UPDATE SET msgs = msgs + 1, last_at = excluded.last_at")
+      .bind(dev, t, t),
+  ]);
 
   // Ιστορικό: εναλλαγή user/assistant (το API την απαιτεί) — διαδοχικά ίδιου ρόλου ενώνονται.
   const hist = ((await env.DB.prepare("SELECT role, body FROM km_agent_messages WHERE session_id = ? ORDER BY id DESC LIMIT ?")
@@ -1380,8 +1413,10 @@ export async function kmAgentPrune(env, nowIso) {
   const r1 = await env.DB.prepare("DELETE FROM km_agent_messages WHERE session_id IN (SELECT id FROM km_agent_sessions WHERE " + cond + ")").bind(d90, m24).run();
   const r2 = await env.DB.prepare("DELETE FROM km_agent_sessions WHERE " + cond).bind(d90, m24).run();
   const r3 = await env.DB.prepare("DELETE FROM km_agent_daily WHERE day < ?").bind(d400).run();
+  // v102 · ο μετρητής ζωής κρατιέται 24 μήνες από το τελευταίο μήνυμα (hash συσκευής, κανένα στοιχείο προσώπου).
+  const r4 = await env.DB.prepare("DELETE FROM km_agent_devices WHERE last_at < ?").bind(m24).run();
   const n = (r) => (r && r.meta && r.meta.changes) || 0;
-  return { messages: n(r1), sessions: n(r2), days: n(r3) };
+  return { messages: n(r1), sessions: n(r2), days: n(r3), devices: n(r4) };
 }
 
 // «Υπάρχει αυτός ο κωδικός πρόσκλησης;» — ΜΟΝΟ ναι/όχι, κανένα στοιχείο του κατόχου.

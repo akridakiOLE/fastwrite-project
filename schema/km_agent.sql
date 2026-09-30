@@ -37,3 +37,14 @@ CREATE TABLE IF NOT EXISTS km_agent_daily (
   cache_tok  INTEGER NOT NULL DEFAULT 0,
   usd_micro  INTEGER NOT NULL DEFAULT 0
 );
+
+-- v102 (30/9/2026) · ΟΡΙΟ ΖΩΗΣ ΑΝΑ ΣΥΣΚΕΥΗ: ο βοηθός είναι μόνο για την εγκατάσταση — 30 μηνύματα χρήστη
+-- ανά συσκευή, για πάντα. ΔΕΝ σβήνεται με τις συζητήσεις (90 ημέρες) — αλλιώς το όριο ξαναγεμίζει.
+-- Τήρηση: 24 μήνες από το τελευταίο μήνυμα (kmAgentPrune). dev = hash, όπως παντού.
+CREATE TABLE IF NOT EXISTS km_agent_devices (
+  dev       TEXT PRIMARY KEY,
+  msgs      INTEGER NOT NULL DEFAULT 0,
+  first_at  TEXT NOT NULL,
+  last_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_km_agent_devices_last ON km_agent_devices(last_at);

@@ -2141,7 +2141,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v101';
+  var APP_VER = 'φέτα 3 · v102';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5901,7 +5901,7 @@
      φεύγουν ποτέ από τη συσκευή. Η φωτογραφία φεύγει μόνο για την τρέχουσα
      ερώτηση και δεν αποθηκεύεται πουθενά. */
   var AG_PUBLIC = false;
-  var AG = { on: 'km_agent_on', ok: 'km_agent_ok', sid: 'km_agent_sid', log: 'km_agent_log' };
+  var AG = { on: 'km_agent_on', ok: 'km_agent_ok', sid: 'km_agent_sid', log: 'km_agent_log', gone: 'km_agent_gone' };
   var AG_SECRET = [/\bAIza[0-9A-Za-z_-]{30,}/, /\bAQ\.[0-9A-Za-z_-]{20,}/, /\bsk-ant-[0-9A-Za-z_-]{20,}/];
   var agImg = null, agBusy = false;
   /* v100 · μικρογραφίες ΜΟΝΟ στη μνήμη της σελίδας (κλειδί k στο μήνυμα)· ποτέ σε localStorage/server. */
@@ -5917,8 +5917,15 @@
     return false;
   }
   function agLS(k, v) { try { if (v === undefined) { return localStorage.getItem(k); } if (v === null) { localStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) {} return null; }
+  /* v102 · ΜΟΝΟ ΓΙΑ ΤΗΝ ΕΓΚΑΤΑΣΤΑΣΗ (απόφαση Stavros 30/9): μόλις υπάρχει λογαριασμός ΚΑΙ κλειδί ή
+     «Παράλειψη», ο βοηθός φεύγει από αυτή τη συσκευή — ούτε με ?chat=1. Ο server το επιβάλλει κι αυτός
+     (error 'onboarded'). Για οτιδήποτε μετά: ☰ Μενού → «Υποστήριξη» (email, άνθρωπος). */
+  function agDone() {
+    try { return !!localStorage.getItem(LS.reg) && !!(localStorage.getItem(LS.key) || localStorage.getItem(LS.skip)); } catch (e) { return false; }
+  }
   function agEnabled() {
     if (/[?&]chat=1(&|$)/.test(location.search)) { agLS(AG.on, '1'); }
+    if (agDone()) { return false; }
     return AG_PUBLIC || agLS(AG.on) === '1';
   }
   function agLog() { try { return JSON.parse(agLS(AG.log) || '[]') || []; } catch (e) { return []; } }
@@ -5940,7 +5947,7 @@
     el('ag').hidden = false; el('ag-fab').hidden = true;
     if (agLS(AG.ok) === '1') { agShowChat(); } else { el('ag-consent').hidden = false; el('ag-log').hidden = true; el('ag-form').hidden = true; }
   }
-  function agClose() { el('ag').hidden = true; el('ag-fab').hidden = false; }
+  function agClose() { el('ag').hidden = true; el('ag-fab').hidden = agDone() || agLS(AG.gone) === '1'; }
   var AG_ERR = {
     secret: 'Αυτό μοιάζει με τις 12 λέξεις ή με κλειδί — ΔΕΝ το στείλαμε. Μην το στέλνεις σε κανέναν, ούτε σε εμάς.',
     too_many: 'Πολλά μηνύματα σε λίγη ώρα — δοκίμασε ξανά σε λίγο.',
@@ -5948,7 +5955,8 @@
     bad_image: 'Η φωτογραφία δεν μπόρεσε να σταλεί — δοκίμασε άλλη.',
     unavailable: 'Ο βοηθός δεν είναι διαθέσιμος αυτή τη στιγμή. Γράψε μας στο support@fastwrite.tech.',
     provider: 'Κάτι πήγε στραβά — δοκίμασε ξανά σε λίγο, ή γράψε μας στο support@fastwrite.tech.',
-    offline: 'Χωρίς σύνδεση — ο βοηθός θέλει ίντερνετ.'
+    offline: 'Χωρίς σύνδεση — ο βοηθός θέλει ίντερνετ.',
+    onboarded: 'Ο βοηθός είναι για την εγκατάσταση — εδώ έχεις ήδη τελειώσει. Για οτιδήποτε άλλο: ☰ Μενού → «Υποστήριξη».'
   };
   function agPick(f) {
     if (!f) { return; }
@@ -5997,12 +6005,13 @@
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (j) {
         if (j && j.sid) { agLS(AG.sid, j.sid); }
+        if (j && j.error === 'onboarded') { agLS(AG.gone, '1'); }   // v102 · ο server είπε «τέλειωσες»
         if (j && j.ok && j.reply) { agPush('a', j.reply); } else { agPush('s', AG_ERR[j && j.error] || AG_ERR.provider); }
       }, function () { agPush('s', AG_ERR.offline); })
       .then(function () { agBusy = false; el('ag-send').disabled = false; });
   }
   function agInit() {
-    if (!el('ag-fab') || !agEnabled()) { return; }
+    if (!el('ag-fab') || !agEnabled() || agLS(AG.gone) === '1') { return; }
     el('ag-fab').hidden = false;
     el('ag-fab').onclick = agOpen;
     el('ag-x').onclick = agClose;
