@@ -2141,7 +2141,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v100';
+  var APP_VER = 'φέτα 3 · v101';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5970,6 +5970,8 @@
     img.onerror = function () { URL.revokeObjectURL(url); agPush('s', AG_ERR.bad_image); };
     img.src = url;
   }
+  function agTouch() { try { return window.matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } }
+  function agGrow() { var a = el('ag-in'); if (!a) { return; } a.style.height = 'auto'; a.style.height = Math.min(a.scrollHeight, 120) + 'px'; }
   function agDropImg() {
     agImg = null; agThumb = '';
     if (el('ag-prev')) { el('ag-prev').hidden = true; }
@@ -5984,7 +5986,7 @@
     if (agSecret(t)) { agPush('s', AG_ERR.secret); el('ag-in').value = ''; return; }
     var img = agImg, th = agThumb, k = '';
     agDropImg();
-    el('ag-in').value = '';
+    el('ag-in').value = ''; agGrow();
     if (img && th) { k = 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); agThumbs[k] = th; }
     agPush('u', (img ? '📎 ' : '') + (t || '(φωτογραφία οθόνης)'), k);
     agBusy = true; el('ag-send').disabled = true; agRender(true);
@@ -6008,7 +6010,10 @@
     el('ag-form').onsubmit = agSend;
     el('ag-img').onchange = function () { agPick(this.files && this.files[0]); };
     el('ag-imgx').onclick = agDropImg;
-    el('ag-in').onkeydown = function (ev) { if (ev.key === 'Enter' && !ev.shiftKey) { agSend(ev); } };
+    /* v101 · ΤΟ ↵ ΤΟΥ ΚΙΝΗΤΟΥ = ΝΕΑ ΓΡΑΜΜΗ (εύρημα Stavros 30/9: έστειλε «δες το στιγμιότυπο» πριν
+       βάλει τη φωτογραφία). Σε αφή στέλνει ΜΟΝΟ το ➤. Σε υπολογιστή: Enter στέλνει, Shift+Enter γραμμή. */
+    el('ag-in').onkeydown = function (ev) { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing && !agTouch()) { agSend(ev); } };
+    el('ag-in').oninput = agGrow;
     if (/[?&]chat=1(&|$)/.test(location.search)) { agOpen(); }
   }
   try { agInit(); } catch (e) {}
