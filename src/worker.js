@@ -20,7 +20,7 @@
 // GDPR: δεν αποθηκεύεται IP. Μόνο χώρα (Cloudflare) και user-agent.
 // ---------------------------------------------------------------------------
 
-import { handleKm, kmCleanup, kmDeleteDue, kmSupportPrune } from "./km.js";
+import { handleKm, kmCleanup, kmDeleteDue, kmSupportPrune, kmAgentPrune } from "./km.js";
 
 const V = 3; // έκδοση ερωτηματολογίου
 
@@ -47,6 +47,11 @@ export default {
       ctx.waitUntil(kmCleanup(env).then(
         (r) => console.log("km cleanup:", JSON.stringify(r)),
         (e) => console.error("km cleanup failed:", e)
+      ));
+      // KM-AGENT (29/9/2026) — συζητήσεις Βοηθού: 90 ημέρες χωρίς αίτημα · 24 μήνες με αίτημα
+      ctx.waitUntil(kmAgentPrune(env).then(
+        (r) => console.log("km agent-prune:", JSON.stringify(r)),
+        (e) => console.error("km agent-prune failed:", e)
       ));
       return;
     }

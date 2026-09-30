@@ -1,4 +1,5 @@
 // KM-SERVER-V60-H11B  ← σημάδι έκδοσης· το ψάχνει το deploy_km_h11b.bat
+// KM-SERVER-V99-AGENT  ← σημάδι: Βοηθός Kostometro, Φάση 1 (29/9/2026)
 // KM-SERVER-V98-OAUTH  ← σημάδι: σύνδεση Google/Microsoft (29/9/2026)
 // KM-SERVER-V84-VERIFY ← Brief ΣΤ (24/9/2026): ένα email = ένας λογαριασμός · κωδικός 6 ψηφίων
 // Kostometro — μητρώο + σφραγισμένος φάκελος (Brief Α, Α350 §9.8 Η.1)
@@ -109,6 +110,8 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/register" && method === "POST") return register(request, env);
   if (path === "/api/km/email/code" && method === "POST") return emailCode(request, env);
   if (path === "/api/km/email/verify" && method === "POST") return emailVerify(request, env);
+  // KM-AGENT (29/9/2026) — Βοηθός Kostometro, Φάση 1
+  if (path === "/api/km/agent/chat" && method === "POST") return agentChat(request, env);
   // KM-OAUTH (29/9/2026) — Σύνδεση με Google / Microsoft
   { const m = /^\/api\/km\/auth\/(google|microsoft)\/(start|callback)$/.exec(path);
     if (m && method === "GET") return m[2] === "start" ? oauthStart(request, env, m[1]) : oauthCallback(request, env, m[1]); }
@@ -1124,6 +1127,248 @@ async function oauthCallback(request, env, prov) {
   const busy = await emailBusy(env, email);
   if (busy) return oauthBack(env, oauthFrag("err", { code: busy, e: email }), true);
   return oauthBack(env, oauthFrag("ok", { t: await issueEmailToken(env, email), e: email, p: prov }), true);
+}
+
+// ═══ KM-AGENT · ΒΟΗΘΟΣ KOSTOMETRO — ΦΑΣΗ 1 (29/9/2026) ═══════════════════════
+// Brief_Agent_Syndesi_29-09-2026, Μέρος Β. Ρόλος σήμερα: ΟΔΗΓΟΣ ΕΓΚΑΤΑΣΤΑΣΗΣ
+// (εφαρμογή στο κινητό → λογαριασμός → 12 λέξεις → κλειδί Gemini). Ο ίδιος
+// μηχανισμός γίνεται «πωλητής» για το PRO με άλλη γνώση — όχι άλλος κώδικας.
+//
+//   POST /api/km/agent/chat  {sid?, install_id, src, lang, text, image?, consent}
+//
+// 🔴 Κανόνες που δεν σπάνε:
+//   · ΠΟΤΕ 12 λέξεις / κλειδί Gemini / κλειδί API: φίλτρο στη συσκευή ΚΑΙ εδώ,
+//     πριν γραφτεί οτιδήποτε ή φύγει προς τον πάροχο AI.
+//   · Εικόνα: πάει ΜΟΝΟ στην τρέχουσα κλήση, ΔΕΝ αποθηκεύεται (μένει «[εικόνα]»).
+//   · Ο agent ΔΕΝ έχει εργαλείο που αγγίζει λογαριασμό. Μόνο «πέρνα με σε άνθρωπο».
+//   · Άνθρωπος = αίτημα KM-E μέσα στη ΔΙΑΔΡΟΜΗ ΠΟΥ ΗΔΗ ΥΠΑΡΧΕΙ (km_support_*):
+//     ο Stavros απαντάει στο support@ με τον αριθμό στο θέμα, όποτε μπορεί.
+//   · Κόστος: μετριέται ανά κλήση (km_agent_daily) · ημερήσιο ταβάνι AGENT_DAILY_USD.
+const AGENT_MODEL_DEFAULT = "claude-sonnet-5-5";
+const AGENT_MAX_TEXT = 2000;
+const AGENT_MAX_IMG_B64 = 2000000;        // ~1,5 MB εικόνα — η εφαρμογή στέλνει ≤1280px JPEG
+const AGENT_PER_DEV_HOUR = 40;            // μηνύματα χρήστη ανά συσκευή ανά ώρα
+const AGENT_MAX_TURNS = 80;               // ανά συζήτηση
+const AGENT_HISTORY = 24;                 // πόσα μηνύματα βλέπει το μοντέλο
+const AGENT_DAILY_USD_DEFAULT = 3;
+// $ ανά εκατ. tokens (platform.claude.com/docs/en/about-claude/pricing, 29/9/2026)· cache write εκτίμηση 1,25×.
+const AGENT_PRICE = { in: 2, out: 10, cache_read: 0.2, cache_write: 2.5 };
+const AGENT_SECRET_RE = [/\bAIza[0-9A-Za-z_-]{30,}/, /\bAQ\.[0-9A-Za-z_-]{20,}/, /\bsk-ant-[0-9A-Za-z_-]{20,}/];
+const AGENT_IMG_MIME = { "image/jpeg": 1, "image/png": 1, "image/webp": 1 };
+const AGENT_KNOW_URL = "https://fastwrite.tech/kostometro/agent/knowledge_el.md";
+let agentKnow = null;   // cache ανά isolate
+
+// 12 λέξεις = 11+ συνεχόμενες λατινικές λέξεις 3-8 γραμμάτων (αγγλική λίστα BIP39) — ή μοτίβο κλειδιού.
+export function agentHasSecret(text) {
+  const t = String(text || "");
+  if (AGENT_SECRET_RE.some((r) => r.test(t))) return true;
+  let run = 0;
+  for (const w of t.split(/[\s,.;:·\-–—()\[\]"'«»0-9]+/)) {
+    if (!w) continue;
+    if (/^[a-z]{3,8}$/i.test(w)) { run++; if (run >= 11) return true; } else run = 0;
+  }
+  return false;
+}
+
+async function agentKnowledge(env) {
+  if (agentKnow && Date.now() - agentKnow.at < 10 * 60 * 1000) return agentKnow.text;
+  let text = "";
+  try {
+    const r = env.ASSETS ? await env.ASSETS.fetch(new Request(AGENT_KNOW_URL)) : null;
+    if (r && r.ok) text = await r.text();
+  } catch (e) { /* χωρίς γνώση ο agent παραπέμπει σε άνθρωπο — βλ. κανόνες */ }
+  agentKnow = { at: Date.now(), text };
+  return text;
+}
+
+const AGENT_RULES = [
+  "Είσαι ο «Βοηθός Kostometro», βοηθός τεχνητής νοημοσύνης (AI) της FastWrite. ΔΕΝ είσαι άνθρωπος και το λες αν ρωτηθείς.",
+  "ΣΤΟΧΟΣ: ο χρήστης να φύγει με το Kostometro στο κινητό του, λογαριασμό, τις 12 λέξεις γραμμένες σε χαρτί και (αν θέλει) κλειδί Gemini που δουλεύει. Ένα βήμα τη φορά, σύντομα, απλά ελληνικά (ή στη γλώσσα του χρήστη). Ρώτα τι βλέπει στην οθόνη του· αν χρειάζεται, ζήτα φωτογραφία οθόνης (📎).",
+  "ΜΙΛΑΣ ΜΟΝΟ για το Kostometro / FastWrite. Για οτιδήποτε άλλο: ευγενική άρνηση σε μία πρόταση και επιστροφή στο θέμα.",
+  "ΛΕΣ ΜΟΝΟ ό,τι υπάρχει στη ΓΝΩΣΗ πιο κάτω. Δεν υπόσχεσαι τιμές, ημερομηνίες ή λειτουργίες που δεν γράφονται εκεί (π.χ. PRO: «έρχεται, δεν έχουμε ακόμα ημερομηνία»). Αν δεν ξέρεις, το λες και προτείνεις άνθρωπο.",
+  "🔴 ΠΟΤΕ δεν ζητάς, δεν δέχεσαι, δεν επαναλαμβάνεις τις 12 λέξεις ή κλειδί (Gemini/API). ΠΡΙΝ από κάθε βήμα που τα εμφανίζει λες: «μη μου στείλεις αυτή την οθόνη». Αν τα δεις σε εικόνα ή κείμενο: ΜΗΝ τα γράψεις, πες στον χρήστη να σβήσει τη φωτογραφία, και για κλειδί να το διαγράψει (AI Studio → API Keys → ⋮ → Delete) και να φτιάξει νέο.",
+  "ΔΕΝ μπορείς να αλλάξεις τίποτα στον λογαριασμό του χρήστη και δεν το ισχυρίζεσαι.",
+  "ΑΝΘΡΩΠΟΣ: αν ο χρήστης ζητήσει άνθρωπο, αν κολλήσετε στο ίδιο βήμα 3 φορές, αν είναι θυμωμένος ή αν η ερώτηση δεν καλύπτεται από τη ΓΝΩΣΗ → ζήτα το email του (αν δεν το έχει δώσει) και κάλεσε το εργαλείο handoff_to_human με σύντομη περίληψη. Μετά πες του τον αριθμό αιτήματος και ότι θα του απαντήσουμε ΜΕ EMAIL, με όλη τη συζήτηση μπροστά μας — ΧΩΡΙΣ υπόσχεση χρόνου.",
+  "ΜΟΡΦΗ: απαντήσεις έως ~6 γραμμές, αριθμημένα βήματα όταν είναι βήματα, κουμπιά σε «εισαγωγικά» όπως τα γράφει η οθόνη. Χωρίς markdown επικεφαλίδες.",
+].join("\n");
+
+const AGENT_TOOLS = [{
+  name: "handoff_to_human",
+  description: "Ανοίγει αίτημα υποστήριξης (KM-E) με ολόκληρη τη συζήτηση, ώστε να απαντήσει άνθρωπος με email. Χρησιμοποίησέ το ΜΟΝΟ αφού έχεις το email του χρήστη.",
+  input_schema: { type: "object", properties: {
+    email: { type: "string", description: "Το email του χρήστη, όπως το έδωσε." },
+    summary: { type: "string", description: "Μία-δύο προτάσεις: τι θέλει και πού κόλλησε." },
+  }, required: ["email", "summary"] },
+}];
+
+async function agentCall(env, body) {
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error("anthropic_" + r.status + "_" + ((j && j.error && j.error.type) || ""));
+  return j;
+}
+
+function agentMicro(u) {
+  u = u || {};
+  return Math.round((u.input_tokens || 0) * AGENT_PRICE.in + (u.output_tokens || 0) * AGENT_PRICE.out +
+    (u.cache_read_input_tokens || 0) * AGENT_PRICE.cache_read + (u.cache_creation_input_tokens || 0) * AGENT_PRICE.cache_write);
+}
+
+async function agentHandoff(env, sess, input) {
+  const email = normEmail(input && input.email);
+  if (!email) return { ok: false, error: "bad_email" };
+  if (sess.ticket) return { ok: true, code: sess.ticket, already: true };
+  const n = await supportNext(env, "E");
+  if (!n) return { ok: false, error: "seq" };
+  const code = "KM-E-" + String(n).padStart(6, "0");
+  const summary = String((input && input.summary) || "").replace(/\s+/g, " ").trim().slice(0, 300) || "Βοήθεια από τον Βοηθό";
+  const rows = (await env.DB.prepare("SELECT role, body FROM km_agent_messages WHERE session_id = ? ORDER BY id DESC LIMIT 60").bind(sess.id).all()).results || [];
+  const convo = rows.reverse().map((m) => (m.role === "user" ? "Χρήστης: " : "Βοηθός: ") + m.body).join("\n\n");
+  const body = supBody("Από τον Βοηθό Kostometro (AI).\nΠερίληψη: " + summary + "\n\n— Η συζήτηση —\n\n" + convo);
+  const t = now();
+  await env.DB.batch([
+    env.DB.prepare("INSERT OR IGNORE INTO km_support_tickets (code, scope, issued_at, arrived_at) VALUES (?, 'E', ?, ?)").bind(code, t, t),
+    env.DB.prepare("INSERT INTO km_support_cases (code, scope, topic, email, status, created_at, last_in_at) VALUES (?, 'E', ?, ?, 'open', ?, ?)")
+      .bind(code, ("Βοηθός · " + summary).slice(0, 60), email, t, t),
+    env.DB.prepare("INSERT INTO km_support_messages (code, dir, source, body, at) VALUES (?, 'in', 'agent', ?, ?)").bind(code, body, t),
+    env.DB.prepare("UPDATE km_agent_sessions SET email = ?, ticket = ? WHERE id = ?").bind(email, code, sess.id),
+  ]);
+  sess.ticket = code; sess.email = email;
+  // Προς support@ από το noreply@notify → το Apps Script το ΠΑΡΑΚΑΜΠΤΕΙ (καμία αυτόματη απάντηση).
+  // Reply-To = support@: η απάντηση του Stavros ακολουθεί τη ΓΝΩΣΤΗ διαδρομή (KM-E στο θέμα).
+  const lines = ["Νέο αίτημα από τον Βοηθό Kostometro: " + code, "Πελάτης: " + email, "Περίληψη: " + summary, "",
+    "ΑΠΑΝΤΗΣΗ: πάτα «Απάντηση» — πάει στο support@ με το " + code + " στο θέμα και φεύγει στον πελάτη όπως κάθε αίτημα.", "", "— Η συζήτηση —", "", convo];
+  await supMail(env, "agent", { to: MAIL_SUPPORT, from: MAIL_FROM, replyTo: MAIL_SUPPORT,
+    subject: "[Agent] " + code + " · Kostometro · " + summary.slice(0, 50),
+    text: lines.join("\n"), html: lines.map((l) => escHtml(l)).join("<br>") });
+  return { ok: true, code };
+}
+
+async function agentChat(request, env) {
+  if (!env.ANTHROPIC_API_KEY) return json({ ok: false, error: "unavailable" }, 503);
+  const b = (await safeJson(request)) || {};
+  const inst = clean(b.install_id, 64);
+  if (!inst || !DEVICE_ID.test(inst)) return json({ ok: false, error: "bad_request" }, 400);
+  const text = String(b.text || "").trim();
+  if (text.length > AGENT_MAX_TEXT) return json({ ok: false, error: "too_long" }, 400);
+  let img = null;
+  if (b.image) {
+    const m = String(b.image.mime || ""), d = String(b.image.data || "");
+    if (!AGENT_IMG_MIME[m] || !d || d.length > AGENT_MAX_IMG_B64 || !/^[A-Za-z0-9+/=]+$/.test(d)) return json({ ok: false, error: "bad_image" }, 400);
+    img = { mime: m, data: d };
+  }
+  if (!text && !img) return json({ ok: false, error: "empty" }, 400);
+  // 🔴 ΠΡΙΝ από οποιαδήποτε εγγραφή ή κλήση: μυστικά δεν μπαίνουν ποτέ.
+  if (agentHasSecret(text)) return json({ ok: false, error: "secret" }, 400);
+
+  const dev = await sha256hex(inst + ":" + (env.KM_ADMIN_KEY || ""));
+  const t = now();
+  const hourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+  const nDev = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM km_agent_messages m JOIN km_agent_sessions s ON s.id = m.session_id WHERE s.dev = ? AND m.role = 'user' AND m.at >= ?"
+  ).bind(dev, hourAgo).first();
+  if (nDev && nDev.n >= AGENT_PER_DEV_HOUR) return json({ ok: false, error: "too_many" }, 429);
+
+  const sid = /^[0-9a-f]{32}$/.test(String(b.sid || "")) ? String(b.sid) : null;
+  let sess = sid ? await env.DB.prepare("SELECT * FROM km_agent_sessions WHERE id = ? AND dev = ?").bind(sid, dev).first() : null;
+  if (!sess) {
+    if (b.consent !== true) return json({ ok: false, error: "consent" }, 400);
+    sess = { id: randHex(16), dev, src: clean(funnelSrc(b.src), 24), lang: clean(b.lang, 8) || "el", email: null, ticket: null, turns: 0 };
+    await env.DB.prepare("INSERT INTO km_agent_sessions (id, dev, src, lang, consent_at, started, last_at, turns) VALUES (?, ?, ?, ?, ?, ?, ?, 0)")
+      .bind(sess.id, dev, sess.src, sess.lang, t, t, t).run();
+  }
+  const done = (reply, extra) => json(Object.assign({ ok: true, sid: sess.id, reply, ticket: sess.ticket || null }, extra || {}));
+  if (sess.turns >= AGENT_MAX_TURNS) return done("Η συζήτηση έγινε πολύ μεγάλη για μένα. Γράψε μας στο support@fastwrite.tech — θα σου απαντήσει άνθρωπος.", { limit: true });
+
+  const day = t.slice(0, 10);
+  const spent = await env.DB.prepare("SELECT usd_micro FROM km_agent_daily WHERE day = ?").bind(day).first();
+  const cap = Math.round(Number(env.AGENT_DAILY_USD || AGENT_DAILY_USD_DEFAULT) * 1e6);
+  if (spent && spent.usd_micro >= cap) return done("Αυτή τη στιγμή δεν μπορώ να απαντήσω. Γράψε μας στο support@fastwrite.tech και θα σου απαντήσει άνθρωπος.", { busy: true });
+
+  await env.DB.prepare("INSERT INTO km_agent_messages (session_id, role, body, at) VALUES (?, 'user', ?, ?)")
+    .bind(sess.id, (img ? "[εικόνα] " : "") + text, t).run();
+
+  // Ιστορικό: εναλλαγή user/assistant (το API την απαιτεί) — διαδοχικά ίδιου ρόλου ενώνονται.
+  const hist = ((await env.DB.prepare("SELECT role, body FROM km_agent_messages WHERE session_id = ? ORDER BY id DESC LIMIT ?")
+    .bind(sess.id, AGENT_HISTORY).all()).results || []).reverse();
+  const msgs = [];
+  for (const h of hist) {
+    const role = h.role === "assistant" ? "assistant" : "user";
+    if (msgs.length && msgs[msgs.length - 1].role === role) msgs[msgs.length - 1].content += "\n\n" + h.body;
+    else msgs.push({ role, content: h.body });
+  }
+  while (msgs.length && msgs[0].role !== "user") msgs.shift();
+  const last = msgs[msgs.length - 1];
+  if (img && last && last.role === "user") {
+    last.content = [{ type: "image", source: { type: "base64", media_type: img.mime, data: img.data } },
+      { type: "text", text: String(last.content).replace(/^\[εικόνα\] ?/, "") || "(φωτογραφία οθόνης)" }];
+  }
+  let steps = [];
+  try { steps = ((await env.DB.prepare("SELECT step FROM km_funnel WHERE dev = ?").bind(dev).all()).results || []).map((r) => r.step); } catch (e) {}
+  const ctxLine = "ΚΑΤΑΣΤΑΣΗ ΣΥΣΚΕΥΗΣ (από το χωνί εγγραφής): " + (steps.length ? steps.join(", ") : "κανένα βήμα ακόμα") +
+    " · προέλευση: " + (sess.src || "direct") + " · αίτημα: " + (sess.ticket || "κανένα") +
+    ". Βήματα: open=άνοιξε · email=ζήτησε κωδικό · oauth_google/oauth_microsoft=πάτησε σύνδεση · code=email επιβεβαιώθηκε · account=λογαριασμός · key=έβαλε κλειδί Gemini · key_skip=το παρέλειψε.";
+  const know = await agentKnowledge(env);
+  const system = [
+    { type: "text", text: AGENT_RULES + "\n\n# ΓΝΩΣΗ\n" + (know || "(η γνώση δεν φορτώθηκε — για κάθε ερώτηση πρότεινε άνθρωπο)"), cache_control: { type: "ephemeral" } },
+    { type: "text", text: ctxLine },
+  ];
+
+  let reply = "", micro = 0, calls = 0, inTok = 0, outTok = 0, cacheTok = 0;
+  try {
+    for (let i = 0; i < 3; i++) {
+      const j = await agentCall(env, { model: env.AGENT_MODEL || AGENT_MODEL_DEFAULT, max_tokens: 700, system, tools: AGENT_TOOLS, messages: msgs });
+      calls++; micro += agentMicro(j.usage);
+      const u = j.usage || {}; inTok += u.input_tokens || 0; outTok += u.output_tokens || 0; cacheTok += u.cache_read_input_tokens || 0;
+      const blocks = j.content || [];
+      reply = blocks.filter((x) => x.type === "text").map((x) => x.text).join("\n").trim();
+      const uses = blocks.filter((x) => x.type === "tool_use");
+      if (j.stop_reason !== "tool_use" || !uses.length) break;
+      msgs.push({ role: "assistant", content: blocks });
+      const results = [];
+      for (const tu of uses) {
+        const out = tu.name === "handoff_to_human" ? await agentHandoff(env, sess, tu.input) : { ok: false, error: "unknown_tool" };
+        results.push({ type: "tool_result", tool_use_id: tu.id, content: JSON.stringify(out) });
+      }
+      msgs.push({ role: "user", content: results });
+    }
+  } catch (e) {
+    console.error("agent:", e && e.message);
+    return json({ ok: false, error: "provider", sid: sess.id }, 502);
+  } finally {
+    if (calls) {
+      await env.DB.prepare(
+        `INSERT INTO km_agent_daily (day, calls, in_tok, out_tok, cache_tok, usd_micro) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(day) DO UPDATE SET calls = calls + excluded.calls, in_tok = in_tok + excluded.in_tok,
+           out_tok = out_tok + excluded.out_tok, cache_tok = cache_tok + excluded.cache_tok, usd_micro = usd_micro + excluded.usd_micro`
+      ).bind(day, calls, inTok, outTok, cacheTok, micro).run();
+    }
+  }
+  if (agentHasSecret(reply)) reply = "Για την ασφάλειά σου δεν μπορώ να γράψω αυτό το κείμενο. Μη στέλνεις τις 12 λέξεις ή το κλειδί σου σε κανέναν.";
+  if (!reply) reply = sess.ticket ? "Άνοιξα το αίτημα " + sess.ticket + ". Θα σου απαντήσουμε με email." : "Δεν κατάλαβα — μπορείς να το πεις αλλιώς;";
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO km_agent_messages (session_id, role, body, at) VALUES (?, 'assistant', ?, ?)").bind(sess.id, reply.slice(0, 8000), now()),
+    env.DB.prepare("UPDATE km_agent_sessions SET last_at = ?, turns = turns + 1 WHERE id = ?").bind(now(), sess.id),
+  ]);
+  return done(reply);
+}
+
+// Ημερήσιο: 90 ημέρες χωρίς αίτημα · 24 μήνες με αίτημα · κόστος ημέρας 400 ημέρες.
+export async function kmAgentPrune(env, nowIso) {
+  const base = nowIso ? new Date(nowIso).getTime() : Date.now();
+  const d90 = new Date(base - 90 * 86400000).toISOString();
+  const m24 = new Date(base - 730 * 86400000).toISOString();
+  const d400 = new Date(base - 400 * 86400000).toISOString().slice(0, 10);
+  const cond = "(ticket IS NULL AND last_at < ?) OR (ticket IS NOT NULL AND last_at < ?)";
+  const r1 = await env.DB.prepare("DELETE FROM km_agent_messages WHERE session_id IN (SELECT id FROM km_agent_sessions WHERE " + cond + ")").bind(d90, m24).run();
+  const r2 = await env.DB.prepare("DELETE FROM km_agent_sessions WHERE " + cond).bind(d90, m24).run();
+  const r3 = await env.DB.prepare("DELETE FROM km_agent_daily WHERE day < ?").bind(d400).run();
+  const n = (r) => (r && r.meta && r.meta.changes) || 0;
+  return { messages: n(r1), sessions: n(r2), days: n(r3) };
 }
 
 // «Υπάρχει αυτός ο κωδικός πρόσκλησης;» — ΜΟΝΟ ναι/όχι, κανένα στοιχείο του κατόχου.

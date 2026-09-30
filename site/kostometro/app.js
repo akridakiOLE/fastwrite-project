@@ -2141,7 +2141,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v98';
+  var APP_VER = 'φέτα 3 · v99';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5892,6 +5892,110 @@
   setInterval(function () { if (!document.hidden) { maybePull(); } }, PULL_GAP);
   document.addEventListener('visibilitychange', maybePull);
   window.addEventListener('focus', maybePull);
+
+  /* ══ KM-AGENT (29/9/2026) · ΒΟΗΘΟΣ KOSTOMETRO — ΦΑΣΗ 1 ══════════════════
+     Brief_Agent_Syndesi Μέρος Β. ΚΡΥΦΟΣ: ανάβει ΜΟΝΟ με ?chat=1 (δοκιμή) και
+     μένει αναμμένος σε αυτή τη συσκευή. Όταν δημοσιευτεί η Πολιτική v2, το
+     AG_PUBLIC γίνεται true — μία γραμμή.
+     🔴 Φίλτρο μυστικών ΚΑΙ εδώ ΚΑΙ στον server: οι 12 λέξεις / το κλειδί δεν
+     φεύγουν ποτέ από τη συσκευή. Η φωτογραφία φεύγει μόνο για την τρέχουσα
+     ερώτηση και δεν αποθηκεύεται πουθενά. */
+  var AG_PUBLIC = false;
+  var AG = { on: 'km_agent_on', ok: 'km_agent_ok', sid: 'km_agent_sid', log: 'km_agent_log' };
+  var AG_SECRET = [/\bAIza[0-9A-Za-z_-]{30,}/, /\bAQ\.[0-9A-Za-z_-]{20,}/, /\bsk-ant-[0-9A-Za-z_-]{20,}/];
+  var agImg = null, agBusy = false;
+  function agSecret(t) {
+    t = String(t || '');
+    for (var i = 0; i < AG_SECRET.length; i++) { if (AG_SECRET[i].test(t)) { return true; } }
+    var run = 0, ws = t.split(/[\s,.;:·\-–—()\[\]"'«»0-9]+/);
+    for (var j = 0; j < ws.length; j++) {
+      if (!ws[j]) { continue; }
+      if (/^[a-z]{3,8}$/i.test(ws[j])) { run++; if (run >= 11) { return true; } } else { run = 0; }
+    }
+    return false;
+  }
+  function agLS(k, v) { try { if (v === undefined) { return localStorage.getItem(k); } if (v === null) { localStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) {} return null; }
+  function agEnabled() {
+    if (/[?&]chat=1(&|$)/.test(location.search)) { agLS(AG.on, '1'); }
+    return AG_PUBLIC || agLS(AG.on) === '1';
+  }
+  function agLog() { try { return JSON.parse(agLS(AG.log) || '[]') || []; } catch (e) { return []; } }
+  function agPush(r, t) { var l = agLog(); l.push({ r: r, t: String(t || '') }); agLS(AG.log, JSON.stringify(l.slice(-60))); agRender(); }
+  function agEsc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function agRender(wait) {
+    var box = el('ag-log'); if (!box) { return; }
+    var h = '';
+    agLog().forEach(function (m) { h += '<div class="ag-m ' + (m.r === 'u' ? 'u' : m.r === 's' ? 's' : 'a') + '">' + agEsc(m.t) + '</div>'; });
+    if (!agLog().length) { h += '<div class="ag-m a">Γεια σου! Είμαι ο Βοηθός του Kostometro (AI). Πες μου πού βρίσκεσαι — π.χ. «θέλω να το βάλω στο κινητό» ή «δεν μου ήρθε ο κωδικός». Αν κολλήσεις σε μια οθόνη, στείλε μου φωτογραφία της με το 📎.</div>'; }
+    if (wait) { h += '<div class="ag-m a w">γράφει…</div>'; }
+    box.innerHTML = h;
+    box.scrollTop = box.scrollHeight;
+  }
+  function agShowChat() {
+    el('ag-consent').hidden = true; el('ag-log').hidden = false; el('ag-form').hidden = false; agRender();
+  }
+  function agOpen() {
+    el('ag').hidden = false; el('ag-fab').hidden = true;
+    if (agLS(AG.ok) === '1') { agShowChat(); } else { el('ag-consent').hidden = false; el('ag-log').hidden = true; el('ag-form').hidden = true; }
+  }
+  function agClose() { el('ag').hidden = true; el('ag-fab').hidden = false; }
+  var AG_ERR = {
+    secret: 'Αυτό μοιάζει με τις 12 λέξεις ή με κλειδί — ΔΕΝ το στείλαμε. Μην το στέλνεις σε κανέναν, ούτε σε εμάς.',
+    too_many: 'Πολλά μηνύματα σε λίγη ώρα — δοκίμασε ξανά σε λίγο.',
+    too_long: 'Το μήνυμα είναι πολύ μεγάλο — γράψ\' το πιο σύντομα.',
+    bad_image: 'Η φωτογραφία δεν μπόρεσε να σταλεί — δοκίμασε άλλη.',
+    unavailable: 'Ο βοηθός δεν είναι διαθέσιμος αυτή τη στιγμή. Γράψε μας στο support@fastwrite.tech.',
+    provider: 'Κάτι πήγε στραβά — δοκίμασε ξανά σε λίγο, ή γράψε μας στο support@fastwrite.tech.',
+    offline: 'Χωρίς σύνδεση — ο βοηθός θέλει ίντερνετ.'
+  };
+  function agPick(f) {
+    if (!f) { return; }
+    var img = new Image(), url = URL.createObjectURL(f);
+    img.onload = function () {
+      var k = Math.min(1, 1280 / Math.max(img.width, img.height));
+      var c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      agImg = { mime: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.8).split(',')[1] };
+      el('ag-imgnote').textContent = '📎 Μία φωτογραφία έτοιμη — φεύγει με το επόμενο μήνυμα και δεν αποθηκεύεται. 🔒 Να ΜΗ φαίνονται 12 λέξεις ή κλειδί.';
+      el('ag-imgnote').hidden = false;
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); agPush('s', AG_ERR.bad_image); };
+    img.src = url;
+  }
+  function agSend(e) {
+    if (e) { e.preventDefault(); }
+    if (agBusy) { return; }
+    var t = String(el('ag-in').value || '').trim();
+    if (!t && !agImg) { return; }
+    if (agSecret(t)) { agPush('s', AG_ERR.secret); el('ag-in').value = ''; return; }
+    var img = agImg; agImg = null; el('ag-imgnote').hidden = true; el('ag-img').value = '';
+    el('ag-in').value = '';
+    agPush('u', (img ? '📎 ' : '') + (t || '(φωτογραφία οθόνης)'));
+    agBusy = true; el('ag-send').disabled = true; agRender(true);
+    fetch(KM_API + 'agent/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sid: agLS(AG.sid) || null, install_id: localStorage.getItem(LS.id) || '',
+        src: localStorage.getItem(LS.src) || 'direct', lang: (navigator.language || 'el').slice(0, 2),
+        text: t, image: img, consent: true }) })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.sid) { agLS(AG.sid, j.sid); }
+        if (j && j.ok && j.reply) { agPush('a', j.reply); } else { agPush('s', AG_ERR[j && j.error] || AG_ERR.provider); }
+      }, function () { agPush('s', AG_ERR.offline); })
+      .then(function () { agBusy = false; el('ag-send').disabled = false; });
+  }
+  function agInit() {
+    if (!el('ag-fab') || !agEnabled()) { return; }
+    el('ag-fab').hidden = false;
+    el('ag-fab').onclick = agOpen;
+    el('ag-x').onclick = agClose;
+    el('ag-ok').onclick = function () { agLS(AG.ok, '1'); agShowChat(); };
+    el('ag-form').onsubmit = agSend;
+    el('ag-img').onchange = function () { agPick(this.files && this.files[0]); };
+    el('ag-in').onkeydown = function (ev) { if (ev.key === 'Enter' && !ev.shiftKey) { agSend(ev); } };
+    if (/[?&]chat=1(&|$)/.test(location.search)) { agOpen(); }
+  }
+  try { agInit(); } catch (e) {}
 
   checkVersion(false);   // v30 — πρώτο πράγμα σε κάθε φόρτωση
   openDB().then(boot).then(function () { schedule(800); maybeInstall(); }).catch(function (e) {

@@ -714,6 +714,31 @@
   </div>
 </div>
 
+<!-- ══ KM-AGENT (29/9/2026) · ΒΟΗΘΟΣ KOSTOMETRO — ΦΑΣΗ 1 ════════════════
+     Brief_Agent_Syndesi Μέρος Β. ΚΡΥΦΟΣ για όλους: εμφανίζεται ΜΟΝΟ με ?chat=1
+     (δοκιμή), μέχρι να δημοσιευτεί η Πολιτική v2 (Μέρος Γ). data-agent: σήμανση
+     για τον έλεγχο του deploy, σε λατινικούς (το findstr δεν διαβάζει ελληνικά). -->
+<button id="ag-fab" class="ag-fab" type="button" data-agent="fab" hidden>💬 Βοήθεια</button>
+<section id="ag" class="ag" role="dialog" aria-label="Βοηθός Kostometro" data-agent="panel" hidden>
+  <header class="ag-h">
+    <div><b>Βοηθός Kostometro</b> <span class="ag-ai">AI</span></div>
+    <button id="ag-x" class="ag-x" type="button" aria-label="Κλείσιμο">✕</button>
+  </header>
+  <div id="ag-consent" class="ag-consent" data-agent="consent">
+    <p>Μιλάς με <b>βοηθό τεχνητής νοημοσύνης (AI)</b>, όχι με άνθρωπο. Σε βοηθάει να βάλεις το Kostometro στο κινητό σου και να το ρυθμίσεις, βήμα-βήμα.</p>
+    <p>Η συζήτηση φυλάσσεται <b>90 ημέρες</b>, για να σε βοηθήσουμε. Οι φωτογραφίες οθόνης <b>δεν αποθηκεύονται</b>. Τα μηνύματα τα επεξεργάζεται για λογαριασμό μας η Anthropic. <a href="/legal/privacy" target="_blank" rel="noopener">Πολιτική απορρήτου</a></p>
+    <p class="ag-warn">🔒 Ποτέ μη στείλεις εδώ τις <b>12 λέξεις</b> ή το <b>κλειδί Gemini</b> — ούτε σε φωτογραφία.</p>
+    <button id="ag-ok" class="btn primary" type="button">Ξεκίνα</button>
+  </div>
+  <div id="ag-log" class="ag-log" aria-live="polite" hidden></div>
+  <p id="ag-imgnote" class="ag-imgnote" hidden></p>
+  <form id="ag-form" class="ag-form" hidden>
+    <label class="ag-att" title="Φωτογραφία οθόνης">📎<input id="ag-img" type="file" accept="image/*" hidden></label>
+    <textarea id="ag-in" rows="1" maxlength="2000" placeholder="Γράψε εδώ…"></textarea>
+    <button id="ag-send" class="ag-send" type="submit" aria-label="Αποστολή">➤</button>
+  </form>
+</section>
+
 <script src="/km-crypto.js"></script>
 <script src="/kostometro/app.js"></script>
 </body>

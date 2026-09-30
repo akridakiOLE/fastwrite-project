@@ -695,3 +695,27 @@ textarea.km-ta:focus{outline:none;border-color:var(--accent)}
 .oauth-note{margin:0;text-align:center}
 .oauth .or{display:flex;align-items:center;gap:10px;margin:6px 0 0;color:var(--text2);font-size:14px}
 .oauth .or::before,.oauth .or::after{content:"";flex:1;height:1px;background:var(--border)}
+
+/* KM-AGENT (29/9/2026) — Βοηθός Kostometro */
+.ag-fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:60;border:0;border-radius:24px;padding:12px 18px;background:var(--accent);color:#04131a;font:600 15px/1 inherit;font-family:inherit;box-shadow:0 6px 20px rgba(0,0,0,.4);cursor:pointer}
+.ag{position:fixed;inset:0;z-index:70;display:flex;flex-direction:column;background:var(--bg);color:var(--text,#e6e8ec)}
+.ag[hidden],.ag-fab[hidden]{display:none}
+@media (min-width:700px){.ag{inset:auto 16px 16px auto;width:420px;height:min(640px,calc(100vh - 32px));border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.5)}}
+.ag-h{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.ag-ai{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:8px;background:var(--accent-dim);color:var(--accent);font-size:12px;font-weight:700}
+.ag-x{background:none;border:0;color:var(--text2);font-size:20px;cursor:pointer;padding:4px 8px}
+.ag-consent{padding:16px;overflow:auto;display:flex;flex-direction:column;gap:12px;font-size:15px;line-height:1.5}
+.ag-consent a{color:var(--accent)}
+.ag-warn{background:rgba(248,113,113,.1);border-left:3px solid var(--danger);padding:10px 12px;border-radius:6px}
+.ag-log{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.ag-m{max-width:85%;padding:10px 12px;border-radius:12px;white-space:pre-wrap;word-wrap:break-word;font-size:15px;line-height:1.45}
+.ag-m.u{align-self:flex-end;background:var(--accent-dim);border:1px solid rgba(0,229,160,.3)}
+.ag-m.a{align-self:flex-start;background:var(--bg3)}
+.ag-m.s{align-self:center;background:transparent;color:var(--text2);font-size:13px;text-align:center}
+.ag-m.w{opacity:.6;font-style:italic}
+.ag-imgnote{margin:0;padding:6px 14px;font-size:13px;color:var(--text2)}
+.ag-form{display:flex;gap:8px;align-items:flex-end;padding:10px;border-top:1px solid var(--border);padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+.ag-att{font-size:22px;padding:8px;cursor:pointer}
+.ag-form textarea{flex:1;resize:none;max-height:120px;background:var(--bg2);color:inherit;border:1px solid var(--border);border-radius:10px;padding:10px;font:inherit;font-size:16px}
+.ag-send{border:0;border-radius:10px;background:var(--accent);color:#04131a;font-size:18px;padding:10px 14px;cursor:pointer}
+.ag-send[disabled]{opacity:.4}

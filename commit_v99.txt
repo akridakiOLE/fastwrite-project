@@ -1,0 +1,18 @@
+v99 — Βοηθός Kostometro (KM-AGENT), Φάση 1 — ΚΡΥΦΟΣ (μόνο με ?chat=1)
+
+Brief_Agent_Syndesi_29-09-2026, Μέρος Β (έγκριση Stavros 29/9).
+- Worker: POST /api/km/agent/chat — Claude Sonnet 5.5 μέσω Anthropic API, γνώση με cache,
+  κατάσταση χωνιού της συσκευής ως πλαίσιο, εργαλείο «handoff_to_human».
+- Άνθρωπος = αίτημα KM-E στη ΓΝΩΣΤΗ διαδρομή (km_support_cases/messages, source=agent),
+  email στο support@ με Reply-To support@ — ο Stavros απαντάει με τον αριθμό στο θέμα.
+- 🔴 12 λέξεις / κλειδί Gemini (AIza, AQ.) / sk-ant: φίλτρο στη συσκευή ΚΑΙ στον server, πριν
+  από κάθε εγγραφή ή κλήση · και στην απάντηση του μοντέλου.
+- Εικόνα οθόνης: μόνο στην τρέχουσα κλήση, ΔΕΝ αποθηκεύεται.
+- Συγκατάθεση πριν την 1η χρήση (AI, 90 ημέρες, Anthropic, Πολιτική) · dev = hash, όχι install_id.
+- Όρια: 40 μηνύματα/ώρα/συσκευή · 80 γύροι/συζήτηση · ημερήσιο ταβάνι AGENT_DAILY_USD (3 $).
+- Κόστος ανά ημέρα: km_agent_daily (μικρο-$). Τήρηση: 90 ημ. χωρίς αίτημα, 24 μήνες με αίτημα (ημερήσιο cron).
+- Γνώση: site/kostometro/agent/knowledge_el.md, χτίζεται από FAQ + οδηγό κλειδιού + tools/agent/flow_el.md.
+- Τεστ: tests/v99.test.mjs — 13 φρουροί, 12 αποδείξεις μετάλλαξης. Πραγματική δοκιμή: deploy_v000_agent_smoke.bat.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018WEr118BCAFDGw3YyxJczg
