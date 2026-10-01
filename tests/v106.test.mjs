@@ -102,7 +102,7 @@ await check("Ρ-2 · 🔴 cron: πριν την ώρα τίποτα · στην 
   ok(r.sent === 1 && mails.length === 1, JSON.stringify(r));
   const m = mails[0];
   ok(m.to === "maria@shop.cy" && m.from.includes("noreply@notify.fastwrite.tech"), m.to);
-  ok(m.subject === "Ο Κώστας ρωτά: πώς πάει το Kostometro;", m.subject);
+  ok(m.subject === "Ο Κώστας ρωτά: πώς σου φαίνεται το Kostometro;", m.subject);
   const mm = /https:\/\/fastwrite\.tech\/kostometro\/\?reopen=([0-9a-f]{32})/.exec(m.html); ok(mm && m.text.includes(mm[0]), "σύνδεσμος");
   TOKEN = mm[1];
   ok(m.html.includes("βοηθός τεχνητής νοημοσύνης (AI), όχι άνθρωπος") && m.html.includes("ένα και μοναδικό") && m.html.includes("/legal/privacy#aa8") && m.html.includes("14 ημέρες"), "περιεχόμενο");
