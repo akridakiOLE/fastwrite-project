@@ -2141,7 +2141,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v104';
+  var APP_VER = 'φέτα 3 · v106';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5570,6 +5570,17 @@
   var hpBusy = false;
   function renderHelp() {
     hpSel = ''; hpBusy = false;
+    /* v106 · «Μίλα με τον Κώστα»: μόνο όπου ο βοηθός είναι ενεργός (AG_PUBLIC ή ?chat=1) και υπάρχει λογαριασμός. */
+    try {
+      var kOn = (AG_PUBLIC || agLS(AG.on) === '1') && !!localStorage.getItem(LS.reg);
+      el('hp-kostas').hidden = !kOn;
+      el('hp-kostas-go').disabled = false; el('hp-kostas-err').hidden = true;
+      el('hp-kostas-go').onclick = function () {
+        el('hp-kostas-go').disabled = true; el('hp-kostas-err').hidden = true;
+        agReopen(null, function (m) { el('hp-kostas-err').textContent = m; el('hp-kostas-err').hidden = false; el('hp-kostas-go').disabled = false; })
+          .then(function (ok) { if (ok) { el('hp-kostas-go').disabled = false; } });
+      };
+    } catch (e) { /* ο βοηθός δεν είναι φορτωμένος — η φόρμα δουλεύει κανονικά */ }
     el('hp-topic').value = '';
     el('hp-ticket').textContent = '—';
     el('hp-note').hidden = true;
@@ -5901,7 +5912,7 @@
      φεύγουν ποτέ από τη συσκευή. Η φωτογραφία φεύγει μόνο για την τρέχουσα
      ερώτηση και δεν αποθηκεύεται πουθενά. */
   var AG_PUBLIC = false;
-  var AG = { on: 'km_agent_on', ok: 'km_agent_ok', sid: 'km_agent_sid', log: 'km_agent_log', gone: 'km_agent_gone' };
+  var AG = { on: 'km_agent_on', ok: 'km_agent_ok', sid: 'km_agent_sid', log: 'km_agent_log', gone: 'km_agent_gone', grant: 'km_agent_grant' };
   var AG_SECRET = [/\bAIza[0-9A-Za-z_-]{30,}/, /\bAQ\.[0-9A-Za-z_-]{20,}/, /\bsk-ant-[0-9A-Za-z_-]{20,}/];
   var agImg = null, agBusy = false;
   /* v100 · μικρογραφίες ΜΟΝΟ στη μνήμη της σελίδας (κλειδί k στο μήνυμα)· ποτέ σε localStorage/server. */
@@ -5923,8 +5934,12 @@
   function agDone() {
     try { return !!localStorage.getItem(LS.reg) && !!(localStorage.getItem(LS.key) || localStorage.getItem(LS.skip)); } catch (e) { return false; }
   }
+  /* v106 · ΑΔΕΙΑ ΕΠΑΝΑΝΟΙΓΜΑΤΟΣ (ραντεβού με email ή «Μίλα με τον Κώστα» στην Υποστήριξη): ο server τη
+     δίνει και την επιβάλλει· εδώ κρατάμε μόνο ως πότε ισχύει, για να φανεί το κουμπί. */
+  function agGrantOn() { return Number(agLS(AG.grant) || 0) > Date.now(); }
   function agEnabled() {
     if (/[?&]chat=1(&|$)/.test(location.search)) { agLS(AG.on, '1'); }
+    if (agGrantOn()) { return true; }
     if (agDone()) { return false; }
     return AG_PUBLIC || agLS(AG.on) === '1';
   }
@@ -5947,7 +5962,7 @@
     el('ag').hidden = false; el('ag-fab').hidden = true;
     if (agLS(AG.ok) === '1') { agShowChat(); } else { el('ag-consent').hidden = false; el('ag-log').hidden = true; el('ag-form').hidden = true; }
   }
-  function agClose() { el('ag').hidden = true; el('ag-fab').hidden = agDone() || agLS(AG.gone) === '1'; }
+  function agClose() { el('ag').hidden = true; el('ag-fab').hidden = agGrantOn() ? false : (agDone() || agLS(AG.gone) === '1'); }
   var AG_ERR = {
     secret: 'Αυτό μοιάζει με τις 12 λέξεις ή με κλειδί — ΔΕΝ το στείλαμε. Μην το στέλνεις σε κανέναν, ούτε σε εμάς.',
     too_many: 'Πολλά μηνύματα σε λίγη ώρα — δοκίμασε ξανά σε λίγο.',
@@ -5956,7 +5971,11 @@
     unavailable: 'Ο βοηθός δεν είναι διαθέσιμος αυτή τη στιγμή. Γράψε μας στο support@fastwrite.tech.',
     provider: 'Κάτι πήγε στραβά — δοκίμασε ξανά σε λίγο, ή γράψε μας στο support@fastwrite.tech.',
     offline: 'Χωρίς σύνδεση — ο βοηθός θέλει ίντερνετ.',
-    onboarded: 'Ο βοηθός είναι για την εγκατάσταση — εδώ έχεις ήδη τελειώσει. Για οτιδήποτε άλλο: ☰ Μενού → «Υποστήριξη».'
+    onboarded: 'Ο βοηθός είναι για την εγκατάσταση — εδώ έχεις ήδη τελειώσει. Για οτιδήποτε άλλο: ☰ Μενού → «Υποστήριξη».',
+    expired: 'Ο σύνδεσμος του email έληξε. Όποτε θες: ☰ Μενού → «Υποστήριξη» → «Μίλα με τον Κώστα».',
+    used: 'Αυτός ο σύνδεσμος έχει ήδη χρησιμοποιηθεί. Όποτε θες: ☰ Μενού → «Υποστήριξη» → «Μίλα με τον Κώστα».',
+    month_limit: 'Έχουμε ήδη μιλήσει 2 φορές αυτόν τον μήνα. Γράψε μας εδώ, στη φόρμα — θα σου απαντήσει άνθρωπος.',
+    no_account: 'Για να μιλήσεις ξανά με τον Κώστα, άνοιξε το Kostometro από το εικονίδιο όπου έχεις τον λογαριασμό σου.'
   };
   function agPick(f) {
     if (!f) { return; }
@@ -6005,13 +6024,16 @@
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (j) {
         if (j && j.sid) { agLS(AG.sid, j.sid); }
-        if (j && j.error === 'onboarded') { agLS(AG.gone, '1'); }   // v102 · ο server είπε «τέλειωσες»
+        if (j && j.error === 'onboarded') { agLS(AG.gone, '1'); agLS(AG.grant, null); }   // v102 · ο server είπε «τέλειωσες»
+        if (j && j.limit) { agLS(AG.grant, null); }
         if (j && j.ok && j.reply) { agPush('a', j.reply); } else { agPush('s', AG_ERR[j && j.error] || AG_ERR.provider); }
       }, function () { agPush('s', AG_ERR.offline); })
       .then(function () { agBusy = false; el('ag-send').disabled = false; });
   }
+  var agInited = false;
   function agInit() {
-    if (!el('ag-fab') || !agEnabled() || agLS(AG.gone) === '1') { return; }
+    if (agInited || !el('ag-fab') || !agEnabled() || (agLS(AG.gone) === '1' && !agGrantOn())) { return; }
+    agInited = true;
     el('ag-fab').hidden = false;
     el('ag-fab').onclick = agOpen;
     el('ag-x').onclick = agClose;
@@ -6026,6 +6048,36 @@
     if (/[?&]chat=1(&|$)/.test(location.search)) { agOpen(); }
   }
   try { agInit(); } catch (e) {}
+  /* v106 · ΞΑΝΑΝΟΙΓΜΑ: token από το email του ραντεβού (?reopen=…) ή κουμπί στην Υποστήριξη (χωρίς token).
+     Νέα συζήτηση στον server (καινούριο sid)· το παλιό ιστορικό της εγκατάστασης σβήνει από την οθόνη. */
+  function agReopen(token, onErr) {
+    var id = ''; try { id = localStorage.getItem(LS.id) || ''; } catch (e) {}
+    return fetch(KM_API + 'agent/reopen', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ install_id: id, token: token || undefined }) })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.ok && j.until) {
+          agLS(AG.grant, String(Date.parse(j.until) || (Date.now() + 3600000)));
+          agLS(AG.gone, null); agLS(AG.sid, null); agLS(AG.log, null);
+          agInit(); agOpen();
+          agPush('s', 'Καλώς ήρθες ξανά! Μία συζήτηση, έως ' + (j.msgs || 20) + ' μηνύματα.');
+          return true;
+        }
+        var m = AG_ERR[j && j.error] || AG_ERR.provider;
+        if (onErr) { onErr(m); }
+        return false;
+      }, function () { if (onErr) { onErr(AG_ERR.offline); } return false; });
+  }
+  /* Το install_id γράφεται στο boot· σε πρώτη επίσκεψη (π.χ. Safari από το email) περιμένουμε έως 10″. */
+  function agReopenFromUrl(tries) {
+    var m = /[?&]reopen=([0-9a-f]{32})(&|$)/.exec(location.search);
+    if (!m) { return; }
+    var id = ''; try { id = localStorage.getItem(LS.id) || ''; } catch (e) {}
+    if (!id && (tries || 0) < 40) { setTimeout(function () { agReopenFromUrl((tries || 0) + 1); }, 250); return; }
+    try { history.replaceState(null, '', location.pathname + location.search.replace(/([?&])reopen=[0-9a-f]{32}(&|$)/, '$1').replace(/[?&]$/, '') + location.hash); } catch (e) {}
+    agReopen(m[1], function (msg) { agLS(AG.on, '1'); agInit(); if (el('ag')) { agOpen(); agPush('s', msg); } });
+  }
+  try { agReopenFromUrl(0); } catch (e) {}
 
   checkVersion(false);   // v30 — πρώτο πράγμα σε κάθε φόρτωση
   openDB().then(boot).then(function () { schedule(800); maybeInstall(); }).catch(function (e) {

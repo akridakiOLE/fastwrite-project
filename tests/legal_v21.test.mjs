@@ -25,7 +25,7 @@ const ok = (c, m) => { if (!c) throw new Error(m); };
 const num = (re) => { const m = re.exec(src); if (!m) throw new Error("δεν βρέθηκε στον κώδικα: " + re); return Number(m[1]); };
 
 check("Π-1 · δομή: ελληνικά, v2.1, 1/10/2026, όλες οι ενότητες και οι άγκυρες", () => {
-  ok(/<html lang="el">/.test(html) && html.includes("Έκδοση 2.1") && html.includes("1 Οκτωβρίου 2026"), "κεφαλίδα");
+  ok(/<html lang="el">/.test(html) && html.includes("Έκδοση 2.2") && html.includes("1 Οκτωβρίου 2026"), "κεφαλίδα");
   for (const id of ["a1", "a2", "kostometro", "aa1", "aa2", "aa6", "aa7", "aa8", "fastwrite-desktop", "istotopos", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]) ok(html.includes('id="' + id + '"'), "άγκυρα " + id);
   ok(/<p class="legal-lang"><strong>English:<\/strong>[^<]*<a href="\/legal\/privacy-en">/.test(html), "σύνδεσμος στο αγγλικό");
 });
@@ -52,7 +52,7 @@ check("Π-4 · 🔴 λέει την αλήθεια για: προώθηση στ
   ok(/μη αναστρέψιμο αποτύπωμα, χωρίς email/.test(html) && /sha256hex\(inst \+ ":" \+ \(env\.KM_ADMIN_KEY/.test(src), "χωνί");
 });
 check("Π-5 · το αγγλικό v1.2 μένει στο /legal/privacy-en με σημείωση προς το νέο", () => {
-  ok(/<html lang="en">/.test(en) && en.includes("Notice (1 October 2026)") && /is in Greek at <a href="\/legal\/privacy">/.test(en) && en.includes("v2.1"), "privacy-en");
+  ok(/<html lang="en">/.test(en) && en.includes("Notice (1 October 2026)") && /is in Greek at <a href="\/legal\/privacy">/.test(en) && en.includes("v2.2"), "privacy-en");
 });
 if (ONLY) { if (failed) { console.log("Μ" + ONLY + " → κοκκίνισε ✔"); process.exit(0); } console.log("Μ" + ONLY + " ΠΕΡΑΣΕ — το τεστ δεν πιάνει τίποτα"); process.exit(1); }
 console.log(failed ? "ΑΠΕΤΥΧΑΝ " + failed : "✔ ΟΛΑ ΠΕΡΑΣΑΝ (5)"); process.exit(failed ? 1 : 0);

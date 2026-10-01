@@ -8,14 +8,14 @@ const ONLY = (() => { const a = process.argv.find((x) => x.startsWith("--mutate=
 let src = readFileSync("src/km.js", "utf8");
 let js = readFileSync("site/kostometro/app.js", "utf8");
 const MUT = [
-  ["src", "  if (!warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: \"onboarded\" }, 403);\n", ""], // 1 · 🔴 απαντά σε ολοκληρωμένους
+  ["src", "  if (!grant && !warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: \"onboarded\" }, 403);\n", ""], // 1 · 🔴 απαντά σε ολοκληρωμένους
   ["src", "  if (!st.includes(\"account\")) return true;", "  if (!st.includes(\"account\")) return false;"],   // 2 · 🔴 παλιοί χρήστες (πριν το χωνί) ξεφεύγουν
   ["src", "  const warm = sess.last_at &&", "  const warm = false &&"],                                               // 3 · κόβει ανοιχτή συζήτηση στη μέση
   ["src", "  if (life && life.msgs >= AGENT_DEV_MAX)", "  if (false)"],                                                   // 4 · 🔴 χωρίς όριο ζωής
   ["src", "    env.DB.prepare(\"INSERT INTO km_agent_devices", "    null && env.DB.prepare(\"INSERT INTO km_agent_devices"], // 5 · 🔴 ο μετρητής δεν μετράει
   ["js", "    if (agDone()) { return false; }\n", ""],                                                                   // 6 · 🔴 κουμπί μένει μετά την εγγραφή
   ["src", "  const r4 = await env.DB.prepare(\"DELETE FROM km_agent_devices WHERE last_at < ?\").bind(m24).run();", "  const r4 = null;"], // 7 · μετρητής κρατιέται για πάντα
-  ["js", "        if (j && j.error === 'onboarded') { agLS(AG.gone, '1'); }", "        if (false) { agLS(AG.gone, '1'); }"], // 8 · άρνηση server δεν κρύβει το κουμπί
+  ["js", "        if (j && j.error === 'onboarded') { agLS(AG.gone, '1'); agLS(AG.grant, null); }", "        if (false) { agLS(AG.gone, '1'); }"], // 8 · άρνηση server δεν κρύβει το κουμπί
 ];
 if (ONLY) { const m = MUT[ONLY - 1]; if (!m) process.exit(2); const bag = { src, js };
   if (!bag[m[0]].includes(m[1])) { console.log("Μ" + ONLY + " ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ"); process.exit(3); }
@@ -100,8 +100,8 @@ await check("Ν102-7 · 🔴 εφαρμογή: μετά την εγγραφή (�
 });
 await check("Ν102-8 · άρνηση του server («onboarded») σβήνει το 💬 οριστικά από τη συσκευή", async () => {
   const send = slice("  function agSend(e) {", "  function agInit() {");
-  ok(send.includes("if (j && j.error === 'onboarded') { agLS(AG.gone, '1'); }"), "δεν γράφει gone");
-  ok(/if \(!el\('ag-fab'\) \|\| !agEnabled\(\) \|\| agLS\(AG\.gone\) === '1'\) \{ return; \}/.test(js), "agInit αγνοεί gone");
+  ok(send.includes("if (j && j.error === 'onboarded') { agLS(AG.gone, '1'); agLS(AG.grant, null); }"), "δεν γράφει gone");   // v106: + σβήνει την άδεια
+  ok(js.includes("if (agInited || !el('ag-fab') || !agEnabled() || (agLS(AG.gone) === '1' && !agGrantOn())) { return; }"), "agInit αγνοεί gone");
   ok(/function agClose\(\) \{[^}]*agDone\(\) \|\| agLS\(AG\.gone\) === '1'/.test(js), "agClose ξαναδείχνει το κουμπί");
 });
 if (ONLY) { if (failed) { console.log("Μ" + ONLY + " → κοκκίνισε ✔"); process.exit(0); } console.log("Μ" + ONLY + " ΠΕΡΑΣΕ — το τεστ δεν πιάνει τίποτα"); process.exit(1); }

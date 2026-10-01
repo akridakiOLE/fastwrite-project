@@ -20,7 +20,7 @@
 // GDPR: δεν αποθηκεύεται IP. Μόνο χώρα (Cloudflare) και user-agent.
 // ---------------------------------------------------------------------------
 
-import { handleKm, kmCleanup, kmDeleteDue, kmSupportPrune, kmAgentPrune } from "./km.js";
+import { handleKm, kmCleanup, kmDeleteDue, kmSupportPrune, kmAgentPrune, kmAgentFollowups } from "./km.js";
 
 const V = 3; // έκδοση ερωτηματολογίου
 
@@ -63,6 +63,11 @@ export default {
     ctx.waitUntil(kmSupportPrune(env).then(
       (r) => console.log("km support-prune:", JSON.stringify(r)),
       (e) => console.error("km support-prune failed:", e)
+    ));
+    // v106 · ραντεβού επανασύνδεσης του Κώστα — ωριαίο, για να φεύγει την ώρα που υποσχέθηκε
+    ctx.waitUntil(kmAgentFollowups(env).then(
+      (r) => console.log("km agent-followups:", JSON.stringify(r)),
+      (e) => console.error("km agent-followups failed:", e)
     ));
   },
 

@@ -81,7 +81,7 @@ await check("Ν105-4 · ο builder βάζει πακέτο + «Κάλεσε» κ
   ok(build.includes("if len(s) > 60000:"), "όριο μεγέθους");
 });
 await check("Ν105-5 · το v102 μένει: μετά την εγκατάσταση (λογαριασμός + κλειδί) ο Κώστας ΔΕΝ ανοίγει νέα συζήτηση", async () => {
-  ok(src.includes("if (!warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: \"onboarded\" }, 403);"), "πόρτα v102");
+  ok(src.includes("if (!grant && !warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: \"onboarded\" }, 403);"), "πόρτα v102 (+ v106 άδεια)");
   ok(src.includes("const AGENT_DEV_MAX = 30;"), "όριο ζωής");
 });
 await check("Ν105-6 · 🔴 απάντηση που κόπηκε στο όριο tokens: φτάνει στον πελάτη ΜΕΧΡΙ την τελευταία ολόκληρη πρόταση · όριο 1000", async () => {

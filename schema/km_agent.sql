@@ -48,3 +48,41 @@ CREATE TABLE IF NOT EXISTS km_agent_devices (
   last_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_km_agent_devices_last ON km_agent_devices(last_at);
+
+-- v106 (1/10/2026) · ΡΑΝΤΕΒΟΥ ΕΠΑΝΑΣΥΝΔΕΣΗΣ — Πολιτική §Α8 (v2.2, έγκριση Stavros 1/10/2026).
+-- Γράφεται ΜΟΝΟ αφού ο χρήστης πει ρητά «ναι» στον Κώστα (εργαλείο schedule_followup). ΕΝΑ email τη
+-- μέρα due_at (ωριαίο cron), στο email του ΛΟΓΑΡΙΑΣΜΟΥ (km_accounts) — δεν αντιγράφεται εδώ.
+-- Ο σύνδεσμος κρατιέται ΜΟΝΟ ως hash (token_hash) και λήγει σε 14 ημέρες. consent_text = τι απάντησε.
+-- Τήρηση: 24 μήνες από τη δημιουργία (kmAgentPrune) — ως απόδειξη της συγκατάθεσης.
+CREATE TABLE IF NOT EXISTS km_agent_followups (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  folder_id    TEXT NOT NULL,
+  dev          TEXT NOT NULL,
+  created      TEXT NOT NULL,
+  due_at       TEXT NOT NULL,
+  consent_text TEXT,
+  sent_at      TEXT,
+  sent_ok      INTEGER,
+  token_hash   TEXT,
+  token_exp    TEXT,
+  used_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_km_agent_followups_due ON km_agent_followups(sent_at, due_at);
+CREATE INDEX IF NOT EXISTS idx_km_agent_followups_folder ON km_agent_followups(folder_id, created);
+CREATE INDEX IF NOT EXISTS idx_km_agent_followups_token ON km_agent_followups(token_hash);
+
+-- v106 · ΑΔΕΙΑ ΕΠΑΝΑΝΟΙΓΜΑΤΟΣ: μία συζήτηση (έως AGENT_GRANT_MSGS μηνύματα, AGENT_GRANT_HOURS ώρες) σε
+-- συσκευή που έχει τελειώσει την εγκατάσταση. Από το email του ραντεβού (via='mail') ή από την
+-- Υποστήριξη (via='support', έως AGENT_REOPEN_MONTH τον μήνα ανά λογαριασμό). folder_id NULL = άνοιξε
+-- από browser χωρίς λογαριασμό (π.χ. Safari στο iPhone) με το token του email.
+CREATE TABLE IF NOT EXISTS km_agent_grants (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  dev         TEXT NOT NULL,
+  folder_id   TEXT,
+  via         TEXT NOT NULL,
+  granted_at  TEXT NOT NULL,
+  expires_at  TEXT NOT NULL,
+  msgs_left   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_km_agent_grants_dev ON km_agent_grants(dev, expires_at);
+CREATE INDEX IF NOT EXISTS idx_km_agent_grants_folder ON km_agent_grants(folder_id, granted_at);

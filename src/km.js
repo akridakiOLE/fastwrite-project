@@ -115,6 +115,7 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/email/verify" && method === "POST") return emailVerify(request, env);
   // KM-AGENT (29/9/2026) — Βοηθός Kostometro, Φάση 1
   if (path === "/api/km/agent/chat" && method === "POST") return agentChat(request, env);
+  if (path === "/api/km/agent/reopen" && method === "POST") return agentReopen(request, env);
   // KM-OAUTH (29/9/2026) — Σύνδεση με Google / Microsoft
   { const m = /^\/api\/km\/auth\/(google|microsoft)\/(start|callback)$/.exec(path);
     if (m && method === "GET") return m[2] === "start" ? oauthStart(request, env, m[1]) : oauthCallback(request, env, m[1]); }
@@ -1174,6 +1175,29 @@ const AGENT_TOPIC = "Κώστας · βοηθός Kostometro";   // v104 · το
 const AGENT_DEV_MAX = 30;
 const AGENT_MAX_OUT = 1000;   // v105 · ήταν 700: τα ελληνικά «τρώνε» tokens και οι απαντήσεις κόβονταν
 const AGENT_GRACE_MS = 2 * 3600 * 1000;
+// KM-SERVER-V106-RANTEVOU (1/10/2026) · ΡΑΝΤΕΒΟΥ ΕΠΑΝΑΣΥΝΔΕΣΗΣ — Πολιτική v2.2 §Α8, έγκριση Stavros.
+//   · «Ναι» στον Κώστα → schedule_followup → ΕΝΑ email τη μέρα του ραντεβού (ωριαίο cron, kmAgentFollowups)
+//     με σύνδεσμο ?reopen=<token>· token μόνο ως hash, λήγει σε 14 ημέρες.
+//   · Ο σύνδεσμος — ή το κουμπί «Μίλα με τον Κώστα» στην Υποστήριξη — δίνει ΑΔΕΙΑ: μία συζήτηση, έως
+//     AGENT_GRANT_MSGS μηνύματα μέσα σε AGENT_GRANT_HOURS. Από την Υποστήριξη έως AGENT_REOPEN_MONTH φορές
+//     τον μήνα ανά ΛΟΓΑΡΙΑΣΜΟ (folder_id — όχι ανά συσκευή, αλλιώς 6 συσκευές PRO = 6× το όριο).
+//   · Η άδεια είναι η ΔΕΥΤΕΡΗ ΠΟΡΤΑ που προέβλεπε το v102 — δικό της όριο, όχι εξαίρεση στην πρώτη.
+const AGENT_GRANT_MSGS = 20;
+const AGENT_GRANT_HOURS = 24;
+const AGENT_REOPEN_MONTH = 2;
+const AGENT_FOLLOWUP_LINK_DAYS = 14;
+const AGENT_FOLLOWUP_BATCH = 200;
+async function agentFolder(env, inst) {
+  const r = await env.DB.prepare(
+    "SELECT folder_id FROM km_devices WHERE install_id = ? UNION ALL SELECT folder_id FROM km_device_links WHERE install_id = ? LIMIT 1"
+  ).bind(inst, inst).first();
+  return (r && r.folder_id) || null;
+}
+// Η τελευταία άδεια της συσκευής που δεν έχει λήξει (ακόμα κι αν τελείωσαν τα μηνύματά της).
+async function agentGrantOf(env, dev, t) {
+  return env.DB.prepare("SELECT id, via, msgs_left, expires_at FROM km_agent_grants WHERE dev = ? AND expires_at > ? ORDER BY id DESC LIMIT 1")
+    .bind(dev, t).first();
+}
 export async function agentOnboarded(env, inst, dev) {
   const acct = await env.DB.prepare(
     "SELECT 1 AS x FROM km_devices WHERE install_id = ? UNION ALL SELECT 1 AS x FROM km_device_links WHERE install_id = ? LIMIT 1"
@@ -1241,6 +1265,9 @@ const AGENT_RULES = [
   "ΤΙΜΕΣ: ΚΑΜΙΑ τιμή για PRO ή FastWrite — ούτε ενδεικτική, ούτε «περίπου» — και ΚΑΜΙΑ ημερομηνία. Αν ρωτηθείς: οι τιμές θα ανακοινωθούν όταν βγει το PRO και όσοι έχουν ήδη το Kostometro το μαθαίνουν πρώτοι· αυτό που κατεβάζει σήμερα είναι δωρεάν χωρίς όριο χρόνου. Τα παραδείγματα οφέλους είναι ΥΠΟΘΕΤΙΚΑ και το λες· ποτέ υπόσχεση κέρδους. Ό,τι ζητά δέσμευση (έκπτωση, προσφορά, κλείδωμα τιμής) → άνθρωπος.",
   "ΙΣΤΟΡΙΑ: την ιστορία του ανθρώπου που έφτιαξε το Kostometro τη λες σε ΤΡΙΤΟ πρόσωπο, το πολύ μία φορά, μόνο με όσα γράφει η ΓΝΩΣΗ — ποτέ σαν δική σου εμπειρία (είσαι AI).",
   "ΛΟΓΙΣΤΗΣ: αν μιλάς με λογιστή που ενδιαφέρεται για συνεργασία, λες μόνο όσα γράφει η ΓΝΩΣΗ, δεν διαπραγματεύεσαι όρους· ζητάς το email του και καλείς handoff_to_human με περίληψη που αρχίζει «Συνεργασία λογιστή:».",
+  // KM-SERVER-V106-RANTEVOU
+  "ΡΑΝΤΕΒΟΥ: όταν η ΚΑΤΑΣΤΑΣΗ δείχνει account ΚΑΙ (key ή key_skip), δεν υπάρχει ήδη ραντεβού και δεν είσαι σε ΕΠΑΝΑΣΥΝΔΕΣΗ: αφού πεις για το πληρωμένο κλειδί, ρώτα ΜΙΑ φορά «Θες να τα ξαναπούμε σε μια βδομάδα, να μου πεις πώς πάει; Θα σου έρθει ένα email με σύνδεσμο.» Καλείς schedule_followup ΜΟΝΟ αν απαντήσει ρητά ναι (days=7, ή όσες μέρες πει, 3–14). Αν πει όχι ή δεν απαντήσει: «Όποτε θες, ☰ Μενού → «Υποστήριξη» → «Μίλα με τον Κώστα».» — και δεν ξαναρωτάς.",
+  "ΕΠΑΝΑΣΥΝΔΕΣΗ: αν η ΚΑΤΑΣΤΑΣΗ λέει ΕΠΑΝΑΣΥΝΔΕΣΗ: ΝΑΙ, ο χρήστης έχει ήδη το Kostometro. Ρώτα πώς πάει, τι τον δυσκόλεψε, τι θα ήθελε να κάνει η εφαρμογή· βοήθησε με ό,τι ξέρεις· στο τέλος ευχαρίστησέ τον και πες ότι τα σχόλιά του τα διαβάζει η ομάδα. Δεν προτείνεις νέο ραντεβού.",
   "ΜΙΛΑΣ ΜΟΝΟ για το Kostometro / FastWrite. Για οτιδήποτε άλλο: ευγενική άρνηση σε μία πρόταση και επιστροφή στο θέμα.",
   "ΛΕΣ ΜΟΝΟ ό,τι υπάρχει στη ΓΝΩΣΗ πιο κάτω. Δεν υπόσχεσαι λειτουργίες που δεν γράφονται εκεί· για PRO / FastWrite λες ότι σχεδιάζονται. Αν δεν ξέρεις, το λες και προτείνεις άνθρωπο.",
   "🔴 ΠΟΤΕ δεν ζητάς, δεν δέχεσαι, δεν επαναλαμβάνεις τις 12 λέξεις ή κλειδί (Gemini/API). ΠΡΙΝ από κάθε βήμα που τα εμφανίζει λες: «μη μου στείλεις αυτή την οθόνη». Αν τα δεις σε εικόνα ή κείμενο: ΜΗΝ τα γράψεις, πες στον χρήστη να σβήσει τη φωτογραφία, και για κλειδί να το διαγράψει (AI Studio → API Keys → ⋮ → Delete) και να φτιάξει νέο.",
@@ -1256,7 +1283,31 @@ const AGENT_TOOLS = [{
     email: { type: "string", description: "Το email του χρήστη, όπως το έδωσε." },
     summary: { type: "string", description: "Μία-δύο προτάσεις: τι θέλει και πού κόλλησε." },
   }, required: ["email", "summary"] },
+}, {
+  name: "schedule_followup",
+  description: "Κλείνει ραντεβού επανασύνδεσης: σε `days` ημέρες φεύγει ΕΝΑ email στο email του λογαριασμού με σύνδεσμο που ξανανοίγει τον Κώστα για μία συζήτηση. ΜΟΝΟ αφού ο χρήστης έχει λογαριασμό ΚΑΙ είπε ρητά «ναι» σε αυτή την ερώτηση.",
+  input_schema: { type: "object", properties: {
+    days: { type: "integer", description: "Σε πόσες ημέρες (3–14). Προεπιλογή 7." },
+  }, required: ["days"] },
 }];
+
+// v106 · «ναι» στο ραντεβού. Το email ΔΕΝ αντιγράφεται: διαβάζεται από τον λογαριασμό τη μέρα της αποστολής
+// (αν στο μεταξύ σβήσει ο λογαριασμός, δεν φεύγει τίποτα). Ένα εκκρεμές ραντεβού ανά λογαριασμό.
+async function agentFollowup(env, inst, dev, input, said) {
+  const folder = await agentFolder(env, inst);
+  const acct = folder ? await env.DB.prepare("SELECT 1 AS x FROM km_accounts WHERE folder_id = ? AND deleted IS NULL").bind(folder).first() : null;
+  if (!acct) return { ok: false, error: "no_account", note: "Το ραντεβού κλείνεται μόνο αφού ολοκληρωθεί η εγγραφή." };
+  const pend = await env.DB.prepare("SELECT due_at FROM km_agent_followups WHERE folder_id = ? AND sent_at IS NULL ORDER BY id DESC LIMIT 1").bind(folder).first();
+  if (pend) return { ok: true, already: true, due: pend.due_at.slice(0, 10) };
+  let days = Math.round(Number(input && input.days));
+  if (!Number.isFinite(days)) days = 7;
+  days = Math.max(3, Math.min(14, days));
+  const t = now();
+  const due = new Date(Date.now() + days * 86400000).toISOString();
+  await env.DB.prepare("INSERT INTO km_agent_followups (folder_id, dev, created, due_at, consent_text) VALUES (?, ?, ?, ?, ?)")
+    .bind(folder, dev, t, due, String(said || "").slice(0, 300)).run();
+  return { ok: true, due: due.slice(0, 10), days };
+}
 
 async function agentCall(env, body) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1341,9 +1392,13 @@ async function agentChat(request, env) {
   const done = (reply, extra) => json(Object.assign({ ok: true, sid: sess.id, reply, ticket: sess.ticket || null }, extra || {}));
   // v102 · πόρτα 1 — μόνο πριν ολοκληρωθεί η εγγραφή (ή ανοιχτή συζήτηση που δεν έχει κρυώσει).
   const warm = sess.last_at && (Date.now() - new Date(sess.last_at).getTime()) < AGENT_GRACE_MS && sess.turns > 0;
-  if (!warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: "onboarded" }, 403);
-  // v102 · όριο ζωής ανά συσκευή.
-  const life = await env.DB.prepare("SELECT msgs FROM km_agent_devices WHERE dev = ?").bind(dev).first();
+  // v106 · πόρτα 2 — άδεια επανανοίγματος (email ραντεβού ή Υποστήριξη), με δικό της όριο μηνυμάτων.
+  const g = await agentGrantOf(env, dev, now());
+  const grant = g && g.msgs_left > 0 ? g : null;
+  if (g && !grant) return done("Αυτή η συζήτηση ολοκληρώθηκε — ευχαριστώ που τα είπαμε! Για οτιδήποτε άλλο: ☰ Μενού → «Υποστήριξη».", { limit: true });
+  if (!grant && !warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: "onboarded" }, 403);
+  // v102 · όριο ζωής ανά συσκευή (ισχύει για την πόρτα 1· η άδεια έχει το δικό της).
+  const life = grant ? null : await env.DB.prepare("SELECT msgs FROM km_agent_devices WHERE dev = ?").bind(dev).first();
   if (life && life.msgs >= AGENT_DEV_MAX) return done("Έφτασες το όριο του βοηθού εγκατάστασης. Για οτιδήποτε άλλο γράψε μας από ☰ Μενού → «Υποστήριξη» ή στο support@fastwrite.tech — θα σου απαντήσει άνθρωπος.", { limit: true });
   if (sess.turns >= AGENT_MAX_TURNS) return done("Η συζήτηση έγινε πολύ μεγάλη για μένα. Γράψε μας στο support@fastwrite.tech — θα σου απαντήσει άνθρωπος.", { limit: true });
 
@@ -1357,7 +1412,7 @@ async function agentChat(request, env) {
       .bind(sess.id, (img ? "[εικόνα] " : "") + text, t),
     env.DB.prepare("INSERT INTO km_agent_devices (dev, msgs, first_at, last_at) VALUES (?, 1, ?, ?) ON CONFLICT(dev) DO UPDATE SET msgs = msgs + 1, last_at = excluded.last_at")
       .bind(dev, t, t),
-  ]);
+  ].concat(grant ? [env.DB.prepare("UPDATE km_agent_grants SET msgs_left = msgs_left - 1 WHERE id = ?").bind(grant.id)] : []));
 
   // Ιστορικό: εναλλαγή user/assistant (το API την απαιτεί) — διαδοχικά ίδιου ρόλου ενώνονται.
   const hist = ((await env.DB.prepare("SELECT role, body FROM km_agent_messages WHERE session_id = ? ORDER BY id DESC LIMIT ?")
@@ -1376,8 +1431,12 @@ async function agentChat(request, env) {
   }
   let steps = [];
   try { steps = ((await env.DB.prepare("SELECT step FROM km_funnel WHERE dev = ?").bind(dev).all()).results || []).map((r) => r.step); } catch (e) {}
+  let fup = null;
+  try { const fo = await agentFolder(env, inst); if (fo) fup = await env.DB.prepare("SELECT due_at FROM km_agent_followups WHERE folder_id = ? AND sent_at IS NULL ORDER BY id DESC LIMIT 1").bind(fo).first(); } catch (e) {}
   const ctxLine = "ΚΑΤΑΣΤΑΣΗ ΣΥΣΚΕΥΗΣ (από το χωνί εγγραφής): " + (steps.length ? steps.join(", ") : "κανένα βήμα ακόμα") +
     " · προέλευση: " + (sess.src || "direct") + " · αίτημα: " + (sess.ticket || "κανένα") +
+    " · ΕΠΑΝΑΣΥΝΔΕΣΗ: " + (grant ? "ΝΑΙ (μέσω " + (grant.via === "mail" ? "email ραντεβού" : "Υποστήριξης") + ", απομένουν " + (grant.msgs_left - 1) + " μηνύματα)" : "όχι") +
+    " · ραντεβού: " + (fup ? "κλεισμένο για " + fup.due_at.slice(0, 10) : "κανένα") +
     ". Βήματα: open=άνοιξε · email=ζήτησε κωδικό · oauth_google/oauth_microsoft=πάτησε σύνδεση · code=email επιβεβαιώθηκε · account=λογαριασμός · key=έβαλε κλειδί Gemini · key_skip=το παρέλειψε.";
   const know = await agentKnowledge(env);
   const system = [
@@ -1398,7 +1457,9 @@ async function agentChat(request, env) {
       msgs.push({ role: "assistant", content: blocks });
       const results = [];
       for (const tu of uses) {
-        const out = tu.name === "handoff_to_human" ? await agentHandoff(env, sess, tu.input) : { ok: false, error: "unknown_tool" };
+        const out = tu.name === "handoff_to_human" ? await agentHandoff(env, sess, tu.input)
+          : tu.name === "schedule_followup" ? await agentFollowup(env, inst, dev, tu.input, text)
+          : { ok: false, error: "unknown_tool" };
         results.push({ type: "tool_result", tool_use_id: tu.id, content: JSON.stringify(out) });
       }
       msgs.push({ role: "user", content: results });
@@ -1426,6 +1487,96 @@ async function agentChat(request, env) {
 }
 
 // Ημερήσιο: 90 ημέρες χωρίς αίτημα · 24 μήνες με αίτημα · κόστος ημέρας 400 ημέρες.
+// v106 · POST /api/km/agent/reopen { install_id, token? } — δίνει ΑΔΕΙΑ μίας συζήτησης.
+//   token (από το email του ραντεβού): ισχύει 14 ημέρες, μία φορά, σε όποια συσκευή — αποδεικνύει ότι
+//     έλαβε το email (π.χ. Safari στο iPhone, που δεν βλέπει τον λογαριασμό του εικονιδίου).
+//   χωρίς token (κουμπί στην Υποστήριξη): μόνο συσκευή με λογαριασμό, έως AGENT_REOPEN_MONTH τον μήνα.
+async function agentReopen(request, env) {
+  if (!env.ANTHROPIC_API_KEY) return json({ ok: false, error: "unavailable" }, 503);
+  const b = (await safeJson(request)) || {};
+  const inst = clean(b.install_id, 64);
+  if (!inst || !DEVICE_ID.test(inst)) return json({ ok: false, error: "bad_request" }, 400);
+  const dev = await sha256hex(inst + ":" + (env.KM_ADMIN_KEY || ""));
+  const t = now();
+  const live = await agentGrantOf(env, dev, t);
+  if (live && live.msgs_left > 0) return json({ ok: true, until: live.expires_at, msgs: live.msgs_left, via: live.via });
+  const until = new Date(Date.now() + AGENT_GRANT_HOURS * 3600000).toISOString();
+  const folder = await agentFolder(env, inst);
+  const token = String(b.token || "");
+  if (token) {
+    if (!/^[0-9a-f]{32}$/.test(token)) return json({ ok: false, error: "expired" }, 410);
+    const f = await env.DB.prepare("SELECT id, used_at, token_exp FROM km_agent_followups WHERE token_hash = ?").bind(await sha256hex(token)).first();
+    if (!f || !f.token_exp || f.token_exp <= t) return json({ ok: false, error: "expired" }, 410);
+    if (f.used_at) return json({ ok: false, error: "used" }, 410);
+    const u = await env.DB.prepare("UPDATE km_agent_followups SET used_at = ? WHERE id = ? AND used_at IS NULL").bind(t, f.id).run();
+    if (!u || !u.meta || !u.meta.changes) return json({ ok: false, error: "used" }, 410);   // δύο κλικ ταυτόχρονα
+    await env.DB.prepare("INSERT INTO km_agent_grants (dev, folder_id, via, granted_at, expires_at, msgs_left) VALUES (?, ?, 'mail', ?, ?, ?)")
+      .bind(dev, folder, t, until, AGENT_GRANT_MSGS).run();
+    return json({ ok: true, until, msgs: AGENT_GRANT_MSGS, via: "mail" });
+  }
+  if (!folder) return json({ ok: false, error: "no_account" }, 403);
+  const month = t.slice(0, 7) + "-01T00:00:00.000Z";
+  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_agent_grants WHERE folder_id = ? AND via = 'support' AND granted_at >= ?").bind(folder, month).first();
+  if (n && n.n >= AGENT_REOPEN_MONTH) return json({ ok: false, error: "month_limit" }, 429);
+  await env.DB.prepare("INSERT INTO km_agent_grants (dev, folder_id, via, granted_at, expires_at, msgs_left) VALUES (?, ?, 'support', ?, ?, ?)")
+    .bind(dev, folder, t, until, AGENT_GRANT_MSGS).run();
+  return json({ ok: true, until, msgs: AGENT_GRANT_MSGS, via: "support" });
+}
+
+export function agentFollowupMail(token) {
+  const link = "https://fastwrite.tech/kostometro/?reopen=" + token;
+  const pol = "https://fastwrite.tech/legal/privacy#aa8";
+  const subject = "Ο Κώστας ρωτά: πώς πάει το Kostometro;";
+  const paras = [
+    "Γεια σου,",
+    "Πριν από λίγες μέρες στήσαμε μαζί το Kostometro και μου είπες ότι θέλεις να τα ξαναπούμε. Πώς πάει; Τι σε δυσκόλεψε, τι θα ήθελες να κάνει;",
+  ];
+  const after = [
+    "Ο σύνδεσμος ισχύει 14 ημέρες και ανοίγει μία συζήτηση. Αν ανοίξει σε λάθος συσκευή: άνοιξε το Kostometro από το εικονίδιο → ☰ Μενού → «Υποστήριξη» → «Μίλα με τον Κώστα».",
+    "Ο Κώστας είναι βοηθός τεχνητής νοημοσύνης (AI), όχι άνθρωπος.",
+  ];
+  const foot = "Το λαμβάνεις επειδή το ζήτησες στον Κώστα. Είναι ένα και μοναδικό — δεν θα λάβεις άλλο.";
+  const P = (x) => "<p style=\"margin:0 0 12px\">" + escHtml(x) + "</p>";
+  const html = "<div style=\"font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#1a1d21;max-width:560px\">" +
+    paras.map(P).join("") +
+    "<p style=\"margin:18px 0\"><a href=\"" + link + "\" style=\"background:#1f7a4d;color:#fff;text-decoration:none;padding:11px 18px;border-radius:8px;display:inline-block\">💬 Μίλα με τον Κώστα</a></p>" +
+    after.map(P).join("") +
+    "<p style=\"margin:18px 0 0;font-size:12px;color:#667\">" + escHtml(foot) + " <a href=\"" + pol + "\" style=\"color:#667\">Πολιτική απορρήτου</a></p></div>";
+  const text = paras.join("\n\n") + "\n\nΜίλα με τον Κώστα: " + link + "\n\n" + after.join("\n\n") + "\n\n--\n" + foot + "\nΠολιτική απορρήτου: " + pol;
+  return { subject, html, text };
+}
+
+// v106 · ωριαίο cron: στέλνει τα ραντεβού που έφτασαν. Το email διαβάζεται από τον λογαριασμό ΤΩΡΑ.
+export async function kmAgentFollowups(env, nowIso) {
+  const t = nowIso || now();
+  const rows = (await env.DB.prepare(
+    "SELECT f.id, a.email FROM km_agent_followups f LEFT JOIN km_accounts a ON a.folder_id = f.folder_id AND a.deleted IS NULL " +
+    "WHERE f.sent_at IS NULL AND f.due_at <= ? ORDER BY f.due_at LIMIT ?"
+  ).bind(t, AGENT_FOLLOWUP_BATCH).all()).results || [];
+  let sent = 0, skipped = 0, failed = 0;
+  for (const r of rows) {
+    const dest = normEmail(r.email);
+    if (!dest) { await env.DB.prepare("UPDATE km_agent_followups SET sent_at = ?, sent_ok = 0 WHERE id = ?").bind(t, r.id).run(); skipped++; continue; }
+    const token = randHex(16);
+    const exp = new Date(new Date(t).getTime() + AGENT_FOLLOWUP_LINK_DAYS * 86400000).toISOString();
+    // Πρώτα «κλείδωμα» της γραμμής (sent_at), μετά αποστολή: δύο cron ταυτόχρονα δεν στέλνουν δύο email.
+    const lock = await env.DB.prepare("UPDATE km_agent_followups SET sent_at = ?, token_hash = ?, token_exp = ? WHERE id = ? AND sent_at IS NULL")
+      .bind(t, await sha256hex(token), exp, r.id).run();
+    if (!lock || !lock.meta || !lock.meta.changes) continue;
+    const m = agentFollowupMail(token);
+    let ok = false, err = null, mid = null;
+    try {
+      if (!env.EMAIL || typeof env.EMAIL.send !== "function") throw new Error("no_binding");
+      const x = await env.EMAIL.send({ to: dest, from: MAIL_FROM, subject: m.subject, text: m.text, html: m.html });
+      ok = true; mid = x && x.messageId ? String(x.messageId) : null;
+    } catch (e) { err = String((e && e.message) || e).slice(0, 300); }
+    await env.DB.prepare("UPDATE km_agent_followups SET sent_ok = ? WHERE id = ?").bind(ok ? 1 : 0, r.id).run();
+    try { await env.DB.prepare("INSERT INTO km_mail_log (kind, ok, err, msg_id, at) VALUES ('agent_followup', ?, ?, ?, ?)").bind(ok ? 1 : 0, err, mid, t).run(); } catch (e) {}
+    if (ok) sent++; else failed++;
+  }
+  return { due: rows.length, sent, skipped, failed };
+}
+
 export async function kmAgentPrune(env, nowIso) {
   const base = nowIso ? new Date(nowIso).getTime() : Date.now();
   const d90 = new Date(base - 90 * 86400000).toISOString();
@@ -1437,8 +1588,11 @@ export async function kmAgentPrune(env, nowIso) {
   const r3 = await env.DB.prepare("DELETE FROM km_agent_daily WHERE day < ?").bind(d400).run();
   // v102 · ο μετρητής ζωής κρατιέται 24 μήνες από το τελευταίο μήνυμα (hash συσκευής, κανένα στοιχείο προσώπου).
   const r4 = await env.DB.prepare("DELETE FROM km_agent_devices WHERE last_at < ?").bind(m24).run();
+  // v106 · ραντεβού (απόδειξη συγκατάθεσης) και άδειες: 24 μήνες.
+  const r5 = await env.DB.prepare("DELETE FROM km_agent_followups WHERE created < ?").bind(m24).run();
+  const r6 = await env.DB.prepare("DELETE FROM km_agent_grants WHERE granted_at < ?").bind(m24).run();
   const n = (r) => (r && r.meta && r.meta.changes) || 0;
-  return { messages: n(r1), sessions: n(r2), days: n(r3), devices: n(r4) };
+  return { messages: n(r1), sessions: n(r2), days: n(r3), devices: n(r4), followups: n(r5), grants: n(r6) };
 }
 
 // «Υπάρχει αυτός ο κωδικός πρόσκλησης;» — ΜΟΝΟ ναι/όχι, κανένα στοιχείο του κατόχου.
