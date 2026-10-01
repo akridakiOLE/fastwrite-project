@@ -18,6 +18,20 @@ k = rd('site/kostometro/kleidi/index.html')
 k = re.sub(r'<script.*?</script>|<style.*?</style>|<!--.*?-->', '', k, flags=re.S)
 k = re.sub(r'\s+', ' ', txt(re.sub(r'</(p|li|h\d|div)>', '\n', k)))
 out += ['', '## ΟΔΗΓΟΣ ΚΛΕΙΔΙΟΥ GEMINI (fastwrite.tech/kostometro/kleidi/, αυτολεξεί)', k.strip()]
+# v105 · το πακέτο (πώληση οφέλους, ιστορία, τιμές, λογιστής) + η οθόνη «Κάλεσε» αυτολεξεί (PRO, FastWrite, επιβράβευση)
+out += ['', rd('tools/agent/pakketo_el.md').strip()]
+h = rd('site/kostometro/index.html')
+a = h.index('id="s-ref"'); b = h.index('<section', a + 10)
+r = h[a:b]
+r = r[r.index('ΤΙ ΕΡΧΕΤΑΙ'):] if 'ΤΙ ΕΡΧΕΤΑΙ' in r else r
+r = re.sub(r'<script.*?</script>|<style.*?</style>|<!--.*?-->|<select.*?</select>', '', r, flags=re.S)
+r = txt(re.sub(r'</(p|li|h\d|div)>', '\n', r))
+r = '\n'.join(x.strip() for x in r.split('\n') if x.strip() and x.strip() != '—')
+for cut in ('ΠΟΥ ΕΙΣΑΙ',):
+    if cut in r: r = r[:r.index(cut)].rstrip() + '\n' + r[r.index('Οι ενεργές συστάσεις ενεργοποιούνται'):] if 'Οι ενεργές συστάσεις ενεργοποιούνται' in r else r[:r.index(cut)]
+if 'ΤΟ FastWrite' not in r and 'FastWrite' not in r: raise SystemExit('Κάλεσε: δεν βρέθηκε η ενότητα FastWrite — κάτι άλλαξε στο index.html')
+if 'Η ΕΠΙΒΡΑΒΕΥΣΗ' not in r: raise SystemExit('Κάλεσε: δεν βρέθηκε η επιβράβευση — κάτι άλλαξε στο index.html')
+out += ['', '## ΤΙ ΕΡΧΕΤΑΙ — οθόνη «Κάλεσε» της εφαρμογής (☰ Μενού → «Κάλεσε»), αυτολεξεί', r]
 s = '\n'.join(out) + '\n'
 if n < 15: raise SystemExit('FAQ: βρέθηκαν μόνο %d ερωτήσεις — κάτι άλλαξε στο app.js' % n)
 if len(s) > 60000: raise SystemExit('η γνώση ξεπέρασε τους 60.000 χαρακτήρες')
