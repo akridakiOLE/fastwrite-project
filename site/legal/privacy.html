@@ -1,293 +1,381 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="el">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Privacy Policy — FastWrite</title>
+<title>Πολιτική Απορρήτου — FastWrite · Kostometro</title>
+<meta name="description" content="Πολιτική απορρήτου για το Kostometro, το FastWrite Desktop και τον ιστότοπο fastwrite.tech. Έκδοση 2.1, 1 Οκτωβρίου 2026." />
 <meta name="theme-color" content="#0a0e14" />
 <link rel="stylesheet" href="/style.css" />
+<style>
+.legal-page .legal-toc{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;margin:0 0 28px}
+.legal-page .legal-toc ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 14px}
+.legal-page .legal-toc li{margin:0;font-size:14px}
+.legal-page .legal-lang{font-size:14px;margin:-8px 0 20px}
+.legal-page table{display:block;overflow-x:auto;font-size:14px;max-width:100%}
+.legal-page th,.legal-page td{vertical-align:top;min-width:120px}
+.legal-page h2,.legal-page h3{scroll-margin-top:96px}
+</style>
 </head>
 <body>
-<header><div class="container"><div class="brand">Fast<span>Write</span></div><nav><ul><li><a href="/">Home</a></li><li><a href="/legal/privacy">Privacy</a></li><li><a href="/legal/terms">Terms</a></li><li><a href="mailto:support@fastwrite.tech">Contact</a></li></ul></nav></div></header>
+<header><div class="container"><div class="brand">Fast<span>Write</span></div><nav><ul><li><a href="/">Αρχική</a></li><li><a href="/kostometro/">Kostometro</a></li><li><a href="/legal/privacy">Απόρρητο</a></li><li><a href="/legal/terms">Όροι</a></li><li><a href="mailto:support@fastwrite.tech">Επικοινωνία</a></li></ul></nav></div></header>
 <main class="legal-page">
   <div class="container">
-    <h1>Privacy Policy</h1>
-    <div class="legal-meta">Effective Date: 11 June 2026 · Last Updated: 14 September 2026</div>
-    <p><strong>Effective Date:</strong> 11 June 2026
-<strong>Last Updated:</strong> 14 September 2026</p>
-<hr />
-<h2>1. Introduction</h2>
-<p>This Privacy Policy describes how <strong>FastWrite</strong> ("we", "us", or "our") collects, uses, and protects your information when you use the FastWrite desktop application and related services (the "Service").</p>
-<p>FastWrite is designed with <strong>privacy by default</strong>: your documents, extracted data, and API keys are stored locally on your computer and never transmitted to our servers. We collect the minimum information necessary to provide the Service.</p>
-<p>This Policy is written to comply with the General Data Protection Regulation (GDPR) and the UK Data Protection Act 2018, and applies to all users worldwide.</p>
-<p><strong>Did you fill in our Facebook form?</strong> If you gave us your name and email through our Facebook lead form, the information that applies to you is in <a href="#leadform">Section 15</a>, written in Greek.</p>
-<hr />
-<h2>2. Who We Are (Data Controller)</h2>
-<p><strong>Operator:</strong> Stavros Kallenos, operating as an individual (natural person) in Cyprus
-<strong>Brand:</strong> FastWrite
-<strong>Country of Establishment:</strong> Republic of Cyprus
-<strong>Registered Address:</strong> Derveneion 2B, 1055 Nicosia, Cyprus
-<strong>Contact Email for Privacy Matters:</strong> support@fastwrite.tech</p>
-<p>For GDPR purposes, we act as the <strong>data controller</strong> for the limited personal data we collect (see Section 3). For data you push to your own accounting platform (currently Xero; support for additional platforms such as QuickBooks is planned) through FastWrite, <strong>you remain the data controller</strong> and FastWrite is a transient data processor.</p>
-<p>Because FastWrite performs <strong>no server-side processing of your invoices, extracted data, or financial information</strong> — all such processing happens locally on your device under your own AI provider key (BYOK) — no separate Data Processing Agreement (DPA) is required for that content.</p>
-<hr />
-<h2>3. Information We Collect</h2>
-<h3>3.1 Information You Provide Directly</h3>
+    <h1>Πολιτική Απορρήτου</h1>
+    <div class="legal-meta">Έκδοση 2.1 · Ισχύει από 1 Οκτωβρίου 2026 · Kostometro · FastWrite Desktop · fastwrite.tech</div>
+    <p class="legal-lang"><strong>English:</strong> the previous policy (v1.2) for FastWrite Desktop remains available at <a href="/legal/privacy-en">/legal/privacy-en</a> until this text is translated.</p>
+    <nav class="legal-toc" aria-label="Περιεχόμενα"><ul>
+      <li><a href="#a1">1. Ποιοι είμαστε</a></li><li><a href="#a2">2. Με ποιον ρόλο</a></li>
+      <li><a href="#kostometro">Α. Kostometro</a></li><li><a href="#aa8">Α8. Ο βοηθός (AI)</a></li>
+      <li><a href="#fastwrite-desktop">Β. FastWrite Desktop</a></li><li><a href="#istotopos">Γ. Ιστότοπος, φόρμα, λίστα</a></li>
+      <li><a href="#a3">3. Υπεκτελούντες</a></li><li><a href="#a5">5. Πόσο κρατάμε τι</a></li>
+      <li><a href="#a6">6. Τα δικαιώματά σου</a></li><li><a href="#a7">7. Ασφάλεια και αντίγραφα</a></li>
+    </ul></nav>
+
+<h2 id="a1">1. Ποιοι είμαστε</h2>
+<p>Υπεύθυνος επεξεργασίας είναι ο <strong>Σταύρος Καλλένος</strong>, φυσικό πρόσωπο στην Κύπρο, που λειτουργεί με το εμπορικό σήμα FastWrite.</p>
+<ul>
+<li>Διεύθυνση: Δερβενίου 2Β, 1055 Λευκωσία, Κύπρος</li>
+<li>Email για θέματα προσωπικών δεδομένων: <strong>support@fastwrite.tech</strong></li>
+</ul>
+<p>Η πολιτική καλύπτει δύο προϊόντα και τις σελίδες μας στον ιστό:</p>
+<ul>
+<li><strong>Μέρος Α — Kostometro:</strong> η εφαρμογή κινητού για τα τιμολόγια παραλαβής (fastwrite.tech/kostometro).</li>
+<li><strong>Μέρος Β — FastWrite Desktop:</strong> η εφαρμογή Windows.</li>
+<li><strong>Μέρος Γ — Ιστότοπος, ερωτηματολόγιο, φόρμα Facebook και λίστα email.</strong></li>
+</ul>
+<h2 id="a2">2. Με ποιον ρόλο επεξεργαζόμαστε τι</h2>
 <table>
 <thead>
 <tr>
-<th>Category</th>
-<th>Examples</th>
-<th>Purpose</th>
+<th>Τι</th>
+<th>Ποιος αποφασίζει γι' αυτό (υπεύθυνος)</th>
+<th>Εμείς</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Account information</td>
-<td>Email, username, password (hashed)</td>
-<td>Account creation, authentication</td>
+<td>Ο λογαριασμός σου (email, συσκευές, ημερομηνίες)</td>
+<td>εμείς</td>
+<td>υπεύθυνος</td>
 </tr>
 <tr>
-<td>License information</td>
-<td>License JWT, payment metadata (for paid tiers, if applicable)</td>
-<td>License validation</td>
+<td>Τα τιμολόγια και οι φωτογραφίες στον σφραγισμένο φάκελο του Kostometro</td>
+<td><strong>η επιχείρησή σου</strong></td>
+<td>εκτελών επεξεργασία, για λογαριασμό της</td>
 </tr>
 <tr>
-<td>Support communications</td>
-<td>Emails you send to support@fastwrite.tech</td>
-<td>Responding to your inquiries</td>
+<td>Η φωτογραφία που στέλνεις στο Gemini με το δικό σου κλειδί</td>
+<td>εσύ, απευθείας με την Google</td>
+<td>κανένας ρόλος, γιατί η φωτογραφία δεν περνάει από εμάς</td>
+</tr>
+<tr>
+<td>Η σύνδεση με Google ή Microsoft (η οθόνη του παρόχου)</td>
+<td>ο πάροχος, ως ξεχωριστός υπεύθυνος</td>
+<td>λαμβάνουμε μόνο το email σου (Α2)</td>
+</tr>
+<tr>
+<td>Ό,τι γράφεις στην υποστήριξη, στον βοηθό, στη «Γνώμη σου», στο ερωτηματολόγιο</td>
+<td>εμείς</td>
+<td>υπεύθυνος</td>
 </tr>
 </tbody>
 </table>
-<h3>3.2 Information Stored Locally (NOT Transmitted to Us)</h3>
-<p>The following data is stored <strong>only on your computer</strong> under <code>%APPDATA%\FastWrite\</code>. FastWrite is currently distributed as a <strong>Windows desktop application</strong>. We do <strong>not</strong> have access to this data:</p>
+<hr />
+<h2 id="kostometro">ΜΕΡΟΣ Α — KOSTOMETRO</h2>
+<h3 id="aa1">Α1. Τι μένει μόνο στο κινητό σου</h3>
+<p>Τα τιμολόγια, οι φωτογραφίες, τα ποσά, οι προμηθευτές, οι <strong>12 λέξεις</strong> σου και το κλειδί Gemini (αν βάλεις) αποθηκεύονται στον αποθηκευτικό χώρο του browser στο κινητό σου.</p>
 <ul>
-<li>Uploaded documents (invoices, receipts, PDFs)</li>
-<li>Extracted data and templates</li>
-<li>Your AI provider API keys (e.g., Google Gemini), encrypted with a machine-specific Fernet key</li>
-<li>Your accounting-platform OAuth tokens (e.g., Xero, and future providers such as QuickBooks), encrypted with the same machine-specific key</li>
-<li>Your local SQLite database (<code>app.db</code>)</li>
+<li>Χωρίς αυτόν τον χώρο η εφαρμογή δεν λειτουργεί, και δεν χρησιμοποιείται για τίποτα άλλο.</li>
+<li>Εμείς <strong>δεν έχουμε πρόσβαση</strong> σε αυτά.</li>
+<li>Η εφαρμογή <strong>δεν</strong> κρυπτογραφεί αυτόν τον χώρο μέσα στο κινητό. Τον προστατεύουν το κλείδωμα οθόνης και η κρυπτογράφηση του ίδιου του κινητού. Βάλε κλείδωμα οθόνης.</li>
 </ul>
-<h3>3.3 Information We Do NOT Collect</h3>
-<ul>
-<li>We do <strong>not</strong> collect or transmit the content of your invoices to our servers.</li>
-<li>We do <strong>not</strong> track detailed behavioural analytics (e.g., clicks, navigation, feature-by-feature behaviour). We collect only the <strong>aggregate usage counts</strong> described in Section 3.4.</li>
-<li>We do <strong>not</strong> use cookies for tracking.</li>
-<li>We do <strong>not</strong> sell, rent, or share your personal data with third parties for marketing.</li>
-</ul>
-<h3>3.4 Telemetry &amp; In-App Feedback (added August 2026)</h3>
-<p>To operate the beta programme, diagnose problems, and improve the Service, the desktop application sends a small amount of <strong>telemetry</strong> to our server:</p>
+<h3 id="aa2">Α2. Τι φτάνει σε εμάς</h3>
 <table>
 <thead>
 <tr>
-<th>Data</th>
-<th>When it is sent</th>
-<th>What it contains</th>
+<th>Δεδομένα</th>
+<th>Πότε</th>
+<th>Γιατί</th>
+<th>Νομική βάση</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Anonymous install identifier</td>
-<td>Generated once, on first run</td>
-<td>A random ID (<code>install_id</code>) not derived from your hardware or personal data</td>
+<td><strong>Email</strong></td>
+<td>στη δημιουργία λογαριασμού</td>
+<td>για να υπάρχει λογαριασμός και να μην υπάρχουν δύο με το ίδιο email · για ειδοποιήσεις ασφαλείας (αίτημα διαγραφής, ακύρωσή της, ολοκλήρωσή της, αλλαγή 12 λέξεων) · για ενημερώσεις της υπηρεσίας</td>
+<td>σύμβαση, άρθρο 6(1)(β)</td>
 </tr>
 <tr>
-<td>Registration event</td>
-<td>When you create an account</td>
-<td>Username, email address, timestamp</td>
+<td><strong>Επιβεβαίωση του email</strong>: ο 6ψήφιος κωδικός που σου στέλνουμε, ή το email όπως το δίνει η Google / η Microsoft αν πατήσεις «Συνέχεια με Google / Microsoft»</td>
+<td>στη δημιουργία λογαριασμού</td>
+<td>για να ανήκει ο λογαριασμός σε email που ελέγχεις</td>
+<td>σύμβαση, 6(1)(β)</td>
 </tr>
 <tr>
-<td>Usage counts</td>
-<td>After each extraction</td>
-<td>Counts only: demo documents used / remaining allowance, total number of documents processed</td>
+<td><strong>Τυχαίο αναγνωριστικό εγκατάστασης</strong>, όνομα και τύπος συσκευής από τον browser, πότε φάνηκε τελευταία</td>
+<td>σε κάθε συγχρονισμό</td>
+<td>για να ξέρουμε ποια συσκευή είναι η ενεργή και να σταματάμε άλλες</td>
+<td>σύμβαση, 6(1)(β)</td>
+</tr>
+<tr>
+<td><strong>Χώρα</strong> (από τη Cloudflare), <strong>από πού ήρθες</strong> (π.χ. σύνδεσμος εκστρατείας), <strong>ποιος σε κάλεσε</strong> (ο κωδικός πρόσκλησης, αν έβαλες)</td>
+<td>στη δημιουργία λογαριασμού</td>
+<td>στατιστικά: από πού έρχονται οι χρήστες μας · το πρόγραμμα συστάσεων</td>
+<td>έννομο συμφέρον, 6(1)(στ)</td>
+</tr>
+<tr>
+<td><strong>Σε ποιο βήμα της εγγραφής έφτασε η συσκευή</strong> (άνοιξε, ζήτησε κωδικό, πάτησε σύνδεση, επιβεβαίωσε, έκανε λογαριασμό, έβαλε ή παρέλειψε κλειδί) — με τη συσκευή γραμμένη ως μη αναστρέψιμο αποτύπωμα, χωρίς email</td>
+<td>μία φορά ανά βήμα</td>
+<td>για να βλέπουμε πού σταματούν οι άνθρωποι και να το διορθώνουμε</td>
+<td>έννομο συμφέρον, 6(1)(στ)</td>
+</tr>
+<tr>
+<td>Ημερομηνία εγγραφής, τελευταίου συγχρονισμού, <strong>μέγεθος</strong> του φακέλου, αν χρησιμοποιείς κλειδί Gemini (ναι/όχι)</td>
+<td>συνεχώς</td>
+<td>λειτουργία και έλεγχος του συστήματος</td>
+<td>σύμβαση, 6(1)(β)</td>
+</tr>
+<tr>
+<td><strong>Σφραγισμένος φάκελος</strong>: τιμολόγια και φωτογραφίες, κρυπτογραφημένα <strong>στο κινητό σου πριν φύγουν</strong></td>
+<td>σε κάθε συγχρονισμό</td>
+<td>για να έχεις τα τιμολόγιά σου σε νέα συσκευή</td>
+<td>ως εκτελών, για λογαριασμό της επιχείρησής σου</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Telemetry never includes the content of your documents, extracted data, file names, or API keys — only counts.</strong> Telemetry is sent on a best-effort basis: if our server is unreachable, the application continues to work normally.</p>
-<p>The application also includes an optional <strong>"Feedback" (Σχόλια &amp; Ιδέες)</strong> form. If you choose to use it, we receive the category and message you write and, only if you attach one, a screenshot (PNG/JPG, up to 2 MB). The form warns you <strong>not to include real invoices or personal data in screenshots</strong> — please attach demo documents only. Feedback submissions are rate-limited and stored on our EU server (see Section 7.1).</p>
-<hr />
-<h2>4. How We Use Information</h2>
-<p>We use the limited information we collect for the following purposes:</p>
-<ol>
-<li><strong>Account &amp; Authentication:</strong> Creating your account, signing you in, securing access.</li>
-<li><strong>License Validation:</strong> Verifying your entitlement to use paid features (if applicable).</li>
-<li><strong>Support:</strong> Responding to questions, troubleshooting issues, sending service announcements.</li>
-<li><strong>Beta Operation &amp; Improvement:</strong> Understanding how many testers install and use the application (aggregate counts — Section 3.4) and reviewing feedback you choose to send us, so we can fix problems and improve the Service.</li>
-<li><strong>Legal Compliance:</strong> Complying with applicable laws and responding to lawful requests from authorities.</li>
-</ol>
-<hr />
-<h2>5. Legal Bases for Processing (GDPR Article 6)</h2>
-<p>We rely on the following legal bases:</p>
+<p><strong>Δεν</strong> κρατάμε διεύθυνση IP. Για να περιορίζουμε την κατάχρηση (π.χ. πολλούς κωδικούς email σε λίγη ώρα), κρατάμε για <strong>έως 24 ώρες</strong> ένα μη αναστρέψιμο αποτύπωμα της διεύθυνσης και της ημέρας, που δεν μπορεί να γυρίσει πίσω σε διεύθυνση.</p>
+<p><strong>Σύνδεση με Google ή Microsoft.</strong> Αν την επιλέξεις, η οθόνη που βλέπεις είναι του παρόχου και ισχύει η δική του πολιτική. Ο πάροχος μας επιστρέφει το email σου (επιβεβαιωμένο) και το βασικό σου προφίλ (όνομα, εικόνα). <strong>Κρατάμε μόνο το email</strong>· το όνομα και η εικόνα δεν αποθηκεύονται πουθενά. Δεν ζητάμε επαφές και δεν αποκτάμε πρόσβαση στον λογαριασμό σου στον πάροχο. Ο προσωρινός κωδικός της σύνδεσης ζει <strong>έως 10 λεπτά</strong> και σβήνεται με τη χρήση του.</p>
+<p><strong>Το αναγνωριστικό εγκατάστασης δεν είναι «ανώνυμο».</strong> Είναι τυχαίο, αλλά συνδέεται με τον λογαριασμό σου, άρα είναι <strong>ψευδώνυμο</strong>.</p>
+<h3 id="aa3">Α3. Ο σφραγισμένος φάκελος — τι μπορούμε και τι δεν μπορούμε</h3>
 <ul>
-<li><strong>Contract (Art. 6(1)(b)):</strong> To deliver the Service you have signed up for.</li>
-<li><strong>Legitimate Interests (Art. 6(1)(f)):</strong> To secure our Service, prevent fraud, improve reliability, and operate the minimal usage telemetry described in Section 3.4.</li>
-<li><strong>Consent (Art. 6(1)(a)):</strong> Where applicable, for optional features (e.g., marketing emails — opt-in only).</li>
-<li><strong>Legal Obligation (Art. 6(1)(c)):</strong> Where required by law (e.g., tax records, court orders).</li>
+<li>Ο φάκελος κλειδώνει <strong>στη συσκευή σου</strong> με ένα τυχαίο κλειδί. Το κλειδί αυτό το ξεκλειδώνουν <strong>μόνο οι 12 λέξεις σου</strong>.</li>
+<li>Εμείς δεν έχουμε τις λέξεις, άρα <strong>δεν μπορούμε να ανοίξουμε τον φάκελο</strong>, ούτε αν μας το ζητήσει κάποιος.</li>
+<li>Βλέπουμε μόνο <strong>ότι υπάρχει</strong>, <strong>πόσο μεγάλος</strong> είναι και <strong>πότε</strong> άλλαξε.</li>
+<li>Ζει σε διακομιστές της Cloudflare με <strong>δέσμευση αποθήκευσης στην Ευρωπαϊκή Ένωση</strong>.</li>
+<li>Επειδή δίπλα του κρατάμε το email σου, τον αντιμετωπίζουμε <strong>ως προσωπικό δεδομένο</strong>, παρότι δεν μπορούμε να τον διαβάσουμε.</li>
+</ul>
+<h3 id="aa4">Α4. Οι 12 λέξεις</h3>
+<p>Είναι το κλειδί του λογαριασμού σου.</p>
+<ul>
+<li><strong>Δεν τις έχουμε και δεν μπορούμε να σου τις δώσουμε.</strong></li>
+<li>Αν τις χάσεις μαζί με το κινητό σου, τα δεδομένα στον φάκελο δεν ανοίγουν ποτέ ξανά.</li>
+<li>Όταν τις αλλάζεις από τις Ρυθμίσεις, σου στέλνουμε email ειδοποίησης. Δεν περιέχει τις λέξεις.</li>
+</ul>
+<h3 id="aa5">Α5. Ανάγνωση ποσών με Gemini (Google)</h3>
+<p>Αν βάλεις δικό σου κλειδί Gemini, η φωτογραφία του τιμολογίου πηγαίνει <strong>απευθείας από το κινητό σου στην Google</strong>. Δεν περνάει από εμάς, και η σχέση για αυτή την αποστολή είναι ανάμεσα σε εσένα και την Google. Σύμφωνα με τους όρους της Google (τελευταία ενημέρωση 28/4/2026):</p>
+<ul>
+<li><strong>Αν βρίσκεσαι σε ΕΟΧ, Ελβετία ή Ηνωμένο Βασίλειο:</strong> η Google δεν χρησιμοποιεί τις φωτογραφίες και τις απαντήσεις για να βελτιώσει τα προϊόντα της, ακόμα και με δωρεάν κλειδί.</li>
+<li><strong>Αν βρίσκεσαι αλλού και το κλειδί σου είναι δωρεάν:</strong> η Google μπορεί να τις χρησιμοποιήσει για να βελτιώσει τα προϊόντα της, και άνθρωποι μπορεί να τις διαβάσουν.</li>
+<li><strong>Σε κάθε περίπτωση:</strong> η Google τις κρατάει για περιορισμένο χρόνο, για τον έλεγχο κατάχρησης, και μπορεί να τις αποθηκεύσει προσωρινά σε οποιαδήποτε χώρα.</li>
+</ul>
+<p>Χωρίς κλειδί, δεν φεύγει καμία φωτογραφία προς την Google.</p>
+<h3 id="aa6">Α6. Διαγραφή λογαριασμού</h3>
+<p>Από τις Ρυθμίσεις → «Διαγραφή λογαριασμού». <strong>Δεν γίνεται αμέσως: γίνεται σε 72 ώρες.</strong> Ο λόγος: αν κάποιος κρατάει το ξεκλείδωτο κινητό σου, μπορεί να ζητήσει τη διαγραφή αντί για σένα. Οι 72 ώρες σου δίνουν χρόνο να τη σταματήσεις.</p>
+<ul>
+<li><strong>Μόλις τη ζητήσεις</strong>, ο λογαριασμός <strong>παγώνει</strong> σε όλες τις συσκευές — τίποτα δεν ανεβαίνει, τίποτα δεν κατεβαίνει — και σου στέλνουμε email που λέει την <strong>ακριβή ώρα</strong> που θα ολοκληρωθεί.</li>
+<li><strong>Μπορείς να τη σταματήσεις</strong>, όσο δεν έχουν περάσει οι 72 ώρες, <strong>με τις 12 λέξεις σου</strong>, από <strong>οποιαδήποτε</strong> συσκευή: μέσα από την εφαρμογή ή στη σελίδα <strong>fastwrite.tech/akyrosi</strong>.</li>
+<li><strong>Δεν βάζουμε σύνδεσμο ακύρωσης μέσα στο email, επίτηδες.</strong> Ο σύνδεσμος θα ζούσε μέσα στο ίδιο κινητό που μπορεί να έχει χαθεί ή κλαπεί. Οι 12 λέξεις είναι το μόνο που δεν το έχει όποιος κρατάει τη συσκευή σου.</li>
+<li><strong>Μετά τις 72 ώρες σβήνουμε:</strong> τον σφραγισμένο φάκελο, τις φωτογραφίες, την κλειδαριά των 12 λέξεων, τη σύνδεση κάθε συσκευής σου, το email σου, τα αιτήματα υποστήριξης του λογαριασμού και τον κωδικό πρόσβασης. <strong>Από εκεί και πέρα δεν υπάρχει επαναφορά</strong> — ούτε με τις 12 λέξεις, ούτε από εμάς.</li>
+<li><strong>Το email σου διατηρείται μέχρι τη λήξη των 72 ωρών</strong> (και όχι περισσότερο): το χρειαζόμαστε για να σου στείλουμε την τελική ειδοποίηση. Σβήνεται μαζί με όλα τα υπόλοιπα.</li>
+<li><strong>Σου στέλνουμε έως τρία email:</strong> όταν ζητηθεί η διαγραφή · αν την ακυρώσεις · και όταν ολοκληρωθεί. Κανένα δεν περιέχει τις λέξεις σου ή σύνδεσμο που εκτελεί κάτι.</li>
+<li><strong>Μένει στη βάση μας μία γραμμή στατιστικών</strong> με ακριβώς τέσσερα στοιχεία: <strong>μήνας εγγραφής, μήνας διαγραφής, χώρα, από πού ήρθες</strong>. Δίπλα τους μένει ένα τυχαίο αναγνωριστικό, που δεν μπορούμε να συνδέσουμε με εσένα. Χρησιμεύει για να μην ξαναχρησιμοποιηθούν ποτέ οι ίδιες 12 λέξεις και για να μάθουν οι άλλες σου συσκευές ότι ο λογαριασμός διαγράφηκε. Με λίγους χρήστες, τέσσερα τέτοια στοιχεία δεν εγγυώνται πλήρη ανωνυμία, γι' αυτό τα αναφέρουμε ρητά.</li>
+<li><strong>Οι άλλες σου συσκευές</strong> κρατάνε τα τιμολόγια που έχουν ήδη, μέχρι να τα σβήσεις εσύ με «Ξεκίνα καθαρά».</li>
+<li><strong>Αντίγραφα ασφαλείας:</strong> βλ. ενότητα 7. Ό,τι σβήνεται μπορεί να υπάρχει στα αυτόματα σημεία επαναφοράς της βάσης μας για <strong>έως 30 ημέρες</strong> ακόμα, και μετά χάνεται και από εκεί.</li>
+</ul>
+<h3 id="aa7">Α7. Υποστήριξη και «Η γνώμη σου»</h3>
+<ul>
+<li><strong>Υποστήριξη από την εφαρμογή (☰ Μενού → Υποστήριξη):</strong> κάθε αίτημα παίρνει έναν <strong>αριθμό</strong> (π.χ. KM-ΧΧΧΧ-3). Το κείμενό σου, οι απαντήσεις μας και η κατάσταση του αιτήματος <strong>αποθηκεύονται στον διακομιστή μας</strong>, ώστε να βλέπεις το ιστορικό μέσα στην εφαρμογή και να μην ξαναεξηγείς από την αρχή. Μαζί γράφονται η έκδοση της εφαρμογής και ο τύπος της συσκευής σου. Η διεύθυνση email δεν αντιγράφεται στο αίτημα· διαβάζεται από τον λογαριασμό σου τη στιγμή που απαντάμε. Αν γράψεις <strong>εσύ</strong> email στο support@fastwrite.tech, παίρνεις αυτόματη απάντηση με αριθμό (KM-E-…) και το αίτημα αποθηκεύεται με το ίδιο τρόπο, μαζί με τη διεύθυνση από την οποία έγραψες. Αριθμοί που εκδόθηκαν αλλά δεν έφτασε ποτέ μήνυμα σβήνονται σε 24 ώρες.</li>
+<li><strong>Πώς διαβάζουμε το support@:</strong> το γραμματοκιβώτιο λειτουργεί στο Google Workspace. Τα μηνύματα <strong>προωθούνται και σε προσωπικό γραμματοκιβώτιο Gmail του υπευθύνου επεξεργασίας</strong>, από όπου απαντά. Οι απαντήσεις φεύγουν πάντα από το support@fastwrite.tech.</li>
+<li><strong>Η γνώμη σου:</strong> αποθηκεύουμε τα αστέρια, το κείμενο, την έκδοση της εφαρμογής, τον <strong>μήνα</strong> και τη χώρα. Το email σου <strong>μόνο</strong> αν τσεκάρεις «Θέλω απάντηση». Τίποτα από αυτά δεν συνδέεται με τον λογαριασμό σου. Νομική βάση: έννομο συμφέρον (6(1)(στ)) για τη βελτίωση της υπηρεσίας, και για το email η δική σου επιλογή.</li>
+</ul>
+<h3 id="aa8">Α8. Ο βοηθός (τεχνητή νοημοσύνη)</h3>
+<p>Μέσα στο Kostometro μπορεί να δεις το κουμπί «💬 Βοήθεια». Είναι <strong>βοηθός τεχνητής νοημοσύνης, όχι άνθρωπος</strong>, και το λέει πριν ξεκινήσεις. Βοηθάει στην εγκατάσταση και στη δημιουργία λογαριασμού· όταν ολοκληρώσεις την εγγραφή, φεύγει από τη συσκευή σου.</p>
+<ul>
+<li><strong>Τι γίνεται με όσα γράφεις:</strong> τα μηνύματά σου και οι απαντήσεις του βοηθού αποθηκεύονται στον διακομιστή μας και <strong>επεξεργάζονται για λογαριασμό μας από την Anthropic PBC</strong> (ΗΠΑ), που παρέχει το μοντέλο τεχνητής νοημοσύνης. Η Anthropic δεν χρησιμοποιεί τα μηνύματα για να εκπαιδεύσει τα μοντέλα της, σύμφωνα με τους εμπορικούς της όρους.</li>
+<li><strong>Φωτογραφίες οθόνης:</strong> αν στείλεις μία, χρησιμοποιείται <strong>μόνο για εκείνη την απάντηση</strong> και <strong>δεν αποθηκεύεται</strong> — ούτε σε εμάς, ούτε μετά την απάντηση. Στο ιστορικό μένει μόνο η σημείωση «[εικόνα]».</li>
+<li><strong>Τι δεν δέχεται:</strong> μηνύματα που μοιάζουν με τις 12 λέξεις ή με κλειδί (Gemini ή άλλο) <strong>σταματούν στη συσκευή σου και στον διακομιστή πριν αποθηκευτούν ή φύγουν</strong> προς τον πάροχο. Μη στέλνεις ποτέ τις 12 λέξεις σου, ούτε εδώ ούτε πουθενά.</li>
+<li><strong>Το email σου</strong> ζητείται και αποθηκεύεται <strong>μόνο</strong> αν ζητήσεις να σε βοηθήσει άνθρωπος. Τότε ανοίγει αίτημα υποστήριξης (Α7) με ολόκληρη τη συζήτηση, και σου απαντάμε με email.</li>
+<li><strong>Τι βλέπει ο βοηθός για σένα:</strong> σε ποιο βήμα της εγγραφής είναι η συσκευή σου (Α2), ώστε να μη σε ρωτάει ξανά. Δεν βλέπει τα τιμολόγιά σου, τον φάκελο ή το κλειδί σου, και <strong>δεν μπορεί να αλλάξει τίποτα</strong> στον λογαριασμό σου.</li>
+<li><strong>Όρια:</strong> για να μην καταχράται, κρατάμε για κάθε συσκευή (ως αποτύπωμα, χωρίς email) πόσα μηνύματα έστειλε. Ο βοηθός σταματά μετά από ένα όριο μηνυμάτων και σε παραπέμπει στην υποστήριξη.</li>
+<li><strong>Πόσο κρατάμε τη συζήτηση:</strong> <strong>90 ημέρες</strong> από το τελευταίο μήνυμα· αν ζήτησες άνθρωπο, <strong>24 μήνες</strong>, όπως κάθε αίτημα υποστήριξης. Το αποτύπωμα συσκευής με τον μετρητή: 24 μήνες.</li>
+<li><strong>Νομική βάση:</strong> η συγκατάθεσή σου (6(1)(α)), που δίνεις στην πρώτη οθόνη του βοηθού. Αν δεν τη δώσεις, ο βοηθός δεν ανοίγει και τίποτα δεν στέλνεται.</li>
 </ul>
 <hr />
-<h2>6. Third-Party Services</h2>
-<p>FastWrite enables you to integrate with the following third-party services. These integrations are <strong>initiated by you</strong> and operate under the third party's own privacy policy:</p>
-<h3>6.1 Google Gemini (AI Document Extraction)</h3>
+<h2 id="fastwrite-desktop">ΜΕΡΟΣ Β — FASTWRITE DESKTOP</h2>
+<p>Το FastWrite Desktop είναι εφαρμογή Windows. <strong>Τα τιμολόγια, τα δεδομένα που εξάγει και το κλειδί του παρόχου τεχνητής νοημοσύνης σου μένουν στον υπολογιστή σου</strong> και δεν μεταδίδονται σε εμάς. Γι' αυτό για το FastWrite Desktop δεν απαιτείται ξεχωριστή σύμβαση επεξεργασίας.</p>
 <ul>
-<li>You provide your <strong>own</strong> Google Gemini API key (BYOK — "Bring Your Own Key").</li>
-<li>When you process a document, its content is sent <strong>directly from your computer to Google's Gemini API</strong>, not through our servers.</li>
-<li>Google's processing of this content is governed by <a href="https://policies.google.com/privacy">Google's Privacy Policy</a> and <a href="https://policies.google.com/terms">Google AI Terms</a>.</li>
-<li>We never see your Gemini API key in plain text — it is encrypted on your computer with Fernet symmetric encryption.</li>
+<li><strong>Τι φτάνει σε εμάς:</strong> email, όνομα χρήστη και κωδικός (ως μη αναστρέψιμο αποτύπωμα) για τον λογαριασμό · στοιχεία άδειας χρήσης · ένα <strong>τυχαίο αναγνωριστικό εγκατάστασης</strong> (ψευδώνυμο, συνδέεται με τον λογαριασμό σου) · έκδοση της εφαρμογής και των Windows · στατιστικά χρήσης και τα σχόλια που στέλνεις από μέσα της. Λεπτομέρειες στο αγγλικό κείμενο, <a href="/legal/privacy-en">/legal/privacy-en</a>, ενότητες 3–7.</li>
+<li><strong>Διακομιστής λογαριασμών:</strong> Hetzner Online GmbH, Φινλανδία (ΕΕ).</li>
+<li><strong>Ανάγνωση με Gemini:</strong> όπως στην ενότητα Α5. Με δικό σου κλειδί, η σχέση είναι εσύ ↔ Google.</li>
+<li><strong>Τήρηση:</strong> ο λογαριασμός σβήνεται <strong>12 μήνες μετά την τελευταία σύνδεση</strong>. Στατιστικά και σχόλια: έως 12 μήνες μετά τη δοκιμαστική περίοδο.</li>
 </ul>
-<h3>6.2 Accounting Platform Integrations (Xero — and future providers)</h3>
-<p>FastWrite lets you connect to a third-party accounting platform. <strong>Xero</strong> is the currently supported provider; support for additional platforms (such as <strong>QuickBooks</strong>) is planned and, when released, will operate under the same principles described here.</p>
-<ul>
-<li>If you choose to connect FastWrite to your accounting platform account, we use OAuth 2.0 with PKCE — meaning <strong>no client secret is ever stored in the application</strong>.</li>
-<li>Your accounting-platform OAuth tokens are stored <strong>locally and encrypted</strong> on your computer.</li>
-<li>When you push a document as a Bill, the data is transmitted <strong>directly from your computer to the accounting platform's API</strong>, not through our servers.</li>
-<li>Each provider's handling of this data is governed by its own privacy policy — for example, <a href="https://www.xero.com/about/legal/privacy/">Xero's Privacy Policy</a>. For QuickBooks and any future provider, that provider's published privacy policy will apply.</li>
-<li>You can disconnect FastWrite from a connected accounting platform at any time via the in-app Settings (e.g., Connect to Xero → Disconnect). This deletes the local token and revokes our access on the provider's side.</li>
-</ul>
-<h3>6.3 Email Service Providers</h3>
-<p>If you contact us at support@fastwrite.tech, your message is routed through Cloudflare Email Routing to a Gmail mailbox. Cloudflare's and Google's respective privacy policies apply.</p>
 <hr />
-<h2>7. Data Storage &amp; Security</h2>
-<h3>7.1 Where Data Is Stored</h3>
+<h2 id="istotopos">ΜΕΡΟΣ Γ — ΙΣΤΟΤΟΠΟΣ, ΕΡΩΤΗΜΑΤΟΛΟΓΙΟ, ΦΟΡΜΑ FACEBOOK, ΛΙΣΤΑ EMAIL</h2>
 <ul>
-<li><strong>Account data</strong> (the small set in Section 3.1): stored on our server hosted at Hetzner Cloud (Helsinki, Finland — EU).</li>
-<li><strong>Telemetry and feedback data</strong> (Section 3.4), including any screenshots you attach to feedback: stored on the same EU server.</li>
-<li><strong>Everything else</strong> (Section 3.2): stored on <strong>your computer only</strong>.</li>
+<li><strong>Γ1 · Ιστότοπος (fastwrite.tech):</strong> δεν χρησιμοποιούμε cookies ανάλυσης, διαφήμισης ή παρακολούθησης. Η εφαρμογή Kostometro χρησιμοποιεί τον αποθηκευτικό χώρο του browser μόνο για να λειτουργεί (Α1). Ο Πίνακας Ελέγχου μας μετράει εγγραφές, συσκευές, βήματα εγγραφής και κόστη <strong>συγκεντρωτικά</strong>, ποτέ ανά πρόσωπο.</li>
+<li><strong>Γ2 · Ερωτηματολόγιο (/gnomi):</strong> κρατάμε τις απαντήσεις, τη χώρα, τον τύπο browser, ένα τυχαίο αναγνωριστικό επίσκεψης και την πηγή (π.χ. Facebook). Το email και το σχόλιο <strong>μόνο αν τα γράψεις</strong>. <strong>Όχι</strong> IP. Νομική βάση: έννομο συμφέρον (έρευνα αγοράς), και για το email η δική σου επιλογή.</li>
+<li><strong>Γ3 · Φόρμα στο Facebook:</strong></li>
+<li>Όταν συμπληρώνεις τη φόρμα μας μέσα στο Facebook, η Meta είναι ξεχωριστός υπεύθυνος για την πλατφόρμα της. Εμείς λαμβάνουμε <strong>το όνομά σου, τη διεύθυνση email σου και την απάντησή σου στη μία ερώτηση της φόρμας</strong>.</li>
+<li><strong>Σκοπός, δύο πράγματα:</strong> (α) <strong>έρευνα αγοράς</strong> — να μετρήσουμε πόσο συχνά ένας προμηθευτής χρεώνει ακριβότερα χωρίς να το πει, γιατί είναι το πρόβλημα που λύνει το Kostometro. Νομική βάση: έννομο συμφέρον, 6(1)(στ). (β) <strong>να σου στείλουμε την εφαρμογή</strong> όταν είναι έτοιμη, αν άφησες το email σου. Νομική βάση: η συγκατάθεσή σου, 6(1)(α).</li>
+<li>Η Meta σβήνει τα στοιχεία από την πλατφόρμα της σε 90 ημέρες.</li>
+<li><strong>Γ4 · Λίστα email (όσοι άφησαν email στη φόρμα):</strong> κρατάμε το email, το όνομα, την ημερομηνία της φόρμας και <strong>ποιο μήνυμα σου στείλαμε και πότε</strong> (ώστε να μη σου στείλουμε ποτέ δύο φορές το ίδιο). Η απάντησή σου στην ερώτηση της φόρμας <strong>δεν</strong> αποθηκεύεται στη λίστα. Κάθε email έχει <strong>σύνδεσμο διαγραφής</strong> στο τέλος· ένα κλικ, και δεν ξαναλαμβάνεις τίποτα — ή γράψε στο support@fastwrite.tech. Τήρηση: <strong>24 μήνες</strong> από τη συμπλήρωση της φόρμας, εκτός αν γίνεις χρήστης. Μπορείς να αποσύρεις τη συγκατάθεση οποτεδήποτε.</li>
 </ul>
-<h3>7.2 Security Measures</h3>
-<ul>
-<li>All transmissions between FastWrite and external APIs (Xero, Gemini) use HTTPS with TLS 1.2 or higher.</li>
-<li>Server access is restricted, password-protected, and uses SSH key authentication.</li>
-<li>Local secrets (API keys, OAuth tokens) are encrypted using the <code>cryptography</code> Python library's Fernet implementation, with a machine-specific key generated on first run.</li>
-<li>Passwords are stored using bcrypt hashing.</li>
-</ul>
-<h3>7.3 Data Breach Notification</h3>
-<p>If a security incident affecting your personal data occurs, we will notify affected users within <strong>72 hours</strong> of becoming aware of the incident, as required by GDPR Art. 33.</p>
 <hr />
-<h2>8. Your Data Subject Rights (GDPR Articles 15–22)</h2>
-<p>If you are a resident of the European Economic Area (EEA), the United Kingdom, or similar jurisdictions, you have the following rights:</p>
+<h2 id="a3">3. Σε ποιους φτάνουν τα δεδομένα (υπεκτελούντες)</h2>
 <table>
 <thead>
 <tr>
-<th>Right</th>
-<th>What it means</th>
-<th>How to exercise</th>
+<th>Ποιος</th>
+<th>Για τι</th>
+<th>Τι κάνει</th>
+<th>Πού</th>
+<th>Εγγύηση</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Access</strong> (Art. 15)</td>
-<td>Receive a copy of your personal data we hold</td>
-<td>Email support@fastwrite.tech</td>
+<td><strong>Cloudflare, Inc.</strong></td>
+<td>Kostometro, ιστότοπος, email</td>
+<td>διακομιστές (Workers), βάση (D1), αποθήκευση φακέλων (R2, <strong>δέσμευση ΕΕ</strong>), δρομολόγηση του support@, αποστολή των email ειδοποίησης και της λίστας</td>
+<td>ΕΕ για τον φάκελο· για τα υπόλοιπα, κατά τη σύμβασή της</td>
+<td>Σύμβαση Επεξεργασίας Cloudflare, Data Privacy Framework ΕΕ–ΗΠΑ, Τυποποιημένες Συμβατικές Ρήτρες</td>
 </tr>
 <tr>
-<td><strong>Rectification</strong> (Art. 16)</td>
-<td>Correct inaccurate or incomplete data</td>
-<td>Email or via Settings page</td>
+<td><strong>Anthropic PBC</strong></td>
+<td>ο βοηθός (Α8)</td>
+<td>το μοντέλο τεχνητής νοημοσύνης που γράφει τις απαντήσεις</td>
+<td>ΗΠΑ</td>
+<td>εμπορικοί όροι με σύμβαση επεξεργασίας, Data Privacy Framework ΕΕ–ΗΠΑ, Τυποποιημένες Συμβατικές Ρήτρες· χωρίς εκπαίδευση μοντέλων με τα δεδομένα</td>
 </tr>
 <tr>
-<td><strong>Erasure</strong> (Art. 17)</td>
-<td>Request deletion of your account and data</td>
-<td>Email support@fastwrite.tech</td>
+<td><strong>Hetzner Online GmbH</strong></td>
+<td>FastWrite Desktop</td>
+<td>διακομιστής λογαριασμών</td>
+<td>Φινλανδία, ΕΕ</td>
+<td>ΕΕ</td>
 </tr>
 <tr>
-<td><strong>Restriction</strong> (Art. 18)</td>
-<td>Limit how we process your data</td>
-<td>Email</td>
+<td><strong>Google (Workspace)</strong></td>
+<td>υποστήριξη</td>
+<td>το γραμματοκιβώτιο του support@ και η αυτόματη απάντηση</td>
+<td>κατά τη σύμβαση της Google</td>
+<td>Σύμβαση Επεξεργασίας Google Workspace, Data Privacy Framework, Τυποποιημένες Συμβατικές Ρήτρες</td>
 </tr>
 <tr>
-<td><strong>Portability</strong> (Art. 20)</td>
-<td>Receive your data in a machine-readable format</td>
-<td>Email</td>
-</tr>
-<tr>
-<td><strong>Objection</strong> (Art. 21)</td>
-<td>Object to processing based on legitimate interests</td>
-<td>Email</td>
-</tr>
-<tr>
-<td><strong>Withdraw Consent</strong></td>
-<td>Withdraw any consent you previously gave</td>
-<td>Email or in-app settings</td>
+<td><strong>Google (Gmail, προσωπικός λογαριασμός)</strong></td>
+<td>υποστήριξη</td>
+<td>προώθηση των μηνυμάτων του support@ στο προσωπικό γραμματοκιβώτιο του υπευθύνου (Α7)</td>
+<td>κατά τους όρους της Google</td>
+<td>όροι Google για καταναλωτές· τα μηνύματα δεν περιέχουν τίποτα πέρα από όσα μας έγραψες</td>
 </tr>
 </tbody>
 </table>
-<p>We will respond to all valid requests within <strong>one month</strong> (GDPR Art. 12(3)).</p>
-<p>You also have the right to lodge a complaint with a supervisory authority — for Cyprus, this is the <a href="https://www.dataprotection.gov.cy/">Office of the Commissioner for Personal Data Protection</a>.</p>
-<hr />
-<h2>9. Cookies &amp; Similar Technologies</h2>
-<p>The FastWrite desktop application does not use cookies. The FastWrite marketing website (fastwrite.tech) may use only <strong>strictly necessary</strong> cookies for session management. We do <strong>not</strong> use analytics, advertising, or tracking cookies.</p>
-<hr />
-<h2>10. International Data Transfers</h2>
-<p>The account data we hold is stored in the European Union (Finland). When you use third-party integrations (e.g., Gemini, Xero, and future accounting providers such as QuickBooks), data is transferred to those providers' infrastructure, which may be located outside the EU. We rely on the following safeguards:</p>
+<p><strong>Ξεχωριστοί υπεύθυνοι (όχι υπεκτελούντες μας):</strong> Google και Microsoft για τη «Σύνδεση με Google / Microsoft» (Α2) · Google για το Gemini με δικό σου κλειδί (Α5) · Meta για τη φόρμα Facebook (Γ3).</p>
+<h2 id="a4">4. Διαβιβάσεις εκτός ΕΕ</h2>
 <ul>
-<li><strong>Gemini:</strong> Google's Standard Contractual Clauses and self-certification under applicable frameworks.</li>
-<li><strong>Accounting platforms (Xero; QuickBooks and others when supported):</strong> the relevant provider's published data processing terms and Standard Contractual Clauses.</li>
+<li>Ο φάκελος του Kostometro μένει στην ΕΕ.</li>
+<li>Για ό,τι άλλο περνάει από Cloudflare, Anthropic ή Google, η διαβίβαση στηρίζεται στο Data Privacy Framework ΕΕ–ΗΠΑ και στις Τυποποιημένες Συμβατικές Ρήτρες.</li>
+<li>Η φωτογραφία προς το Gemini είναι δική σου αποστολή (Α5).</li>
 </ul>
-<hr />
-<h2>11. Data Retention</h2>
+<h2 id="a5">5. Πόσο καιρό κρατάμε τι</h2>
+<table>
+<thead>
+<tr>
+<th>Τι</th>
+<th>Πόσο</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Λογαριασμός και φάκελος Kostometro</td>
+<td>όσο υπάρχει ο λογαριασμός · σβήνουν 72 ώρες μετά το αίτημα διαγραφής (Α6)</td>
+</tr>
+<tr>
+<td>Email σου, μετά από αίτημα διαγραφής</td>
+<td><strong>έως 72 ώρες</strong> — μόνο για την τελική ειδοποίηση, μετά σβήνει</td>
+</tr>
+<tr>
+<td>Γραμμή στατιστικών μετά τη διαγραφή</td>
+<td><strong>36 μήνες</strong>, μετά σβήνει</td>
+</tr>
+<tr>
+<td>Κωδικός επιβεβαίωσης email (ως αποτύπωμα) και αποτύπωμα διεύθυνσης για όριο ρυθμού</td>
+<td><strong>24 ώρες</strong></td>
+</tr>
+<tr>
+<td>Προσωρινός κωδικός σύνδεσης Google / Microsoft</td>
+<td><strong>10 λεπτά</strong>, ή με τη χρήση του</td>
+</tr>
+<tr>
+<td>Βήματα εγγραφής ανά συσκευή (αποτύπωμα)</td>
+<td><strong>24 μήνες</strong></td>
+</tr>
+<tr>
+<td>Αιτήματα υποστήριξης (κείμενο, απαντήσεις, αριθμός)</td>
+<td><strong>24 μήνες</strong> από το κλείσιμο · ή μαζί με τον λογαριασμό · αριθμοί χωρίς μήνυμα: 24 ώρες</td>
+</tr>
+<tr>
+<td>Συζητήσεις με τον βοηθό</td>
+<td><strong>90 ημέρες</strong> · με αίτημα προς άνθρωπο <strong>24 μήνες</strong> · μετρητής μηνυμάτων ανά συσκευή 24 μήνες · ημερήσιο κόστος (χωρίς πρόσωπο) 400 ημέρες</td>
+</tr>
+<tr>
+<td>«Η γνώμη σου»</td>
+<td><strong>24 μήνες</strong></td>
+</tr>
+<tr>
+<td>Ημερολόγιο αποστολής ειδοποιήσεων (αν έφυγε, πότε, σφάλμα — <strong>χωρίς</strong> διεύθυνση)</td>
+<td>για διάγνωση· δεν συνδέεται με πρόσωπο</td>
+</tr>
+<tr>
+<td>Λογαριασμός FastWrite Desktop</td>
+<td><strong>12 μήνες μετά την τελευταία σύνδεση</strong></td>
+</tr>
+<tr>
+<td>Στατιστικά και σχόλια Desktop</td>
+<td>έως 12 μήνες μετά τη δοκιμαστική περίοδο</td>
+</tr>
+<tr>
+<td>Απαντήσεις ερωτηματολογίου</td>
+<td><strong>24 μήνες</strong></td>
+</tr>
+<tr>
+<td>Λίστα email από τη φόρμα Facebook</td>
+<td><strong>24 μήνες</strong> από τη συμπλήρωση, εκτός αν γίνεις χρήστης · αμέσως αν διαγραφείς</td>
+</tr>
+<tr>
+<td>Φορολογικά αρχεία</td>
+<td>όσο ορίζει ο νόμος</td>
+</tr>
+</tbody>
+</table>
+<p>Οι διαγραφές γίνονται με αυτόματη εργασία στον διακομιστή, καθημερινά.</p>
+<h2 id="a6">6. Τα δικαιώματά σου</h2>
+<p>Πρόσβαση, διόρθωση, διαγραφή, περιορισμός, φορητότητα, αντίρρηση, ανάκληση συγκατάθεσης (άρθρα 15–22).</p>
 <ul>
-<li><strong>Account data:</strong> Retained while your account is active and for a reasonable period afterwards (typically 12 months) for legal compliance and support history.</li>
-<li><strong>Telemetry and feedback data:</strong> Retained for the duration of the beta programme and up to 12 months afterwards. You can request earlier deletion (including of feedback screenshots) at any time via support@fastwrite.tech.</li>
-<li><strong>Local data on your computer:</strong> You control retention. Uninstalling FastWrite or deleting the <code>%APPDATA%\FastWrite\</code> folder removes all local data.</li>
-<li><strong>Support emails:</strong> Retained for up to 24 months for service-quality purposes.</li>
-<li><strong>Legal/tax records:</strong> Retained for the period required by applicable law (typically 7 years in Cyprus).</li>
+<li><strong>Άσκηση:</strong> στο support@fastwrite.tech. Στο Kostometro η <strong>διαγραφή</strong> γίνεται και μέσα από την εφαρμογή (Α6), και για τη λίστα email με τον σύνδεσμο στο τέλος κάθε μηνύματος (Γ4).</li>
+<li><strong>Απάντηση:</strong> μέσα σε έναν μήνα.</li>
+<li><strong>Προσοχή:</strong> στα τιμολόγια του φακέλου δεν μπορούμε να δώσουμε πρόσβαση ούτε να τα διορθώσουμε εμείς, γιατί δεν μπορούμε να τα ανοίξουμε. Τα βλέπεις και τα διορθώνεις εσύ στην εφαρμογή.</li>
+<li><strong>Αυτοματοποιημένες αποφάσεις:</strong> δεν παίρνουμε καμία. Ο βοηθός (Α8) απαντά σε ερωτήσεις· δεν αποφασίζει τίποτα για σένα και δεν κάνει προφίλ.</li>
+<li><strong>Καταγγελία:</strong> μπορείς να κάνεις καταγγελία στον <strong>Επίτροπο Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (Κύπρος)</strong> ή στην <strong>Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (Ελλάδα)</strong>.</li>
 </ul>
-<hr />
-<h2>12. Children's Privacy</h2>
-<p>FastWrite is a <strong>business productivity tool</strong> and is not directed at individuals under the age of 18. We do not knowingly collect personal data from children. If you believe we have collected such data, please contact us at support@fastwrite.tech and we will delete it.</p>
-<hr />
-<h2>13. Changes to This Policy</h2>
-<p>We may update this Policy from time to time. The "Last Updated" date at the top will reflect any change. For material changes, we will notify you via email or in-app announcement at least <strong>30 days</strong> before the changes take effect.</p>
-<hr />
-<h2>14. Contact</h2>
-<p>For any privacy-related question, complaint, or data subject request:</p>
-<p><strong>Email:</strong> support@fastwrite.tech
-<strong>Postal Address:</strong> Derveneion 2B, 1055 Nicosia, Cyprus
-<strong>Website:</strong> https://fastwrite.tech</p>
-<hr />
-<hr />
-<h2 id="leadform">15. Facebook Lead Form — Πληροφορίες για όσους συμπλήρωσαν τη φόρμα μας</h2>
-<p><em>This section covers the Greek-language Facebook lead form used in Cyprus. It is written in Greek because everyone who filled it in is a Greek speaker.</em></p>
-<h3>Ποιος μαζεύει τα στοιχεία</h3>
-<p>Υπεύθυνος επεξεργασίας είναι ο <strong>Σταύρος Καλλένος</strong>, Δερβενίου 2Β, 1055 Λευκωσία, Κύπρος. Επικοινωνία για οτιδήποτε αφορά τα δεδομένα σου: <strong>support@fastwrite.tech</strong></p>
-<h3>Τι ακριβώς μαζέψαμε</h3>
-<p>Αν συμπλήρωσες τη φόρμα μας στο Facebook, έχουμε τρία πράγματα και τίποτα άλλο:</p>
+<h2 id="a7">7. Ασφάλεια, αντίγραφα ασφαλείας και παραβιάσεις</h2>
 <ul>
-<li>το <strong>όνομά</strong> σου</li>
-<li>το <strong>email</strong> σου</li>
-<li>την <strong>απάντησή σου στη μία ερώτηση</strong> της φόρμας, για το αν σου έτυχε προμηθευτής να χρεώσει προϊόν ακριβότερα χωρίς να σου το πει</li>
+<li><strong>Μέτρα:</strong> κρυπτογράφηση του φακέλου στη συσκευή με τυχαίο κλειδί · οι 12 λέξεις δεν φεύγουν ποτέ από τη συσκευή · κωδικοί και προσωρινά κλειδιά μόνο ως μη αναστρέψιμα αποτυπώματα · σύνδεση HTTPS · κανένα IP στις βάσεις μας.</li>
+<li><strong>Αντίγραφα ασφαλείας:</strong> η βάση μας στην Cloudflare κρατάει αυτόματα σημεία επαναφοράς για <strong>30 ημέρες</strong>, για την περίπτωση βλάβης. Γι' αυτό ό,τι σβήνεται μπορεί να υπάρχει εκεί έως 30 ημέρες ακόμα. Οι σφραγισμένοι φάκελοι (R2) δεν έχουν σήμερα ξεχωριστό αντίγραφο· όταν αποκτήσουν, θα γραφτεί εδώ, με τον ίδιο κανόνα των 30 ημερών.</li>
+<li><strong>Παραβίαση:</strong> αν συμβεί παραβίαση, ενημερώνουμε την <strong>αρμόδια αρχή μέσα σε 72 ώρες</strong> (άρθρο 33). <strong>Εσένα</strong> σε ενημερώνουμε <strong>χωρίς αδικαιολόγητη καθυστέρηση</strong> όταν η παραβίαση ενέχει υψηλό κίνδυνο για σένα (άρθρο 34).</li>
 </ul>
-<p>Δεν ζητήσαμε και δεν έχουμε τηλέφωνο, διεύθυνση, στοιχεία εταιρείας, τιμολόγια ή οτιδήποτε από την επιχείρησή σου.</p>
-<h3>Γιατί τα μαζέψαμε — δύο λόγοι, δύο διαφορετικές βάσεις</h3>
-<p><strong>1. Για να καταλάβουμε την αγορά.</strong> Η απάντησή σου στην ερώτηση μάς λέει πόσο συχνά συμβαίνει το πρόβλημα που προσπαθούμε να λύσουμε. Νομική βάση: <strong>έννομο συμφέρον</strong>, άρθρο 6(1)(στ) GDPR — το συμφέρον μας να χτίσουμε κάτι χρήσιμο, ζυγισμένο απέναντι στο ότι η πληροφορία αυτή είναι ελάχιστη και δεν σε ταυτοποιεί ως επιχείρηση. Μπορείς να <strong>εναντιωθείς</strong> σε αυτή τη χρήση οποιαδήποτε στιγμή.</p>
-<p><strong>2. Για να σου στείλουμε την εφαρμογή όταν βγει.</strong> Άφησες το email σου επειδή σου είπαμε ότι θα είσαι από τους πρώτους που θα την πάρουν. Νομική βάση: <strong>η συγκατάθεσή σου</strong>, άρθρο 6(1)(α) GDPR. Μπορείς να την <strong>ανακαλέσεις</strong> όποτε θέλεις, το ίδιο εύκολα όσο τη δώσατε — και η ανάκληση δεν επηρεάζει όσα έγιναν νόμιμα πριν από αυτήν.</p>
-<h3>Πώς καταργείς την εγγραφή σου</h3>
-<p>Δύο δρόμοι, και οι δύο δουλεύουν:</p>
-<ul>
-<li><strong>Ο σύνδεσμος κατάργησης εγγραφής</strong> στο τέλος κάθε email που σου στέλνουμε. Ένα κλικ.</li>
-<li><strong>Ένα email στο support@fastwrite.tech</strong> με ό,τι λόγια θέλεις. Δεν χρειάζεται να εξηγήσεις τίποτα.</li>
-</ul>
-<p>Μόλις το ζητήσεις, το email σου <strong>διαγράφεται από τη λίστα</strong> και δεν ξαναλαμβάνεις μήνυμα από εμάς.</p>
-<h3>Πόσο καιρό τα κρατάμε</h3>
-<p><strong>24 μήνες</strong> από την ημέρα που συμπλήρωσες τη φόρμα. Μετά διαγράφονται.</p>
-<p>Αν καταργήσεις την εγγραφή σου ή ζητήσεις διαγραφή, διαγράφονται <strong>αμέσως</strong>, χωρίς να περιμένουμε τους 24 μήνες.</p>
-<h3>Ποιος άλλος τα βλέπει</h3>
-<ul>
-<li><strong>Meta Platforms Ireland Limited</strong> — η φόρμα είναι δική τους και τα στοιχεία περνούν και αποθηκεύονται στα συστήματά τους μέχρι να τα κατεβάσουμε. Η Meta τα επεξεργάζεται και για δικούς της σκοπούς, σύμφωνα με τη δική της πολιτική.</li>
-<li><strong>Google Ireland Limited</strong> — το γραμματοκιβώτιο <code>support@fastwrite.tech</code> λειτουργεί σε Google Workspace, με σύμβαση επεξεργασίας δεδομένων.</li>
-</ul>
-<p><strong>Δεν πουλάμε, δεν νοικιάζουμε και δεν ανταλλάσσουμε τα στοιχεία σου με κανέναν άλλον.</strong></p>
-<p>Και οι δύο πάροχοι ενδέχεται να επεξεργάζονται δεδομένα <strong>εκτός Ευρωπαϊκού Οικονομικού Χώρου</strong>, με τις εγγυήσεις που προβλέπει το κεφάλαιο V του GDPR.</p>
-<h3>Τα δικαιώματά σου</h3>
-<p>Έχεις δικαίωμα να μάθεις τι έχουμε για σένα, να το διορθώσεις, να το διαγράψεις, να το πάρεις μαζί σου σε αναγνώσιμη μορφή, να περιορίσεις τη χρήση του, να εναντιωθείς στην επεξεργασία, και να ανακαλέσεις τη συγκατάθεσή σου.</p>
-<p>Γράψε στο <strong>support@fastwrite.tech</strong> και απαντάμε μέσα σε <strong>έναν μήνα</strong>.</p>
-<p>Αν δεν μείνεις ικανοποιημένος, μπορείς να καταγγείλεις στο <strong>Γραφείο Επιτρόπου Προστασίας Δεδομένων Προσωπικού Χαρακτήρα</strong> της Κυπριακής Δημοκρατίας.</p>
-<h3>Τι δεν κάνουμε</h3>
-<p>Δεν παίρνουμε αυτοματοποιημένες αποφάσεις για σένα και δεν κάνουμε προφίλ. Ένας άνθρωπος διαβάζει τις απαντήσεις, και τις διαβάζει μαζί με όλες τις άλλες.</p>
+<h2 id="a8">8. Ανήλικοι</h2>
+<p>Τα προϊόντα μας είναι εργαλεία επιχειρήσεων και δεν απευθύνονται σε άτομα κάτω των 18.</p>
+<h2 id="a9">9. Αλλαγές</h2>
+<p>Για κάθε ουσιώδη αλλαγή ενημερώνουμε με email ή μέσα στην εφαρμογή <strong>30 ημέρες πριν</strong>. Η έκδοση 2.1 ισχύει ολόκληρη από τη δημοσίευσή της: περιγράφει λειτουργίες (Kostometro, βοηθός, σύνδεση με Google/Microsoft, λίστα email) που δεν υπήρχαν στην έκδοση 1.2, και για το FastWrite Desktop δεν προσθέτει καμία νέα επεξεργασία.</p>
+<h2 id="a10">10. Επικοινωνία</h2>
+<p>support@fastwrite.tech · Δερβενίου 2Β, 1055 Λευκωσία, Κύπρος · https://fastwrite.tech</p>
 <hr />
-<p><em>FastWrite — Privacy Policy v1.2 — 14 September 2026</em></p>
+<p><em>FastWrite · Kostometro — Πολιτική Απορρήτου v2.1 — 1 Οκτωβρίου 2026</em></p>
   </div>
 </main>
-<footer><div class="container"><div class="copy">© 2026 FastWrite · Operated by Stavros Kallenos (Cyprus)</div><ul><li><a href="/legal/privacy">Privacy Policy</a></li><li><a href="/legal/terms">Terms of Service</a></li><li><a href="mailto:support@fastwrite.tech">Contact</a></li></ul></div></footer>
+<footer><div class="container"><div class="copy">© 2026 FastWrite · Σταύρος Καλλένος (Κύπρος)</div><ul><li><a href="/legal/privacy">Πολιτική Απορρήτου</a></li><li><a href="/legal/privacy-en">Privacy (EN)</a></li><li><a href="/legal/terms">Όροι Χρήσης</a></li><li><a href="mailto:support@fastwrite.tech">Επικοινωνία</a></li></ul></div></footer>
 </body>
 </html>

@@ -1,0 +1,13 @@
+v103 — Πολιτική Απορρήτου v2.1 (ελληνικά) στο /legal/privacy · η v1.2 (EN) μένει στο /legal/privacy-en
+
+Έγκριση κειμένου Stavros 20/9 (v2) + ενημέρωση 1/10/2026 για ό,τι χτίστηκε από τις 11/9:
+- Kostometro: διαγραφή 72 ωρών (Η.11β) · αιτήματα KM-… με ιστορικό στον server (v92–v96) · support@ σε
+  Workspace με προώθηση σε προσωπικό Gmail · χωνί εγγραφής ως αποτύπωμα (v97) · σύνδεση Google/Microsoft,
+  κρατάμε μόνο email (v98) · ο βοηθός (AI) με Anthropic ως υπεκτελούντα, 90 ημ./24 μήνες, φωτογραφίες
+  δεν αποθηκεύονται, όριο ανά συσκευή (v99–v102) · λίστα email leads 24 μήνες · αντίγραφα D1 30 ημέρες.
+- Κάθε χρόνος τήρησης ελέγχθηκε στις σταθερές του κώδικα (tests/legal_v21.test.mjs — 5 φρουροί, 8 μεταλλάξεις).
+- Η σελίδα χτίζεται από το .md με tools/build_privacy.py (το κείμενο ζει εκτός git, στο Claude outputs/politiki/).
+- Ο βοηθός ΠΑΡΑΜΕΝΕΙ κρυφός (AG_PUBLIC=false) — ανοίγει σε επόμενη έκδοση.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01KrCkcQ2kAmUZfAj4ed8heN
