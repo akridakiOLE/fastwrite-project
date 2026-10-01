@@ -1,0 +1,9 @@
+v110 — Εκστρατεία «voithos-2»: δεύτερη επαφή με τους παλιούς leads, με τον Κώστα (έγκριση Stavros 1/10/2026)
+
+- Νέο email leadMailVoithos2 με δικό του src (?chat=1&src=voithos2) — μετριέται χωριστά στο χωνί.
+- LEAD_AUDIENCE: κοινό ανά εκστρατεία. voithos-2 = όσοι πήραν το dianomi-1 · όχι όσοι πήραν το voithos-1 · όχι όσοι έχουν ήδη ζωντανό λογαριασμό με το ίδιο email · όχι διαγραμμένοι.
+- Οι υπόλοιπες εκστρατείες χωρίς αλλαγή. Τίποτα δεν στέλνεται με το deploy.
+- tests/v110 (3 έλεγχοι / 6 μεταλλάξεις) · deploy_v000_voithos2_dry.bat (dry run, δεν στέλνει).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01KrCkcQ2kAmUZfAj4ed8heN

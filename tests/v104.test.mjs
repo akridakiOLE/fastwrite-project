@@ -46,7 +46,7 @@ await check("Κ-2 · 🔴 εκστρατεία voithos-1: σύνδεσμος μ�
   ok(m.from.includes("noreply@notify.fastwrite.tech"), "αποστολέας");
 });
 await check("Κ-3 · άγνωστη εκστρατεία → 400 · η dianomi-1 ΔΕΝ άλλαξε", async () => {
-  const r = await call({ campaign: "voithos-2", dry_run: true }); ok(r.s === 400 && r.j.error === "unknown_campaign", JSON.stringify(r.j));
+  const r = await call({ campaign: "voithos-9", dry_run: true }); ok(r.s === 400 && r.j.error === "unknown_campaign", JSON.stringify(r.j));
   sent.length = 0; const r2 = await call({ campaign: "dianomi-1", dry_run: false, limit: 1 });
   ok(r2.j.sent === 1 && sent[0].subject === "Το πρώτο βήμα είναι έτοιμο — και είσαι μέσα από την αρχή", "dianomi-1");
 });

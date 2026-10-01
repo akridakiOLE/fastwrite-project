@@ -3401,6 +3401,7 @@ async function adminLeadsImport(request, env) {
 // Το κείμενο εγκρίθηκε από τον Stavros 26/9/2026 (Α250). Κάθε αλλαγή = νέα εκστρατεία.
 function leadMail(campaign, lead) {
   if (campaign === "voithos-1") return leadMailVoithos(lead);   // v104 · οι 3 νέοι leads της 28/9, με τον Κώστα
+  if (campaign === "voithos-2") return leadMailVoithos2(lead);  // v110 · δεύτερη επαφή με όσους πήραν το dianomi-1
   if (campaign !== "dianomi-1") return null;
   // 26/9, απόφαση Stavros: ΧΩΡΙΣ όνομα. 74/89 ονόματα σε λατινικά, και η κλητική
   // («Σταύρο», όχι «Σταύρος») δεν βγαίνει αξιόπιστα με κανόνα. «Γεια σου,» = πάντα σωστό.
@@ -3498,6 +3499,40 @@ function leadMailVoithos(lead) {
   return { subject: "Ο Κώστας σε περιμένει για να στήσετε μαζί το Kostometro", html, text };
 }
 
+// KM-SERVER-V110-VOITHOS2 · «voithos-2» — εγκρίθηκε από τον Stavros 1/10/2026. Δεύτερη επαφή με όσους πήραν το
+// dianomi-1 (26/9). Δικό της src (voithos2): κάθε εγγραφή από αυτό το email μετριέται χωριστά στο χωνί.
+function leadMailVoithos2(lead) {
+  const hi = "Γεια σου,";
+  const app = LEAD_SITE + "/kostometro/?chat=1&src=voithos2";
+  const out = LEAD_SITE + "/api/km/lista?t=" + lead.token;
+  const pol = LEAD_SITE + "/legal/privacy";
+  const P = (s) => '<p style="margin:0 0 12px">' + s + "</p>";
+  const p1 = "Πριν από λίγες μέρες σου στείλαμε το Kostometro: φωτογραφίζεις το τιμολόγιο την ώρα της παραλαβής και κρατάς τι πλήρωσες σε κάθε προμηθευτή. Δωρεάν, για το κινητό.";
+  const p2a = "Ξέρουμε ότι μια νέα εφαρμογή θέλει χρόνο για να στηθεί, και χρόνος δεν περισσεύει. Γι' αυτό σου στέλνουμε τον ";
+  const p2b = ", τον ψηφιακό μας βοηθό (AI). Ανοίγεις τον σύνδεσμο από το κινητό και σε πηγαίνει βήμα-βήμα: εγκατάσταση, λογαριασμός, οι 12 λέξεις, το κλειδί για την αυτόματη ανάγνωση. Αν κολλήσεις σε μια οθόνη, του στέλνεις φωτογραφία της και σου λέει τι να πατήσεις.";
+  const p3 = "Έχεις ερωτήσεις πριν ξεκινήσεις; Τι κερδίζεις, πόσο κοστίζει το κλειδί της Google (ενδεικτικά κάτω από 1 € τον μήνα), τι έρχεται με το PRO — ρώτα τον Κώστα. Γι' αυτό είναι εκεί.";
+  const p4 = "Αν το έχεις ήδη στήσει, σε ευχαριστούμε — δεν χρειάζεται να κάνεις τίποτα.";
+  const html = '<!doctype html><html lang="el"><body style="margin:0;padding:0;background:#f4f5f7">' +
+    '<div style="max-width:600px;margin:0 auto;padding:24px 20px;background:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#1a1f29">' +
+    P(escHtml(hi)) + P(p1) + P(p2a + "<b>Κώστα</b>" + p2b) +
+    '<p style="margin:18px 0"><a href="' + app + '" style="display:inline-block;background:#00E5A0;color:#0a0e14;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px">Άνοιξε το Kostometro με τον Κώστα</a></p>' +
+    P(p3) + P(p4) + P("Η ομάδα του Kostometro") +
+    '<hr style="border:0;border-top:1px solid #e3e5ea;margin:26px 0 14px">' +
+    '<p style="margin:0;font-size:12px;color:#6b7385">Λαμβάνεις αυτό το μήνυμα γιατί άφησες το email σου στη φόρμα μας στο Facebook. <a href="' + out + '" style="color:#6b7385">Διαγραφή από τη λίστα</a> · <a href="' + pol + '" style="color:#6b7385">Πολιτική απορρήτου</a></p>' +
+    "</div></body></html>";
+  const text = [hi, "", p1, "", p2a + "Κώστα" + p2b, "", "Άνοιξε το Kostometro με τον Κώστα: " + app, "", p3, "", p4, "",
+    "Η ομάδα του Kostometro", "", "---",
+    "Λαμβάνεις αυτό το μήνυμα γιατί άφησες το email σου στη φόρμα μας στο Facebook. Διαγραφή από τη λίστα: " + out,
+    "Πολιτική απορρήτου: " + pol].join("\n");
+  return { subject: "Σου στήνουμε το Kostometro σε 5 λεπτά — μαζί με τον Κώστα", html, text };
+}
+
+// v110 · ΚΟΙΝΟ ΑΝΑ ΕΚΣΤΡΑΤΕΙΑ: ποιοι ΠΡΕΠΕΙ να έχουν πάρει ποια (need), ποιοι αποκλείονται (skip), και αν
+// αποκλείονται όσοι έχουν ήδη λογαριασμό με το ίδιο email. Εκστρατεία χωρίς γραμμή εδώ = όλοι (όπως πριν).
+const LEAD_AUDIENCE = {
+  "voithos-2": { need: ["dianomi-1"], skip: ["voithos-1"], skipAccounts: true },
+};
+
 async function adminLeadsSend(request, env) {
   if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
   const b = (await safeJson(request)) || {};
@@ -3513,6 +3548,12 @@ async function adminLeadsSend(request, env) {
   let sql = `SELECT l.email, l.name, l.token FROM km_leads l
              WHERE l.unsub_at IS NULL
                AND (? OR NOT EXISTS (SELECT 1 FROM km_lead_sends s WHERE s.email = l.email AND s.campaign = ? AND s.ok = 1))`;
+  const aud = LEAD_AUDIENCE[campaign];
+  if (aud) {
+    for (const c of aud.need || []) { sql += " AND EXISTS (SELECT 1 FROM km_lead_sends n WHERE n.email = l.email AND n.campaign = ? AND n.ok = 1)"; args.push(c); }
+    for (const c of aud.skip || []) { sql += " AND NOT EXISTS (SELECT 1 FROM km_lead_sends k WHERE k.email = l.email AND k.campaign = ? AND k.ok = 1)"; args.push(c); }
+    if (aud.skipAccounts) sql += " AND NOT EXISTS (SELECT 1 FROM km_accounts a WHERE a.email = l.email AND a.deleted IS NULL)";
+  }
   if (only) { sql += " AND l.email = ?"; args.push(only); }
   const pending = (await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM (${sql})`).bind(...args).first() || {}).n || 0;
