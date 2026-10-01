@@ -1,0 +1,12 @@
+v104 — Ο βοηθός λέγεται «Κώστας» (AI) · εκστρατεία «voithos-1» για τους 3 νέους leads της 28/9
+
+Αποφάσεις Stavros 1/10/2026:
+- Ένας βοηθός, ένα όνομα: «Κώστας · βοηθός Kostometro (AI)» — η ένδειξη AI κολλημένη στο όνομα παντού
+  (κανόνες server, κεφαλίδα και συγκατάθεση εφαρμογής, πρώτο μήνυμα, θέμα email, ειδοποίηση support@).
+- Εκστρατεία «voithos-1» (κείμενο εγκεκριμένο 1/10): σύνδεσμος fastwrite.tech/kostometro/?chat=1&src=leads
+  (ο Κώστας ανάβει μόνο σε εκείνη τη συσκευή· παραμένει κρυφός για όλους τους άλλους, AG_PUBLIC=false),
+  διαγραφή με token, πολιτική v2.1. Το dianomi-1 δεν αλλάζει.
+- Τεστ: tests/v104.test.mjs — 3 φρουροί, 6 αποδείξεις μετάλλαξης · v100 στο νέο όνομα.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01KrCkcQ2kAmUZfAj4ed8heN

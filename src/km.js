@@ -1,4 +1,5 @@
 // KM-SERVER-V60-H11B  ← σημάδι έκδοσης· το ψάχνει το deploy_km_h11b.bat
+// KM-SERVER-V104-KOSTAS  ← σημάδι: ο βοηθός λέγεται «Κώστας» + εκστρατεία «voithos-1» στους 3 νέους leads (1/10/2026)
 // KM-SERVER-V102-AGENT  ← σημάδι: βοηθός ΜΟΝΟ για την εγκατάσταση + όριο 30 μηνυμάτων ανά συσκευή (30/9/2026)
 // KM-SERVER-V100-AGENT  ← σημάδι: θέμα email πελάτη ουδέτερο + καθάρισμα μοναχικού χαρακτήρα (30/9/2026)
 // KM-SERVER-V99-AGENT  ← σημάδι: Βοηθός Kostometro, Φάση 1 (29/9/2026)
@@ -1158,7 +1159,7 @@ const AGENT_PRICE = { in: 2, out: 10, cache_read: 0.2, cache_write: 2.5 };
 const AGENT_SECRET_RE = [/\bAIza[0-9A-Za-z_-]{30,}/, /\bAQ\.[0-9A-Za-z_-]{20,}/, /\bsk-ant-[0-9A-Za-z_-]{20,}/];
 const AGENT_IMG_MIME = { "image/jpeg": 1, "image/png": 1, "image/webp": 1 };
 // v100 · ουδέτερο θέμα αιτήματος: ο πελάτης βλέπει «Re: Βοηθός Kostometro [KM-E-…]». Η περίληψη μένει ΜΟΝΟ στο εσωτερικό email.
-const AGENT_TOPIC = "Βοηθός Kostometro";
+const AGENT_TOPIC = "Κώστας · βοηθός Kostometro";   // v104 · το όνομα (απόφαση Stavros 1/10)
 
 // ═══ v102 · ΒΟΗΘΟΣ ΜΟΝΟ ΓΙΑ ΤΗΝ ΕΓΚΑΤΑΣΤΑΣΗ (απόφαση Stavros 30/9/2026) ═══
 // Ο ρόλος του είναι να φέρει τον χρήστη ως το τέλος της εγγραφής — μετά φεύγει. Ο SERVER το επιβάλλει,
@@ -1217,7 +1218,7 @@ async function agentKnowledge(env) {
 }
 
 const AGENT_RULES = [
-  "Είσαι ο «Βοηθός Kostometro», βοηθός τεχνητής νοημοσύνης (AI) της FastWrite. ΔΕΝ είσαι άνθρωπος και το λες αν ρωτηθείς.",
+  "Είσαι ο «Κώστας», ο ψηφιακός βοηθός του Kostometro — βοηθός τεχνητής νοημοσύνης (AI) της FastWrite. ΔΕΝ είσαι άνθρωπος: το λες αν ρωτηθείς και δεν προσποιείσαι ποτέ το αντίθετο. Συστήνεσαι ως «Κώστας (AI)» μόνο την πρώτη φορά, μετά απλά βοηθάς.",
   "ΣΤΟΧΟΣ: ο χρήστης να φύγει με το Kostometro στο κινητό του, λογαριασμό, τις 12 λέξεις γραμμένες σε χαρτί και (αν θέλει) κλειδί Gemini που δουλεύει. Ένα βήμα τη φορά, σύντομα, απλά ελληνικά (ή στη γλώσσα του χρήστη). Ρώτα τι βλέπει στην οθόνη του· αν χρειάζεται, ζήτα φωτογραφία οθόνης (📎).",
   "ΜΙΛΑΣ ΜΟΝΟ για το Kostometro / FastWrite. Για οτιδήποτε άλλο: ευγενική άρνηση σε μία πρόταση και επιστροφή στο θέμα.",
   "ΛΕΣ ΜΟΝΟ ό,τι υπάρχει στη ΓΝΩΣΗ πιο κάτω. Δεν υπόσχεσαι τιμές, ημερομηνίες ή λειτουργίες που δεν γράφονται εκεί (π.χ. PRO: «έρχεται, δεν έχουμε ακόμα ημερομηνία»). Αν δεν ξέρεις, το λες και προτείνεις άνθρωπο.",
@@ -1263,7 +1264,7 @@ async function agentHandoff(env, sess, input) {
   const summary = String((input && input.summary) || "").replace(/\s+/g, " ").trim().slice(0, 300) || "Βοήθεια από τον Βοηθό";
   const rows = (await env.DB.prepare("SELECT role, body FROM km_agent_messages WHERE session_id = ? ORDER BY id DESC LIMIT 60").bind(sess.id).all()).results || [];
   const convo = rows.reverse().map((m) => (m.role === "user" ? "Χρήστης: " : "Βοηθός: ") + m.body).join("\n\n");
-  const body = supBody("Από τον Βοηθό Kostometro (AI).\nΠερίληψη: " + summary + "\n\n— Η συζήτηση —\n\n" + convo);
+  const body = supBody("Από τον Κώστα, τον βοηθό Kostometro (AI).\nΠερίληψη: " + summary + "\n\n— Η συζήτηση —\n\n" + convo);
   const t = now();
   await env.DB.batch([
     env.DB.prepare("INSERT OR IGNORE INTO km_support_tickets (code, scope, issued_at, arrived_at) VALUES (?, 'E', ?, ?)").bind(code, t, t),
@@ -1275,7 +1276,7 @@ async function agentHandoff(env, sess, input) {
   sess.ticket = code; sess.email = email;
   // Προς support@ από το noreply@notify → το Apps Script το ΠΑΡΑΚΑΜΠΤΕΙ (καμία αυτόματη απάντηση).
   // Reply-To = support@: η απάντηση του Stavros ακολουθεί τη ΓΝΩΣΤΗ διαδρομή (KM-E στο θέμα).
-  const lines = ["Νέο αίτημα από τον Βοηθό Kostometro: " + code, "Πελάτης: " + email, "Περίληψη: " + summary, "",
+  const lines = ["Νέο αίτημα από τον Κώστα (βοηθό AI): " + code, "Πελάτης: " + email, "Περίληψη: " + summary, "",
     "ΑΠΑΝΤΗΣΗ: πάτα «Απάντηση» — πάει στο support@ με το " + code + " στο θέμα και φεύγει στον πελάτη όπως κάθε αίτημα.", "", "— Η συζήτηση —", "", convo];
   await supMail(env, "agent", { to: MAIL_SUPPORT, from: MAIL_FROM, replyTo: MAIL_SUPPORT,
     subject: "[Agent] " + code + " · Kostometro · " + summary.slice(0, 50),
@@ -3211,6 +3212,7 @@ async function adminLeadsImport(request, env) {
 
 // Το κείμενο εγκρίθηκε από τον Stavros 26/9/2026 (Α250). Κάθε αλλαγή = νέα εκστρατεία.
 function leadMail(campaign, lead) {
+  if (campaign === "voithos-1") return leadMailVoithos(lead);   // v104 · οι 3 νέοι leads της 28/9, με τον Κώστα
   if (campaign !== "dianomi-1") return null;
   // 26/9, απόφαση Stavros: ΧΩΡΙΣ όνομα. 74/89 ονόματα σε λατινικά, και η κλητική
   // («Σταύρο», όχι «Σταύρος») δεν βγαίνει αξιόπιστα με κανόνα. «Γεια σου,» = πάντα σωστό.
@@ -3273,6 +3275,39 @@ function leadMail(campaign, lead) {
     "Πολιτική απορρήτου: " + pol,
   ].join("\n");
   return { subject: "Το πρώτο βήμα είναι έτοιμο — και είσαι μέσα από την αρχή", html, text };
+}
+
+// v104 · «voithos-1» — εγκρίθηκε από τον Stavros 1/10/2026 (Α250). Ένας στόχος: να ανοίξουν τον σύνδεσμο με τον Κώστα
+// από το κινητό. ?chat=1 ανάβει τον βοηθό ΜΟΝΟ σε εκείνη τη συσκευή (κρυφός για όλους τους άλλους) · ?src=leads μετράει στο χωνί.
+function leadMailVoithos(lead) {
+  const hi = "Γεια σου,";
+  const app = LEAD_SITE + "/kostometro/?chat=1&src=leads";
+  const out = LEAD_SITE + "/api/km/lista?t=" + lead.token;
+  const pol = LEAD_SITE + "/legal/privacy";
+  const P = (s) => '<p style="margin:0 0 12px">' + s + "</p>";
+  const html = '<!doctype html><html lang="el"><body style="margin:0;padding:0;background:#f4f5f7">' +
+    '<div style="max-width:600px;margin:0 auto;padding:24px 20px;background:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#1a1f29">' +
+    P(escHtml(hi)) +
+    P("Άφησες το email σου στο Facebook για να δεις πρώτος το Kostometro: φωτογραφίζεις το τιμολόγιο την ώρα της παραλαβής και κρατάς τι πλήρωσες σε κάθε προμηθευτή. Δωρεάν, για το κινητό.") +
+    P("Για να μη χαθείς στο στήσιμο, σου στέλνουμε τον <b>Κώστα</b>, τον ψηφιακό μας τεχνικό (AI). Ανοίγεις τον σύνδεσμο από το κινητό, του λες «θέλω να το βάλω», και σε πηγαίνει βήμα-βήμα: εγκατάσταση, λογαριασμός, οι 12 λέξεις, το κλειδί για την αυτόματη ανάγνωση. Αν κολλήσεις σε μια οθόνη, του στέλνεις φωτογραφία της και σου λέει τι να πατήσεις.") +
+    '<p style="margin:18px 0"><a href="' + app + '" style="display:inline-block;background:#00E5A0;color:#0a0e14;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px">Άνοιξε το Kostometro με τον Κώστα</a></p>' +
+    P("Πέντε λεπτά, από το κινητό, με το τιμολόγιο της επόμενης παραλαβής στο χέρι.") +
+    P("Η ομάδα του Kostometro") +
+    '<hr style="border:0;border-top:1px solid #e3e5ea;margin:26px 0 14px">' +
+    '<p style="margin:0;font-size:12px;color:#6b7385">Λαμβάνεις αυτό το μήνυμα γιατί άφησες το email σου στη φόρμα μας στο Facebook. <a href="' + out + '" style="color:#6b7385">Διαγραφή από τη λίστα</a> · <a href="' + pol + '" style="color:#6b7385">Πολιτική απορρήτου</a></p>' +
+    "</div></body></html>";
+  const text = [
+    hi, "",
+    "Άφησες το email σου στο Facebook για να δεις πρώτος το Kostometro: φωτογραφίζεις το τιμολόγιο την ώρα της παραλαβής και κρατάς τι πλήρωσες σε κάθε προμηθευτή. Δωρεάν, για το κινητό.", "",
+    "Για να μη χαθείς στο στήσιμο, σου στέλνουμε τον Κώστα, τον ψηφιακό μας τεχνικό (AI). Ανοίγεις τον σύνδεσμο από το κινητό, του λες «θέλω να το βάλω», και σε πηγαίνει βήμα-βήμα: εγκατάσταση, λογαριασμός, οι 12 λέξεις, το κλειδί για την αυτόματη ανάγνωση. Αν κολλήσεις σε μια οθόνη, του στέλνεις φωτογραφία της και σου λέει τι να πατήσεις.", "",
+    "Άνοιξε το Kostometro με τον Κώστα: " + app, "",
+    "Πέντε λεπτά, από το κινητό, με το τιμολόγιο της επόμενης παραλαβής στο χέρι.", "",
+    "Η ομάδα του Kostometro", "",
+    "---",
+    "Λαμβάνεις αυτό το μήνυμα γιατί άφησες το email σου στη φόρμα μας στο Facebook. Διαγραφή από τη λίστα: " + out,
+    "Πολιτική απορρήτου: " + pol,
+  ].join("\n");
+  return { subject: "Ο Κώστας σε περιμένει για να στήσετε μαζί το Kostometro", html, text };
 }
 
 async function adminLeadsSend(request, env) {

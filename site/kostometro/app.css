@@ -702,6 +702,7 @@ textarea.km-ta:focus{outline:none;border-color:var(--accent)}
 .ag[hidden],.ag-fab[hidden]{display:none}
 @media (min-width:700px){.ag{inset:auto 16px 16px auto;width:420px;height:min(640px,calc(100vh - 32px));border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.5)}}
 .ag-h{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.ag-sub{color:var(--text2);font-weight:400;font-size:14px}
 .ag-ai{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:8px;background:var(--accent-dim);color:var(--accent);font-size:12px;font-weight:700}
 .ag-x{background:none;border:0;color:var(--text2);font-size:20px;cursor:pointer;padding:4px 8px}
 .ag-consent{padding:16px;overflow:auto;display:flex;flex-direction:column;gap:12px;font-size:15px;line-height:1.5}

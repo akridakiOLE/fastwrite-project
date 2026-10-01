@@ -74,7 +74,7 @@ await check("Ν100-3 · 🔴 «άνθρωπος»: το θέμα του αιτή
   const r = await chat({ sid: env.__sid, install_id: "km_t1", text: "θέλω άνθρωπο" });
   ok(r.j.ticket === "KM-E-000001", JSON.stringify(r.j));
   const c = db.prepare("SELECT topic FROM km_support_cases WHERE code = 'KM-E-000001'").get();
-  ok(c && c.topic === "Βοηθός Kostometro", "topic = " + JSON.stringify(c));
+  ok(c && c.topic === "Κώστας · βοηθός Kostometro", "topic = " + JSON.stringify(c));   // v104: όνομα
   ok(mails.length === 1 && /^\[Agent\] KM-E-000001 · Kostometro · Ο χρήστης δεν έχει/.test(mails[0].subject), "εσωτερικό θέμα: " + (mails[0] && mails[0].subject));
 });
 
