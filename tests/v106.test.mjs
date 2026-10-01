@@ -177,7 +177,9 @@ await check("Ρ-8 · εφαρμογή: ?reopen= μετά το boot · κουμπ
   ok(html.includes('<button class="btn ghost" id="hp-kostas-go">💬 Μίλα με τον Κώστα (AI)</button>') && html.includes('id="hp-kostas" class="hp-kostas" hidden'), "κουμπί");
   ok(js.includes("var kOn = (AG_PUBLIC || agLS(AG.on) === '1') && !!localStorage.getItem(LS.reg);"), "κρυφό όσο ο βοηθός είναι κρυφός");
   ok(wk.includes("ctx.waitUntil(kmAgentFollowups(env).then(") && wk.indexOf("kmAgentFollowups(env).then(") > wk.indexOf('if (cron === "0 3 * * *")') + 400, "ωριαίο cron");
-  ok(js.includes("var APP_VER = 'φέτα 3 · v106';") && readFileSync("site/kostometro/sw.js", "utf8").includes("var CACHE = 'km-v106';"), "έκδοση");
+  // v111: η έκδοση διαβάζεται από το version.json — ανεβαίνει σε κάθε deploy (απόφαση Stavros 1/10)
+  const V = JSON.parse(readFileSync("site/kostometro/version.json", "utf8")).v;
+  ok(js.includes("var APP_VER = 'φέτα 3 · " + V + "';") && readFileSync("site/kostometro/sw.js", "utf8").includes("var CACHE = 'km-" + V + "';"), "έκδοση");
 });
 await check("Ρ-9 · τήρηση: ραντεβού και άδειες σβήνονται στους 24 μήνες", async () => {
   const old = new Date(Date.now() - 800 * 86400000).toISOString();

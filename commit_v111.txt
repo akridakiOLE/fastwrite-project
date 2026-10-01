@@ -1,0 +1,8 @@
+v111 — Ο αριθμός έκδοσης της εφαρμογής ανεβαίνει σε v111
+
+- Μετά τα v107–v110 (μόνο server) η εφαρμογή έδειχνε v106· από τώρα ο αριθμός ανεβαίνει σε κάθε deploy (απόφαση Stavros 1/10/2026), για εύκολο έλεγχο στο κινητό.
+- tests/v106: η έκδοση διαβάζεται από το version.json αντί για καρφωτό v106.
+- Καμία αλλαγή λειτουργίας.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01KrCkcQ2kAmUZfAj4ed8heN
