@@ -2863,7 +2863,9 @@ function pkFilters(p) {
   const g = (k, max) => (p.get(k) || "").trim().slice(0, max || 60);
   const from = g("from", 10), to = g("to", 10), q = g("q", 80);
   const src = g("src"), ref = g("ref"), cty = g("cty", 8), st = g("st", 10);
+  const since = pkSince(p);
   const w = ["a.deleted IS NULL"], args = [];
+  if (since) { w.push("a.created >= ?"); args.push(cyMidnightUtc(since)); }   // KM-PK-SINCE
   if (from) { w.push("a.created >= ?"); args.push(from + "T00:00:00.000Z"); }
   if (to)   { w.push("a.created <= ?"); args.push(to + "T23:59:59.999Z"); }
   if (q)    { w.push("a.email LIKE ?"); args.push("%" + q + "%"); }
@@ -2875,7 +2877,22 @@ function pkFilters(p) {
   else if (st === "paid")    w.push("a.plan IS NOT NULL");
   else if (st === "key")     w.push("a.has_key = 1");
   else if (st === "quiet")   w.push("a.last_sync IS NULL");
-  return { where: " WHERE " + w.join(" AND "), args, echo: { from, to, q, src, ref, cty, st } };
+  return { where: " WHERE " + w.join(" AND "), args, echo: { from, to, q, src, ref, cty, st, since } };
+}
+
+/* ══ KM-PK-SINCE · 2/10/2026 — «ΑΠΟ ΗΜΕΡΟΜΗΝΙΑ» (αίτημα Stavros) ═══════════
+   Ένα πεδίο στην κορυφή του Πίνακα: ΟΛΑ τα νούμερα του Kostometro μετράνε
+   από τα μεσάνυχτα ΚΥΠΡΟΥ εκείνης της μέρας και μετά — για να φαίνεται
+   καθαρά μια καμπάνια (Fasi3 από 3/10) χωρίς τις δοκιμές πριν από αυτήν.
+   Μόνο YYYY-MM-DD· οτιδήποτε άλλο = κανένα φίλτρο (όχι σφάλμα, όχι SQL).
+   Οι «σήμερα / 7 / 30 ημέρες» μένουν παράθυρα, αλλά ΠΟΤΕ πριν από το since.
+   ⚠ Η ζώνη FastWrite (Hetzner) ΔΕΝ φιλτράρεται ακόμα — το λέει η οθόνη. */
+function pkSince(p) {
+  const v = String((p && p.get("since")) || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "";
+  const d = new Date(v + "T12:00:00Z");
+  if (isNaN(d) || d.toISOString().slice(0, 10) !== v) return "";
+  return v;
 }
 
 async function adminPinakas(request, env) {
@@ -2887,6 +2904,12 @@ async function adminPinakas(request, env) {
   const d1 = cyMidnightUtc(today), d7 = cyMidnightUtc(cyShift(today, -6)), d30 = cyMidnightUtc(cyShift(today, -29));
   const one = async (sql, ...args) => ((await env.DB.prepare(sql).bind(...args).first()) || {});
   const all = async (sql, ...args) => (await env.DB.prepare(sql).bind(...args).all()).results || [];
+  // KM-PK-SINCE — s0 = μεσάνυχτα Κύπρου του since σε UTC· mx(x) = το αργότερο από x και s0.
+  const since = pkSince(params), s0 = since ? cyMidnightUtc(since) : "";
+  const mx = (x) => (s0 && s0 > x ? s0 : x);
+  const SA = s0 ? [s0] : [];
+  const andC = (col) => (s0 ? " AND " + col + " >= ?" : "");
+  const whereC = (col) => (s0 ? " WHERE " + col + " >= ?" : "");
 
   // ── Γρήγορες έξοδοι: «δείξε μου κι άλλους» ───────────────────────────
   // Το κουμπί «κι άλλους» ΔΕΝ ξαναϋπολογίζει σύνολα και ΔΕΝ ξαναρωτάει τον
@@ -2917,17 +2940,17 @@ async function adminPinakas(request, env) {
             SUM(CASE WHEN deleted IS NULL THEN folder_bytes ELSE 0 END) AS bytes,
             SUM(CASE WHEN deleted IS NULL AND has_key = 1 THEN 1 ELSE 0 END) AS with_gemini_key,
             SUM(CASE WHEN deleted IS NULL AND plan IS NOT NULL THEN 1 ELSE 0 END) AS paid
-     FROM km_accounts`, d1, d7, d30, d7, d30);
+     FROM km_accounts${whereC("created")}`, d1, d7, d30, d7, d30, ...SA);
 
   // ── (α) ΑΠΟ ΠΟΥ ───────────────────────────────────────────────────────
   const bySource = await all(
     `SELECT COALESCE(source, '(άγνωστη)') AS source, COUNT(*) AS n
-     FROM km_accounts WHERE deleted IS NULL GROUP BY source ORDER BY n DESC`);
+     FROM km_accounts WHERE deleted IS NULL${andC("created")} GROUP BY source ORDER BY n DESC`, ...SA);
 
   // ── (γ) ΠΟΙΟΣ ΣΥΣΤΗΣΕ ΠΟΙΟΝ ───────────────────────────────────────────
   const byRef = await all(
     `SELECT ref, COUNT(*) AS n FROM km_accounts
-     WHERE deleted IS NULL AND ref IS NOT NULL AND ref <> '' GROUP BY ref ORDER BY n DESC LIMIT 50`);
+     WHERE deleted IS NULL AND ref IS NOT NULL AND ref <> ''${andC("created")} GROUP BY ref ORDER BY n DESC LIMIT 50`, ...SA);
 
   // ── ανά ημέρα, 30 ημέρες ──────────────────────────────────────────────
   /* KM-PK-CALDAY — ανά ΩΡΑ από τη βάση (το πολύ 720 γραμμές, όσοι κι αν
@@ -2937,7 +2960,7 @@ async function adminPinakas(request, env) {
   const perHour = await all(
     `SELECT substr(created, 1, 13) AS h, COUNT(*) AS n,
             SUM(CASE WHEN deleted IS NOT NULL THEN 1 ELSE 0 END) AS gone
-     FROM km_accounts WHERE created >= ? GROUP BY h`, d30);
+     FROM km_accounts WHERE created >= ? GROUP BY h`, mx(d30));
   const perDay = [], dayIdx = {};
   for (let i = 29; i >= 0; i--) { const day = cyShift(today, -i); dayIdx[day] = perDay.length; perDay.push({ day, n: 0, gone: 0 }); }
   for (const r of perHour) {
@@ -2949,7 +2972,7 @@ async function adminPinakas(request, env) {
   // ── χώρες ─────────────────────────────────────────────────────────────
   const byCountry = await all(
     `SELECT COALESCE(country, '?') AS country, COUNT(*) AS n
-     FROM km_accounts WHERE deleted IS NULL GROUP BY country ORDER BY n DESC LIMIT 20`);
+     FROM km_accounts WHERE deleted IS NULL${andC("created")} GROUP BY country ORDER BY n DESC LIMIT 20`, ...SA);
 
   // ── συσκευές ──────────────────────────────────────────────────────────
   const dev = await one(
@@ -2957,22 +2980,22 @@ async function adminPinakas(request, env) {
             COUNT(DISTINCT install_id) AS distinct_devices,
             SUM(CASE WHEN last_seen >= ? THEN 1 ELSE 0 END) AS seen_7d,
             SUM(CASE WHEN unsynced > 0 THEN 1 ELSE 0 END) AS with_unsynced
-     FROM km_device_links`, d7);
+     FROM km_device_links${whereC("created")}`, d7, ...SA);
 
   // ── εκκρεμείς διαγραφές (Η.11β) — μόνο ημερομηνίες, ΟΧΙ email ─────────
   const pending = await all(
     `SELECT substr(folder_id, 1, 8) AS folder, delete_requested_at, delete_due_at
-     FROM km_accounts WHERE deleted IS NULL AND delete_due_at IS NOT NULL ORDER BY delete_due_at`);
+     FROM km_accounts WHERE deleted IS NULL AND delete_due_at IS NOT NULL${andC("delete_requested_at")} ORDER BY delete_due_at`, ...SA);
 
   // ── email + γνώμες ────────────────────────────────────────────────────
   const mail = await one(
     `SELECT COUNT(*) AS sent, SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END) AS ok,
             SUM(CASE WHEN ok = 0 THEN 1 ELSE 0 END) AS failed
-     FROM km_mail_log WHERE at >= ?`, d30);
+     FROM km_mail_log WHERE at >= ?`, mx(d30));
   const fb = await one(
     `SELECT COUNT(*) AS n, AVG(stars) AS avg_stars,
             SUM(CASE WHEN email IS NOT NULL THEN 1 ELSE 0 END) AS want_reply
-     FROM km_feedback`);
+     FROM km_feedback${since ? " WHERE month >= ?" : ""}`, ...(since ? [since.slice(0, 7)] : []));
 
   // v95 · KM-SUP-THREAD — αιτήματα υποστήριξης: τι περιμένει ΕΜΑΣ
   let sup = { open: 0, waiting_24h: 0, answered: 0, closed_7d: 0 };
@@ -2983,23 +3006,23 @@ async function adminPinakas(request, env) {
               SUM(CASE WHEN status = 'open' AND last_in_at < ? THEN 1 ELSE 0 END) AS waiting_24h,
               SUM(CASE WHEN status = 'answered' THEN 1 ELSE 0 END) AS answered,
               SUM(CASE WHEN status = 'closed' AND closed_at >= ? THEN 1 ELSE 0 END) AS closed_7d
-       FROM km_support_cases`).bind(h24, d7).first();
+       FROM km_support_cases${whereC("created_at")}`).bind(h24, d7, ...SA).first();
     sup = { open: Number(s && s.open) || 0, waiting_24h: Number(s && s.waiting_24h) || 0, answered: Number(s && s.answered) || 0, closed_7d: Number(s && s.closed_7d) || 0 };
   } catch (e) { /* πριν τη μετάβαση της βάσης ο Πίνακας ΔΕΝ πέφτει */ }
 
   // v97 · KM-FUNNEL — χωνί 30 ημερών ανά προέλευση + κάρτα leads (διαγραφές από τη λίστα)
   let funnel = [], leads = null;
   try {
-    funnel = await all("SELECT src, step, COUNT(*) AS n FROM km_funnel WHERE at >= ? GROUP BY src, step", d30);
+    funnel = await all("SELECT src, step, COUNT(*) AS n FROM km_funnel WHERE at >= ? GROUP BY src, step", s0 || d30);
   } catch (e) { funnel = []; }
   try {
     const lt = await one(
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN unsub_at IS NOT NULL THEN 1 ELSE 0 END) AS unsub,
               SUM(CASE WHEN stay_at IS NOT NULL THEN 1 ELSE 0 END) AS stay
-       FROM km_leads`);
-    const ls = await all("SELECT campaign, COUNT(*) AS n, SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END) AS ok FROM km_lead_sends GROUP BY campaign");
-    const lu = await all("SELECT email, name, unsub_at FROM km_leads WHERE unsub_at IS NOT NULL ORDER BY unsub_at DESC LIMIT 50");
+       FROM km_leads${whereC("imported_at")}`, ...SA);
+    const ls = await all("SELECT campaign, COUNT(*) AS n, SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END) AS ok FROM km_lead_sends" + whereC("at") + " GROUP BY campaign", ...SA);
+    const lu = await all("SELECT email, name, unsub_at FROM km_leads WHERE unsub_at IS NOT NULL" + andC("unsub_at") + " ORDER BY unsub_at DESC LIMIT 50", ...SA);
     leads = { total: Number(lt.total) || 0, unsub: Number(lt.unsub) || 0, stay: Number(lt.stay) || 0, sends: ls, unsub_list: lu };
   } catch (e) { leads = null; }
 
@@ -3018,6 +3041,7 @@ async function adminPinakas(request, env) {
     ok: true,
     at: nowIso,
     today: today,
+    since: since || null,   // KM-PK-SINCE
     fastwrite,
     totals: {
       live: tot.live || 0, tombstones: tot.tombstones || 0, pending_delete: tot.pending_delete || 0,

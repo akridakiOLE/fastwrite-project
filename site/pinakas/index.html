@@ -149,6 +149,15 @@ html[data-gate="data"] #s-key  { display: none !important; }
 html:not([data-gate]) #s-key,
 html:not([data-gate]) #s-data  { display: none !important; }
 
+/* KM-PK-SINCE · 2/10/2026 — το πεδίο «Μετράω από» στην κορυφή. */
+.since-row { display: flex; align-items: center; gap: 10px; }
+.since-lab { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.since-row input { flex: 1; min-width: 0; background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  border-radius: 10px; padding: 10px; font-size: 16px; font-family: inherit; }
+.since-row .btn { padding: 10px 12px; }
+.since-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.since-card.on .since-lab { color: var(--accent); }
+#since-note { margin-top: 6px; }
 /* Δ3 · η επιλογή μεγέθους δίπλα στο «Κι άλλους». */
 .pg-n { display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; font-size: 13px; opacity: .85; }
 .pg-n select, .pg-n input { min-height: 34px; padding: 4px 8px; border-radius: 8px;
@@ -194,6 +203,17 @@ html:not([data-gate]) #s-data  { display: none !important; }
 <div id="s-data" hidden>
 
   <p class="err" id="err" hidden></p>
+
+  <!-- KM-PK-SINCE · 2/10/2026 — αίτημα Stavros: «από αυτή την ημερομηνία και μετά».
+       Μένει στη συσκευή (pk_since) — ΔΕΝ σβήνει με έξοδο / αλλαγή κλειδιού. -->
+  <section class="card since-card" id="since-card">
+    <div class="since-row">
+      <label for="since" class="since-lab">Μετράω από</label>
+      <input type="date" id="since">
+      <button class="btn ghost" id="since-clr" type="button">Όλα</button>
+    </div>
+    <p class="fine hint" id="since-note"></p>
+  </section>
 
   <!-- ═══ ΖΩΝΗ 1: KOSTOMETRO FREE ═══ -->
   <div class="band"><h3>Kostometro</h3><span class="pill acc">Free</span><span class="ln"></span></div>

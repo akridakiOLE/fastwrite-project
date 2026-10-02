@@ -6,6 +6,27 @@
 (function () {
   var el = function (id) { return document.getElementById(id); };
   var KEY = 'pk_admin_key';
+  /* KM-PK-SINCE · 2/10/2026 — «Μετράω από». Χωριστό κλειδί από το pk_admin_key:
+     η έξοδος / αλλαγή κλειδιού σβήνει ΜΟΝΟ το κλειδί, ποτέ την ημερομηνία.
+     Αλλάζει ΜΟΝΟ όταν την αλλάξει ο Stavros (αίτημα 2/10). */
+  var SINCE = 'pk_since';
+  function sinceGet() {
+    var v = '';
+    try { v = localStorage.getItem(SINCE) || ''; } catch (e) {}
+    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
+  }
+  function sinceSet(v) {
+    try { if (v) { localStorage.setItem(SINCE, v); } else { localStorage.removeItem(SINCE); } } catch (e) {}
+  }
+  function sincePaint() {
+    var v = sinceGet(), inp = el('since');
+    if (inp && inp.value !== v) { inp.value = v; }
+    el('since-card').classList.toggle('on', !!v);
+    var p = v ? v.split('-') : null;
+    el('since-note').innerHTML = v
+      ? 'Όλα τα νούμερα του <b>Kostometro</b> μετράνε από <b>' + p[2] + '/' + p[1] + '/' + p[0] + '</b> και μετά (ώρα Κύπρου). Μένει έτσι ώσπου να το αλλάξεις. <span class="muted">Η ζώνη FastWrite δεν φιλτράρεται ακόμα.</span>'
+      : 'Χωρίς ημερομηνία: όλα από την αρχή. Διάλεξε μέρα για να μετράνε όλα από εκείνη και μετά.';
+  }
   var API = '/api/km/admin/pinakas';
   var PAGE = 100;
 
@@ -420,6 +441,7 @@
     /* Η πρώτη φόρτωση σέβεται κι αυτή την επιλογή μεγέθους. Το fn μένει
        PAGE: η ζώνη FastWrite είναι ο Hetzner και δεν άλλαξε (Δ3 = Kostometro). */
     p.set('n', accN()); p.set('fn', PAGE);
+    if (sinceGet()) { p.set('since', sinceGet()); }   // KM-PK-SINCE
     api(p).then(function (j) {
       gate('data');
       el('s-key').hidden = true; el('s-data').hidden = false;
@@ -436,6 +458,7 @@
     /* Δ3 · ΣΕΛΙΔΟΔΕΙΚΤΗΣ αντί για OFFSET. Στέλνουμε πού σταματήσαμε, όχι
        πόσα να προσπεράσει: η 200ή σελίδα κοστίζει όσο η πρώτη. */
     p.set('only', 'km'); p.set('n', accN());
+    if (sinceGet()) { p.set('since', sinceGet()); }   // KM-PK-SINCE — και η λίστα σέβεται την ημερομηνία
     if (append && st.kmNext) { p.set('ac', st.kmNext.c); p.set('ar', st.kmNext.r); }
     api(p).then(function (j) { renderKmAcc(j, append); })
       .catch(fail).then(function () { busy = false; b.disabled = false; done(); });
@@ -478,10 +501,18 @@
   };
   el('key').addEventListener('keydown', function (e) { if (e.key === 'Enter') el('b-save').click(); });
   el('b-refresh').onclick = load;
+  /* KM-PK-SINCE — αλλαγή = αποθήκευση + πλήρης φόρτωση (σύνολα + λίστα). */
+  el('since').addEventListener('change', function () {
+    var v = String(el('since').value || '').trim();
+    sinceSet(/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
+    sincePaint(); load();
+  });
+  el('since-clr').onclick = function () { sinceSet(''); sincePaint(); load(); };
   el('b-key').onclick = function () { showKeyScreen(); };
 
   if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/pinakas/sw.js').catch(function () {}); }
   wireDatePickers();
   wireAccN();
+  sincePaint();
   load();
 })();
