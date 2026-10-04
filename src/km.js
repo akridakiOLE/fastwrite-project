@@ -3037,6 +3037,28 @@ async function adminPinakas(request, env) {
     leads = { total: Number(lt.total) || 0, unsub: Number(lt.unsub) || 0, stay: Number(lt.stay) || 0, sends: ls, unsub_list: lu };
   } catch (e) { leads = null; }
 
+  // v114 · KM-PK-KOSTAS — κάρτα «Κώστας (βοηθός)»: συνομιλίες, κόστος, παραδόσεις, ραντεβού (Α010 §2.3)
+  let kostas = null;
+  try {
+    const ks = await one(
+      `SELECT COUNT(*) AS sessions, COALESCE(SUM(turns), 0) AS turns,
+              SUM(CASE WHEN ticket IS NOT NULL THEN 1 ELSE 0 END) AS handoffs,
+              COUNT(DISTINCT dev) AS devices
+       FROM km_agent_sessions${whereC("started")}`, ...SA);
+    const bySrc = await all("SELECT COALESCE(src, 'direct') AS src, COUNT(*) AS n, SUM(CASE WHEN ticket IS NOT NULL THEN 1 ELSE 0 END) AS handoffs FROM km_agent_sessions" +
+      whereC("started") + " GROUP BY COALESCE(src, 'direct') ORDER BY n DESC LIMIT 20", ...SA);
+    const fu = await one("SELECT COUNT(*) AS booked, SUM(CASE WHEN sent_at IS NOT NULL THEN 1 ELSE 0 END) AS sent, SUM(CASE WHEN used_at IS NOT NULL THEN 1 ELSE 0 END) AS used FROM km_agent_followups" + whereC("created"), ...SA);
+    const gr = await one("SELECT COUNT(*) AS n FROM km_agent_grants WHERE via <> 'mail'" + andC("granted_at"), ...SA);
+    const kd = await all("SELECT day, calls, usd_micro FROM km_agent_daily WHERE day >= ? ORDER BY day DESC LIMIT 30", (s0 || d30).slice(0, 10));
+    const ktd = kd.find((r) => r.day === nowIso.slice(0, 10)) || {};
+    kostas = { sessions: Number(ks.sessions) || 0, turns: Number(ks.turns) || 0, handoffs: Number(ks.handoffs) || 0, devices: Number(ks.devices) || 0,
+      by_src: bySrc, followups: { booked: Number(fu.booked) || 0, sent: Number(fu.sent) || 0, used: Number(fu.used) || 0 },
+      support_opens: Number(gr.n) || 0,
+      today: { calls: Number(ktd.calls) || 0, usd: (Number(ktd.usd_micro) || 0) / 1e6 },
+      period_usd: kd.reduce((x, r) => x + (Number(r.usd_micro) || 0), 0) / 1e6,
+      cap_usd: Number(env.AGENT_DAILY_USD || AGENT_DAILY_USD_DEFAULT), days: kd };
+  } catch (e) { kostas = null; /* πριν τη μετάβαση της βάσης ο Πίνακας ΔΕΝ πέφτει */ }
+
   // v113 · KM-READ-GIFT — κάρτα «Δώρο Κώστα»: φέρνει κόσμο το δώρο;
   let readGift = null;
   try {
@@ -3087,6 +3109,7 @@ async function adminPinakas(request, env) {
     support: sup,
     funnel: funnel, leads: leads,
     read_gift: readGift,   // v113 · KM-READ-GIFT
+    kostas: kostas,        // v114 · KM-PK-KOSTAS
     accounts: list.rows,
     accounts_total: list.total,
     next: list.next, n: list.n, filters: list.filters,

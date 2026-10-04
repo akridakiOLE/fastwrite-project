@@ -269,12 +269,12 @@
       'Αιτήματα απαντημένα: <b>' + (sp.answered || 0) + '</b> · κλειστά 7 ημ.: <b>' + (sp.closed_7d || 0) + '</b>';
 
     /* v97 · KM-FUNNEL — χωνί ανά προέλευση · κάρτα leads */
-    var FN = ['open', 'email', 'code', 'account', 'key', 'key_skip'], fm = {};
+    var FN = ['open', 'email', 'oauth_google', 'oauth_microsoft', 'code', 'account', 'key', 'key_skip'], fm = {};   // v114: + Google/Microsoft
     (j.funnel || []).forEach(function (r) { (fm[r.src] = fm[r.src] || {})[r.step] = Number(r.n) || 0; });
     var fk = Object.keys(fm).sort(function (a, b) { return (fm[b].open || 0) - (fm[a].open || 0); });
     el('fnl').innerHTML = fk.length ? fk.map(function (s) {
       return '<tr><td>' + esc(srcLab(s)) + '</td>' + FN.map(function (st) { return '<td>' + (fm[s][st] || 0) + '</td>'; }).join('') + '</tr>';
-    }).join('') : '<tr><td colspan="7" class="muted">Κανείς ακόμα.</td></tr>';
+    }).join('') : '<tr><td colspan="9" class="muted">Κανείς ακόμα.</td></tr>';
     var ld = j.leads;
     if (ld) {
       var sent = (ld.sends || []).reduce(function (a, r) { return a + (Number(r.ok) || 0); }, 0);
@@ -283,6 +283,22 @@
       var ul = ld.unsub_list || [];
       el('ld-un-wrap').hidden = !ul.length;
       el('ld-un').innerHTML = ul.map(function (r) { return '<tr><td>' + esc(r.email) + '</td><td>' + esc(r.name || '') + '</td><td>' + fmtDate(r.unsub_at) + '</td></tr>'; }).join('');
+    }
+
+    /* v114 · KM-PK-KOSTAS — κάρτα «Κώστας (βοηθός)» */
+    var ks = j.kostas;
+    el('ks-card').hidden = !ks;
+    if (ks) {
+      el('k-ks-s').textContent = ks.sessions; el('k-ks-t').textContent = ks.turns;
+      el('k-ks-h').textContent = ks.handoffs; el('k-ks-f').textContent = ks.followups.booked;
+      el('k-ks-usd').textContent = '$' + (ks.today.usd ? ks.today.usd.toFixed(3) : '0');
+      el('k-ks-all').textContent = '$' + (ks.period_usd ? ks.period_usd.toFixed(2) : '0');
+      var kss = ks.by_src || [];
+      el('ks-src-wrap').hidden = !kss.length;
+      el('ks-src').innerHTML = kss.map(function (r) { return '<tr><td>' + esc(srcLab(r.src)) + '</td><td>' + r.n + '</td><td>' + (r.handoffs || 0) + '</td></tr>'; }).join('');
+      el('k-ks-more').innerHTML = 'Συσκευές: <b>' + ks.devices + '</b> · άνοιξαν από «Υποστήριξη»: <b>' + ks.support_opens + '</b> · ' +
+        'ραντεβού: <b>' + ks.followups.booked + '</b> κλεισμένα, <b>' + ks.followups.sent + '</b> email, <b>' + ks.followups.used + '</b> ξανάνοιξαν · ' +
+        'ταβάνι <b>$' + ks.cap_usd + '</b>/ημέρα · κλήσεις σήμερα: <b>' + ks.today.calls + '</b>';
     }
 
     /* v113 · KM-READ-GIFT — κάρτα «Δώρο Κώστα» */

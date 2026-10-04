@@ -11,7 +11,7 @@
   var LS = {
     /* v89 · KM-UPD-TOAST — ποια έκδοση είδε ο χρήστης τελευταία στην κάμερα */
     seenVer: 'km_seen_ver',
-    /* v113 · KM-READ-GIFT — η τελευταία γνωστή κατάσταση του δώρου {active, left, at, done_seen}.
+    /* v113 · KM-READ-GIFT — η τελευταία γνωστή κατάσταση του δώρου {active, left, at}.
        ΜΟΝΟ αντίγραφο για να φαίνεται χωρίς δίκτυο· η αλήθεια ζει στον server. */
     gift: 'km_gift',
     email: 'km_email',
@@ -2149,7 +2149,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v113';
+  var APP_VER = 'φέτα 3 · v114';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -2513,7 +2513,7 @@
       // ΠΡΙΝ: το κουτί σε κάθε άνοιγμα της κάμερας (✕ = ως το επόμενο), το κουμπί πάντα.
       el('gift-t').textContent = '🎁 Έκπληξη bonus';
       el('gift-p').hidden = false; el('gift-k').hidden = true;
-      box.hidden = giftFold;
+      giftFoldShow(box);
       btn.hidden = false; btn.className = 'gift-b'; btn.disabled = false;
       btn.innerHTML = '🤖 Ενεργοποίηση<br>Κώστα AI';
       return;
@@ -2530,17 +2530,22 @@
     el('gift-t').textContent = 'Τα 20 δώρα τελείωσαν';
     el('gift-p').textContent = 'Συνεχίζεις χειροκίνητα, ή βάζεις δικό σου κλειδί Google για αυτόματη ανάγνωση.';
     el('gift-p').hidden = false; el('gift-k').hidden = false;
-    box.hidden = !!g.done_seen || giftFold;
+    giftFoldShow(box);   // v114: σε κάθε άνοιγμα ξανά — υπενθύμιση για το κλειδί (εισήγηση Stavros)
+  }
+  /* v114 · βελάκι αντί για ✕: μαζεμένο = φαίνεται μόνο το βελάκι, ποτέ εντελώς κρυφό */
+  function giftFoldShow(box) {
+    box.hidden = false;
+    box.classList.toggle('fold', !!giftFold);
+    var x = el('gift-x');
+    if (x) { x.setAttribute('aria-expanded', giftFold ? 'false' : 'true'); x.setAttribute('aria-label', giftFold ? 'Άνοιγμα' : 'Μάζεμα'); }
   }
   function giftShow() {
-    giftFold = false;          // ✕ ισχύει ως το επόμενο άνοιγμα της κάμερας
+    giftFold = false;          // το μάζεμα ισχύει ως το επόμενο άνοιγμα της κάμερας
     giftRender();
     giftRefresh(false);
   }
   function giftClose() {
-    giftFold = true;
-    var g = giftGet();
-    if (g && g.active && !(g.left > 0)) { g.done_seen = 1; giftSet(g); }
+    giftFold = !giftFold;      // v114: το βελάκι μαζεύει ΚΑΙ ξανανοίγει
     giftRender();
   }
   function giftMsg(m) {
@@ -5189,7 +5194,7 @@
   /* v113 · KM-READ-GIFT */
   el('gift-b').onclick = giftAsk;
   el('gift-x').onclick = function (e) { e.stopPropagation(); giftClose(); };
-  el('gift').onclick = function (e) { if (e.target && e.target.id === 'gift-k') { return; } var g = giftGet(); if (!g || !g.active) { giftAsk(); } };
+  el('gift').onclick = function (e) { if (e.target && e.target.id === 'gift-k') { return; } if (giftFold) { return; } var g = giftGet(); if (!g || !g.active) { giftAsk(); } };
   el('gift-ok-go').onclick = giftActivate;
   el('gift-ok-no').onclick = function () { el('gift-ok').hidden = true; };
   el('cam-retry').onclick = startCam;

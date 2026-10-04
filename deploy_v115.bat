@@ -4,9 +4,14 @@ rem v101: to parathyro tou deploy_watch den einai UTF-8 - xoris afto to python p
 set PYTHONIOENCODING=utf-8
 cd /d C:\Users\User\fastwrite-project
 echo.
-echo  v114 = VELAKI anti gia X sto kouti "Ekplixi bonus" / "Ta 20 dora teleiosan" (eisigisi Stavros 4/10)
-echo         + Pinakas: karta "Kostas (voithos)" + stiles Google/Microsoft sto xoni.
-echo         KAMIA allagi vasis. O voithos-syzitisi MENEI KRYFOS (?chat=1) - anoigei sti v115 (kampania).
+echo  v115 = IMERA KAMPANIAS Fasi3: o Kostas (AI) ANOIGEI GIA OLOUS (AG_PUBLIC=true)
+echo         kai to imerisio tavani kostous tou anevainei 3 -^> 10 USD. KAMIA allagi vasis.
+echo.
+if exist ".git\index.lock" del /f /q ".git\index.lock"
+
+echo [A/7] Efarmogi allagon imeras kampanias...
+python tools\kampania\apply_v115.py
+if errorlevel 1 goto failed
 
 echo [0/7] Gnosi tou voithou apo tis piges (i selida Politikis xtistike idi apo to keimeno)...
 python tools\agent\build_knowledge.py
@@ -21,27 +26,7 @@ findstr /c:"KM-PK-KOSTAS" src\km.js >nul
 if errorlevel 1 goto nm
 findstr /c:"id=\"ks-card\"" site\pinakas\index.html >nul
 if errorlevel 1 goto nm
-findstr /c:"KM-SERVER-V113-DORO20" src\km.js >nul
-if errorlevel 1 goto nm
-findstr /c:"async function readInvoice(request, env)" src\km.js >nul
-if errorlevel 1 goto nm
-findstr /c:"const READ_MODEL_DEFAULT = \"claude-haiku-4-5-20251001\";" src\km.js >nul
-if errorlevel 1 goto nm
-findstr /c:"CREATE TABLE IF NOT EXISTS km_read_gift" schema\km_read.sql >nul
-if errorlevel 1 goto nm
-findstr /c:"CREATE TABLE IF NOT EXISTS km_read_daily" schema\km_read.sql >nul
-if errorlevel 1 goto nm
-findstr /c:"function giftSweep()" site\kostometro\app.js >nul
-if errorlevel 1 goto nm
-findstr /c:"id=\"gift-b\"" site\kostometro\index.html >nul
-if errorlevel 1 goto nm
-findstr /c:".gift-b{" site\kostometro\app.css >nul
-if errorlevel 1 goto nm
-findstr /c:"id=\"rg-card\"" site\pinakas\index.html >nul
-if errorlevel 1 goto nm
-findstr /c:"id=\"aa9\"" site\legal\privacy.html >nul
-if errorlevel 1 goto nm
-findstr /c:"privacy#aa9" site\kostometro\index.html >nul
+findstr /c:"'oauth_google', 'oauth_microsoft'" site\pinakas\app.js >nul
 if errorlevel 1 goto nm
 findstr /c:"function pkSince(p)" src\km.js >nul
 if errorlevel 1 goto nm
@@ -113,15 +98,17 @@ findstr /c:"if (agentHasSecret(text)) return json" src\km.js >nul
 if errorlevel 1 goto nm
 findstr /c:"el('ag-imgx').onclick = agDropImg;" site\kostometro\app.js >nul
 if errorlevel 1 goto nm
-findstr /c:"var AG_PUBLIC = false;" site\kostometro\app.js >nul
+findstr /c:"var AG_PUBLIC = true;" site\kostometro\app.js >nul
+if errorlevel 1 goto nm
+findstr /c:"const AGENT_DAILY_USD_DEFAULT = 10;" src\km.js >nul
 if errorlevel 1 goto nm
 findstr /c:"data-agent=\"preview\" hidden" site\kostometro\index.html >nul
 if errorlevel 1 goto nm
 findstr /c:".ag-thumb{" site\kostometro\app.css >nul
 if errorlevel 1 goto nm
-findstr /c:"km-v114" site\kostometro\sw.js >nul
+findstr /c:"km-v115" site\kostometro\sw.js >nul
 if errorlevel 1 goto nm
-findstr /c:"\"v\": \"v114\"" site\kostometro\version.json >nul
+findstr /c:"\"v\": \"v115\"" site\kostometro\version.json >nul
 if errorlevel 1 goto nm
 findstr /c:"&& !agTouch()) { agSend(ev); }" site\kostometro\app.js >nul
 if errorlevel 1 goto nm
@@ -132,9 +119,9 @@ if errorlevel 1 goto nm
 echo    OK
 
 echo [2/7] Deiktes pou PREPEI na leipoun...
-findstr /c:"km-v113'" site\kostometro\sw.js >nul
+findstr /c:"km-v114'" site\kostometro\sw.js >nul
 if not errorlevel 1 goto lo
-findstr /c:"var AG_PUBLIC = true" site\kostometro\app.js >nul
+findstr /c:"var AG_PUBLIC = false" site\kostometro\app.js >nul
 if not errorlevel 1 goto lo
 findstr /c:"sk-ant-api03" src\km.js >nul
 if not errorlevel 1 goto lo
@@ -275,25 +262,29 @@ echo    OK
 echo [6/7] Kamia metavasi vasis se afti tin ekdosi.
 
 echo [7/7] Staging kai push...
-git add src\km.js site\pinakas\app.js site\pinakas\index.html site\kostometro\app.js site\kostometro\index.html site\kostometro\app.css site\kostometro\sw.js site\kostometro\version.json tests\v114.test.mjs deploy_v114.bat commit_v114.txt deploy_v115.bat commit_v115.txt tools\kampania\apply_v115.py
+git add src\km.js site\kostometro\app.js site\kostometro\sw.js site\kostometro\version.json tests\v99.test.mjs tools\kampania\apply_v115.py deploy_v115.bat commit_v115.txt site\pinakas\app.js site\pinakas\index.html tests\v114.test.mjs site\kostometro\index.html site\kostometro\app.css
 if errorlevel 1 goto failed
-git commit -F commit_v114.txt
+git commit -F commit_v115.txt
 if errorlevel 1 goto failed
 git push origin master
 if errorlevel 1 goto failed
 echo.
 echo ================================
-echo   OK - Cloudflare ~2 lepta. v114 - VELAKI + PINAKAS
+echo   OK - Cloudflare ~2 lepta. v115 - O KOSTAS EINAI ANOIXTOS
 echo ================================
 echo.
 pause
 exit /b 0
 
 :tf
+echo  Epanafora ton allagon v115 - o Kostas MENEI kryfos.
+git checkout -- site\kostometro\app.js site\kostometro\sw.js site\kostometro\version.json src\km.js tests\v99.test.mjs
 echo. & echo  ******** TESTS FAILED - tipota den anevike. ******** & echo.
 pause
 exit /b 1
 :mf
+echo  Epanafora ton allagon v115 - o Kostas MENEI kryfos.
+git checkout -- site\kostometro\app.js site\kostometro\sw.js site\kostometro\version.json src\km.js tests\v99.test.mjs
 echo. & echo  ******** APODEIXI METALLAXIS APETYXE. ******** & echo.
 pause
 exit /b 1
@@ -308,6 +299,8 @@ goto failed
 echo    Leipei APAITOUMENOS deiktis.
 goto failed
 :failed
+echo  Epanafora ton allagon v115 - o Kostas MENEI kryfos.
+git checkout -- site\kostometro\app.js site\kostometro\sw.js site\kostometro\version.json src\km.js tests\v99.test.mjs
 echo. & echo  ******** APETYXE. ******** & echo.
 pause
 exit /b 1

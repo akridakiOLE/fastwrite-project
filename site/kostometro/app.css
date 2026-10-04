@@ -80,7 +80,12 @@ input:focus{outline:none;border-color:var(--accent)}
 .gift{position:absolute;z-index:2;left:50%;transform:translateX(-50%);top:calc(max(14px,env(safe-area-inset-top)) + 108px);
   width:calc(100% - 32px);max-width:420px;background:rgba(18,32,28,.92);border:1px solid rgba(0,229,160,.45);border-radius:14px;
   padding:12px 40px 12px 14px;color:#fff;font-size:13px;line-height:1.45;display:flex;flex-direction:column;gap:4px}
-.gift .upd-x{top:16px;transform:none}
+.gift-x{position:absolute;top:8px;right:6px;width:30px;height:30px;border-radius:50%;border:1px solid rgba(0,229,160,.5);
+  background:rgba(0,229,160,.12);color:var(--accent);font-size:16px;line-height:1;cursor:pointer;padding:0}
+/* v114 · μαζεμένο: μένει ΜΟΝΟ το βελάκι, στην ίδια θέση */
+.gift.fold{width:auto;max-width:none;left:auto;right:16px;transform:none;padding:0;background:none;border:0;min-height:32px}
+.gift.fold > :not(.gift-x){display:none}
+.gift.fold .gift-x{position:static;transform:rotate(180deg);background:rgba(10,14,20,.85);width:36px;height:36px}
 .gift-t{color:var(--accent);font-size:15px;font-weight:700}
 .gift-p b{color:#fff}
 .gift-k{color:var(--accent);font-size:13px;text-decoration:underline;margin-top:2px}
