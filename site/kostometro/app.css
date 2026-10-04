@@ -76,6 +76,24 @@ input:focus{outline:none;border-color:var(--accent)}
 .upd-toast b{color:var(--accent);font-weight:600}
 .upd-toast span{color:var(--text2);font-size:12px}
 .upd-toast.on{opacity:1;transform:translate(-50%,0)}
+/* v113 · KM-READ-GIFT */
+.gift{position:absolute;z-index:2;left:50%;transform:translateX(-50%);top:calc(max(14px,env(safe-area-inset-top)) + 108px);
+  width:calc(100% - 32px);max-width:420px;background:rgba(18,32,28,.92);border:1px solid rgba(0,229,160,.45);border-radius:14px;
+  padding:12px 40px 12px 14px;color:#fff;font-size:13px;line-height:1.45;display:flex;flex-direction:column;gap:4px}
+.gift .upd-x{top:16px;transform:none}
+.gift-t{color:var(--accent);font-size:15px;font-weight:700}
+.gift-p b{color:#fff}
+.gift-k{color:var(--accent);font-size:13px;text-decoration:underline;margin-top:2px}
+.gift-b{position:absolute;right:14px;top:50%;transform:translateY(-35%);max-width:calc(50% - 60px);
+  background:rgba(0,229,160,.16);border:1px solid var(--accent);border-radius:12px;color:#fff;font-size:12px;font-weight:600;
+  line-height:1.25;padding:8px 10px;cursor:pointer;font-family:inherit;text-align:center}
+.gift-b.on{background:rgba(0,0,0,.5);border-color:rgba(255,255,255,.25);cursor:default;font-weight:500}
+.gift-ok{position:absolute;inset:0;z-index:6;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+.gift-ok-in{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 16px;max-width:420px;width:100%;
+  color:var(--text);font-size:14px;line-height:1.5;display:flex;flex-direction:column;gap:10px}
+.gift-ok-in > b{font-size:17px;color:var(--accent)}
+.gift-ok-in p{margin:0}
+.gift-ok-in a{color:var(--accent)}
 .icon-btn{background:none;border:0;color:#fff;font-size:24px;line-height:1;padding:4px 10px;cursor:pointer}
 .cam-bottom{
   position:absolute;bottom:0;left:0;right:0;z-index:2;
@@ -97,6 +115,7 @@ input:focus{outline:none;border-color:var(--accent)}
   background:rgba(0,0,0,.75);color:var(--accent);border:1px solid var(--accent);
   padding:12px 22px;border-radius:999px;font-weight:700;font-size:17px;
 }
+.toast.wide{border-radius:14px;font-size:15px;font-weight:600;width:max-content;max-width:calc(100% - 48px);text-align:center}   /* v113 · μηνύματα του δώρου */
 .cam-err{position:absolute;inset:0;z-index:5;background:var(--bg);padding:32px 24px;display:flex;flex-direction:column;justify-content:center;gap:14px}
 .cam-err p{color:var(--text2);font-size:15px}
 

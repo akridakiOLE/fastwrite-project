@@ -1,4 +1,5 @@
 // KM-SERVER-V60-H11B  ← σημάδι έκδοσης· το ψάχνει το deploy_km_h11b.bat
+// KM-SERVER-V113-DORO20  ← σημάδι: «Δώρο 20 αναγνώσεων με τον Κώστα (AI)» — ανάγνωση τιμολογίου μέσω Anthropic, χωρίς αποθήκευση εικόνας (4/10/2026)
 // KM-SERVER-V104-KOSTAS  ← σημάδι: ο βοηθός λέγεται «Κώστας» + εκστρατεία «voithos-1» στους 3 νέους leads (1/10/2026)
 // KM-SERVER-V102-AGENT  ← σημάδι: βοηθός ΜΟΝΟ για την εγκατάσταση + όριο 30 μηνυμάτων ανά συσκευή (30/9/2026)
 // KM-SERVER-V100-AGENT  ← σημάδι: θέμα email πελάτη ουδέτερο + καθάρισμα μοναχικού χαρακτήρα (30/9/2026)
@@ -116,6 +117,10 @@ export async function handleKm(request, env, ctx, path) {
   // KM-AGENT (29/9/2026) — Βοηθός Kostometro, Φάση 1
   if (path === "/api/km/agent/chat" && method === "POST") return agentChat(request, env);
   if (path === "/api/km/agent/reopen" && method === "POST") return agentReopen(request, env);
+  // v113 · KM-READ-GIFT — «Δώρο 20 αναγνώσεων με τον Κώστα (AI)» (4/10/2026)
+  if (path === "/api/km/read/status" && method === "GET") return readStatus(request, env);
+  if (path === "/api/km/read/activate" && method === "POST") return readActivate(request, env);
+  if (path === "/api/km/read" && method === "POST") return readInvoice(request, env);
   // KM-OAUTH (29/9/2026) — Σύνδεση με Google / Microsoft
   { const m = /^\/api\/km\/auth\/(google|microsoft)\/(start|callback)$/.exec(path);
     if (m && method === "GET") return m[2] === "start" ? oauthStart(request, env, m[1]) : oauthCallback(request, env, m[1]); }
@@ -1604,6 +1609,8 @@ export async function kmAgentPrune(env, nowIso) {
   // v106 · ραντεβού (απόδειξη συγκατάθεσης) και άδειες: 24 μήνες.
   const r5 = await env.DB.prepare("DELETE FROM km_agent_followups WHERE created < ?").bind(m24).run();
   const r6 = await env.DB.prepare("DELETE FROM km_agent_grants WHERE granted_at < ?").bind(m24).run();
+  // v113 · KM-READ-GIFT — ημερήσια σύνολα ανάγνωσης (χωρίς πρόσωπο): 400 ημέρες, όπως του βοηθού.
+  try { await env.DB.prepare("DELETE FROM km_read_daily WHERE day < ?").bind(d400).run(); } catch (e) {}
   const n = (r) => (r && r.meta && r.meta.changes) || 0;
   return { messages: n(r1), sessions: n(r2), days: n(r3), devices: n(r4), followups: n(r5), grants: n(r6) };
 }
@@ -2207,6 +2214,10 @@ async function wipeFolder(env, folderId) {
        WHERE folder_id = ?`
     ).bind(folderId),
   ]);
+
+  // v113 · KM-READ-GIFT — ο μετρητής του δώρου φεύγει με τον λογαριασμό (ξεχωριστά: πριν τη
+  // μετάβαση της βάσης ο πίνακας δεν υπάρχει και η διαγραφή ΔΕΝ πρέπει να πέσει γι' αυτό).
+  try { await env.DB.prepare("DELETE FROM km_read_gift WHERE folder_id = ?").bind(folderId).run(); } catch (e) {}
 
   return {
     folder_id: folderId,
@@ -3026,6 +3037,24 @@ async function adminPinakas(request, env) {
     leads = { total: Number(lt.total) || 0, unsub: Number(lt.unsub) || 0, stay: Number(lt.stay) || 0, sends: ls, unsub_list: lu };
   } catch (e) { leads = null; }
 
+  // v113 · KM-READ-GIFT — κάρτα «Δώρο Κώστα»: φέρνει κόσμο το δώρο;
+  let readGift = null;
+  try {
+    const g = await one(
+      `SELECT COUNT(*) AS activated, COALESCE(SUM(g.used), 0) AS reads,
+              SUM(CASE WHEN g.used >= ${READ_GIFT} THEN 1 ELSE 0 END) AS finished,
+              SUM(CASE WHEN g.used > 0 THEN 1 ELSE 0 END) AS tried,
+              SUM(CASE WHEN a.has_key = 1 THEN 1 ELSE 0 END) AS with_key
+       FROM km_read_gift g LEFT JOIN km_accounts a ON a.folder_id = g.folder_id${whereC("g.activated_at")}`, ...SA);
+    const days = await all("SELECT day, calls, ok, fail, in_tok, out_tok, usd_micro FROM km_read_daily WHERE day >= ? ORDER BY day DESC LIMIT 30",
+      (s0 || d30).slice(0, 10));
+    const td = days.find((r) => r.day === nowIso.slice(0, 10)) || {};
+    readGift = { gift: READ_GIFT, activated: Number(g.activated) || 0, tried: Number(g.tried) || 0, reads: Number(g.reads) || 0,
+      finished: Number(g.finished) || 0, with_key: Number(g.with_key) || 0,
+      today: { calls: Number(td.calls) || 0, usd: (Number(td.usd_micro) || 0) / 1e6 },
+      cap_usd: Number(env.READ_DAILY_USD || READ_DAILY_USD_DEFAULT), model: env.READ_MODEL || READ_MODEL_DEFAULT, days };
+  } catch (e) { readGift = null; /* πριν τη μετάβαση της βάσης ο Πίνακας ΔΕΝ πέφτει */ }
+
   // ── (α) Η ΛΙΣΤΑ — ποιος, από πού, πότε, τελευταία δραστηριότητα ───────
   // Το email ΕΙΝΑΙ δεδομένο συνεργασίας (Brief Β (α)): ο Stavros πρέπει να
   // βλέπει ποιος γράφτηκε. Οι ταφόπετρες έχουν κενό email και δεν μπαίνουν.
@@ -3057,6 +3086,7 @@ async function adminPinakas(request, env) {
     feedback: { n: fb.n || 0, avg_stars: fb.avg_stars ? Number(fb.avg_stars).toFixed(2) : null, want_reply: fb.want_reply || 0 },
     support: sup,
     funnel: funnel, leads: leads,
+    read_gift: readGift,   // v113 · KM-READ-GIFT
     accounts: list.rows,
     accounts_total: list.total,
     next: list.next, n: list.n, filters: list.filters,
@@ -3647,4 +3677,159 @@ async function leadsLista(request, env) {
     "<p>Τώρα που ξέρεις τι έρχεται — το Kostometro PRO, με την τιμή κάθε κωδικού πάνω στην παραλαβή, και το FastWrite για τον λογιστή σου — θέλεις να μείνεις στη λίστα και να μαθαίνεις πρώτος κάθε βήμα μέχρι το τελικό προϊόν;</p>" +
     '<form method="post" action="' + self + '"><button class="stay" name="c" value="stay">Μένω στη λίστα</button>' +
     '<button class="leave" name="c" value="leave">Διαγραφή από τη λίστα</button></form>');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// v113 · KM-READ-GIFT — «ΔΩΡΟ 20 ΑΝΑΓΝΩΣΕΩΝ ΜΕ ΤΟΝ ΚΩΣΤΑ (AI)»
+// Brief_Doro20_04-10-2026.md — εγκρίθηκε από τον Stavros 4/10/2026.
+//   GET  /api/km/read/status    -> { gift, active, used, left }
+//   POST /api/km/read/activate  -> { consent: true } → γράφει τη συγκατάθεση
+//   POST /api/km/read           -> { pages: [base64 jpeg, …] } → { net, vat, total, date, left }
+// ΚΑΝΟΝΕΣ (Brief §2):
+//   · μετρητής ΑΝΑ ΛΟΓΑΡΙΑΣΜΟ, 20 μία φορά για πάντα
+//   · η ανάγνωση ΔΕΣΜΕΥΕΤΑΙ ατομικά πριν την κλήση και ΕΠΙΣΤΡΕΦΕΤΑΙ αν αποτύχει
+//     ή αν δεν διαβάστηκε κανένα ποσό — δεν χρεώνουμε τον χρήστη για δική μας αποτυχία
+//   · μόνο η ενεργή συσκευή (η αναγνώστρια δεν διαβάζει — ίδιο με v35)
+//   · ξεχωριστό ημερήσιο ταβάνι από τη συζήτηση του Κώστα (READ_DAILY_USD)
+//   · 🔴 Η ΦΩΤΟΓΡΑΦΙΑ ΔΕΝ ΓΡΑΦΕΤΑΙ ΠΟΥΘΕΝΑ: ούτε D1, ούτε R2, ούτε log.
+//     Ζει μόνο στη μνήμη αυτής της κλήσης (Πολιτική v2.3, Α350 §9.8 όπως άνοιξε 4/10).
+// Μοντέλο: Haiku 4.5 — ΜΕΤΡΗΘΗΚΕ 4/10/2026 σε 6 εικόνες (3 καρέ κάμερας + 3 PDF με
+// κλίση/θόρυβο): 6/6 σωστά σε όλα τα πεδία, 0,0024 $ ανά τιμολόγιο, 1–1,5″.
+// ⚠ Το Haiku τυλίγει το JSON σε ```json — το readParse() το καθαρίζει.
+// ⚠ Το Sonnet 5.5 ΑΠΟΡΡΙΠΤΕΙ την παράμετρο temperature (400) — γι' αυτό δεν στέλνεται.
+// ════════════════════════════════════════════════════════════════════════════
+const READ_GIFT = 20;
+const READ_MODEL_DEFAULT = "claude-haiku-4-5-20251001";
+const READ_PRICE = { in: 1, out: 5 };          // micro-$ ανά token (Haiku 4.5: 1 $ / 5 $ ανά εκατ.)
+const READ_DAILY_USD_DEFAULT = 10;
+const READ_RATE_PER_MIN = 10;
+const READ_MAX_PAGES = 6;
+const READ_MAX_B64 = 8 * 1024 * 1024;          // όλες οι σελίδες μαζί, σε base64
+const READ_CONSENT = "v113-el";
+// Η ΙΔΙΑ ΕΝΤΟΛΗ με την ανάγνωση Gemini (aiOnce στο app.js), λέξη προς λέξη.
+const READ_PROMPT_ONE = "Φωτογραφία τιμολογίου ή απόδειξης (ελληνικά ή αγγλικά). ";
+const READ_PROMPT_REST =
+  'Απάντησε ΜΟΝΟ με JSON: {"net": καθαρή αξία ΠΡΟ ΦΠΑ (ελληνικά: καθαρή αξία, μερικό σύνολο, υποσύνολο · αγγλικά: net, subtotal, amount before VAT), "vat": συνολικό ποσό ΦΠΑ όλων των συντελεστών μαζί (ελληνικά: ΦΠΑ · αγγλικά: VAT, tax), "total": τελικό πληρωτέο ΜΕ ΦΠΑ (ελληνικά: σύνολο, γενικό σύνολο, πληρωτέο · αγγλικά: total, grand total, amount due), "date": η ημερομηνία ΤΟΥ ΤΙΜΟΛΟΓΙΟΥ ως "YYYY-MM-DD", ή null}. ' +
+  "ΠΡΟΣΟΧΗ ΣΤΟΥΣ ΑΡΙΘΜΟΥΣ: το χαρτί μπορεί να γράφει 1.234,56 (ελληνικά) ή 1,234.56 (αγγλικά) — και τα δύο σημαίνουν χίλια διακόσια τριάντα τέσσερα και 56 λεπτά. Κατάλαβε ποιο σύστημα χρησιμοποιεί το ΣΥΓΚΕΚΡΙΜΕΝΟ χαρτί και δώσε τον αριθμό ΠΑΝΤΑ με τελεία δεκαδικών και ΧΩΡΙΣ διαχωριστή χιλιάδων: 1234.56. " +
+  "Χωρίς σύμβολα, χωρίς κείμενο. Αν κάτι δεν διαβάζεται ΚΑΘΑΡΑ, βάλε null — ποτέ μην μαντεύεις.";
+function readPrompt(n) {
+  return (n > 1
+    ? "Οι " + n + " φωτογραφίες είναι ΣΕΛΙΔΕΣ ΤΟΥ ΙΔΙΟΥ τιμολογίου, με τη σειρά. Δώσε ΕΝΑ σύνολο για ολόκληρο το τιμολόγιο — το τελικό πληρωτέο, που συνήθως βρίσκεται στην ΤΕΛΕΥΤΑΙΑ σελίδα. ΠΟΤΕ μην προσθέσεις μερικά σύνολα από διαφορετικές σελίδες. "
+    : READ_PROMPT_ONE) + READ_PROMPT_REST;
+}
+// Καθαρίζει ```json … ``` και κείμενο γύρω· [{…}] → {…}. Επιστρέφει αντικείμενο ή null.
+function readParse(txt) {
+  const s = String(txt || "");
+  const a = s.indexOf("{"), b = s.lastIndexOf("}");
+  if (a < 0 || b <= a) return null;
+  let o = null;
+  try { o = JSON.parse(s.slice(a, b + 1)); } catch (e) { return null; }
+  if (Array.isArray(o)) o = o[0] || null;
+  return o && typeof o === "object" ? o : null;
+}
+// Μόνο αριθμοί ή null φτάνουν στη συσκευή· ημερομηνία μόνο ως YYYY-MM-DD.
+function readNum(v) { return typeof v === "number" && isFinite(v) ? Math.round(v * 100) / 100 : null; }
+function readDate(v) { return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null; }
+
+async function readGiftRow(env, folder) {
+  return env.DB.prepare("SELECT * FROM km_read_gift WHERE folder_id = ?").bind(folder).first();
+}
+function readGiftOut(row) {
+  const used = row ? Number(row.used) || 0 : 0;
+  return { ok: true, gift: READ_GIFT, active: !!(row && row.activated_at), activated_at: row ? row.activated_at : null,
+           used, left: Math.max(0, READ_GIFT - used) };
+}
+
+async function readStatus(request, env) {
+  const a = await authed(request, env);
+  if (a.err) return a.err;
+  return json(readGiftOut(await readGiftRow(env, a.id.folder)));
+}
+
+async function readActivate(request, env) {
+  const a = await authed(request, env);
+  if (a.err) return a.err;
+  const b = (await safeJson(request)) || {};
+  if (b.consent !== true) return json({ ok: false, error: "consent" }, 400);
+  // INSERT OR IGNORE: δεύτερο πάτημα (ή δεύτερη συσκευή) δεν ξαναγεμίζει το δώρο.
+  await env.DB.prepare("INSERT OR IGNORE INTO km_read_gift (folder_id, activated_at, consent, used) VALUES (?, ?, ?, 0)")
+    .bind(a.id.folder, now(), READ_CONSENT).run();
+  return json(readGiftOut(await readGiftRow(env, a.id.folder)));
+}
+
+async function readDaily(env, day, f) {
+  try {
+    await env.DB.prepare(
+      `INSERT INTO km_read_daily (day, calls, ok, fail, in_tok, out_tok, usd_micro) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(day) DO UPDATE SET calls = calls + excluded.calls, ok = ok + excluded.ok, fail = fail + excluded.fail,
+         in_tok = in_tok + excluded.in_tok, out_tok = out_tok + excluded.out_tok, usd_micro = usd_micro + excluded.usd_micro`
+    ).bind(day, f.calls || 0, f.ok || 0, f.fail || 0, f.in || 0, f.out || 0, f.micro || 0).run();
+  } catch (e) { /* η μέτρηση δεν ρίχνει ποτέ την ανάγνωση */ }
+}
+
+async function readInvoice(request, env) {
+  const a = await authed(request, env);
+  if (a.err) return a.err;
+  const folder = a.id.folder;
+  // μόνο η ενεργή συσκευή γράφει — και η ανάγνωση είναι γράψιμο (v35)
+  if (a.acc.active_device_id && a.acc.active_device_id !== a.id.device) return json({ ok: false, error: "not_active" }, 409);
+  const row = await readGiftRow(env, folder);
+  if (!row || !row.activated_at) return json({ ok: false, error: "not_activated" }, 403);
+  if ((Number(row.used) || 0) >= READ_GIFT) return json(Object.assign(readGiftOut(row), { ok: false, error: "gift_done" }), 403);
+
+  const b = await safeJson(request);
+  const pages = b && Array.isArray(b.pages) ? b.pages : null;
+  if (!pages || !pages.length || pages.length > READ_MAX_PAGES) return json({ ok: false, error: "bad_pages" }, 400);
+  let size = 0;
+  for (const p of pages) {
+    if (typeof p !== "string" || !/^[A-Za-z0-9+/=]+$/.test(p.slice(0, 200))) return json({ ok: false, error: "bad_pages" }, 400);
+    size += p.length;
+  }
+  if (size > READ_MAX_B64) return json({ ok: false, error: "too_big" }, 413);
+
+  const t = now(), day = t.slice(0, 10);
+  // όριο ρυθμού ανά λογαριασμό: παράθυρο ενός λεπτού
+  const winFresh = row.win_at && (Date.parse(t) - Date.parse(row.win_at)) < 60000;
+  if (winFresh && (Number(row.win_n) || 0) >= READ_RATE_PER_MIN) return json({ ok: false, error: "rate", retry_after: 30 }, 429);
+  // ημερήσιο ταβάνι — η ανάγνωση ΠΕΡΙΜΕΝΕΙ, δεν χάνεται
+  const spent = await env.DB.prepare("SELECT usd_micro FROM km_read_daily WHERE day = ?").bind(day).first();
+  const cap = Math.round(Number(env.READ_DAILY_USD || READ_DAILY_USD_DEFAULT) * 1e6);
+  if (spent && spent.usd_micro >= cap) return json({ ok: false, error: "busy", retry_after: 1800 }, 429);
+
+  // ΔΕΣΜΕΥΣΗ — ατομική: δύο συσκευές ταυτόχρονα δεν περνούν ποτέ το 20.
+  const res = await env.DB.prepare(
+    `UPDATE km_read_gift SET used = used + 1, last_at = ?,
+       win_n = CASE WHEN win_at IS NOT NULL AND win_at >= ? THEN win_n + 1 ELSE 1 END,
+       win_at = CASE WHEN win_at IS NOT NULL AND win_at >= ? THEN win_at ELSE ? END
+     WHERE folder_id = ? AND activated_at IS NOT NULL AND used < ?`
+  ).bind(t, new Date(Date.parse(t) - 60000).toISOString(), new Date(Date.parse(t) - 60000).toISOString(), t, folder, READ_GIFT).run();
+  if (!res.meta || !res.meta.changes) {
+    return json(Object.assign(readGiftOut(await readGiftRow(env, folder)), { ok: false, error: "gift_done" }), 403);
+  }
+  const refund = () => env.DB.prepare("UPDATE km_read_gift SET used = used - 1 WHERE folder_id = ? AND used > 0").bind(folder).run();
+
+  const content = pages.map((d) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: d } }))
+    .concat([{ type: "text", text: readPrompt(pages.length) }]);
+  let j;
+  try {
+    // ⚠ ΧΩΡΙΣ temperature — το Sonnet 5.5 το απορρίπτει (400, μετρήθηκε 4/10)· έτσι το μοντέλο αλλάζει χωρίς νέα έκδοση.
+    j = await agentCall(env, { model: env.READ_MODEL || READ_MODEL_DEFAULT, max_tokens: 300, messages: [{ role: "user", content }] });
+  } catch (e) {
+    await refund();
+    await readDaily(env, day, { fail: 1 });
+    // 🔴 ΜΟΝΟ το μήνυμα σφάλματος — ποτέ το σώμα του αιτήματος (περιέχει την εικόνα)
+    console.error("read:", e && e.message);
+    const st = /anthropic_(429|529)/.test(String(e && e.message)) ? 429 : 503;
+    return json({ ok: false, error: "provider", retry_after: 30 }, st);
+  }
+  const u = j.usage || {};
+  const micro = Math.round((u.input_tokens || 0) * READ_PRICE.in + (u.output_tokens || 0) * READ_PRICE.out);
+  const txt = (j.content || []).filter((x) => x.type === "text").map((x) => x.text).join("");
+  const o = readParse(txt) || {};
+  const out = { net: readNum(o.net), vat: readNum(o.vat), total: readNum(o.total), date: readDate(o.date) };
+  const nothing = out.net === null && out.vat === null && out.total === null;
+  if (nothing) await refund();   // διάβασε αλλά δεν είδε ποσά → δεν μετράει
+  await readDaily(env, day, { calls: 1, ok: nothing ? 0 : 1, fail: nothing ? 1 : 0, in: u.input_tokens || 0, out: u.output_tokens || 0, micro });
+  const st = readGiftOut(await readGiftRow(env, folder));
+  return json(Object.assign({ ok: true, counted: !nothing }, out, { used: st.used, left: st.left, gift: READ_GIFT }));
 }

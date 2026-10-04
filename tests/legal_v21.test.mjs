@@ -15,6 +15,8 @@ const MUT = [
   ["en", 'is in Greek at <a href="/legal/privacy">', 'is in Greek at <a href="/legal/nothing">'],                                              // 6 · το αγγλικό δεν δείχνει στο νέο
   ["html", "προσωπικό γραμματοκιβώτιο Gmail", "γραμματοκιβώτιο Workspace"],                 // 7 · 🔴 η προώθηση στο προσωπικό Gmail κρύβεται
   ["html", "Κρατάμε μόνο το email", "Κρατάμε email και όνομα"],                            // 8 · σύνδεση Google/MS: τι κρατάμε
+  ["html", "<strong>ούτε τη φωτογραφία ούτε τα ποσά.</strong>", "<strong>τη φωτογραφία για 30 ημέρες.</strong>"],  // 9 · 🔴 v113: η Α9 λέει ότι κρατάμε τη φωτογραφία
+  ["html", "<td>ο βοηθός (Α8) και η ανάγνωση τιμολογίων (Α9)</td>", "<td>ο βοηθός (Α8)</td>"],                     // 10 · 🔴 v113: η Anthropic λείπει ως υπεκτελών της ανάγνωσης
 ];
 if (ONLY) { const m = MUT[ONLY - 1]; if (!m) process.exit(2); const bag = { html, en };
   if (!bag[m[0]].includes(m[1])) { console.log("Μ" + ONLY + " ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ"); process.exit(3); }
@@ -25,12 +27,13 @@ const ok = (c, m) => { if (!c) throw new Error(m); };
 const num = (re) => { const m = re.exec(src); if (!m) throw new Error("δεν βρέθηκε στον κώδικα: " + re); return Number(m[1]); };
 
 check("Π-1 · δομή: ελληνικά, v2.1, 1/10/2026, όλες οι ενότητες και οι άγκυρες", () => {
-  ok(/<html lang="el">/.test(html) && html.includes("Έκδοση 2.2") && html.includes("1 Οκτωβρίου 2026"), "κεφαλίδα");
+  ok(/<html lang="el">/.test(html) && html.includes("Έκδοση 2.3") && html.includes("4 Οκτωβρίου 2026") /* v113: Πολιτική v2.3 (Α9 — ανάγνωση από τον Κώστα) */, "κεφαλίδα");
   for (const id of ["a1", "a2", "kostometro", "aa1", "aa2", "aa6", "aa7", "aa8", "fastwrite-desktop", "istotopos", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]) ok(html.includes('id="' + id + '"'), "άγκυρα " + id);
   ok(/<p class="legal-lang"><strong>English:<\/strong>[^<]*<a href="\/legal\/privacy-en">/.test(html), "σύνδεσμος στο αγγλικό");
 });
 check("Π-2 · 🔴 ο βοηθός (Α8): AI όχι άνθρωπος · Anthropic ως υπεκτελών · φωτογραφίες δεν αποθηκεύονται · 12 λέξεις/κλειδί μπλοκάρονται · email μόνο για άνθρωπο · συγκατάθεση", () => {
-  const a8 = html.slice(html.indexOf('id="aa8"'), html.indexOf('id="fastwrite-desktop"'));
+  // v113: η Α8 τελειώνει στην Α9 (ανάγνωση από τον Κώστα), όχι στο Μέρος Β — αλλιώς η Α9 «καλύπτει» την Α8
+  const a8 = html.slice(html.indexOf('id="aa8"'), html.indexOf('id="aa9"') > 0 ? html.indexOf('id="aa9"') : html.indexOf('id="fastwrite-desktop"'));
   ok(/όχι άνθρωπος/.test(a8) && /Anthropic PBC/.test(a8) && /<strong>δεν αποθηκεύεται<\/strong>/.test(a8) && /12 λέξεις ή με κλειδί/.test(a8) && /μόνο<\/strong> αν ζητήσεις να σε βοηθήσει άνθρωπος/.test(a8) && /συγκατάθεσή σου/.test(a8), "Α8 ελλιπές");
   ok(/<td><strong>Anthropic PBC<\/strong><\/td>/.test(html), "Anthropic στον πίνακα υπεκτελούντων");
   ok(/id="ag-consent"[\s\S]*Anthropic[\s\S]*\/legal\/privacy/.test(app), "η οθόνη συγκατάθεσης της εφαρμογής δείχνει εδώ");
@@ -54,5 +57,13 @@ check("Π-4 · 🔴 λέει την αλήθεια για: προώθηση στ
 check("Π-5 · το αγγλικό v1.2 μένει στο /legal/privacy-en με σημείωση προς το νέο", () => {
   ok(/<html lang="en">/.test(en) && en.includes("Notice (1 October 2026)") && /is in Greek at <a href="\/legal\/privacy">/.test(en) && en.includes("v2.2"), "privacy-en");
 });
+check("Π-6 · 🔴 v113 · Α9 (ανάγνωση από τον Κώστα): μόνο μετά την ενεργοποίηση · ΟΥΤΕ φωτογραφία ΟΥΤΕ ποσά σε εμάς · Anthropic 30 ημέρες, χωρίς εκπαίδευση · υπεκτελών · τήρηση", () => {
+  const a9 = html.slice(html.indexOf('id="aa9"'), html.indexOf('id="fastwrite-desktop"'));
+  ok(a9.length > 500, "λείπει η Α9");
+  ok(/<strong>μετά<\/strong> την ενεργοποίηση/.test(a9) && /<strong>ούτε τη φωτογραφία ούτε τα ποσά\.<\/strong>/.test(a9) && /30 ημέρες/.test(a9) && /δεν χρησιμοποιεί τις φωτογραφίες για να εκπαιδεύσει/.test(a9) && /ως εκτελών/.test(a9), "Α9 ελλιπής");
+  ok(html.includes("<td>ο βοηθός (Α8) και η ανάγνωση τιμολογίων (Α9)</td>"), "Anthropic υπεκτελών της Α9");
+  ok(/Φωτογραφία τιμολογίου για ανάγνωση από τον Κώστα \(Α9\)<\/td>\s*<td><strong>δεν αποθηκεύεται<\/strong>/.test(html), "τήρηση");
+  ok(/id="gift-ok"[\s\S]*Anthropic[\s\S]*\/legal\/privacy#aa9/.test(app), "η οθόνη ενεργοποίησης δείχνει στην Α9");
+});
 if (ONLY) { if (failed) { console.log("Μ" + ONLY + " → κοκκίνισε ✔"); process.exit(0); } console.log("Μ" + ONLY + " ΠΕΡΑΣΕ — το τεστ δεν πιάνει τίποτα"); process.exit(1); }
-console.log(failed ? "ΑΠΕΤΥΧΑΝ " + failed : "✔ ΟΛΑ ΠΕΡΑΣΑΝ (5)"); process.exit(failed ? 1 : 0);
+console.log(failed ? "ΑΠΕΤΥΧΑΝ " + failed : "✔ ΟΛΑ ΠΕΡΑΣΑΝ (6)"); process.exit(failed ? 1 : 0);

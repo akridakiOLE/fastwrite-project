@@ -211,8 +211,27 @@
   </div>
   <!-- v89 · KM-UPD-TOAST — μία φορά ανά έκδοση · v90: 7″ + ✕ (εύρημα Stavros 26/9: στα 3″ δεν προλαβαίνει να διαβαστεί) -->
   <div class="upd-toast" id="upd-toast" role="status" hidden><button class="upd-x" id="upd-x" type="button" aria-label="Κλείσιμο">✕</button><b id="upd-ver"></b><span id="upd-note" hidden></span></div>
+  <!-- v113 · KM-READ-GIFT — «Δώρο 20 αναγνώσεων με τον Κώστα (AI)» (Brief 4/10/2026, έγκριση Stavros).
+       Κάτω από το «Ενημερώθηκε» · ✕ το κλείνει ως το επόμενο άνοιγμα της κάμερας · ξαναβγαίνει ως την ενεργοποίηση. -->
+  <div class="gift" id="gift" hidden>
+    <button class="upd-x" id="gift-x" type="button" aria-label="Κλείσιμο">✕</button>
+    <b class="gift-t" id="gift-t">🎁 Έκπληξη bonus</b>
+    <span class="gift-p" id="gift-p">Σου δίνουμε τη δυνατότητα να επεξεργαστείς μαζί με τον Κώστα (AI) έως και <b>20 τιμολόγια εντελώς ΔΩΡΕΑΝ</b>, για να δεις με τα μάτια σου τη διαφορά. Βγάζεις φωτογραφία — ο Κώστας διαβάζει ημερομηνία, καθαρό, ΦΠΑ και σύνολο. Εσύ απλώς επιβεβαιώνεις.</span>
+    <a class="gift-k" id="gift-k" href="/kostometro/kleidi/" hidden>Οδηγός κλειδιού Google ›</a>
+  </div>
+  <div class="gift-ok" id="gift-ok" hidden>
+    <div class="gift-ok-in" role="dialog" aria-modal="true" aria-labelledby="gift-ok-t">
+      <b id="gift-ok-t">Ενεργοποίηση Κώστα AI</b>
+      <p>Ο Κώστας είναι <b>τεχνητή νοημοσύνη</b> (Anthropic). Η φωτογραφία του τιμολογίου περνάει από τον server μας <b>μόνο για την ανάγνωση και δεν αποθηκεύεται</b>.</p>
+      <p>Διαβάζει τις φωτογραφίες που θα βγάλεις <b>από τώρα και πέρα</b>, έως και 20, δωρεάν. Τα ποσά τα επιβεβαιώνεις πάντα εσύ.</p>
+      <p class="note"><a href="/legal/privacy#aa9" target="_blank" rel="noopener">Πολιτική Απορρήτου (Α9)</a></p>
+      <button class="btn primary" id="gift-ok-go" type="button">Ενεργοποίηση</button>
+      <button class="btn ghost" id="gift-ok-no" type="button">Όχι τώρα</button>
+    </div>
+  </div>
   <div class="cam-bottom">
     <button id="shutter" class="shutter" aria-label="Λήψη"></button>
+    <button id="gift-b" class="gift-b" type="button" hidden>🤖 Ενεργοποίηση<br>Κώστα AI</button>
   </div>
 
   <!-- ΠΡΟΕΠΙΣΚΟΠΗΣΗ (v9) — η φωτογραφία ΟΛΟΚΛΗΡΗ, πριν από οτιδήποτε άλλο.
@@ -579,6 +598,7 @@
     <div class="kv diag"><span>Τελευταίο σφάλμα</span><b id="st-aierr">—</b></div>
     <div class="kv diag"><span>Απάντηση Google</span><b id="st-airaw">—</b></div>
     <div class="kv diag"><span>Tokens ανά κλήση</span><b id="st-aitok">—</b></div>
+    <div class="kv diag"><span>Δώρο Κώστα AI</span><b id="st-gift">—</b></div>
     <button class="btn ghost" id="st-sync-now">Συγχρονισμός τώρα</button>
     <button class="btn ghost" id="st-update">Έλεγχος ενημέρωσης</button>
     <div class="sep"></div>

@@ -11,6 +11,9 @@
   var LS = {
     /* v89 · KM-UPD-TOAST — ποια έκδοση είδε ο χρήστης τελευταία στην κάμερα */
     seenVer: 'km_seen_ver',
+    /* v113 · KM-READ-GIFT — η τελευταία γνωστή κατάσταση του δώρου {active, left, at, done_seen}.
+       ΜΟΝΟ αντίγραφο για να φαίνεται χωρίς δίκτυο· η αλήθεια ζει στον server. */
+    gift: 'km_gift',
     email: 'km_email',
     key:   'km_key',
     skip:  'km_key_skipped',
@@ -335,7 +338,7 @@
        ΚΑΘΕ διαδρομή μπαίνει στο ΕΝΑ σημείο απ' όπου περνάνε όλες. */
     if (id === 's-email') { renderConsent(); }
     if (id === 's-acc')   { accWarn(); }
-    if (id === 's-cam')   { updToast(); }
+    if (id === 's-cam')   { updToast(); giftShow(); }
   }
   /* ══ v75 · Ο ΦΡΟΥΡΟΣ ΤΟΥ ΔΙΠΛΟΥ ΛΟΓΑΡΙΑΣΜΟΥ ΣΤΟ iPHONE (20/9/2026) ════
      KM-ACC-WARN-IOS   ← λατινικός δείκτης για το findstr του deploy .bat
@@ -745,7 +748,7 @@
        εδώ ήρθες επίτηδες να δεις αποτέλεσμα, και η σιωπή είναι το πρόβλημα. */
     /* == null (όχι ===) ώστε να πιάνει ΚΑΙ το undefined των παλιών εγγραφών */
     var empty = (r.net == null && r.vat == null && r.total == null);
-    if (!sug && localStorage.getItem(LS.key) && empty) {
+    if (!sug && (localStorage.getItem(LS.key) || giftFor(r)) && empty) {   // v113: και το δώρο
       var busy = document.createElement('p');
       busy.className = 'ai-busy';
       /* ΚΑΘΕ κατάσταση έχει το δικό της μήνυμα. Σιωπή = ο χρήστης νομίζει
@@ -2115,6 +2118,11 @@
     el('st-aierr').textContent = localStorage.getItem(LS.aiErr) || 'κανένα';
     el('st-airaw').textContent = localStorage.getItem(LS.aiRaw) || '—';
     el('st-aitok').textContent = aiTokLine();
+    /* v113 · KM-READ-GIFT */
+    (function () {
+      var g = giftGet();
+      el('st-gift').textContent = !g || !g.active ? 'δεν ενεργοποιήθηκε' : (g.left + '/' + GIFT_N + ' απομένουν' + (g.at ? ' · από ' + new Date(g.at).toLocaleDateString('el-GR') : ''));
+    })();
     /* v30 — τι τρέχει ΕΔΩ, τι έχει ο server, ποιος worker σερβίρει.
        Χωρίς αυτά, «δεν ενημερώθηκε» είναι εντύπωση, όχι μέτρηση. */
     el('st-srvver').textContent = 'ελέγχεται…';
@@ -2141,7 +2149,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v112';
+  var APP_VER = 'φέτα 3 · v113';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -2448,7 +2456,212 @@
     if (aiTimer) { clearTimeout(aiTimer); }
     aiTimer = setTimeout(function () { aiTimer = null; aiSweep(); }, ms);
   }
+  /* ══ v113 · KM-READ-GIFT — «ΔΩΡΟ 20 ΑΝΑΓΝΩΣΕΩΝ ΜΕ ΤΟΝ ΚΩΣΤΑ (AI)» ════════════
+     Brief_Doro20_04-10-2026 (έγκριση Stavros 4/10/2026). Δεύτερος «αναγνώστης»
+     δίπλα στο Gemini, με ΤΗΝ ΙΔΙΑ έξοδο {net, vat, total, date}: όλο το υπόλοιπο
+     (επιβεβαίωση, ουρά, προσπάθειες, διαγνωστικά) μένει ίδιο.
+       · ο μετρητής ζει στον server, ανά λογαριασμό (20 μία φορά για πάντα)
+       · διαβάζει ΜΟΝΟ φωτογραφίες ΜΕΤΑ την ενεργοποίηση (Brief §2.3) — αλλιώς
+         40 παλιά εκκρεμή καίνε το δώρο σε ένα λεπτό χωρίς να δει τίποτα ο χρήστης
+       · αν υπάρχει και κλειδί Google: πρώτα το δώρο, μετά το κλειδί (Brief §2.4)
+       · σφάλμα του δώρου ΔΕΝ κλειδώνει ποτέ την ανάγνωση με κλειδί (aiHalt) */
+  var GIFT_N = 20;
+  var GIFT_PX = 1568;          // το βέλτιστο μέγεθος εικόνας της Anthropic
+  var giftBusy = false, giftFold = false, giftAt = 0, giftWait = 0;
+  function giftGet() {
+    try { return JSON.parse(localStorage.getItem(LS.gift) || 'null') || null; } catch (e) { return null; }
+  }
+  function giftSet(g) {
+    try { localStorage.setItem(LS.gift, JSON.stringify(g)); } catch (e) {}
+  }
+  /* Ενεργό και με υπόλοιπο → ο Κώστας διαβάζει. */
+  function giftLive() {
+    var g = giftGet();
+    return !!(g && g.active && g.left > 0 && hasAccount() && !isReader());
+  }
+  /* Μετράει αυτό το τιμολόγιο; Μόνο αν τραβήχτηκε ΜΕΤΑ την ενεργοποίηση. */
+  function giftFor(r) {
+    var g = giftGet();
+    return !!(giftLive() && r && g.at && r.ts >= g.at);
+  }
+  function giftFromSrv(j) {
+    if (!j || typeof j.left !== 'number') { return; }
+    var g = giftGet() || {};
+    g.active = !!(j.active === undefined ? g.active : j.active);
+    g.left = j.left;
+    /* Το «από πότε» μετριέται με το ρολόι ΤΗΣ ΣΥΣΚΕΥΗΣ (r.ts είναι τοπικό): ρολόι κινητού
+       πίσω από τον server θα έκανε τη νέα φωτογραφία να φαίνεται «πριν την ενεργοποίηση». */
+    if (g.active && !g.at) { g.at = Math.min(Date.parse(j.activated_at) || Date.now(), Date.now()); }
+    if (!g.active) { g.at = 0; }
+    giftSet(g);
+    giftRender();
+  }
+  function giftRefresh(force) {
+    if (!hasAccount() || isReader() || !navigator.onLine) { return; }
+    if (!force && Date.now() - giftAt < 60000) { return; }
+    giftAt = Date.now();
+    kmFetch('read/status', { method: 'GET', headers: kmHead() }).then(function (r) {
+      return r.ok ? r.json() : null;
+    }).then(giftFromSrv).catch(function () {});
+  }
+  function giftRender() {
+    var box = el('gift'), btn = el('gift-b');
+    if (!box || !btn) { return; }
+    var g = giftGet();
+    if (!hasAccount() || isReader()) { box.hidden = true; btn.hidden = true; return; }
+    if (!g || !g.active) {
+      // ΠΡΙΝ: το κουτί σε κάθε άνοιγμα της κάμερας (✕ = ως το επόμενο), το κουμπί πάντα.
+      el('gift-t').textContent = '🎁 Έκπληξη bonus';
+      el('gift-p').hidden = false; el('gift-k').hidden = true;
+      box.hidden = giftFold;
+      btn.hidden = false; btn.className = 'gift-b'; btn.disabled = false;
+      btn.innerHTML = '🤖 Ενεργοποίηση<br>Κώστα AI';
+      return;
+    }
+    if (g.left > 0) {
+      // ΜΕΤΑ: μία ένδειξη υπολοίπου δίπλα στο κουμπί φωτογραφίας
+      box.hidden = true;
+      btn.hidden = false; btn.className = 'gift-b on'; btn.disabled = true;
+      btn.innerHTML = '🤖 Κώστας AI<br>απομένουν <b>' + g.left + '</b>/' + GIFT_N;
+      return;
+    }
+    // ΤΕΛΟΣ: ένα κουτί, μία φορά, με τους δύο δρόμους (Brief §1.4 — καμία τιμή, κανένα PRO)
+    btn.hidden = true;
+    el('gift-t').textContent = 'Τα 20 δώρα τελείωσαν';
+    el('gift-p').textContent = 'Συνεχίζεις χειροκίνητα, ή βάζεις δικό σου κλειδί Google για αυτόματη ανάγνωση.';
+    el('gift-p').hidden = false; el('gift-k').hidden = false;
+    box.hidden = !!g.done_seen || giftFold;
+  }
+  function giftShow() {
+    giftFold = false;          // ✕ ισχύει ως το επόμενο άνοιγμα της κάμερας
+    giftRender();
+    giftRefresh(false);
+  }
+  function giftClose() {
+    giftFold = true;
+    var g = giftGet();
+    if (g && g.active && !(g.left > 0)) { g.done_seen = 1; giftSet(g); }
+    giftRender();
+  }
+  function giftMsg(m) {
+    var t = el('toast'); if (!t) { return; }
+    t.textContent = m; t.classList.add('wide'); t.hidden = false;
+    setTimeout(function () { t.hidden = true; t.classList.remove('wide'); t.textContent = '✓ Μπήκε'; }, 2600);
+  }
+  function giftAsk() {
+    var g = giftGet();
+    if (g && g.active) { return; }
+    el('gift-ok').hidden = false;
+  }
+  function giftActivate() {
+    var go = el('gift-ok-go');
+    go.disabled = true; go.textContent = 'Μία στιγμή…';
+    kmFetch('read/activate', { method: 'POST', headers: kmHead(), body: JSON.stringify({ consent: true }) }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; });
+    }).then(function (x) {
+      go.disabled = false; go.textContent = 'Ενεργοποίηση';
+      if (!x.ok || !x.j || !x.j.ok) { giftMsg('Δεν έγινε — δοκίμασε ξανά σε λίγο'); return; }
+      el('gift-ok').hidden = true;
+      var g0 = giftGet() || {}; g0.at = Date.now() - 1000; giftSet(g0);   // ενεργοποιήθηκε ΕΔΩ: τοπικό ρολόι
+      giftFromSrv(x.j);
+      giftMsg('🤖 Ο Κώστας είναι έτοιμος — βγάλε φωτογραφία');
+    }).catch(function () {
+      go.disabled = false; go.textContent = 'Ενεργοποίηση';
+      giftMsg('Χωρίς σύνδεση — δοκίμασε ξανά');
+    });
+  }
+  /* Σμίκρυνση στη συσκευή στα 1568 px πριν φύγει (Brief §2.7): λιγότερα tokens,
+     γρηγορότερη αποστολή σε κινητό δίκτυο. Αν αποτύχει, φεύγει η αρχική. */
+  function giftShrink(blob) {
+    if (!window.createImageBitmap || !blob) { return blobB64(blob); }
+    return createImageBitmap(blob).then(function (bmp) {
+      var k = Math.min(1, GIFT_PX / Math.max(bmp.width, bmp.height));
+      if (k >= 1) { return blobB64(blob); }
+      var c = document.createElement('canvas');
+      c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+      return new Promise(function (res) { c.toBlob(function (b) { res(b || blob); }, 'image/jpeg', 0.85); }).then(blobB64);
+    }).catch(function () { return blobB64(blob); });
+  }
+  /* Ο Κώστας διαβάζει ένα τιμολόγιο. Σφάλματα με την ίδια μορφή με το aiOnce
+     (status · retryAfter · msg), συν err.gift = τι σημαίνει για το δώρο. */
+  function giftRead(rec) {
+    var t0 = Date.now();
+    return Promise.all(pagesOf(rec).map(giftShrink)).then(function (b64s) {
+      return kmFetch('read', { method: 'POST', headers: kmHead(), body: JSON.stringify({ pages: b64s }) });
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (r.ok && j && j.ok) {
+          giftFromSrv(j);
+          try {
+            localStorage.setItem(LS.aiMs, aiStamp() + ' · ' + (Math.round((Date.now() - t0) / 100) / 10).toString().replace('.', ',') +
+              '″ · Κώστας AI · απομένουν ' + j.left + '/' + GIFT_N);
+            localStorage.setItem(LS.aiRaw, aiStamp() + ' · Κώστας AI · ' + JSON.stringify({ net: j.net, vat: j.vat, total: j.total, date: j.date }));
+          } catch (e) {}
+          return { net: aiNum(j.net), vat: aiNum(j.vat), total: aiNum(j.total), date: aiDate(j.date) };
+        }
+        var e = new Error('http'); e.status = r.status; e.msg = (j && j.error) || ('σφάλμα ' + r.status);
+        e.gift = (j && (j.error === 'gift_done' || j.error === 'not_activated')) ? 'done'
+               : (r.status === 429 || r.status >= 500) ? 'wait'
+               : 'stop';
+        e.retryAfter = ((j && j.retry_after) || 30) * 1000;
+        if (j && j.error === 'gift_done') { giftFromSrv(j); }
+        if (j && j.error === 'not_activated') { var g = giftGet() || {}; g.active = false; giftSet(g); giftRender(); }
+        throw e;
+      });
+    });
+  }
+  /* Η ουρά του δώρου: ίδια λογική με την aiSweep (νεότερο πρώτα, 3 προσπάθειες),
+     ΜΟΝΟ για φωτογραφίες μετά την ενεργοποίηση. Επιστρέφει true αν ανέλαβε. */
+  function giftSweep() {
+    if (!giftLive() || giftBusy || !navigator.onLine) { return false; }
+    if (giftWait > Date.now()) { schedule(giftWait - Date.now() + 500); return true; }
+    giftBusy = true; aiBusy = true;
+    all().then(function (rows) {
+      var q = rows.filter(function (r) {
+        return isPending(r) && !r.sug && (r.aiTry || 0) < AI_MAX_TRY && giftFor(r) && (manualRun || autoIds[r.id]);
+      }).sort(function (a, b) { return b.ts - a.ts; });
+      if (!q.length) { giftBusy = false; aiBusy = false; giftNext(); return; }
+      var rec = q[0];
+      diag('διαβάζει ο Κώστας AI…');
+      giftRead(rec).then(function (sug) {
+        if (sug.total === null && sug.vat === null && sug.net === null) {
+          rec.aiTry = (rec.aiTry || 0) + 1;
+          diag('ο Κώστας δεν διάβασε ποσά (' + rec.aiTry + '/3) — δεν χρεώθηκε στο δώρο');
+        } else {
+          rec.sug = sug; rec.aiAt = Date.now(); rec.aiBy = 'kostas';
+          diag('✓ διάβασε ο Κώστας AI: ' + num(sug.total) + ' / ' + num(sug.vat));
+        }
+        return put(rec).then(function () {
+          if (!el('s-pend').hidden) { renderPending(); }
+          giftBusy = false; aiBusy = false;
+          schedule(AI_NEXT);
+        });
+      }).catch(function (err) {
+        giftBusy = false; aiBusy = false;
+        aiErrLog('Κώστας AI · ' + (err.msg || err.message || 'δίκτυο'));
+        if (err.gift === 'done') { diag('το δώρο τελείωσε'); schedule(AI_NEXT); return; }
+        if (err.gift === 'stop') { diag('Κώστας AI · ' + (err.msg || '')); giftWait = Date.now() + 600000; return; }
+        giftWait = Date.now() + (err.retryAfter || 30000);       // 429/5xx/δίκτυο: περιμένει, δεν χάνεται
+        diag('Κώστας AI · αναμονή ' + Math.ceil((giftWait - Date.now()) / 1000) + 'ς');
+        schedule(giftWait - Date.now() + 500);
+      });
+    }).catch(function () { giftBusy = false; aiBusy = false; });
+    return true;
+  }
+  /* Μετά το δώρο: ό,τι μένει (παλιά εκκρεμή, ή μετά το 20ό) πάει στο κλειδί, αν υπάρχει. */
+  function giftNext() {
+    if (localStorage.getItem(LS.key)) { aiSweepKey(); } else { diag('τίποτα για τον Κώστα AI'); }
+  }
+
   function aiSweep() {
+    /* v113 · KM-READ-GIFT — όσο υπάρχει δώρο, πρώτα ο Κώστας (Brief §2.4). */
+    if (isReader()) { diag('μόνο ανάγνωση — γράφει η ενεργή συσκευή'); return; }
+    if (aiBusy) { return; }
+    if (giftSweep()) { return; }
+    aiSweepKey();
+  }
+  function aiSweepKey() {
     /* v35 · Η.3 — Η ΑΝΑΓΝΩΣΗ ΕΙΝΑΙ ΓΡΑΨΙΜΟ. Αποθηκεύει προτάσεις ποσών στη
        βάση· σε αναγνώστρια συσκευή αυτά δεν θα ανέβαιναν ποτέ και θα τα
        πατούσε το επόμενο κατέβασμα. Χειρότερα: θα έκαιγε το όριο του
@@ -4973,6 +5186,12 @@
     toCam();
   };
   el('shutter').onclick = capture;
+  /* v113 · KM-READ-GIFT */
+  el('gift-b').onclick = giftAsk;
+  el('gift-x').onclick = function (e) { e.stopPropagation(); giftClose(); };
+  el('gift').onclick = function (e) { if (e.target && e.target.id === 'gift-k') { return; } var g = giftGet(); if (!g || !g.active) { giftAsk(); } };
+  el('gift-ok-go').onclick = giftActivate;
+  el('gift-ok-no').onclick = function () { el('gift-ok').hidden = true; };
   el('cam-retry').onclick = startCam;
 
   /* ── v35 · Η.3 — ΕΠΙΣΤΡΟΦΗ ΤΗΣ ΕΠΕΞΕΡΓΑΣΙΑΣ ΣΕ ΑΥΤΗ ΤΗ ΣΥΣΚΕΥΗ ────
@@ -5392,7 +5611,7 @@
     { q: 'Τι κάνει το Kostometro;',
       a: 'Φωτογραφίζεις το τιμολόγιο τη στιγμή που παραλαμβάνεις το εμπόρευμα και το βρίσκεις οργανωμένο ανά προμηθευτή. Βλέπεις πόσα πλήρωσες σε κάθε προμηθευτή, σήμερα, αυτόν τον μήνα ή σε όποια περίοδο θέλεις.' },
     { q: 'Πόσο κοστίζει;',
-      a: 'Από εμάς, τίποτα. Είναι δωρεάν, χωρίς όριο χρόνου.<br><br>Για να διαβάζονται τα ποσά αυτόματα χρειάζεται κλειδί Gemini της Google. <b>Σου συνιστούμε πληρωμένο κλειδί</b>: διαβάζει σε λίγα δευτερόλεπτα και συνεχίζει κανονικά όταν η Google έχει φόρτο. Η Google το χρεώνει ανά ανάγνωση — ενδεικτικά <b>περίπου 0,50 € για 100 τιμολόγια</b>. Η τιμή ορίζεται από την Google και μπορεί να αλλάξει. Υπάρχει και δωρεάν κλειδί, αλλά είναι αργό και κάποιες ώρες δεν λειτουργεί. Η επιλογή είναι της επιχείρησής σου.' },
+      a: 'Από εμάς, τίποτα. Είναι δωρεάν, χωρίς όριο χρόνου.<br><br>Για να διαβάζονται τα ποσά αυτόματα χρειάζεται κλειδί Gemini της Google. <b>Σου συνιστούμε πληρωμένο κλειδί</b>: διαβάζει σε λίγα δευτερόλεπτα και συνεχίζει κανονικά όταν η Google έχει φόρτο. Η Google το χρεώνει ανά ανάγνωση — ενδεικτικά <b>περίπου 0,50 € για 100 τιμολόγια</b>. Η τιμή ορίζεται από την Google και μπορεί να αλλάξει. Υπάρχει και δωρεάν κλειδί, αλλά είναι αργό και κάποιες ώρες δεν λειτουργεί. Η επιλογή είναι της επιχείρησής σου.<br><br><b>🎁 Δώρο:</b> τα πρώτα <b>20 τιμολόγια</b> τα διαβάζει ο Κώστας (AI) <b>δωρεάν και χωρίς κλειδί</b> — πάτα «Ενεργοποίηση Κώστα AI» στην οθόνη φωτογραφίας. Αυτά τα πληρώνουμε εμείς. Μετά συνεχίζεις χειροκίνητα ή με δικό σου κλειδί Google· με το κλειδί η χρέωση είναι της Google, όχι δική μας.' },
     { h: 'Ανάγνωση ποσών' },
     { q: 'Τι είναι το «κλειδί Gemini»; Το χρειάζομαι;',
       a: 'Όχι υποχρεωτικά. Με κλειδί, η εφαρμογή διαβάζει μόνη της καθαρό ποσό, ΦΠΑ και σύνολο από τη φωτογραφία, και εσύ απλώς επιβεβαιώνεις. Χωρίς κλειδί, τα γράφεις εσύ. Το κλειδί το φτιάχνεις από τον λογαριασμό Google σου, με οδηγό βήμα-βήμα με εικόνες (fastwrite.tech/kostometro/kleidi), και μένει μόνο στο κινητό σου. Σου συνιστούμε <b>πληρωμένο</b> κλειδί — δες «Πόσο κοστίζει;».',

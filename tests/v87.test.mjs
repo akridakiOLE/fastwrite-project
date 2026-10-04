@@ -27,7 +27,8 @@ const check = (n, f) => { try { f(); if (!ONLY) console.log("  ✔ " + n); } cat
 check("Ν87-1 · 🔴 ο οδηγός ΠΟΤΕ δεν κλείνει παράθυρο", () => { if (guide.includes("window.close")) throw new Error("window.close στον οδηγό"); });
 check("Ν87-2 · 🔴 κανένας σύνδεσμος προς τον οδηγό σε νέο παράθυρο", () => {
   const links = [...html.matchAll(/<a [^>]*href="\/kostometro\/kleidi\/"[^>]*>/g)].map((m) => m[0]);
-  if (links.length !== 2) throw new Error("περίμενα 2 συνδέσμους, βρήκα " + links.length);
+  // v113: +1 σύνδεσμος — το κουτί «Τα 20 δώρα τελείωσαν» (KM-READ-GIFT), ίδιο παράθυρο
+  if (links.length !== 3) throw new Error("περίμενα 3 συνδέσμους, βρήκα " + links.length);
   if (links.some((l) => l.includes("_blank"))) throw new Error("σύνδεσμος με _blank");
   const i = js.indexOf("guide.href = '/kostometro/kleidi/'"); if (i < 0) throw new Error("λείπει ο σύνδεσμος του «σταμάτησε»");
   if (js.slice(i, js.indexOf("\n", i)).includes("_blank")) throw new Error("ο σύνδεσμος του «σταμάτησε» ανοίγει νέο παράθυρο");

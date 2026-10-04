@@ -285,6 +285,20 @@
       el('ld-un').innerHTML = ul.map(function (r) { return '<tr><td>' + esc(r.email) + '</td><td>' + esc(r.name || '') + '</td><td>' + fmtDate(r.unsub_at) + '</td></tr>'; }).join('');
     }
 
+    /* v113 · KM-READ-GIFT — κάρτα «Δώρο Κώστα» */
+    var rg = j.read_gift;
+    el('rg-card').hidden = !rg;
+    if (rg) {
+      el('k-rg-act').textContent = rg.activated; el('k-rg-try').textContent = rg.tried;
+      el('k-rg-fin').textContent = rg.finished; el('k-rg-key').textContent = rg.with_key;
+      el('k-rg-n').textContent = rg.reads;
+      el('k-rg-usd').textContent = '$' + (rg.today && rg.today.usd ? rg.today.usd.toFixed(3) : '0');
+      var rgAll = (rg.days || []).reduce(function (a, r) { return a + (Number(r.usd_micro) || 0); }, 0) / 1e6;
+      var rgFail = (rg.days || []).reduce(function (a, r) { return a + (Number(r.fail) || 0); }, 0);
+      el('k-rg-more').innerHTML = 'Μοντέλο: <b>' + esc(rg.model) + '</b> · ταβάνι <b>$' + rg.cap_usd + '</b>/ημέρα · ' +
+        'κόστος περιόδου: <b>$' + rgAll.toFixed(3) + '</b> · χωρίς ποσά/σφάλματα: <b>' + rgFail + '</b> (δεν χρεώθηκαν στο δώρο).';
+    }
+
     var p = j.pending_deletions || [];
     el('c-pend').hidden = !p.length;
     el('pend').innerHTML = p.map(function (r) {

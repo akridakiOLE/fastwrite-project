@@ -99,7 +99,8 @@ await check("Ν89-8 · δεύτερη ασφάλεια: χωρίς σημάδι 
   if (!w.nodes["upd-toast"].hidden) throw new Error("βγήκε χωρίς λογαριασμό");
 });
 await check("Ν89-7 · δεμένο στην κάμερα · στοιχεία στο HTML · δεν κάθεται στο κουμπί λήψης", async () => {
-  if (!js.includes("if (id === 's-cam')   { updToast(); }")) throw new Error("δεν καλείται στην κάμερα");
+  // v113: στην ίδια γραμμή μπήκε και το giftShow() — ο φρουρός ελέγχει ότι το updToast() μένει ΠΡΩΤΟ
+  if (!js.includes("if (id === 's-cam')   { updToast();")) throw new Error("δεν καλείται στην κάμερα");
   for (const id of ["upd-toast", "upd-ver", "upd-note", "upd-x"]) if (!html.includes('id="' + id + '"')) throw new Error("#" + id);
   const i = html.indexOf('id="upd-toast"'), c = html.indexOf('class="cam-bottom"');
   if (!(i > 0 && i < c)) throw new Error("λάθος θέση");
