@@ -18,7 +18,7 @@ const MUT = [
   ["src", "replyTo: MAIL_SUPPORT,\n    subject: \"[Agent] \"", "replyTo: email,\n    subject: \"[Agent] \""],                   // 7 · 🔴 απάντηση παρακάμπτει το support@
   ["src", "    if (b.consent !== true) return json({ ok: false, error: \"consent\" }, 400);\n", ""],                            // 8 · 🔴 συζήτηση χωρίς συγκατάθεση
   ["js", "    if (agSecret(t)) { agPush('s', AG_ERR.secret);", "    if (false) { agPush('s', AG_ERR.secret);"],                // 9 · 🔴 φίλτρο συσκευής σβηστό
-  ["js", "  var AG_PUBLIC = false;", "  var AG_PUBLIC = true;"],                                                                // 10 · 🔴 ανοιχτός σε όλους πριν την Πολιτική
+  ["js", "  var AG_PUBLIC = true;", "  var AG_PUBLIC = false;"],                                                                // 10 · 🔴 ανοιχτός σε όλους πριν την Πολιτική
   ["src", "  if (agentHasSecret(reply)) reply =", "  if (false) reply ="],                                                        // 11 · μυστικό σε απάντηση του μοντέλου
   ["src", "const m24 = new Date(base - 730 * 86400000)", "const m24 = new Date(base - 1 * 86400000)"],                          // 12 · 🔴 αιτήματα σβήνονται νωρίς
 ];
@@ -143,7 +143,7 @@ await check("Α-11 · 🔴 φίλτρο συσκευής: 12 λέξεις / κλ
   ok(send.indexOf("if (agSecret(t)) { agPush('s', AG_ERR.secret);") > -1 && send.indexOf("agSecret(t)") < send.indexOf("fetch(KM_API"), "🔴 φίλτρο μετά την αποστολή");
 });
 await check("Α-12 · 🔴 ΚΡΥΦΟΣ για όλους: ανάβει μόνο με ?chat=1 · κουμπί κρυφό στο HTML · δήλωση AI + Πολιτική + προειδοποίηση", async () => {
-  ok(js.includes("  var AG_PUBLIC = false;"), "AG_PUBLIC");
+  ok(js.includes("  var AG_PUBLIC = true;"), "AG_PUBLIC (v115: ανοιχτός από την ημέρα της καμπάνιας)");
   ok(/<button id="ag-fab"[^>]*hidden>/.test(html) && /<section id="ag"[^>]*hidden>/.test(html), "κρυφά στοιχεία");
   const c = html.slice(html.indexOf('id="ag-consent"'), html.indexOf('id="ag-log"'));
   ok(/τεχνητής νοημοσύνης \(AI\)/.test(c) && /90 ημέρες/.test(c) && /δεν αποθηκεύονται/.test(c) && /Anthropic/.test(c) && /\/legal\/privacy/.test(c) && /12 λέξεις/.test(c), "συγκατάθεση");

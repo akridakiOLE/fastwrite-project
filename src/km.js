@@ -1159,7 +1159,7 @@ const AGENT_MAX_IMG_B64 = 2000000;        // ~1,5 MB εικόνα — η εφα�
 const AGENT_PER_DEV_HOUR = 40;            // μηνύματα χρήστη ανά συσκευή ανά ώρα
 const AGENT_MAX_TURNS = 80;               // ανά συζήτηση
 const AGENT_HISTORY = 24;                 // πόσα μηνύματα βλέπει το μοντέλο
-const AGENT_DAILY_USD_DEFAULT = 3;
+const AGENT_DAILY_USD_DEFAULT = 10;   // v115 · ημέρα καμπάνιας Fasi3 (ήταν 3 όσο ήταν κρυφός)
 // $ ανά εκατ. tokens (platform.claude.com/docs/en/about-claude/pricing, 29/9/2026)· cache write εκτίμηση 1,25×.
 const AGENT_PRICE = { in: 2, out: 10, cache_read: 0.2, cache_write: 2.5 };
 const AGENT_SECRET_RE = [/\bAIza[0-9A-Za-z_-]{30,}/, /\bAQ\.[0-9A-Za-z_-]{20,}/, /\bsk-ant-[0-9A-Za-z_-]{20,}/];
