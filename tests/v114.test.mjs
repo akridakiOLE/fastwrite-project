@@ -77,10 +77,10 @@ await check("Κ-2 · «Μετράω από» 2026-10-05: μόνο η καμπά�
   eq(k.by_src.map((r) => r.src).sort(), ["direct", "fasi3"], "προελεύσεις:");
 });
 await check("Κ-3 · το χωνί δείχνει Google / Microsoft — στήλες ίσες με τα βήματα", async () => {
-  if (!/var FN = \['open', 'email', 'oauth_google', 'oauth_microsoft', 'code', 'account', 'key', 'key_skip'\]/.test(ui)) throw new Error("FN χωρίς oauth");
+  if (!/var FN = \['open', 'email', 'oauth_google', 'oauth_microsoft', 'code', 'account', 'login', 'key', 'key_skip'\]/.test(ui)) throw new Error("FN χωρίς oauth");
   const th = (html.slice(html.indexOf("Χωνί εγγραφής")).match(/<thead>[\s\S]*?<\/thead>/) || [""])[0];
-  eq((th.match(/<th>/g) || []).length, 9, "στήλες:");
-  if (!ui.includes('colspan="9"')) throw new Error("colspan");
+  eq((th.match(/<th>/g) || []).length, 10, "στήλες:");   // v116: + «είσοδος με 12 λέξεις»
+  if (!ui.includes('colspan="10"')) throw new Error("colspan");
   const f = (await pk()).funnel; if (!f.some((r) => r.step === "oauth_google" && r.n === 1)) throw new Error("ο server δεν φέρνει oauth");
 });
 await check("Κ-4 · η κάρτα υπάρχει στην οθόνη και κρύβεται αν ο server δεν τη στείλει", async () => {

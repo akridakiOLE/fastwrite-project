@@ -1,0 +1,10 @@
+v116 - Pinakas: sosti metrisi (evrima Stavros 5/10/2026)
+
+- Eisodos me 12 lexeis metraei 'login', OXI neos logariasmos (o server leei account new/existing).
+- ENERGES syskeves: mia ana logariasmo; to istoriko (exodos/eisodos, browser, incognito) xorista.
+- Xoni: kathara onomata stilon; 'kathe browser metraei xorista'.
+- 'Metrao apo' me imerominia + ORA Kyprou (datetime-local, palia timi = 00:00).
+- tests/v116.test.mjs: 5 elegxoi + 7 metallaxeis; v114 test: 10 stiles.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01C8JkgpYoEszhp6Cbwn6Boq

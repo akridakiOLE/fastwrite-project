@@ -13,19 +13,20 @@
   function sinceGet() {
     var v = '';
     try { v = localStorage.getItem(SINCE) || ''; } catch (e) {}
-    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
+    return /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/.test(v) ? v : '';   // v116: + ώρα
   }
   function sinceSet(v) {
     try { if (v) { localStorage.setItem(SINCE, v); } else { localStorage.removeItem(SINCE); } } catch (e) {}
   }
   function sincePaint() {
     var v = sinceGet(), inp = el('since');
-    if (inp && inp.value !== v) { inp.value = v; }
+    var vi = v && v.length === 10 ? v + 'T00:00' : v;   // v116: παλιά τιμή μόνο με ημερομηνία = 00:00
+    if (inp && inp.value !== vi) { inp.value = vi; }
     el('since-card').classList.toggle('on', !!v);
-    var p = v ? v.split('-') : null;
+    var p = v ? v.slice(0, 10).split('-') : null, hm = v.length === 16 ? v.slice(11) : '00:00';
     el('since-note').innerHTML = v
-      ? 'Όλα τα νούμερα του <b>Kostometro</b> μετράνε από <b>' + p[2] + '/' + p[1] + '/' + p[0] + '</b> και μετά (ώρα Κύπρου). Μένει έτσι ώσπου να το αλλάξεις. <span class="muted">Η ζώνη FastWrite δεν φιλτράρεται ακόμα.</span>'
-      : 'Χωρίς ημερομηνία: όλα από την αρχή. Διάλεξε μέρα για να μετράνε όλα από εκείνη και μετά.';
+      ? 'Όλα τα νούμερα του <b>Kostometro</b> μετράνε από <b>' + p[2] + '/' + p[1] + '/' + p[0] + ' ' + hm + '</b> και μετά (ώρα Κύπρου). Μένει έτσι ώσπου να το αλλάξεις. <span class="muted">Η ζώνη FastWrite δεν φιλτράρεται ακόμα.</span>'
+      : 'Χωρίς ημερομηνία: όλα από την αρχή. Διάλεξε μέρα και ώρα για να μετράνε όλα από εκείνη και μετά.';
   }
   var API = '/api/km/admin/pinakas';
   var PAGE = 100;
@@ -253,7 +254,7 @@
     bars(el('src'), (j.by_source || []).map(function (r) { return { source: srcLab(r.source), n: r.n }; }), 'source');
     bars(el('ref'), j.by_ref, 'ref');
 
-    el('k-dev').textContent = j.devices.distinct;
+    el('k-dev').textContent = (j.devices.active != null ? j.devices.active : j.devices.distinct);   // v116 · KM-PK-V116: ΕΝΕΡΓΕΣ
     el('k-dev7').textContent = j.devices.seen_7d;
     el('k-mail').textContent = j.mail_30d.ok + (j.mail_30d.failed ? ' / ' + j.mail_30d.failed + '🔴' : '');
     el('k-fb').textContent = j.feedback.n;
@@ -263,18 +264,19 @@
     el('k-sup24').textContent = (sp.waiting_24h || 0) + (sp.waiting_24h ? '🔴' : '');
     el('k-more').innerHTML =
       'Συσκευές με ανέβαστα: <b>' + j.devices.with_unsynced + '</b> · ' +
+      'Ταυτότητες συσκευών στο ιστορικό: <b>' + j.devices.distinct + '</b> <span class="muted">(έξοδος/είσοδος, κάθε browser και incognito μετράει χωριστά)</span> · ' +
       'Email που απέτυχαν (30 ημ.): <b>' + j.mail_30d.failed + '</b> · ' +
       'Μέσος όρος αστεριών: <b>' + (j.feedback.avg_stars || '—') + '</b> · ' +
       'Θέλουν απάντηση: <b>' + j.feedback.want_reply + '</b> · ' +
       'Αιτήματα απαντημένα: <b>' + (sp.answered || 0) + '</b> · κλειστά 7 ημ.: <b>' + (sp.closed_7d || 0) + '</b>';
 
     /* v97 · KM-FUNNEL — χωνί ανά προέλευση · κάρτα leads */
-    var FN = ['open', 'email', 'oauth_google', 'oauth_microsoft', 'code', 'account', 'key', 'key_skip'], fm = {};   // v114: + Google/Microsoft
+    var FN = ['open', 'email', 'oauth_google', 'oauth_microsoft', 'code', 'account', 'login', 'key', 'key_skip'], fm = {};   // v114: + Google/Microsoft
     (j.funnel || []).forEach(function (r) { (fm[r.src] = fm[r.src] || {})[r.step] = Number(r.n) || 0; });
     var fk = Object.keys(fm).sort(function (a, b) { return (fm[b].open || 0) - (fm[a].open || 0); });
     el('fnl').innerHTML = fk.length ? fk.map(function (s) {
       return '<tr><td>' + esc(srcLab(s)) + '</td>' + FN.map(function (st) { return '<td>' + (fm[s][st] || 0) + '</td>'; }).join('') + '</tr>';
-    }).join('') : '<tr><td colspan="9" class="muted">Κανείς ακόμα.</td></tr>';
+    }).join('') : '<tr><td colspan="10" class="muted">Κανείς ακόμα.</td></tr>';
     var ld = j.leads;
     if (ld) {
       var sent = (ld.sends || []).reduce(function (a, r) { return a + (Number(r.ok) || 0); }, 0);
@@ -349,7 +351,7 @@
         '<span>σύσταση ' + (r.ref ? '<b class="tag acc">' + esc(r.ref) + '</b>' : '<span class="muted">—</span>') + '</span>' +
         '<span>εγγραφή <b>' + fmtDate(r.created) + '</b></span>' +
         '<span>sync <b>' + ago(r.last_sync) + '</b>' + (r.folder_version ? ' <span class="muted">v' + r.folder_version + '</span>' : '') + '</span>' +
-        '<span>συσκευές <b>' + (r.devices || 0) + '</b></span>' +
+        '<span>συσκευή <b>' + (r.devices_active || 0) + '</b> ενεργή' + ((r.devices || 0) > (r.devices_active || 0) ? ' <span class="muted">· ' + r.devices + ' στο ιστορικό</span>' : '') + '</span>' +   // v116 · KM-PK-V116
       '</div></div>';
   }
 
@@ -534,7 +536,8 @@
   /* KM-PK-SINCE — αλλαγή = αποθήκευση + πλήρης φόρτωση (σύνολα + λίστα). */
   el('since').addEventListener('change', function () {
     var v = String(el('since').value || '').trim();
-    sinceSet(/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
+    v = v.slice(0, 16);
+    sinceSet(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/.test(v) ? v : '');
     sincePaint(); load();
   });
   el('since-clr').onclick = function () { sinceSet(''); sincePaint(); load(); };

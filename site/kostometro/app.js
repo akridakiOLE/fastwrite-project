@@ -2067,7 +2067,7 @@
      για το πρόσωπο: install_id (ο server το κάνει hash), βήμα, προέλευση. */
   function funnel(step) {
     try {
-      if (localStorage.getItem(LS.reg) && step !== 'account' && step !== 'key' && step !== 'key_skip') { return; }
+      if (localStorage.getItem(LS.reg) && step !== 'account' && step !== 'login' && step !== 'key' && step !== 'key_skip') { return; }
       var k = 'km_fn_' + step;
       if (localStorage.getItem(k)) { return; }
       var inst = localStorage.getItem(LS.id) || '';
@@ -2149,7 +2149,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v115';
+  var APP_VER = 'φέτα 3 · v116';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -3436,13 +3436,15 @@
     }).then(function (r) {
       if (!r.ok) { return false; }
       localStorage.setItem(LS.reg, '1');
-      funnel('account');   // v97 · KM-FUNNEL
       localStorage.removeItem(LS.emailTok);   // καμένο στον server — δεν ξαναχρησιμεύει
       localStorage.removeItem(LS.wrapped);   // v47 — η κλειδαριά γράφτηκε μαζί με τον λογαριασμό
       /* Το register ΚΑΝΕΙ αυτή τη συσκευή ενεργή στον server (Η.3: όποια
          βάλει τις 12 λέξεις γίνεται η ενεργή). Το γράφουμε ρητά, τη στιγμή
          που το μαθαίνουμε από την απάντηση — όχι με υπόθεση αργότερα. */
       return r.json().then(function (j) {
+        /* v116 · KM-PK-V116 — ο server λέει αν ΦΤΙΑΧΤΗΚΕ λογαριασμός ή αν μπήκε σε υπάρχοντα (12 λέξεις).
+           Ως τη v115 και τα δύο μετρούσαν «λογαριασμός» (εύρημα Stavros 5/10). */
+        if (j && j.account === 'existing') { funnel('login'); } else { funnel('account'); }   // v97 · KM-FUNNEL
         setActiveState(true, j && j.state && j.state.active_since);
         return true;
       }).catch(function () { setActiveState(true); return true; });

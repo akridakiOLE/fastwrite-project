@@ -209,7 +209,7 @@ html:not([data-gate]) #s-data  { display: none !important; }
   <section class="card since-card" id="since-card">
     <div class="since-row">
       <label for="since" class="since-lab">Μετράω από</label>
-      <input type="date" id="since">
+      <input type="datetime-local" id="since">
       <button class="btn ghost" id="since-clr" type="button">Όλα</button>
     </div>
     <p class="fine hint" id="since-note"></p>
@@ -262,7 +262,7 @@ html:not([data-gate]) #s-data  { display: none !important; }
   <section class="card">
     <h2>Συσκευές · Email · Γνώμες</h2>
     <div class="grid">
-      <div class="kpi"><div class="n" id="k-dev">—</div><div class="l">συσκευές</div></div>
+      <div class="kpi"><div class="n" id="k-dev">—</div><div class="l">ενεργές συσκευές</div></div>
       <div class="kpi"><div class="n" id="k-dev7">—</div><div class="l">είδαμε 7 ημ.</div></div>
       <div class="kpi"><div class="n" id="k-mail">—</div><div class="l">email 30 ημ.</div></div>
       <div class="kpi"><div class="n" id="k-fb">—</div><div class="l">γνώμες</div></div>
@@ -274,9 +274,9 @@ html:not([data-gate]) #s-data  { display: none !important; }
 
   <!-- v97 · KM-FUNNEL — ΧΩΝΙ ΕΓΓΡΑΦΗΣ + LEADS -->
   <section class="card">
-    <h2>Χωνί εγγραφής <span class="muted">30 ημέρες · μοναδικές συσκευές</span></h2>
-    <div class="scroll"><table><thead><tr><th>προέλευση</th><th>άνοιξαν</th><th>έβαλαν email</th><th>Google</th><th>Microsoft</th><th>επιβεβαίωσαν κωδικό</th><th>λογαριασμός</th><th>κλειδί</th><th>χωρίς κλειδί</th></tr></thead><tbody id="fnl"></tbody></table></div>
-    <p class="fine hint" id="fnl-note">Μετράει από τη v97 (27/9/2026) — ό,τι έγινε πριν δεν φαίνεται εδώ.</p>
+    <h2>Χωνί εγγραφής <span class="muted">30 ημέρες · ανά browser</span></h2>
+    <div class="scroll"><table><thead><tr><th>προέλευση</th><th>άνοιξαν (browser)</th><th>έβαλαν email</th><th>πάτησαν Σύνδεση Google</th><th>πάτησαν Σύνδεση Microsoft</th><th>επιβεβαίωσαν email</th><th>ΝΕΟΣ λογαριασμός</th><th>είσοδος με 12 λέξεις</th><th>κλειδί</th><th>χωρίς κλειδί</th></tr></thead><tbody id="fnl"></tbody></table></div>
+    <p class="fine hint" id="fnl-note">Μετράει από τη v97 (27/9/2026). <b>Κάθε browser μετράει χωριστά</b>: ο ίδιος άνθρωπος στον browser του Facebook και μετά στο Chrome (ή σε incognito) = 2 γραμμές «άνοιξαν». Η «είσοδος με 12 λέξεις» μετριέται χωριστά από τη v116 — πριν, μετρούσε ως «λογαριασμός».</p>
   </section>
   <section class="card">
     <h2>Λίστα leads</h2>

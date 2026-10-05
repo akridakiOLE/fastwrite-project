@@ -550,7 +550,7 @@ export async function kmSupportAutoClose(env, nowIso) {
 // ═══ v97 · KM-FUNNEL — ΧΩΝΙ ΕΓΓΡΑΦΗΣ (27/9/2026) ═══
 // Η εφαρμογή λέει «έφτασα στο βήμα Χ» ΜΙΑ φορά ανά βήμα, μόνο πριν ολοκληρωθεί η εγγραφή.
 // Ο server κρατάει ΜΟΝΟ: συσκευή (hash), βήμα, προέλευση, ώρα. Όχι email, όχι IP.
-const FUNNEL_STEPS = { open: 1, email: 1, code: 1, account: 1, key: 1, key_skip: 1, oauth_google: 1, oauth_microsoft: 1 };  // KM-OAUTH: +2
+const FUNNEL_STEPS = { open: 1, email: 1, code: 1, account: 1, key: 1, key_skip: 1, oauth_google: 1, oauth_microsoft: 1, login: 1 };  // KM-OAUTH: +2 · v116 KM-PK-V116: login = είσοδος με 12 λέξεις σε υπάρχοντα (ΟΧΙ νέος λογαριασμός)
 function funnelSrc(v) {
   let s = String(v || "direct").toLowerCase();
   if (/^ref:/.test(s)) s = "ref";
@@ -2844,7 +2844,18 @@ function cyShift(ymd, n) {
   const d = new Date(ymd + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
+// v116 · KM-PK-V116 — ώρα Κύπρου «ΩΩ:ΛΛ» μιας μέρας σε UTC (το «Μετράω από» με ώρα, αίτημα Stavros 5/10)
+const CY_HM = new Intl.DateTimeFormat("en-GB", { timeZone: CY_TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+function cyLocalUtc(ymd, hm) {
+  const base = new Date(ymd + "T" + hm + ":00Z").getTime();
+  for (let off = -14; off <= 14; off++) {
+    const t = base - off * 3600e3;
+    if (cyDate(t) === ymd && CY_HM.format(new Date(t)) === hm) return new Date(t).toISOString();
+  }
+  return new Date(base).toISOString();
+}
 function cyMidnightUtc(ymd) {
+  if (ymd.length === 16) return cyLocalUtc(ymd.slice(0, 10), ymd.slice(11));   // v116 · «ΗΗΗΗ-ΜΜ-ΗΗTΩΩ:ΛΛ»
   const base = new Date(ymd + "T00:00:00Z").getTime();
   for (let off = -14; off <= 14; off++) {
     const t = base - off * 3600e3;
@@ -2900,9 +2911,9 @@ function pkFilters(p) {
    ⚠ Η ζώνη FastWrite (Hetzner) ΔΕΝ φιλτράρεται ακόμα — το λέει η οθόνη. */
 function pkSince(p) {
   const v = String((p && p.get("since")) || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "";
-  const d = new Date(v + "T12:00:00Z");
-  if (isNaN(d) || d.toISOString().slice(0, 10) !== v) return "";
+  if (!/^\d{4}-\d{2}-\d{2}(T([01]\d|2[0-3]):[0-5]\d)?$/.test(v)) return "";   // v116: + προαιρετική ώρα
+  const d = new Date(v.slice(0, 10) + "T12:00:00Z");
+  if (isNaN(d) || d.toISOString().slice(0, 10) !== v.slice(0, 10)) return "";
   return v;
 }
 
@@ -2992,6 +3003,9 @@ async function adminPinakas(request, env) {
             SUM(CASE WHEN last_seen >= ? THEN 1 ELSE 0 END) AS seen_7d,
             SUM(CASE WHEN unsynced > 0 THEN 1 ELSE 0 END) AS with_unsynced
      FROM km_device_links${whereC("created")}`, d7, ...SA);
+  // v116 · KM-PK-V116 — ΕΝΕΡΓΕΣ συσκευές: μία ανά ζωντανό λογαριασμό. Το km_device_links κρατάει ΚΑΘΕ συσκευή που
+  // πέρασε ποτέ (έξοδος + είσοδος = νέα ταυτότητα· κάθε browser/incognito = άλλη) — αυτό είναι ιστορικό, όχι «συσκευές».
+  const devAct = await one(`SELECT COUNT(*) AS n FROM km_accounts WHERE deleted IS NULL AND active_device_id IS NOT NULL${andC("created")}`, ...SA);
 
   // ── εκκρεμείς διαγραφές (Η.11β) — μόνο ημερομηνίες, ΟΧΙ email ─────────
   const pending = await all(
@@ -3102,7 +3116,7 @@ async function adminPinakas(request, env) {
       with_gemini_key: tot.with_gemini_key || 0, paid: tot.paid || 0,
     },
     by_source: bySource, by_ref: byRef, per_day: perDay, by_country: byCountry,
-    devices: { links: dev.links || 0, distinct: dev.distinct_devices || 0, seen_7d: dev.seen_7d || 0, with_unsynced: dev.with_unsynced || 0 },
+    devices: { active: Number(devAct.n) || 0, links: dev.links || 0, distinct: dev.distinct_devices || 0, seen_7d: dev.seen_7d || 0, with_unsynced: dev.with_unsynced || 0 },
     pending_deletions: pending,
     mail_30d: { sent: mail.sent || 0, ok: mail.ok || 0, failed: mail.failed || 0 },
     feedback: { n: fb.n || 0, avg_stars: fb.avg_stars ? Number(fb.avg_stars).toFixed(2) : null, want_reply: fb.want_reply || 0 },
@@ -3165,7 +3179,8 @@ async function kmAccounts(all, one, params) {
     `SELECT a.rowid AS rid, a.email, a.created, a.country, a.source, a.ref, a.last_sync,
             a.folder_version, a.folder_bytes, a.has_key, a.plan,
             a.delete_due_at, substr(a.folder_id, 1, 8) AS folder,
-            (SELECT COUNT(*) FROM km_device_links l WHERE l.folder_id = a.folder_id) AS devices
+            (SELECT COUNT(*) FROM km_device_links l WHERE l.folder_id = a.folder_id) AS devices,
+            (CASE WHEN a.deleted IS NULL AND a.active_device_id IS NOT NULL THEN 1 ELSE 0 END) AS devices_active   -- v116 · KM-PK-V116
      FROM km_accounts a${seek} ORDER BY a.created DESC, a.rowid DESC LIMIT ?`,
     ...seekArgs, n);
 
