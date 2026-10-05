@@ -150,8 +150,8 @@ html:not([data-gate]) #s-key,
 html:not([data-gate]) #s-data  { display: none !important; }
 
 /* KM-PK-SINCE · 2/10/2026 — το πεδίο «Μετράω από» στην κορυφή. */
-.since-row { display: flex; align-items: center; gap: 10px; }
-.since-lab { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.since-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }   /* v117 · KM-PK-V117 */
+.since-lab { font-size: 14px; font-weight: 700; white-space: nowrap; flex-basis: 100%; }   /* v117: δική της γραμμή — η ώρα δεν κόβεται */
 .since-row input { flex: 1; min-width: 0; background: var(--bg3); border: 1px solid var(--border); color: var(--text);
   border-radius: 10px; padding: 10px; font-size: 16px; font-family: inherit; }
 .since-row .btn { padding: 10px 12px; }

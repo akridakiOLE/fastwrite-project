@@ -1,0 +1,7 @@
+v117 - Pinakas: i ora sto 'Metrao apo' den kovetai sto kinito
+
+- Etiketa se diki tis grammi; pedio + 'Ola' sti deuteri (evrima Stavros 5/10 22:05).
+- tests/v116: + P-6.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01C8JkgpYoEszhp6Cbwn6Boq

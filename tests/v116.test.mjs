@@ -112,5 +112,9 @@ await check("Π-5 · οθόνη: ημερομηνία + ώρα · στήλες �
   for (const s of ["άνοιξαν (browser)", "πάτησαν Σύνδεση Google", "ΝΕΟΣ λογαριασμός", "είσοδος με 12 λέξεις"]) if (!th.includes(s)) throw new Error("λείπει στήλη «" + s + "»");
   if (!/var FN = \['open', 'email', 'oauth_google', 'oauth_microsoft', 'code', 'account', 'login', 'key', 'key_skip'\]/.test(ui)) throw new Error("FN");
 });
+await check("Π-6 · v117: η ετικέτα «Μετράω από» σε δική της γραμμή — η ώρα δεν κόβεται στο κινητό", async () => {
+  if (!/\.since-row \{[^}]*flex-wrap: wrap/.test(html)) throw new Error("χωρίς αναδίπλωση");
+  if (!/\.since-lab \{[^}]*flex-basis: 100%/.test(html)) throw new Error("η ετικέτα μοιράζεται τη γραμμή");
+});
 console.log(failed ? "\nΚΟΚΚΙΝΟ: " + failed : "\n✔ ΟΛΑ ΠΕΡΑΣΑΝ");
 process.exit(ONLY !== null ? (failed ? 0 : 1) : (failed ? 1 : 0));
