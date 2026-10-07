@@ -1,0 +1,9 @@
+v119 - Afairesi "Midenismos eggrafis" (apofasi Stavros 6/10/2026, Brief "Mia porta" Gamma)
+
+- Esvine to email eno logariasmos xoris email den yparxei; afine orfanous logariasmous
+  kai anakateve ta topika timologia tou paliou me ton neo.
+- Kalyptetai apo: allagi syskevis, "Xekina kathara", Diagrafi logariasmou (H.11b).
+- tests/v119: 3 elegxoi + 2 metallaxeis. Kamia allagi server.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019EMeqhx3XCsBFnmEjoGepE
