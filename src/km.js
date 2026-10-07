@@ -1,4 +1,5 @@
 // KM-SERVER-V60-H11B  ← σημάδι έκδοσης· το ψάχνει το deploy_km_h11b.bat
+// KM-SERVER-V120-QR  ← σημάδι: «Μεταφορά λογαριασμού με QR» + εγγραφή χωρίς 12 λέξεις (Brief Γ, 7/10/2026)
 // KM-SERVER-V118-RECLAIM  ← σημάδι: «Αλλαγή 12 λέξεων με διπλή απόδειξη — και από συσκευή εκτός λειτουργίας» (Brief Γ, 7/10/2026)
 // KM-SERVER-V113-DORO20  ← σημάδι: «Δώρο 20 αναγνώσεων με τον Κώστα (AI)» — ανάγνωση τιμολογίου μέσω Anthropic, χωρίς αποθήκευση εικόνας (4/10/2026)
 // KM-SERVER-V104-KOSTAS  ← σημάδι: ο βοηθός λέγεται «Κώστας» + εκστρατεία «voithos-1» στους 3 νέους leads (1/10/2026)
@@ -147,6 +148,9 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/unlock" && method === "POST") return unlock(request, env);
   if (path === "/api/km/lock" && method === "POST") return addLock(request, env, ctx);
   if (path === "/api/km/words/reclaim" && method === "POST") return reclaimWords(request, env, ctx);   // v118
+  if (path === "/api/km/transfer/new" && method === "POST") return transferNew(request, env);            // v120
+  if (path === "/api/km/transfer/status" && method === "GET") return transferStatus(request, env);       // v120
+  if (path === "/api/km/transfer/take" && method === "POST") return transferTake(request, env);          // v120
   if (path === "/api/km/inbox") {
     if (method === "GET")    return getInbox(request, env);
     if (method === "PUT")    return putInbox(request, env);
@@ -933,11 +937,17 @@ async function emailCode(request, env) {
   // λογαριασμού» (Brief Γ, 7/10/2026). Ο κωδικός πάει ΜΟΝΟ στο email του
   // λογαριασμού που ζητά η ταυτότητα της συσκευής — ποτέ σε όποιο email γραφτεί.
   const own = b.purpose === "own";
+  const qr = b.purpose === "transfer";   // v120 — η Συσκευή Β δεν έχει ταυτότητα· έχει το tid του QR
   let email;
   if (own) {
     const a = await authed(request, env);
     if (a.err) return a.err;
     email = normEmail(a.acc.email);
+    if (!email) return json({ ok: false, error: "no_email" }, 409);
+  } else if (qr) {
+    const t = await transferRow(env, b.tid);
+    if (!t) return json({ ok: false, error: "transfer_gone" }, 410);
+    email = normEmail(t.email);
     if (!email) return json({ ok: false, error: "no_email" }, 409);
   } else {
     email = normEmail(b.email);
@@ -966,19 +976,24 @@ async function emailCode(request, env) {
   ).bind(email, await sha256hex(email + ":" + code), new Date(t).toISOString(), new Date(t + CODE_TTL_MS).toISOString(), ipH).run();
   // Εδώ ΠΕΡΙΜΕΝΟΥΜΕ την αποστολή: χωρίς email ο χρήστης δεν προχωρά, άρα
   // πρέπει να ξέρει ΤΩΡΑ ότι απέτυχε — όχι να κοιτάει άδειο inbox.
-  const sent = await mailSend(env, own ? "code_own" : "code", email, { code });
+  const sent = await mailSend(env, own ? "code_own" : (qr ? "code_qr" : "code"), email, { code });
   if (!sent) return json({ ok: false, error: "mail_failed" }, 502);
-  return json({ ok: true, sent: true, ttl_min: CODE_TTL_MS / 60000, to: own ? maskEmail(email) : undefined });
+  return json({ ok: true, sent: true, ttl_min: CODE_TTL_MS / 60000, to: (own || qr) ? maskEmail(email) : undefined });
 }
 
 async function emailVerify(request, env) {
   const b = (await safeJson(request)) || {};
   const own = b.purpose === "own";   // v118 · KM-OWN-PROOF
+  const qr = b.purpose === "transfer";   // v120
   let email = normEmail(b.email);
   if (own) {
     const a = await authed(request, env);
     if (a.err) return a.err;
     email = normEmail(a.acc.email);
+  } else if (qr) {
+    const t = await transferRow(env, b.tid);
+    if (!t) return json({ ok: false, error: "transfer_gone" }, 410);
+    email = normEmail(t.email);
   }
   const code = String(b.code || "").replace(/\D/g, "");
   if (!email || code.length !== 6) return json({ ok: false, error: "bad_code" }, 400);
@@ -994,7 +1009,7 @@ async function emailVerify(request, env) {
   }
   // Ξαναελέγχεται: στο μεταξύ κάποιος μπορεί να γράφτηκε με το ίδιο email.
   // (v118: στην απόδειξη κατόχου το email ΕΙΝΑΙ πιασμένο — από τον ίδιο.)
-  if (!own) {
+  if (!own && !qr) {
     const busy = await emailBusy(env, email);
     if (busy) return json({ ok: false, error: busy }, 409);
   }
@@ -1790,7 +1805,7 @@ async function register(request, env, ctx) {
   // συσκευή παίρνει τη σκυτάλη (όχι η ίδια που ξαναμπαίνει). Η αποτυχία του
   // email δεν ακυρώνει την είσοδο.
   if (acc.active_device_id && acc.active_device_id !== id.device) {
-    fireMail(env, ctx, "newdev", acc.email ? String(acc.email) : null, { device: clean(b.device_name, 60) });
+    fireMail(env, ctx, b.via === "qr" ? "qrdev" : "newdev", acc.email ? String(acc.email) : null, { device: clean(b.device_name, 60) });
   }
   await env.DB.prepare(
     "UPDATE km_accounts SET active_device_id = ?, active_since = ?, has_key = MAX(has_key, ?) WHERE folder_id = ?"
@@ -1976,6 +1991,67 @@ async function reclaimWords(request, env, ctx) {
   const fresh = await env.DB.prepare("SELECT * FROM km_accounts WHERE folder_id = ?").bind(a.id.folder).first();
   return json({ ok: true, lock_id: lockId, reclaimed: prevActive !== a.id.device,
                 state: pub(fresh), locks: await lockSummary(env, a.id.folder) });
+}
+
+// ═══ v120 · ΜΕΤΑΦΟΡΑ ΛΟΓΑΡΙΑΣΜΟΥ ΜΕ QR — KM-QR (Brief Γ · απόφαση Stavros 6/10/2026) ═══
+// Μοντέλο WhatsApp/Signal. Α: δακτυλικό/PIN (στη συσκευή) → κλειδώνει τα στοιχεία με
+// τυχαίο Τ που ζει ΜΟΝΟ στο QR → ανεβάζει το κλειδωμένο πακέτο εδώ (10′, μία χρήση).
+// Β: σκανάρει → αποδεικνύει το email του ΛΟΓΑΡΙΑΣΜΟΥ (Google/Microsoft ή κωδικός) →
+// παίρνει το πακέτο → το ανοίγει με το Τ → μπαίνει → η Α βγαίνει εκτός (μία συσκευή, 6/9).
+// Ο server ΔΕΝ βλέπει ποτέ το Τ, άρα δεν μπορεί να ανοίξει το πακέτο.
+const QR_TTL_MS = 10 * 60 * 1000;
+const QR_PER_HOUR = 6;
+const QR_MAX_BLOB = 8000;
+async function transferRow(env, tidRaw) {
+  const tid = String(tidRaw || "").toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(tid)) return null;
+  const t = await env.DB.prepare(
+    "SELECT t.*, a.email AS email, a.deleted AS deleted, a.delete_due_at AS due FROM km_transfers t JOIN km_accounts a ON a.folder_id = t.folder_id WHERE t.tid_hash = ?"
+  ).bind(await sha256hex(tid)).first();
+  if (!t || t.taken || t.deleted || t.due || t.expires < now()) return null;
+  return t;
+}
+async function transferNew(request, env) {
+  const a = await authed(request, env);
+  if (a.err) return a.err;
+  // Μόνο η ΕΝΕΡΓΗ συσκευή δίνει τον λογαριασμό. Η εκτός λειτουργίας έχει το «Πάρε πίσω».
+  if (a.acc.active_device_id !== a.id.device) return json({ ok: false, error: "not_active_device" }, 409);
+  const b = (await safeJson(request)) || {};
+  const blob = String(b.blob || "");
+  if (!blob || blob.length > QR_MAX_BLOB || !/^[A-Za-z0-9_-]+$/.test(blob)) return json({ ok: false, error: "bad_blob" }, 400);
+  const t = Date.now();
+  await env.DB.prepare("DELETE FROM km_transfers WHERE expires < ?").bind(new Date(t - 24 * 3600 * 1000).toISOString()).run();
+  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_transfers WHERE folder_id = ? AND created >= ?")
+    .bind(a.id.folder, new Date(t - 3600 * 1000).toISOString()).first();
+  if (n && n.n >= QR_PER_HOUR) return json({ ok: false, error: "too_many" }, 429);
+  const tid = randHex(16);
+  await env.DB.prepare("INSERT INTO km_transfers (tid_hash, folder_id, blob, from_device, created, expires, taken) VALUES (?, ?, ?, ?, ?, ?, NULL)")
+    .bind(await sha256hex(tid), a.id.folder, blob, a.id.device, new Date(t).toISOString(), new Date(t + QR_TTL_MS).toISOString()).run();
+  return json({ ok: true, tid, ttl_s: QR_TTL_MS / 1000 });
+}
+async function transferStatus(request, env) {
+  const a = await authed(request, env);
+  if (a.err) return a.err;
+  const tid = String(new URL(request.url).searchParams.get("tid") || "").toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(tid)) return json({ ok: false, error: "bad_tid" }, 400);
+  const t = await env.DB.prepare("SELECT taken, expires FROM km_transfers WHERE tid_hash = ? AND folder_id = ?")
+    .bind(await sha256hex(tid), a.id.folder).first();
+  if (!t) return json({ ok: false, error: "not_found" }, 404);
+  return json({ ok: true, taken: !!t.taken, expired: !t.taken && t.expires < now() });
+}
+async function transferTake(request, env) {
+  const b = (await safeJson(request)) || {};
+  const t = await transferRow(env, b.tid);
+  if (!t) return json({ ok: false, error: "transfer_gone" }, 410);
+  const email = normEmail(t.email);
+  const tok = email ? await tokenFor(env, b.email_token, email) : null;
+  if (!tok) return json({ ok: false, error: "email_unverified" }, 403);
+  const ts = now();
+  // Μία χρήση: το πακέτο καίγεται ΜΑΖΙ με το token, στην ίδια πράξη.
+  const r = await env.DB.prepare("UPDATE km_transfers SET taken = ?, blob = '' WHERE tid_hash = ? AND taken IS NULL").bind(ts, t.tid_hash).run();
+  if (!r || !r.meta || r.meta.changes !== 1) return json({ ok: false, error: "transfer_gone" }, 410);
+  await env.DB.prepare("UPDATE km_email_tokens SET used = ? WHERE token_hash = ?").bind(ts, tok).run();
+  return json({ ok: true, blob: t.blob, email });
 }
 
 async function status(request, env) {
@@ -2329,6 +2405,8 @@ async function wipeFolder(env, folderId) {
   // v113 · KM-READ-GIFT — ο μετρητής του δώρου φεύγει με τον λογαριασμό (ξεχωριστά: πριν τη
   // μετάβαση της βάσης ο πίνακας δεν υπάρχει και η διαγραφή ΔΕΝ πρέπει να πέσει γι' αυτό).
   try { await env.DB.prepare("DELETE FROM km_read_gift WHERE folder_id = ?").bind(folderId).run(); } catch (e) {}
+  // v120 · KM-QR — εκκρεμές κλειδωμένο πακέτο μεταφοράς φεύγει κι αυτό (ίδιο μοτίβο, ίδιος λόγος).
+  try { await env.DB.prepare("DELETE FROM km_transfers WHERE folder_id = ?").bind(folderId).run(); } catch (e) {}
 
   return {
     folder_id: folderId,
@@ -3458,6 +3536,34 @@ function mailBody(kind, extra) {
           " Enter it in the app within 15 minutes." +
           " IF YOU DID NOT ASK FOR IT, someone has your 12 words: open Kostometro and tap" +
           " \"Take your account back\". Need help? " + MAIL_SUPPORT,
+    };
+  }
+
+  // v120 · KM-QR — κωδικός για μεταφορά σε νέα συσκευή
+  if (kind === "code_qr") {
+    return {
+      subject: "Κωδικός μεταφοράς του Kostometro σε νέα συσκευή: " + x.code + " · Kostometro device transfer code",
+      el: "Ο κωδικός σου για να μεταφέρεις το Kostometro σε νέα συσκευή είναι: " + x.code + "." +
+          " Γράψ' τον στη ΝΕΑ συσκευή μέσα σε 15 λεπτά." +
+          " ΑΝ ΔΕΝ ΤΟΝ ΖΗΤΗΣΕΣ ΕΣΥ, μην τον δώσεις σε κανέναν. Χρειάζεσαι βοήθεια; " + MAIL_SUPPORT,
+      en: "Your code to move Kostometro to a new device is: " + x.code + "." +
+          " Enter it on the NEW device within 15 minutes." +
+          " IF YOU DID NOT ASK FOR IT, do not share it with anyone. Need help? " + MAIL_SUPPORT,
+    };
+  }
+  // v120 · KM-QR — ο λογαριασμός μεταφέρθηκε με QR
+  if (kind === "qrdev") {
+    const dev = x.device ? " («" + x.device + "»)" : "";
+    return {
+      subject: "Το Kostometro σου μεταφέρθηκε σε νέα συσκευή · Your Kostometro moved to a new device",
+      el: "Στις " + when + " ο λογαριασμός σου στο Kostometro μεταφέρθηκε με QR σε νέα συσκευή" + dev + "," +
+          " και η προηγούμενη συσκευή πέρασε εκτός λειτουργίας. Αν ήσουν εσύ, δεν χρειάζεται τίποτα." +
+          " ΑΝ ΔΕΝ ΗΣΟΥΝ ΕΣΥ: άνοιξε το Kostometro στην προηγούμενη συσκευή σου και πάτα" +
+          " «Δεν ήσουν εσύ; Πάρε πίσω τον λογαριασμό σου». Χρειάζεσαι βοήθεια; " + MAIL_SUPPORT,
+      en: "On " + when + " (Cyprus time) your Kostometro account was moved by QR to a new device" + dev + "," +
+          " and your previous device was switched off. If this was you, nothing to do." +
+          " IF THIS WAS NOT YOU: open Kostometro on your previous device and tap" +
+          " \"Not you? Take your account back\". Need help? " + MAIL_SUPPORT,
     };
   }
 

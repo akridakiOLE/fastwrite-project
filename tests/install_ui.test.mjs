@@ -183,13 +183,15 @@ check("Ε-7 · Το iPadOS ανιχνεύεται παρότι λέει «Macint
       "το iPad περνάει ως υπολογιστής");
 });
 
-check("Ε-8 · 🔴 Η ΚΑΡΤΑ ΒΓΑΙΝΕΙ ΣΕ ΚΑΘΕ ΑΝΟΙΓΜΑ — κανένα φρένο ανά άνοιγμα", () => {
+check("Ε-8 · 🔴 v120: Η ΚΑΡΤΑ ΒΓΑΙΝΕΙ ΣΕ ΚΑΘΕ ΑΝΟΙΓΜΑ ΜΕΤΑ ΤΟΝ ΛΟΓΑΡΙΑΣΜΟ — κανένα φρένο ανά άνοιγμα (Stavros 7/10 ανακαλεί το «και πριν τον λογαριασμό» της 20/9)", () => {
   const i = js.indexOf("function maybeInstall()");
   const f = js.slice(i, js.indexOf("if (el('inst-no'))", i));
   hasnt(f, /INST_AT|\.n \|\| 0|indexOf\(n\)/, "επέζησε μετρητής ανοιγμάτων");
-  /* Οι ΜΟΝΟΙ επιτρεπτοί φραγμοί: υπολογιστής · ήδη εγκατεστημένη · appinstalled. */
+  /* Οι ΜΟΝΟΙ επιτρεπτοί φραγμοί: υπολογιστής · ΧΩΡΙΣ λογαριασμό (v120) · μέσα σε Facebook/Messenger (v120) ·
+     ήδη εγκατεστημένη · appinstalled. */
   const gates = (f.match(/if \(.*?\) \{ return; \}/g) || []);
-  if (gates.length !== 3) throw new Error("φραγμοί: " + gates.length + " αντί για 3 — " + gates.join(" | "));
+  if (gates.length !== 5) throw new Error("φραγμοί: " + gates.length + " αντί για 5 — " + gates.join(" | "));
+  has(f, "if (!localStorage.getItem(LS.reg)) { return; }", "v120: η κάρτα βγαίνει πριν τον λογαριασμό");
   has(f, "instSteps();", "δεν ζωγραφίζει τα βήματα");
 });
 

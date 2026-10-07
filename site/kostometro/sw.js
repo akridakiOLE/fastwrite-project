@@ -15,7 +15,7 @@
    ⚠ Και το /km-crypto.js μπήκε στο πεδίο: ζει ΕΞΩ από το /kostometro/, άρα
    μέχρι τώρα δεν το έπιανε καθόλου ο worker — χωρίς δίκτυο η οθόνη των 12
    λέξεων θα έσπαγε. */
-var CACHE = 'km-v119';
+var CACHE = 'km-v120';
 var SHELL = [
   '/kostometro/',
   '/kostometro/index.html',
@@ -23,6 +23,7 @@ var SHELL = [
   '/kostometro/app.js',
   '/km-crypto.js',
   '/kostometro/manifest.webmanifest',
+  '/kostometro/qr.js',   // v120 · (6) γεννήτρια QR (qrcode-generator, MIT, Kazuhiko Arase)
   '/kostometro/icons/icon-192.png',
   '/kostometro/icons/icon-512.png'
 ];

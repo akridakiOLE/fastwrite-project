@@ -54,6 +54,13 @@
     emailTok: 'km_email_tok',
     /* v118 · KM-OWN-PROOF — «έφυγα για Google/Microsoft για ΑΛΛΑΓΗ λέξεων» (επιβιώνει του redirect) */
     ownPend: 'km_own_pend',
+    /* v120 · (5) λέξεις που ΔΕΝ έχει γράψει ακόμα ο χρήστης (εγγραφή χωρίς λέξεις) */
+    wordsTodo: 'km_words_todo',
+    /* v120 · (6) QR στη Συσκευή Β — επιβιώνει του redirect Google/Microsoft */
+    qrIn: 'km_qr_in',
+    qrVia: 'km_via_qr',
+    /* v120 · η κλειδαριά ΑΥΤΗΣ της συσκευής δεν υπάρχει πια (οι 12 λέξεις άλλαξαν από άλλη συσκευή) */
+    lockDead: 'km_lock_dead',
     /* v26 · Η.2β-1 — ο λογαριασμός. Οι 12 λέξεις ΜΕΝΟΥΝ στη συσκευή:
        από αυτές βγαίνουν folder/auth (πάνε στον server) και το κλειδί
        κρυπτογράφησης (ΔΕΝ φεύγει ποτέ). */
@@ -328,7 +335,10 @@
                  's-menu','s-pend','s-sup','s-ref','s-settings','s-shot','s-mywords',
                  's-del','s-gone','s-dpend','s-faq','s-help','s-fb','s-case'];
   SCREENS.push('s-own');   // v118 · KM-OWN-PROOF — επιβεβαίωση κατόχου πριν από νέες 12 λέξεις
+  SCREENS.push('s-iab', 's-qr', 's-qrin');   // v120 · Messenger · QR (Α) · QR (Β)
   function show(id) {
+    /* v120 · (4) στην κάμερα ο Κώστας ανεβαίνει πάνω από το κουμπί λήψης (δεν το σκεπάζει) */
+    try { document.body.classList.toggle('on-cam', id === 's-cam'); } catch (e) {}
     var pv = el('preview');
     if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
     SCREENS.forEach(function (s) { el(s).hidden = (s !== id); });
@@ -341,7 +351,7 @@
        ΚΑΘΕ διαδρομή μπαίνει στο ΕΝΑ σημείο απ' όπου περνάνε όλες. */
     if (id === 's-email') { renderConsent(); }
     if (id === 's-acc')   { accWarn(); }
-    if (id === 's-cam')   { updToast(); giftShow(); }
+    if (id === 's-cam')   { updToast(); giftShow(); kwRender(); }
   }
   /* ══ v75 · Ο ΦΡΟΥΡΟΣ ΤΟΥ ΔΙΠΛΟΥ ΛΟΓΑΡΙΑΣΜΟΥ ΣΤΟ iPHONE (20/9/2026) ════
      KM-ACC-WARN-IOS   ← λατινικός δείκτης για το findstr του deploy .bat
@@ -2152,7 +2162,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v119';
+  var APP_VER = 'φέτα 3 · v120';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -3239,6 +3249,15 @@
     /* Στο ΔΩΡΕΑΝ δεν υπάρχει διαδρομή προς τα τιμολόγια από εδώ. */
     el('ro-menu').hidden = locked;
     el('ro-reclaim').hidden = !locked;   // v118 · (α) — μόνο στο ΔΩΡΕΑΝ, εκτός λειτουργίας
+    if (localStorage.getItem(LS.lockDead)) {
+      /* v120 — οι λέξεις άλλαξαν από άλλη συσκευή: το «Πάρε πίσω» εδώ δεν μπορεί να δουλέψει
+         (η κλειδαριά αυτής της συσκευής δεν υπάρχει πια). Μόνος δρόμος: οι ΝΕΕΣ λέξεις. */
+      el('ro-title').textContent = 'Οι 12 λέξεις του λογαριασμού άλλαξαν.';
+      el('ro-when').textContent = '';
+      el('ro-info').textContent = 'Άλλαξαν από άλλη συσκευή, οπότε αυτή βγήκε εκτός. Αν τις άλλαξες εσύ, γράψε εδώ τις ΝΕΕΣ 12 λέξεις για να δουλέψεις από αυτή τη συσκευή. Αν δεν ήσουν εσύ, γράψε στο support@fastwrite.tech.';
+      el('ro-reclaim').hidden = true;
+      el('ro-menu').hidden = true;
+    }
 
     var n = locked ? unsyncedGet() : (pullInfo.notUp || 0);
     var pe = el('ro-pend');
@@ -3435,13 +3454,16 @@
         wrapped_k: localStorage.getItem(LS.wrapped) || null,
         /* Brief ΣΤ — χωρίς αυτό ο server δεν φτιάχνει ΝΕΟ λογαριασμό. Για
            είσοδο σε υπάρχοντα (12 λέξεις) αγνοείται. */
-        email_token: localStorage.getItem(LS.emailTok) || null
+        email_token: localStorage.getItem(LS.emailTok) || null,
+        via: localStorage.getItem(LS.qrVia) ? 'qr' : undefined   // v120 · (6) — άλλο email ειδοποίησης
       })
     }).then(function (r) {
       if (!r.ok) { return false; }
       localStorage.setItem(LS.reg, '1');
       localStorage.removeItem(LS.emailTok);   // καμένο στον server — δεν ξαναχρησιμεύει
       localStorage.removeItem(LS.wrapped);   // v47 — η κλειδαριά γράφτηκε μαζί με τον λογαριασμό
+      localStorage.removeItem(LS.qrVia);     // v120
+      localStorage.removeItem(LS.lockDead);  // v120 — μπήκε με κλειδαριά που ΙΣΧΥΕΙ
       /* Το register ΚΑΝΕΙ αυτή τη συσκευή ενεργή στον server (Η.3: όποια
          βάλει τις 12 λέξεις γίνεται η ενεργή). Το γράφουμε ρητά, τη στιγμή
          που το μαθαίνουμε από την απάντηση — όχι με υπόθεση αργότερα. */
@@ -3667,6 +3689,259 @@
     });
   }
 
+  /* ══ v120 · (5) ΕΓΓΡΑΦΗ ΧΩΡΙΣ ΟΘΟΝΗ 12 ΛΕΞΕΩΝ (απόφαση Stavros 6/10/2026, Brief «Μία πόρτα» Γ) ══
+     Οι λέξεις φτιάχνονται ΣΙΩΠΗΛΑ (χρειάζεται η κλειδαριά του Κ για να υπάρξει φάκελος),
+     αλλά ΔΕΝ δείχνονται και ΔΕΝ μπλοκάρουν: ο χρήστης τις βλέπει όποτε θέλει από το
+     «Οι 12 λέξεις μου» (πίσω από δακτυλικό/PIN) και η υπενθύμιση μένει ως να πει «τις έγραψα».
+     Δρόμος 1: χωρίς γραμμένες λέξεις + χαμένη συσκευή = χαμένα δεδομένα — το λέει η κάρτα. */
+  function silentAccount() {
+    wordsMode = 'new';
+    kmNewWords().then(function (words) {
+      pendingWords = words;
+      localStorage.setItem(LS.wordsTodo, '1');
+      wordsAccepted();
+    }).catch(function () {
+      localStorage.removeItem(LS.wordsTodo);
+      startWords(false);
+    });
+  }
+  function kwRender() {
+    var b = el('kw-b');
+    if (!b) { return; }
+    b.hidden = !(localStorage.getItem(LS.wordsTodo) && localStorage.getItem(LS.reg) && !isLocked());
+  }
+  function kwOpen() {
+    lockAvailable().then(function (ok) {
+      if (!ok) {
+        alert('Για να δεις τις 12 λέξεις σου, η συσκευή σου πρέπει να έχει κλείδωμα οθόνης (δακτυλικό, πρόσωπο ή PIN). Βάλ᾽ το από τις Ρυθμίσεις της συσκευής και ξαναδοκίμασε.\n\nΧωρίς γραμμένες τις 12 λέξεις, αν χάσεις τη συσκευή χάνονται και τα τιμολόγια.');
+        return;
+      }
+      lockVerify().then(function () { showMyWords(); }).catch(function () {});
+    });
+  }
+  if (el('kw-b')) { el('kw-b').onclick = kwOpen; }
+  if (el('kw-chk')) {
+    el('kw-chk').onchange = function () {
+      if (this.checked) { localStorage.removeItem(LS.wordsTodo); } else { localStorage.setItem(LS.wordsTodo, '1'); }
+    };
+  }
+
+
+  /* ══ v120 · (6) ΜΕΤΑΦΟΡΑ ΛΟΓΑΡΙΑΣΜΟΥ ΜΕ QR — KM-QR (Brief Γ, Stavros 6/10/2026) ══
+     Α: δακτυλικό/PIN → τα στοιχεία του λογαριασμού κλειδώνονται (AES-GCM) με τυχαίο Τ →
+        ανεβαίνει ΜΟΝΟ το κλειδωμένο πακέτο (10′, μία χρήση) → το Τ ζει μόνο στο QR (μετά το #).
+     Β: σκανάρει → αποδεικνύει το email του λογαριασμού → παίρνει το πακέτο → το ανοίγει με το Τ →
+        μπαίνει (register) → η Α βγαίνει εκτός. Ο server δεν βλέπει ποτέ το Τ. */
+  function qrB64(bytes) {
+    var s = '', b = new Uint8Array(bytes);
+    for (var i = 0; i < b.length; i++) { s += String.fromCharCode(b[i]); }
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function qrUnB64(str) {
+    var t = String(str).replace(/-/g, '+').replace(/_/g, '/');
+    while (t.length % 4) { t += '='; }
+    var raw = atob(t), a = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) { a[i] = raw.charCodeAt(i); }
+    return a;
+  }
+  function qrSeal(obj, T) {
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    return crypto.subtle.importKey('raw', T, 'AES-GCM', false, ['encrypt']).then(function (key) {
+      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(JSON.stringify(obj)));
+    }).then(function (ct) {
+      var out = new Uint8Array(12 + ct.byteLength);
+      out.set(iv, 0); out.set(new Uint8Array(ct), 12);
+      return qrB64(out);
+    });
+  }
+  function qrOpen(blob, T) {
+    var all = qrUnB64(blob);
+    return crypto.subtle.importKey('raw', T, 'AES-GCM', false, ['decrypt']).then(function (key) {
+      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.slice(0, 12) }, key, all.slice(12));
+    }).then(function (pt) { return JSON.parse(new TextDecoder().decode(pt)); });
+  }
+
+  /* ── Συσκευή Α ── */
+  var qrPoll = null, qrTid = null, qrUntil = 0;
+  function qrErr(m) { el('qr-err').textContent = m || ''; el('qr-err').hidden = !m; }
+  function qrStop() { if (qrPoll) { clearInterval(qrPoll); qrPoll = null; } }
+  function qrStart() {
+    var e = el('mw-err');
+    function stop(m) { e.textContent = m; e.hidden = false; }
+    if (!localStorage.getItem(LS.kkey) || !localStorage.getItem(LS.lock)) { stop('Αυτή η συσκευή δεν έχει περάσει ακόμα στη νέα βάση κλειδιών. Άνοιξε την εφαρμογή μία φορά με δίκτυο και ξαναδοκίμασε.'); return; }
+    if (isReader()) { stop('Μόνο η ενεργή συσκευή μεταφέρει τον λογαριασμό.'); return; }
+    if (typeof qrcode !== 'function') { stop('Δεν φόρτωσε η γεννήτρια QR. Κλείσε και ξανάνοιξε την εφαρμογή.'); return; }
+    lockAvailable().then(function (ok) {
+      if (!ok) { stop('Για τη μεταφορά, η συσκευή σου πρέπει να έχει κλείδωμα (δακτυλικό, πρόσωπο ή PIN).'); return; }
+      return lockVerify().then(function () {
+        var T = crypto.getRandomValues(new Uint8Array(32));
+        var pack = {
+          v: 1,
+          e: localStorage.getItem(LS.email) || '',
+          f: localStorage.getItem(LS.folder) || '',
+          k: localStorage.getItem(LS.kkey) || '',
+          l: localStorage.getItem(LS.lock) || '',
+          la: localStorage.getItem(LS.lockAuth) || '',
+          w: localStorage.getItem(LS.words) || '',
+          wt: localStorage.getItem(LS.wordsTodo) ? 1 : 0,
+          gk: localStorage.getItem(LS.key) || '',
+          sk: localStorage.getItem(LS.skip) ? 1 : 0
+        };
+        return qrSeal(pack, T).then(function (blob) {
+          return kmFetch('transfer/new', { method: 'POST', headers: kmHead(), body: JSON.stringify({ blob: blob }) });
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (!r.ok || !j.tid) {
+              stop(r.status === 409 ? 'Μόνο η ενεργή συσκευή μεταφέρει τον λογαριασμό.'
+                 : r.status === 429 ? 'Πολλές μεταφορές σε λίγη ώρα — δοκίμασε ξανά σε λίγο.'
+                 : 'Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.');
+              return;
+            }
+            qrTid = j.tid;
+            qrUntil = Date.now() + (j.ttl_s || 600) * 1000;
+            var url = location.origin + '/kostometro/?src=qr#km_qr=' + j.tid + '.' + qrB64(T);
+            var q = qrcode(0, 'M'); q.addData(url); q.make();
+            el('qr-box').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+            el('qr-link').textContent = url;
+            qrErr('');
+            show('s-qr');
+            qrTick();
+            qrStop();
+            qrPoll = setInterval(qrTick, 3000);
+          });
+        });
+      }).catch(function () { stop('Δεν επιβεβαιώθηκε το κλείδωμα της συσκευής. Δοκίμασε ξανά.'); });
+    });
+  }
+  function qrTick() {
+    var left = Math.max(0, Math.round((qrUntil - Date.now()) / 1000));
+    el('qr-left').textContent = left > 0 ? 'Ο κωδικός ισχύει ακόμα ' + Math.floor(left / 60) + ':' + ('0' + (left % 60)).slice(-2) + '.' : 'Ο κωδικός έληξε.';
+    if (left <= 0) { qrStop(); el('qr-box').innerHTML = ''; qrErr('Ο κωδικός έληξε — πάτα «Επιστροφή» και ξαναδοκίμασε.'); return; }
+    if (!qrTid) { return; }
+    kmFetch('transfer/status?tid=' + qrTid, { headers: kmHead() }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (j && j.taken) {
+        qrStop();
+        el('qr-box').innerHTML = '';
+        el('qr-lede').innerHTML = '✓ <b>Η μεταφορά ολοκληρώθηκε.</b> Ο λογαριασμός σου είναι πλέον στη νέα συσκευή.';
+        el('qr-left').textContent = '';
+        setTimeout(function () { refreshActive().then(function () { toCam(); }); }, 2500);
+      }
+    }).catch(function () {});
+  }
+  if (el('st-qr')) { el('st-qr').onclick = qrStart; }
+  if (el('qr-back')) { el('qr-back').onclick = function () { qrStop(); qrTid = null; show('s-settings'); }; }
+  if (el('qr-copy')) {
+    el('qr-copy').onclick = function () {
+      var t = el('qr-link').textContent;
+      try { navigator.clipboard.writeText(t).then(function () { el('qr-copy').textContent = 'Αντιγράφηκε ✓'; }); } catch (e) {}
+    };
+  }
+
+  /* ── Συσκευή Β ── */
+  function qrInGet() { try { return JSON.parse(localStorage.getItem(LS.qrIn) || 'null'); } catch (e) { return null; } }
+  function qiErr(m) { el('qi-err').textContent = m || ''; el('qi-err').hidden = !m; }
+  function qrInShow(msg) {
+    if (el('go-google'))    { el('qi-google').innerHTML = el('go-google').innerHTML; }
+    if (el('go-microsoft')) { el('qi-microsoft').innerHTML = el('go-microsoft').innerHTML; }
+    el('qi-busy').hidden = true;
+    qiErr(msg || '');
+    show('s-qrin');
+  }
+  function qrInTake(token) {
+    var q = qrInGet();
+    if (!q) { return qrInShow('Ο κωδικός QR χάθηκε — σκάναρέ τον ξανά από την παλιά συσκευή.'); }
+    el('qi-busy').hidden = false; qiErr('');
+    kmFetch('transfer/take', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tid: q.tid, email_token: token }) }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok || !j.blob) {
+          el('qi-busy').hidden = true;
+          if (r.status === 410) { localStorage.removeItem(LS.qrIn); qiErr('Ο κωδικός QR έληξε ή χρησιμοποιήθηκε. Φτιάξε καινούριο από την παλιά συσκευή.'); }
+          else if (r.status === 403) { qiErr('Το email που επιβεβαίωσες δεν είναι του λογαριασμού που μεταφέρεις.'); }
+          else { qiErr('Δεν έχεις δίκτυο αυτή τη στιγμή. Δοκίμασε ξανά.'); }
+          return;
+        }
+        return qrOpen(j.blob, qrUnB64(q.t)).then(function (p) {
+          if (!p || p.v !== 1 || !p.f || !p.k || !p.l || !p.la) { throw new Error('bad'); }
+          localStorage.setItem(LS.email, p.e || j.email || '');
+          localStorage.setItem(LS.folder, p.f);
+          kStore(p.k);
+          lockStore({ lockId: p.l, authToken: p.la });
+          localStorage.setItem(LS.auth, p.la);
+          if (p.w) { localStorage.setItem(LS.words, p.w); }
+          if (p.wt) { localStorage.setItem(LS.wordsTodo, '1'); } else { localStorage.removeItem(LS.wordsTodo); }
+          localStorage.setItem(LS.wordsOk, '1');
+          if (p.gk) { localStorage.setItem(LS.key, p.gk); localStorage.removeItem(LS.skip); }
+          else if (p.sk) { localStorage.setItem(LS.skip, '1'); }
+          localStorage.setItem(LS.qrVia, '1');
+          localStorage.removeItem(LS.qrIn);
+          localStorage.removeItem(LS.reg);
+          return kmRegister().then(function (ok) {
+            el('qi-busy').hidden = true;
+            if (!ok) { qiErr('Η μεταφορά δεν ολοκληρώθηκε. Δοκίμασε ξανά με δίκτυο.'); return; }
+            needPullRaise();
+            pullNow();
+            afterAccount();
+          });
+        });
+      });
+    }).catch(function () { el('qi-busy').hidden = true; qiErr('Η μεταφορά δεν ολοκληρώθηκε. Φτιάξε καινούριο QR από την παλιά συσκευή.'); });
+  }
+  if (el('qi-google'))    { el('qi-google').onclick    = function () { location.assign(KM_API + 'auth/google/start?purpose=own'); }; }
+  if (el('qi-microsoft')) { el('qi-microsoft').onclick = function () { location.assign(KM_API + 'auth/microsoft/start?purpose=own'); }; }
+  if (el('qi-send')) {
+    el('qi-send').onclick = function () {
+      var q = qrInGet(), b = el('qi-send');
+      if (!q) { return qrInShow('Ο κωδικός QR χάθηκε — σκάναρέ τον ξανά.'); }
+      b.disabled = true; qiErr('');
+      kmFetch('email/code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ purpose: 'transfer', tid: q.tid }) }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          b.disabled = false;
+          if (r.ok) { el('qi-to').textContent = 'Στείλαμε κωδικό 6 ψηφίων στο ' + (j.to || 'email του λογαριασμού') + '. Κοίτα και στα Ανεπιθύμητα.'; el('qi-codebox').hidden = false; b.textContent = 'Στείλε ξανά κωδικό'; return; }
+          if (r.status === 410) { localStorage.removeItem(LS.qrIn); qiErr('Ο κωδικός QR έληξε ή χρησιμοποιήθηκε. Φτιάξε καινούριο από την παλιά συσκευή.'); return; }
+          qiErr(j && j.error === 'too_many' ? CODE_TEXT.too_many : CODE_TEXT.error);
+        });
+      }, function () { b.disabled = false; qiErr(CODE_TEXT.offline); });
+    };
+  }
+  if (el('qi-verify')) {
+    el('qi-verify').onclick = function () {
+      var q = qrInGet(), c = String(el('qi-code').value || '').replace(/\D/g, '');
+      if (!q) { return qrInShow('Ο κωδικός QR χάθηκε — σκάναρέ τον ξανά.'); }
+      if (c.length !== 6) { qiErr('Ο κωδικός έχει 6 ψηφία.'); return; }
+      kmFetch('email/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ purpose: 'transfer', tid: q.tid, code: c }) }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          if (r.ok && j.email_token) { return qrInTake(j.email_token); }
+          qiErr(j && j.error === 'bad_code' ? 'Λάθος κωδικός.' : (j && (j.error === 'code_expired' || j.error === 'no_code')) ? 'Ο κωδικός έληξε — πάτα «Στείλε ξανά κωδικό».' : CODE_TEXT.error);
+        });
+      }, function () { qiErr(CODE_TEXT.offline); });
+    };
+  }
+
+  /* ══ v120 · (2) ΜΕΣΑ ΣΕ FACEBOOK / MESSENGER ══ */
+  function iabShow() {
+    var app = iabName(), ios = instPlatform() === 'ios';
+    el('iab-app').textContent = app;
+    el('iab-br').textContent = ios ? 'Safari' : 'Chrome';
+    el('iab-open').hidden = ios;          // στο iPhone δεν ανοίγει άλλος browser με σύνδεσμο — 2 βήματα
+    el('iab-ios').hidden = !ios;
+    show('s-iab');
+  }
+  if (el('iab-open')) {
+    el('iab-open').onclick = function () {
+      /* Android: το intent ανοίγει ΤΟΝ Chrome στην ίδια διεύθυνση· αν δεν υπάρχει Chrome,
+         ο browser_fallback_url ανοίγει τον προεπιλεγμένο browser. */
+      var u = location.host + location.pathname + location.search;
+      location.href = 'intent://' + u + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' +
+                      encodeURIComponent('https://' + u) + ';end';
+    };
+  }
+  if (el('iab-stay')) {
+    el('iab-stay').onclick = function () {
+      try { sessionStorage.setItem('km_iab_stay', '1'); } catch (e) {}
+      show('s-acc');
+    };
+  }
+
   /* Μετά το τσεκάρισμα: παράγει ταυτότητα, αποθηκεύει, εγγράφει, προχωράει. */
   function wordsAccepted() {
     if (!pendingWords) { return; }
@@ -3716,6 +3991,7 @@
       el('w-go').textContent = 'Συνέχεια';
       el('w-err').textContent = 'Δεν μπόρεσα να φτιάξω το κλειδί σε αυτή τη συσκευή.';
       el('w-err').hidden = false;
+      if (el('s-words').hidden && pendingWords) { renderWords(pendingWords); show('s-words'); }   // v120 · σιωπηλή εγγραφή που απέτυχε
     });
   }
 
@@ -3793,6 +4069,7 @@
           pendingWords = null;
           wordsMode = 'new';
           ownTok = null;
+          localStorage.removeItem(LS.wordsTodo);   // v120 — μόλις τις είδε και τις τσέκαρε
           /* v118 — αυτή η συσκευή είναι πλέον η ΕΝΕΡΓΗ (ο server το έγραψε στην ίδια πράξη). */
           setActiveState(true, (j.state && j.state.active_since) || null);
           b.disabled = false; b.textContent = 'Συνέχεια';
@@ -3893,6 +4170,14 @@
 
   function kmStatus() {
     return kmFetch('status', { headers: kmHead() }).then(function (r) {
+      /* 🔴 v120 — 403 με κλειδαριά = οι 12 λέξεις ΑΛΛΑΞΑΝ από άλλη συσκευή (v118 «Πάρε πίσω»
+         ή «Τις είδε κάποιος»). Ως τη v119 η συσκευή το αγνοούσε: έμενε «ενεργή» τοπικά,
+         φωτογράφιζε, και τίποτα δεν ανέβαινε ποτέ — σιωπηλά. Μετρήθηκε 7/10 στη δοκιμή v120. */
+      if (r.status === 403 && localStorage.getItem(LS.lock) && localStorage.getItem(LS.reg)) {
+        localStorage.setItem(LS.lockDead, '1');
+        setActiveState(false);
+        return null;
+      }
       if (!r.ok) { return null; }
       return r.json();
     }).catch(function () { return null; });
@@ -4560,6 +4845,7 @@
 
   /* Πού πάει ο χρήστης μόλις αποκτήσει λογαριασμό — η παλιά ροή, ίδια. */
   function afterAccount() {
+    setTimeout(maybeInstall, 600);   // v120 · (1) — η προτροπή ΜΕΤΑ τον λογαριασμό
     if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
     if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
     toCam();
@@ -4630,6 +4916,7 @@
   function showMyWords() {
     var w = localStorage.getItem(LS.words);
     if (!w) { return; }
+    if (el('kw-chk')) { el('kw-chk').checked = !localStorage.getItem(LS.wordsTodo); }
     var ol = el('mw-list');
     ol.innerHTML = '';
     w.split(' ').forEach(function (word) {
@@ -4718,6 +5005,22 @@
     return 'other';
   }
 
+  /* v120 · (3) Chrome του Android (όχι Samsung, Firefox, Edge, Opera, Brave) */
+  function instChromeAndroid() {
+    var ua = navigator.userAgent || '';
+    return /Android/.test(ua) && /Chrome\/\d/.test(ua) && !/SamsungBrowser|Firefox|EdgA|OPR\/|YaBrowser|Brave|wv\)/.test(ua);
+  }
+  /* v120 · (2) browser ΜΕΣΑ σε εφαρμογή — επιστρέφει το όνομα ή '' */
+  function iabName() {
+    var ua = navigator.userAgent || '';
+    if (/Instagram/.test(ua)) { return 'Instagram'; }
+    if (/FB_IAB\/MESSENGER|MessengerForiOS|Messenger/.test(ua)) { return 'Messenger'; }
+    if (/FBAN|FBAV|FB_IAB|FBIOS/.test(ua)) { return 'Facebook'; }
+    if (/LinkedInApp/.test(ua)) { return 'LinkedIn'; }
+    if (/musical_ly|BytedanceWebview|TikTok/.test(ua)) { return 'TikTok'; }
+    return '';
+  }
+
   function instSteps() {
     var p = instPlatform(), ol = el('inst-steps'), go = el('inst-go'), wn = el('inst-warn');
     if (!ol) { return; }
@@ -4790,6 +5093,22 @@
      ΔΕΝ γράφεται τίποτα στον δίσκο: το επόμενο άνοιγμα την ξαναδείχνει. */
   function maybeInstall() {
     if (instPlatform() === 'other') { return; }      /* υπολογιστής: δεν είναι το κοινό */
+    /* 🔴 v120 · (1) — ΑΝΑΚΑΛΕΙ ΤΟ 20/9 «ΣΕ ΚΑΘΕ ΑΝΟΙΓΜΑ» (απόφαση Stavros 7/10/2026):
+       ΠΟΤΕ πρώτη οθόνη. Η προτροπή βγαίνει ΜΟΝΟ αφού υπάρχει λογαριασμός — πρώτα
+       μαθαίνει τι είναι το προϊόν, μετά το βάζει στην αρχική οθόνη. */
+    if (!localStorage.getItem(LS.reg)) { return; }
+    /* (2) μέσα σε Facebook/Messenger δεν εγκαθίσταται τίποτα — ποτέ κάρτα εκεί */
+    if (iabName()) { return; }
+    /* (3) Chrome στο Android: όταν μπορεί να εγκαταστήσει, ΣΤΕΛΝΕΙ beforeinstallprompt.
+       Σε incognito (ή ήδη εγκατεστημένο) δεν το στέλνει ΠΟΤΕ — εκεί η κάρτα θα ζητούσε
+       κάτι αδύνατο (εύρημα 29/9 στο tablet). Περιμένουμε έως 4″ και μετά αποφασίζουμε. */
+    if (instPlatform() === 'android' && instChromeAndroid() && !instDefer) {
+      if (!maybeInstall.waited) {
+        maybeInstall.waited = true;
+        setTimeout(maybeInstall, 4000);
+      }
+      return;
+    }
     /* 🔴 v73 — ΓΙΑΤΙ ΔΕΝ ΓΡΑΦΕΤΑΙ `done` ΕΔΩ: η ένδειξη του browser είναι
        ΠΑΡΟΔΙΚΗ. Μία λάθος ανάγνωση δεν επιτρέπεται να σβήσει την προτροπή
        ΓΙΑ ΠΑΝΤΑ σε εκείνη τη συσκευή. Μόνη πηγή του `done` είναι το
@@ -4839,7 +5158,26 @@
     /* KM-OAUTH (29/9/2026) — ΕΠΙΣΤΡΟΦΗ ΑΠΟ GOOGLE / MICROSOFT (#km_oauth=…).
        Ο server δίνει ΤΟ ΙΔΙΟ email_token με τον κωδικό 6 ψηφίων, άρα από εδώ
        η ροή είναι ακριβώς ίδια με το «Επιβεβαίωση» της οθόνης s-code. */
+    /* v120 · (6) — Συσκευή Β: σύνδεσμος QR (#km_qr=tid.T). Το Τ φυλάγεται τοπικά ως την
+       ολοκλήρωση (επιβιώνει του redirect Google/Microsoft) και σβήνει μετά. */
+    var hq = /[#&]km_qr=([0-9a-f]{32})\.([A-Za-z0-9_-]{43})/.exec(String(location.hash || ''));
+    if (hq) {
+      try { history.replaceState(null, '', location.pathname + location.search + ''); } catch (eq) {}   // το Τ δεν μένει στη γραμμή
+      localStorage.setItem(LS.qrIn, JSON.stringify({ tid: hq[1], t: hq[2], at: Date.now() }));
+    }
     var oa = oauthTake();
+    var qin = qrInGet();
+    if (qin && (Date.now() - (qin.at || 0) > 15 * 60 * 1000)) { localStorage.removeItem(LS.qrIn); qin = null; }
+    if (qin && localStorage.getItem(LS.reg)) {
+      /* Η συσκευή έχει ήδη λογαριασμό: δεν τον πατάμε σιωπηλά. */
+      localStorage.removeItem(LS.qrIn); qin = null;
+      setTimeout(function () { alert('Αυτή η συσκευή έχει ήδη λογαριασμό στο Kostometro. Η μεταφορά με QR γίνεται σε συσκευή χωρίς λογαριασμό.'); }, 300);
+    }
+    if (qin) {
+      if (oa && oa.o === '1' && oa.kind === 'ok') { qrInShow(''); return qrInTake(oa.t); }
+      if (oa && oa.o === '1') { return qrInShow(oa.code === 'own_mismatch' ? 'Διάλεξες λογαριασμό με άλλο email (' + (oa.e || '') + '). Διάλεξε αυτόν του Kostometro — ή πάτα «Στείλε μου κωδικό με email».' : (OAUTH_TEXT[oa.code] || '')); }
+      return qrInShow('');
+    }
     /* v118 · KM-OWN-PROOF — επιστροφή από Google/Microsoft για ΑΛΛΑΓΗ 12 λέξεων
        (όχι για εγγραφή). Κρατιέται ως το τέλος του boot και ανοίγει μετά. */
     var ownBack = null;
@@ -4851,7 +5189,7 @@
       localStorage.setItem(LS.emailTok, oa.t);
       localStorage.setItem(LS.email, oa.e);
       funnel('code');   // v97 · KM-FUNNEL — email επιβεβαιωμένο (μέσω παρόχου)
-      return startWords(false);
+      return silentAccount();   // v120 · (5)
     }
     if (oa && oa.kind !== 'ok' && !localStorage.getItem(LS.reg)) { return oauthShow(oa); }
     /* v26 · Η.2β-1 — τρεις καταστάσεις, με αυτή τη σειρά:
@@ -4862,8 +5200,14 @@
     var hasEmail = !!localStorage.getItem(LS.email);
     var hasWords = !!localStorage.getItem(LS.words);
     /* λέξεις χωρίς email = ασύμφωνη κατάσταση· ξεκινάει από την αρχή */
-    if (!hasEmail)                          { return show('s-acc'); }
+    if (!hasEmail) {
+      /* v120 · (2) Facebook/Messenger: πρώτα «Άνοιξε στον Chrome», με «Συνέχεια εδώ» */
+      if (iabName() && !sessionStorage.getItem('km_iab_stay')) { return iabShow(); }
+      return show('s-acc');
+    }
     if (!hasWords)                          { return startWords('auto'); }
+    /* v120 · (5) — λογαριασμός χωρίς δεμένες λέξεις: ΔΕΝ μπλοκάρει, μόνο υπενθύμιση. */
+    if (localStorage.getItem(LS.wordsTodo) && !localStorage.getItem(LS.wordsOk)) { localStorage.setItem(LS.wordsOk, '1'); }
     if (!localStorage.getItem(LS.wordsOk))  { return startWords('auto'); }
     if (!localStorage.getItem(LS.reg))      { kmRegister(); }   // εκκρεμής εγγραφή
     lastPull = Date.now();
@@ -4913,6 +5257,7 @@
        τις είχε ήδη γράψει στο χαρτί θα κρατούσε λάθος κλειδί. Η οθόνη
        ξαναδείχνεται όπως ήταν — το pendingWords μένει άθικτο. */
     if (signinFrom === 's-words') { show('s-words'); return; }
+    if (signinFrom === 's-cam') { startCam(); return; }   // v120 — από τη συσκευή που βγήκε εκτός
     show('s-acc');
   };
 
@@ -5169,7 +5514,7 @@
           localStorage.setItem(LS.email, codeEmail);
           funnel('code');   // v97 · KM-FUNNEL
           codeErr('');
-          startWords(false);
+          silentAccount();   // v120 · (5) — χωρίς οθόνη 12 λέξεων
           return;
         }
         var e = j && j.error;
@@ -5306,6 +5651,14 @@
          διαβάζοντας τον κώδικα πριν ανάψει η σημαία, όχι από τεστ. */
       return kmDeriveLock(c.words).then(function (L) {
         var mine = localStorage.getItem(LS.lock);
+        if (mine && L.lockId !== mine && localStorage.getItem(LS.lockDead)) {
+          /* v120 — οι λέξεις άλλαξαν: οι ΝΕΕΣ ανοίγουν νέα κλειδαριά. Πλήρης είσοδος, ίδιος λογαριασμός. */
+          b.disabled = false; b.textContent = 'Κάνε αυτή τη συσκευή ενεργή';
+          openSignin('s-cam');
+          el('si-words').value = c.words.join(' ');
+          el('si-go').click();
+          return;
+        }
         if (mine && L.lockId !== mine) {
           stop('Αυτές οι 12 λέξεις ανοίγουν άλλον λογαριασμό, όχι αυτόν. Έλεγξε τη σειρά τους.');
           return;

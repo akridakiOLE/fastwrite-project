@@ -1,0 +1,15 @@
+v120 - Paketo "Mia porta" + Gamma (apofaseis Stavros 6-7/10/2026)
+
+1. Parathyro egkatastasis MONO meta ton logariasmo (anakalei to 20/9 "se kathe anoigma").
+2. Mesa se Facebook/Messenger/Instagram: "Anoixe ston Chrome" (Android intent, iPhone 2 vimata) + "Synexeia edo".
+3. Chrome Android xoris beforeinstallprompt (incognito): kanena parathyro.
+4. Kostas: megalyteros, z-index 75 pano apo to parathyro; stin kamera pano apo ta koumpia.
+5. Eggrafi XORIS othoni 12 lexeon; ypenthymisi "Apothikefse tis 12 lexeis sou" os to "Tis egrapsa se xarti".
+6. Metafora logariasmou me QR: AES-GCM me kleidi T MONO sto QR (#); ston server mono to kleidomeno paketo
+   (km_transfers, 10', mia xrisi, svinetai me tin paralavi); i nea syskevi to pairnei MONO me apodeixi email.
+7. Syskevi pou exase tin kleidaria tis (allagi lexeon apo alli): "Oi 12 lexeis allaxan" + eisodos me tis NEES.
+- Politiki Aporritou 2.5 (A4 QR + pinakas tirisis).
+- tests/v120: 10 elegxoi + 13 metallaxeis · e2e se pragmatiko browser: 27/27.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019EMeqhx3XCsBFnmEjoGepE

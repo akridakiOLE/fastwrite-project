@@ -24,7 +24,7 @@ const MUT = [
   // Μ6 · 🔴 ο κωδικός «own» πάει σε όποιο email γράψει ο αιτών
   ["src", "    email = normEmail(a.acc.email);\n    if (!email) return json({ ok: false, error: \"no_email\" }, 409);", "    email = normEmail(b.email) || normEmail(a.acc.email);\n    if (!email) return json({ ok: false, error: \"no_email\" }, 409);"],
   // Μ7 · δεν φεύγει ειδοποίηση όταν μπαίνει ΑΛΛΗ συσκευή
-  ["src", "  if (acc.active_device_id && acc.active_device_id !== id.device) {\n    fireMail(env, ctx, \"newdev\"", "  if (false) {\n    fireMail(env, ctx, \"newdev\""],
+  ["src", "  if (acc.active_device_id && acc.active_device_id !== id.device) {\n    fireMail(env, ctx, b.via", "  if (false) {\n    fireMail(env, ctx, b.via"],
   // Μ8 · το token δεν καίγεται — ξαναχρησιμοποιείται
   ["src", "    env.DB.prepare(\"UPDATE km_email_tokens SET used = ? WHERE token_hash = ?\").bind(ts, tok),\n  ]);\n  await touchDevice(env, request, a.id, null);\n  fireMail(env, ctx, \"words\", email);", "  ]);\n  await touchDevice(env, request, a.id, null);\n  fireMail(env, ctx, \"words\", email);"],
   // Μ9 · η εφαρμογή ξαναστέλνει την αλλαγή στο παλιό /lock

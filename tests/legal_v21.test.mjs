@@ -27,7 +27,7 @@ const ok = (c, m) => { if (!c) throw new Error(m); };
 const num = (re) => { const m = re.exec(src); if (!m) throw new Error("δεν βρέθηκε στον κώδικα: " + re); return Number(m[1]); };
 
 check("Π-1 · δομή: ελληνικά, v2.1, 1/10/2026, όλες οι ενότητες και οι άγκυρες", () => {
-  ok(/<html lang="el">/.test(html) && html.includes("Έκδοση 2.4") && html.includes("7 Οκτωβρίου 2026") /* v118: Πολιτική v2.4 (Α4 — αλλαγή 12 λέξεων με διπλή απόδειξη) */, "κεφαλίδα");
+  ok(/<html lang="el">/.test(html) && html.includes("Έκδοση 2.5") && html.includes("7 Οκτωβρίου 2026") /* v120: Πολιτική v2.5 (Α4 — μεταφορά με QR) */, "κεφαλίδα");
   for (const id of ["a1", "a2", "kostometro", "aa1", "aa2", "aa6", "aa7", "aa8", "fastwrite-desktop", "istotopos", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]) ok(html.includes('id="' + id + '"'), "άγκυρα " + id);
   ok(/<p class="legal-lang"><strong>English:<\/strong>[^<]*<a href="\/legal\/privacy-en">/.test(html), "σύνδεσμος στο αγγλικό");
 });

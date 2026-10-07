@@ -17,6 +17,22 @@
 <body>
 
 <!-- ══ ΟΘΟΝΗ Α0 · ΕΧΕΤΕ ΛΟΓΑΡΙΑΣΜΟ; (Η.6) ═════════════════════ -->
+<!-- ══ v120 · (2) ΜΕΣΑ ΣΕ FACEBOOK / MESSENGER / INSTAGRAM (Brief «Μία πόρτα» Α, 5–7/10/2026) ══
+     Ο browser της εφαρμογής δεν εγκαθιστά, δεν ξέρει τη σύνδεση Google του Chrome και
+     ξεχνάει όταν κλείσει. Πρώτα «Άνοιξε στο Chrome / Safari», αλλά ΠΑΝΤΑ με «Συνέχεια εδώ». -->
+<section id="s-iab" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h1 class="logo">kosto<svg class="logo-mark" viewBox="0 0 34 46" aria-hidden="true"><path d="M6 30 L17 15 L28 30"/></svg>metro</h1>
+    <p class="lede">Το άνοιξες μέσα από το <b id="iab-app">Facebook</b>. Για να δουλέψει σωστά — εγκατάσταση, σύνδεση με ένα πάτημα — άνοιξέ το στον <b id="iab-br">Chrome</b>.</p>
+    <button class="btn primary" id="iab-open" type="button">Άνοιξε στον Chrome</button>
+    <ol class="iab-steps" id="iab-ios" hidden>
+      <li>Πάτα τις <b>τρεις τελείες ⋯</b> πάνω ή κάτω δεξιά.</li>
+      <li>Διάλεξε <b>«Άνοιγμα σε εξωτερικό πρόγραμμα περιήγησης»</b> (ή «Άνοιγμα στο Safari»).</li>
+    </ol>
+    <button class="btn ghost" id="iab-stay" type="button">Συνέχεια εδώ</button>
+  </div>
+</section>
+
 <section id="s-acc" class="screen setup" hidden>
   <div class="setup-inner">
     <h1 class="logo">kosto<svg class="logo-mark" viewBox="0 0 34 46" aria-hidden="true"><path d="M6 30 L17 15 L28 30"/></svg>metro</h1>
@@ -83,11 +99,51 @@
     <p class="lede">Αυτές ανοίγουν τα τιμολόγιά σου σε <b>άλλη συσκευή</b>. Γράψ᾽ τες με τη σειρά.</p>
     <ol class="words" id="mw-list"></ol>
     <p class="note warn">Μην τις φωτογραφίσεις και μην τις αντιγράψεις. Το στιγμιότυπο ανεβαίνει στο cloud του κινητού σου και το πρόχειρο το διαβάζουν άλλες εφαρμογές. <b>Το χαρτί δεν ανεβαίνει πουθενά.</b></p>
+    <!-- v120 · (5) η υπενθύμιση σβήνει ΜΟΝΟ όταν ο χρήστης πει ότι τις έγραψε -->
+    <label class="kw-chk" id="kw-chk-row"><input type="checkbox" id="kw-chk"> <span>Τις έγραψα σε <b>χαρτί</b>, με τη σειρά.</span></label>
     <!-- v118 · KM-OWN-PROOF — «Αλλαγή 12 λέξεων» (Brief Γ, Stavros 7/10/2026).
          ΜΟΝΟ για «τις είδε κάποιος άλλος». Θέλει email του λογαριασμού ΚΑΙ κλείδωμα συσκευής. -->
     <div class="sep"></div>
     <button class="btn ghost" id="st-rotate">Τις είδε κάποιος άλλος; Βγάλε νέες</button>
     <p class="fine hint">Οι τωρινές παύουν να ισχύουν <b>αμέσως</b> και όποια άλλη συσκευή μπήκε με αυτές βγαίνει εκτός. <b>Τα τιμολόγιά σου δεν αγγίζονται</b> — αλλάζει μόνο η κλειδαριά.</p>
+  </div>
+</section>
+
+<!-- ══ v120 · (6) QR — ΣΥΣΚΕΥΗ Α (δίνει τον λογαριασμό) ══ -->
+<section id="s-qr" class="screen page" hidden>
+  <div class="pg-head">
+    <button class="back" id="qr-back" aria-label="Πίσω">‹<span>Επιστροφή</span></button>
+    <h2>Μεταφορά σε νέα συσκευή</h2>
+  </div>
+  <div class="pg-body">
+    <p class="lede" id="qr-lede">Στη <b>νέα</b> συσκευή άνοιξε την κάμερα και σκάναρε τον κωδικό. Θα σου ζητήσει να επιβεβαιώσεις το email σου.</p>
+    <div class="qr-box" id="qr-box"></div>
+    <p class="note" id="qr-left"></p>
+    <p class="note">Όταν ολοκληρωθεί, <b>αυτή η συσκευή βγαίνει εκτός λειτουργίας</b> και τα τιμολόγιά σου συνεχίζουν στη νέα. Τίποτα δεν χάνεται.</p>
+    <details class="faq"><summary>Η νέα συσκευή δεν έχει κάμερα;</summary>
+      <p class="qr-link" id="qr-link"></p>
+      <button class="btn ghost" id="qr-copy" type="button">Αντιγραφή συνδέσμου</button>
+      <p class="fine">Στείλ᾽ τον μόνο στον εαυτό σου. Χωρίς το email σου δεν ανοίγει, αλλά μην τον μοιράζεσαι.</p>
+    </details>
+    <p class="err" id="qr-err" hidden></p>
+  </div>
+</section>
+
+<!-- ══ v120 · (6) QR — ΣΥΣΚΕΥΗ Β (παίρνει τον λογαριασμό) ══ -->
+<section id="s-qrin" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h1 class="logo">kosto<svg class="logo-mark" viewBox="0 0 34 46" aria-hidden="true"><path d="M6 30 L17 15 L28 30"/></svg>metro</h1>
+    <p class="lede">Μεταφορά του λογαριασμού σου <b>σε αυτή τη συσκευή</b>. Επιβεβαίωσε ότι είσαι εσύ, με το <b>email του λογαριασμού σου</b>:</p>
+    <button class="btn oauth-btn" id="qi-google" type="button">Συνέχεια με Google</button>
+    <button class="btn oauth-btn" id="qi-microsoft" type="button">Συνέχεια με Microsoft</button>
+    <button class="btn ghost" id="qi-send" type="button">Στείλε μου κωδικό με email</button>
+    <div id="qi-codebox" hidden>
+      <p class="note" id="qi-to"></p>
+      <label class="fld"><span>Κωδικός 6 ψηφίων</span><input id="qi-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>
+      <button class="btn primary" id="qi-verify" type="button">Επιβεβαίωση</button>
+    </div>
+    <p class="note" id="qi-busy" hidden>Μεταφέρεται…</p>
+    <p class="err" id="qi-err" hidden></p>
   </div>
 </section>
 
@@ -271,6 +327,8 @@
   <div class="cam-bottom">
     <button id="shutter" class="shutter" aria-label="Λήψη"></button>
     <button id="gift-b" class="gift-b" type="button" hidden>🤖 Ενεργοποίηση<br>Κώστα AI</button>
+    <!-- v120 · (5) Η εγγραφή ΔΕΝ δείχνει πια 12 λέξεις (Stavros 6/10). Υπενθύμιση ως να τις γράψει. -->
+    <button id="kw-b" class="kw-b" type="button" hidden>🔑 Αποθήκευσε τις<br>12 λέξεις σου</button>
   </div>
 
   <!-- ΠΡΟΕΠΙΣΚΟΠΗΣΗ (v9) — η φωτογραφία ΟΛΟΚΛΗΡΗ, πριν από οτιδήποτε άλλο.
@@ -653,6 +711,8 @@
     <!-- v36 · Γ.3 — ΟΙ 12 ΛΕΞΕΙΣ ΜΟΥ. Ήταν γραμμένο στο Brief Α από την
          πρώτη μέρα και δεν είχε υλοποιηθεί ποτέ: οι λέξεις ζούσαν στη
          συσκευή και καμία οθόνη δεν τις έδειχνε. -->
+    <!-- v120 · (6) ΜΕΤΑΦΟΡΑ ΣΕ ΑΛΛΗ ΣΥΣΚΕΥΗ ΜΕ QR (Stavros 6/10/2026) — η συνηθισμένη αλλαγή συσκευής, χωρίς χαρτί -->
+    <button class="btn ghost" id="st-qr">Μεταφορά σε νέα συσκευή (QR)</button>
     <button class="btn ghost" id="st-mywords">Οι 12 λέξεις μου</button>
     <!-- v37 — ΤΟ ΛΕΜΕ ΠΡΙΝ, ΟΧΙ ΜΕΤΑ. Στο πρώτο πάτημα το Android γράφει
          «Δημιουργία κλειδιού πρόσβασης» — λέξεις που διαβάζονται ως «φτιάχνω
@@ -817,6 +877,7 @@
 </section>
 
 <script src="/km-crypto.js"></script>
+<script src="/kostometro/qr.js"></script>
 <script src="/kostometro/app.js"></script>
 </body>
 </html>

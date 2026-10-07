@@ -749,3 +749,23 @@ textarea.km-ta:focus{outline:none;border-color:var(--accent)}
 .ag-form textarea{flex:1;resize:none;max-height:120px;background:var(--bg2);color:inherit;border:1px solid var(--border);border-radius:10px;padding:10px;font:inherit;font-size:16px}
 .ag-send{border:0;border-radius:10px;background:var(--accent);color:#04131a;font-size:18px;padding:10px 14px;cursor:pointer}
 .ag-send[disabled]{opacity:.4}
+
+/* ══ v120 · Brief «Μία πόρτα» + Γ (Stavros 7/10/2026) ══ */
+/* (4) Ο Κώστας: μεγαλύτερος και ΠΑΝΤΑ πάνω από κάθε παράθυρο (inst = 70). */
+.ag-fab{z-index:75;padding:16px 22px;font-size:17px;border-radius:28px}
+/* (2) Μέσα σε Facebook / Messenger / Instagram */
+.iab-steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px;color:var(--text2)}
+.iab-steps b{color:var(--text)}
+/* (5) υπενθύμιση «Αποθήκευσε τις 12 λέξεις σου» — καθρέφτης του κουμπιού του δώρου, αριστερά */
+.kw-b{position:absolute;left:14px;top:50%;transform:translateY(-35%);max-width:calc(50% - 60px);
+  background:rgba(255,176,32,.16);border:1px solid #ffb020;border-radius:12px;color:#fff;font-size:12px;font-weight:600;
+  line-height:1.25;padding:8px 10px;cursor:pointer;font-family:inherit;text-align:center}
+.kw-chk{display:flex;gap:10px;align-items:flex-start;font-size:15px;line-height:1.4}
+.kw-chk input{width:22px;height:22px;flex:0 0 auto;margin-top:1px}
+/* (6) QR */
+.qr-box{background:#fff;border-radius:12px;padding:14px;align-self:center;line-height:0}
+.qr-box svg{width:240px;height:240px;display:block}
+.qr-link{word-break:break-all;font-size:12px;color:var(--text2)}
+/* v120 · (4) στην κάμερα: πάνω από τα κουμπιά λήψης/δώρου · στο παράθυρο εγκατάστασης: χώρος να μη σκεπάζει κείμενο */
+body.on-cam .ag-fab{bottom:calc(150px + env(safe-area-inset-bottom));padding:12px 18px;font-size:15px}
+.inst{padding-bottom:calc(84px + env(safe-area-inset-bottom))}

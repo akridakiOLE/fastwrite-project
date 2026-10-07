@@ -151,7 +151,7 @@ await check("Ο-11 · 🔴 κουμπιά στην οθόνη email, ΠΡΙΝ τ
   ok(/localStorage\.setItem\(LS\.src, 'ref:' \+ refIn\)/.test(go) && go.indexOf("LS.src, 'ref:'") < go.indexOf("location.assign"), "σύσταση μετά το redirect");
   ok(go.includes("location.assign(KM_API + 'auth/' + p + '/start')"), "προορισμός");
   const bootOk = slice("    var oa = oauthTake();", "    var hasEmail");
-  ok(/LS\.emailTok, oa\.t/.test(bootOk) && /LS\.email, oa\.e/.test(bootOk) && /startWords\(false\)/.test(bootOk) && /LS\.reg/.test(bootOk), "boot");
+  ok(/LS\.emailTok, oa\.t/.test(bootOk) && /LS\.email, oa\.e/.test(bootOk) && /silentAccount\(\)/.test(bootOk) /* v120: εγγραφή χωρίς οθόνη 12 λέξεων (Stavros 6/10) */ && /LS\.reg/.test(bootOk), "boot");
 });
 if (ONLY) { if (failed) { console.log("Μ" + ONLY + " → κοκκίνισε ✔"); process.exit(0); } console.log("Μ" + ONLY + " ΠΕΡΑΣΕ — το τεστ δεν πιάνει τίποτα"); process.exit(1); }
 console.log(failed ? "ΑΠΕΤΥΧΑΝ " + failed : "✔ ΟΛΑ ΠΕΡΑΣΑΝ (11)"); process.exit(failed ? 1 : 0);
