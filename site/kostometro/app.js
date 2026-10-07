@@ -52,6 +52,8 @@
     /* Brief ΣΤ · το token του επιβεβαιωμένου email. Φεύγει με την εγγραφή
        και σβήνεται μόλις ο server φτιάξει τον λογαριασμό. */
     emailTok: 'km_email_tok',
+    /* v118 · KM-OWN-PROOF — «έφυγα για Google/Microsoft για ΑΛΛΑΓΗ λέξεων» (επιβιώνει του redirect) */
+    ownPend: 'km_own_pend',
     /* v26 · Η.2β-1 — ο λογαριασμός. Οι 12 λέξεις ΜΕΝΟΥΝ στη συσκευή:
        από αυτές βγαίνουν folder/auth (πάνε στον server) και το κλειδί
        κρυπτογράφησης (ΔΕΝ φεύγει ποτέ). */
@@ -325,6 +327,7 @@
   var SCREENS = ['s-acc','s-email','s-code','s-words','s-signin','s-key','s-perm','s-cam','s-who',
                  's-menu','s-pend','s-sup','s-ref','s-settings','s-shot','s-mywords',
                  's-del','s-gone','s-dpend','s-faq','s-help','s-fb','s-case'];
+  SCREENS.push('s-own');   // v118 · KM-OWN-PROOF — επιβεβαίωση κατόχου πριν από νέες 12 λέξεις
   function show(id) {
     var pv = el('preview');
     if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
@@ -2149,7 +2152,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v117';
+  var APP_VER = 'φέτα 3 · v118';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -3235,6 +3238,7 @@
       : 'Εδώ βλέπεις κανονικά όλα τα τιμολόγια και τους προμηθευτές σου. Για να φωτογραφίσεις από αυτή τη συσκευή, κάν᾽ την ενεργή — η άλλη περνάει σε ανάγνωση.';
     /* Στο ΔΩΡΕΑΝ δεν υπάρχει διαδρομή προς τα τιμολόγια από εδώ. */
     el('ro-menu').hidden = locked;
+    el('ro-reclaim').hidden = !locked;   // v118 · (α) — μόνο στο ΔΩΡΕΑΝ, εκτός λειτουργίας
 
     var n = locked ? unsyncedGet() : (pullInfo.notUp || 0);
     var pe = el('ro-pend');
@@ -3748,12 +3752,14 @@
     Promise.all([kmDeriveLock(words), kmDerive(words)]).then(function (dl) {
       var L = dl[0], d = dl[1];
       return kmWrapK(L.kek, rawK).then(function (wrapped) {
-        return kmFetch('lock', {
+        /* v118 · KM-OWN-PROOF — μέσω /words/reclaim ΜΕ την απόδειξη email.
+           Σβήνει ΟΛΕΣ τις κλειδαριές λέξεων και κάνει αυτή τη συσκευή ενεργή. */
+        return kmFetch('words/reclaim', {
           method: 'POST',
           headers: kmHead(),
           body: JSON.stringify({
             lock_id: L.lockId, auth_token: L.authToken, wrapped_k: wrapped,
-            kind: 'words', replace: oldLock,
+            email_token: ownTok,
             /* 🔴 ΚΛΕΙΝΕΙ ΚΑΙ ΤΗΝ ΕΝΑΛΛΑΚΤΙΚΗ ΤΑΥΤΟΤΗΤΑ ΤΟΥ ΛΟΓΑΡΙΑΣΜΟΥ.
                Το `km_accounts.auth_hash` είναι ο κωδικός που δέχεται ο server
                ΧΩΡΙΣ κεφαλίδα κλειδαριάς. Σε λογαριασμό v47+ σπάρθηκε με τον
@@ -3768,8 +3774,9 @@
             account_auth: L.authToken
           })
         }).then(function (r) {
-          if (r.status === 409) { return r.json().catch(function () { return {}; }).then(function () {
-            throw new Error('Δεν είναι αυτή η ενεργή συσκευή. Κάν᾽ την ενεργή πρώτα και ξαναδοκίμασε.');
+          if (r.status === 403) { return r.json().catch(function () { return {}; }).then(function (j) {
+            if (j && j.error === 'email_unverified') { throw new Error('Η επιβεβαίωση του email έληξε. Πάτα «Επιστροφή» και ξεκίνα ξανά.'); }
+            throw new Error('Οι 12 λέξεις άλλαξαν ήδη από άλλη συσκευή. Γράψε στο support@fastwrite.tech.');
           }); }
           if (!r.ok) { throw new Error('Ο διακομιστής δεν δέχτηκε την αλλαγή (σφάλμα ' + r.status + '). Δοκίμασε ξανά.'); }
           return r.json();
@@ -3785,6 +3792,9 @@
           localStorage.setItem(LS.auth, d.authToken);
           pendingWords = null;
           wordsMode = 'new';
+          ownTok = null;
+          /* v118 — αυτή η συσκευή είναι πλέον η ΕΝΕΡΓΗ (ο server το έγραψε στην ίδια πράξη). */
+          setActiveState(true, (j.state && j.state.active_since) || null);
           b.disabled = false; b.textContent = 'Συνέχεια';
           showMyWords();
         });
@@ -4830,6 +4840,13 @@
        Ο server δίνει ΤΟ ΙΔΙΟ email_token με τον κωδικό 6 ψηφίων, άρα από εδώ
        η ροή είναι ακριβώς ίδια με το «Επιβεβαίωση» της οθόνης s-code. */
     var oa = oauthTake();
+    /* v118 · KM-OWN-PROOF — επιστροφή από Google/Microsoft για ΑΛΛΑΓΗ 12 λέξεων
+       (όχι για εγγραφή). Κρατιέται ως το τέλος του boot και ανοίγει μετά. */
+    var ownBack = null;
+    if (localStorage.getItem(LS.ownPend) || (oa && oa.o === '1')) {
+      localStorage.removeItem(LS.ownPend);
+      if (oa && localStorage.getItem(LS.reg)) { ownBack = oa; oa = null; }
+    }
     if (oa && oa.kind === 'ok' && !localStorage.getItem(LS.reg)) {
       localStorage.setItem(LS.emailTok, oa.t);
       localStorage.setItem(LS.email, oa.e);
@@ -4868,6 +4885,7 @@
     scheduleSync(4000);   // v31 — …και μετά ό,τι έμεινε πίσω από εδώ
     if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
     if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
+    if (ownBack) { return ownResume(ownBack); }   // v118
     toCam();
   }
 
@@ -5115,7 +5133,7 @@
       var i = kv.indexOf('=');
       if (i > 0) { try { q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); } catch (e) {} }
     });
-    var o = { kind: q.km_oauth, t: q.t || '', e: q.e || '', code: q.code || '', p: q.p || '' };
+    var o = { kind: q.km_oauth, t: q.t || '', e: q.e || '', code: q.code || '', p: q.p || '', o: q.o || '' };
     if (o.kind === 'ok' && (!/^[0-9a-f]{64}$/.test(o.t) || !validEmail(o.e))) { return { kind: 'err', code: 'provider' }; }
     return o;
   }
@@ -5468,31 +5486,108 @@
      δείχνει μυστικό που γίνεται το κλειδί του λογαριασμού, άρα περνάει από
      το κλείδωμα της συσκευής. Συσκευή χωρίς κανένα κλείδωμα δεν αλλάζει
      λέξεις — όποιος τη σηκώσει θα σκότωνε το χαρτί του ιδιοκτήτη. */
-  el('st-rotate').onclick = function () {
-    var b = el('st-rotate'), e = el('mw-err');
-    e.hidden = true;
-    function done() { b.disabled = false; b.textContent = 'Αλλαγή 12 λέξεων'; }
-    function stop(msg) { done(); e.textContent = msg; e.hidden = false; }
+  /* ══ v118 · KM-OWN-PROOF — ΑΛΛΑΓΗ 12 ΛΕΞΕΩΝ ΜΕ ΔΙΠΛΗ ΑΠΟΔΕΙΞΗ (Brief Γ, 7/10/2026) ══
+     Αποφάσεις Stavros 7/10: η αλλαγή υπάρχει ΜΟΝΟ για «τις είδε / τις πήρε
+     κάποιος άλλος» · δουλεύει ΚΑΙ από την ενεργή ΚΑΙ από συσκευή εκτός
+     λειτουργίας (εκεί ΧΩΡΙΣ να βάλει πρώτα τις 12 λέξεις) · θέλει ΚΑΙ email του
+     λογαριασμού ΚΑΙ κλείδωμα συσκευής — αυτά δεν τα έχει όποιος βρήκε το χαρτί.
+     Ως τη v117 αρκούσε «ενεργή + κλείδωμα», που τα είχε ΚΑΙ ο κλέφτης (μετρήθηκε 7/10).
+     Σειρά: email (Google/Microsoft ή κωδικός) → δακτυλικό/PIN → νέες λέξεις. */
+  var ownTok = null;
+  function ownErr(msg) { el('own-err').textContent = msg || ''; el('own-err').hidden = !msg; }
+  function ownStage(b) { el('own-a').hidden = !!b; el('own-b').hidden = !b; }
+  function rotateStart() {
     if (!localStorage.getItem(LS.kkey) || !localStorage.getItem(LS.lock)) {
-      stop('Αυτή η συσκευή δεν έχει περάσει ακόμα στη νέα βάση κλειδιών. Άνοιξε την εφαρμογή μία φορά με δίκτυο και ξαναδοκίμασε.');
+      var e = el('mw-err');
+      e.textContent = 'Αυτή η συσκευή δεν έχει περάσει ακόμα στη νέα βάση κλειδιών. Άνοιξε την εφαρμογή μία φορά με δίκτυο και ξαναδοκίμασε.';
+      e.hidden = false;
       return;
     }
-    if (isReader()) {
-      stop('Μόνο η ενεργή συσκευή αλλάζει τις 12 λέξεις. Κάν᾽ αυτή τη συσκευή ενεργή πρώτα.');
-      return;
-    }
-    b.disabled = true; b.textContent = 'Επιβεβαίωση…';
+    ownTok = null;
+    ownErr('');
+    ownStage(false);
+    el('own-codebox').hidden = true;
+    el('own-code').value = '';
+    if (el('go-google'))    { el('own-google').innerHTML = el('go-google').innerHTML; }
+    if (el('go-microsoft')) { el('own-microsoft').innerHTML = el('go-microsoft').innerHTML; }
+    show('s-own');
+  }
+  el('st-rotate').onclick = rotateStart;
+  el('ro-reclaim').onclick = rotateStart;
+  el('own-back').onclick = function () {
+    ownTok = null;
+    if (isLocked()) { startCam(); return; }
+    show('s-mywords');
+  };
+  function ownOauth(p) {
+    localStorage.setItem(LS.ownPend, '1');
+    location.assign(KM_API + 'auth/' + p + '/start?purpose=own');
+  }
+  el('own-google').onclick    = function () { ownOauth('google'); };
+  el('own-microsoft').onclick = function () { ownOauth('microsoft'); };
+  el('own-send').onclick = function () {
+    var b = el('own-send');
+    b.disabled = true; ownErr('');
+    kmFetch('email/code', { method: 'POST', headers: kmHead(), body: JSON.stringify({ purpose: 'own' }) }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        b.disabled = false;
+        if (r.ok) {
+          el('own-to').textContent = 'Στείλαμε κωδικό 6 ψηφίων στο ' + (j.to || 'email του λογαριασμού σου') + '. Κοίτα και στα Ανεπιθύμητα.';
+          el('own-codebox').hidden = false;
+          b.textContent = 'Στείλε ξανά κωδικό';
+          return;
+        }
+        var e = j && j.error;
+        ownErr(e === 'too_many' ? CODE_TEXT.too_many
+             : e === 'mail_failed' ? CODE_TEXT.mail_failed
+             : r.status === 403 ? 'Οι 12 λέξεις άλλαξαν ήδη από άλλη συσκευή. Γράψε στο support@fastwrite.tech.'
+             : CODE_TEXT.error);
+      });
+    }, function () { b.disabled = false; ownErr(CODE_TEXT.offline); });
+  };
+  el('own-verify').onclick = function () {
+    var c = String(el('own-code').value || '').replace(/\D/g, '');
+    if (c.length !== 6) { ownErr('Ο κωδικός έχει 6 ψηφία.'); return; }
+    var b = el('own-verify');
+    b.disabled = true; ownErr('');
+    kmFetch('email/verify', { method: 'POST', headers: kmHead(), body: JSON.stringify({ purpose: 'own', code: c }) }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        b.disabled = false;
+        if (r.ok && j && j.email_token) { ownTok = j.email_token; ownStage(true); return; }
+        var e = j && j.error;
+        if (e === 'bad_code') { ownErr('Λάθος κωδικός.' + (typeof j.left === 'number' ? ' Απομένουν ' + j.left + ' προσπάθειες.' : '')); }
+        else if (e === 'code_expired' || e === 'no_code') { ownErr('Ο κωδικός έληξε — πάτα «Στείλε ξανά κωδικό».'); }
+        else if (e === 'too_many') { ownErr('Πολλές λάθος προσπάθειες — πάτα «Στείλε ξανά κωδικό».'); }
+        else { ownErr(CODE_TEXT.error); }
+      });
+    }, function () { b.disabled = false; ownErr(CODE_TEXT.offline); });
+  };
+  /* Επιστροφή από Google/Microsoft (boot → ownResume). */
+  function ownResume(o) {
+    rotateStart();
+    if (!el('s-own') || el('s-own').hidden) { return toCam(); }
+    if (o.kind === 'ok' && /^[0-9a-f]{64}$/.test(o.t)) { ownTok = o.t; ownStage(true); return; }
+    if (o.code === 'cancelled') { return; }
+    ownErr(o.code === 'own_mismatch'
+      ? 'Διάλεξες λογαριασμό με άλλο email (' + (o.e || '') + '). Διάλεξε τον λογαριασμό με το email που έχεις στο Kostometro — ή πάτα «Στείλε μου κωδικό με email».'
+      : (OAUTH_TEXT[o.code] || OAUTH_TEXT.provider));
+  }
+  el('own-go').onclick = function () {
+    if (!ownTok) { ownStage(false); return; }
+    var b = el('own-go');
+    b.disabled = true; ownErr('');
     lockAvailable().then(function (ok) {
       if (!ok) {
-        stop('Για να αλλάξεις τις 12 λέξεις, η συσκευή σου πρέπει να έχει κλείδωμα (δακτυλικό, πρόσωπο ή PIN). Βάλ᾽ το από τις Ρυθμίσεις της συσκευής και ξαναδοκίμασε.');
+        b.disabled = false;
+        ownErr('Για να αλλάξεις τις 12 λέξεις, η συσκευή σου πρέπει να έχει κλείδωμα (δακτυλικό, πρόσωπο ή PIN). Βάλ᾽ το από τις Ρυθμίσεις της συσκευής και ξαναδοκίμασε.');
         return;
       }
       lockVerify().then(function () {
-        done();
-        if (!confirm('Να φτιαχτούν ΝΕΕΣ 12 λέξεις;\n\nΟι τωρινές ΠΑΥΟΥΝ να ισχύουν αμέσως. Τα τιμολόγιά σου δεν αγγίζονται καθόλου.\n\nΘα χρειαστεί να γράψεις τις νέες σε χαρτί.')) { return; }
+        b.disabled = false;
         startWords('rotate');
       }).catch(function () {
-        stop('Δεν επιβεβαιώθηκε το κλείδωμα της συσκευής. Δοκίμασε ξανά.');
+        b.disabled = false;
+        ownErr('Δεν επιβεβαιώθηκε το κλείδωμα της συσκευής. Δοκίμασε ξανά.');
       });
     });
   };

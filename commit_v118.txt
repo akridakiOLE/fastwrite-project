@@ -1,0 +1,15 @@
+v118 - Allagi 12 lexeon me dipli apodeixi (Brief Gamma, Stavros 7/10/2026)
+
+- Server: POST /api/km/words/reclaim - kleidoma syskevis (stin efarmogi) + email_token tou logariasmou.
+  Douleuei KAI apo syskevi ektos leitourgias. Svinei OLES tis kleidaries lexeon, kleinei ton palio kodiko,
+  i syskevi ginetai energi. To /lock me replace lexeon kleinei (use_reclaim).
+- email/code + email/verify me purpose=own (kodikos MONO sto email tou logariasmou).
+- Google/Microsoft me purpose=own (provider "google:own" sto km_oauth_states, xoris metavasi).
+- Email "Mpike nea syskevi" otan ALLI syskevi pairnei ti skytali me tis lexeis.
+- Efarmogi: othoni s-own, "Den isoun esy; Pare piso ton logariasmo sou" stin ektos leitourgias,
+  i allagi metakinithike mesa sto "Oi 12 lexeis mou".
+- Politiki Aporritou 2.4 (mono A4).
+- tests/v118: 11 elegxoi + 11 metallaxeis.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019EMeqhx3XCsBFnmEjoGepE

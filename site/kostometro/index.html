@@ -79,10 +79,48 @@
     <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
     <h2>Οι 12 λέξεις σου</h2>
   </div>
-  <div class="setup-inner">
+  <div class="pg-body">
     <p class="lede">Αυτές ανοίγουν τα τιμολόγιά σου σε <b>άλλη συσκευή</b>. Γράψ᾽ τες με τη σειρά.</p>
     <ol class="words" id="mw-list"></ol>
     <p class="note warn">Μην τις φωτογραφίσεις και μην τις αντιγράψεις. Το στιγμιότυπο ανεβαίνει στο cloud του κινητού σου και το πρόχειρο το διαβάζουν άλλες εφαρμογές. <b>Το χαρτί δεν ανεβαίνει πουθενά.</b></p>
+    <!-- v118 · KM-OWN-PROOF — «Αλλαγή 12 λέξεων» (Brief Γ, Stavros 7/10/2026).
+         ΜΟΝΟ για «τις είδε κάποιος άλλος». Θέλει email του λογαριασμού ΚΑΙ κλείδωμα συσκευής. -->
+    <div class="sep"></div>
+    <button class="btn ghost" id="st-rotate">Τις είδε κάποιος άλλος; Βγάλε νέες</button>
+    <p class="fine hint">Οι τωρινές παύουν να ισχύουν <b>αμέσως</b> και όποια άλλη συσκευή μπήκε με αυτές βγαίνει εκτός. <b>Τα τιμολόγιά σου δεν αγγίζονται</b> — αλλάζει μόνο η κλειδαριά.</p>
+  </div>
+</section>
+
+<!-- ══ v118 · ΟΘΟΝΗ · ΕΠΙΒΕΒΑΙΩΣΗ ΚΑΤΟΧΟΥ ΠΡΙΝ ΑΠΟ ΝΕΕΣ 12 ΛΕΞΕΙΣ (KM-OWN-PROOF) ══
+     Ανοίγει από το «Οι 12 λέξεις μου» ΚΑΙ από τη συσκευή εκτός λειτουργίας
+     («Δεν ήσουν εσύ;»). Δεν δείχνει ΠΟΤΕ τις παλιές λέξεις. -->
+<section id="s-own" class="screen page" hidden>
+  <div class="pg-head">
+    <button class="back" id="own-back" aria-label="Πίσω">‹<span>Επιστροφή</span></button>
+    <h2>Νέες 12 λέξεις</h2>
+  </div>
+  <div class="pg-body">
+    <div id="own-a">
+      <p class="lede">Επιβεβαίωσε ότι είσαι εσύ: με το <b>email του λογαριασμού σου</b> και με το <b>κλείδωμα της συσκευής</b>.</p>
+      <p class="note">Τα τιμολόγιά σου δεν αγγίζονται. Οι τωρινές 12 λέξεις παύουν να ισχύουν και όποια άλλη συσκευή μπήκε με αυτές βγαίνει εκτός.</p>
+      <button class="btn oauth-btn" id="own-google" type="button">Συνέχεια με Google</button>
+      <button class="btn oauth-btn" id="own-microsoft" type="button">Συνέχεια με Microsoft</button>
+      <button class="btn ghost" id="own-send" type="button">Στείλε μου κωδικό με email</button>
+      <div id="own-codebox" hidden>
+        <p class="note" id="own-to"></p>
+        <label class="fld">
+          <span>Κωδικός 6 ψηφίων</span>
+          <input id="own-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+        </label>
+        <button class="btn primary" id="own-verify" type="button">Επιβεβαίωση</button>
+      </div>
+    </div>
+    <div id="own-b" hidden>
+      <p class="lede">✓ Το email επιβεβαιώθηκε.</p>
+      <p class="note">Τώρα η συσκευή θα σου ζητήσει δακτυλικό, πρόσωπο ή PIN — και μετά θα δεις τις νέες 12 λέξεις για να τις γράψεις σε χαρτί.</p>
+      <button class="btn primary" id="own-go" type="button">Συνέχεια</button>
+    </div>
+    <p class="err" id="own-err" hidden></p>
   </div>
 </section>
 
@@ -270,6 +308,9 @@
     <p class="err" id="ro-err" hidden></p>
     <button class="btn primary" id="ro-go">Κάνε αυτή τη συσκευή ενεργή</button>
     <button class="btn ghost" id="ro-menu">☰ Δες τα τιμολόγια</button>
+    <!-- v118 · (α) Stavros 7/10/2026 — η συσκευή που βγήκε εκτός παίρνει πίσω τον
+         λογαριασμό ΧΩΡΙΣ να βάλει πρώτα τις 12 λέξεις. -->
+    <button class="btn ghost" id="ro-reclaim" hidden>Δεν ήσουν εσύ; Πάρε πίσω τον λογαριασμό σου</button>
   </div>
   <div class="cam-err" id="cam-err" hidden>
     <p><b>Δεν άνοιξε η κάμερα.</b></p>
@@ -624,8 +665,8 @@
          με τη βάση Κ (Η.13) οι νέες λέξεις κλειδώνουν το ΙΔΙΟ κλειδί
          δεδομένων, άρα κανένα τιμολόγιο δεν ξαναγράφεται. Το παλιό κουμπί
          της v29 έφτιαχνε ΝΕΟ λογαριασμό και γι' αυτό αφαιρέθηκε (v39). -->
-    <button class="btn ghost" id="st-rotate">Αλλαγή 12 λέξεων</button>
-    <p class="fine hint">Οι τωρινές παύουν να ισχύουν αμέσως και θα γράψεις τις νέες σε χαρτί. <b>Τα τιμολόγιά σου δεν αγγίζονται</b> — αλλάζει μόνο η κλειδαριά.</p>
+    <!-- v118 · Η «Αλλαγή 12 λέξεων» ΜΕΤΑΚΙΝΗΘΗΚΕ μέσα στην οθόνη «Οι 12 λέξεις μου»
+         (απόφαση Stavros 7/10/2026): υπάρχει ΜΟΝΟ για «τις είδε κάποιος άλλος». -->
     <p class="err" id="mw-err" hidden></p>
     <!-- v39 · ΤΟ «ΝΕΕΣ 12 ΛΕΞΕΙΣ» ΑΦΑΙΡΕΘΗΚΕ (απόφαση Stavros 5/9/2026).
          Από τη v29 μπλοκαριζόταν μόλις ο φάκελος είχε δεδομένα, άρα η
@@ -685,7 +726,7 @@
     <p class="fine"><b>Δεν το ζήτησες εσύ;</b> Σταμάτησέ το τώρα. Ο λογαριασμός ξαναδουλεύει αμέσως και ενεργή γίνεται αυτή η συσκευή.</p>
     <p class="err" id="dp-err" hidden></p>
     <button class="btn" id="dp-cancel">Σταμάτησε τη διαγραφή</button>
-    <p class="fine warn"><b>Αν το κινητό σου χάθηκε ή κλάπηκε, η ακύρωση δεν αρκεί.</b> Εκείνη η συσκευή κρατάει ακόμα τις 12 λέξεις σου και μπορεί να ξαναπροσπαθήσει. Αμέσως μετά την ακύρωση, <b>άλλαξε τις 12 λέξεις σου</b> από τις Ρυθμίσεις — τότε μόνο πεθαίνει η δική της κλειδαριά.</p>
+    <p class="fine warn"><b>Αν το κινητό σου χάθηκε ή κλάπηκε, η ακύρωση δεν αρκεί.</b> Εκείνη η συσκευή κρατάει ακόμα τις 12 λέξεις σου και μπορεί να ξαναπροσπαθήσει. Αμέσως μετά την ακύρωση, <b>άλλαξε τις 12 λέξεις σου</b> από τις Ρυθμίσεις → «Οι 12 λέξεις μου» → «Τις είδε κάποιος άλλος; Βγάλε νέες» — τότε μόνο πεθαίνει η δική της κλειδαριά.</p>
     <div class="sep"></div>
     <p class="fine hint">Αν δεν έχεις πρόσβαση σε αυτή τη συσκευή, μπορείς να ακυρώσεις από οπουδήποτε στο <b>fastwrite.tech/akyrosi</b> με τις 12 λέξεις σου.</p>
     <button class="btn ghost" id="dp-close">Κλείσιμο</button>

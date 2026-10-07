@@ -1,4 +1,5 @@
 // KM-SERVER-V60-H11B  ← σημάδι έκδοσης· το ψάχνει το deploy_km_h11b.bat
+// KM-SERVER-V118-RECLAIM  ← σημάδι: «Αλλαγή 12 λέξεων με διπλή απόδειξη — και από συσκευή εκτός λειτουργίας» (Brief Γ, 7/10/2026)
 // KM-SERVER-V113-DORO20  ← σημάδι: «Δώρο 20 αναγνώσεων με τον Κώστα (AI)» — ανάγνωση τιμολογίου μέσω Anthropic, χωρίς αποθήκευση εικόνας (4/10/2026)
 // KM-SERVER-V104-KOSTAS  ← σημάδι: ο βοηθός λέγεται «Κώστας» + εκστρατεία «voithos-1» στους 3 νέους leads (1/10/2026)
 // KM-SERVER-V102-AGENT  ← σημάδι: βοηθός ΜΟΝΟ για την εγκατάσταση + όριο 30 μηνυμάτων ανά συσκευή (30/9/2026)
@@ -111,7 +112,7 @@ export async function handleKm(request, env, ctx, path) {
   const method = request.method;
 
   if (path === "/api/km/lookup" && method === "GET") return lookup(request, env);
-  if (path === "/api/km/register" && method === "POST") return register(request, env);
+  if (path === "/api/km/register" && method === "POST") return register(request, env, ctx);
   if (path === "/api/km/email/code" && method === "POST") return emailCode(request, env);
   if (path === "/api/km/email/verify" && method === "POST") return emailVerify(request, env);
   // KM-AGENT (29/9/2026) — Βοηθός Kostometro, Φάση 1
@@ -145,6 +146,7 @@ export async function handleKm(request, env, ctx, path) {
 
   if (path === "/api/km/unlock" && method === "POST") return unlock(request, env);
   if (path === "/api/km/lock" && method === "POST") return addLock(request, env, ctx);
+  if (path === "/api/km/words/reclaim" && method === "POST") return reclaimWords(request, env, ctx);   // v118
   if (path === "/api/km/inbox") {
     if (method === "GET")    return getInbox(request, env);
     if (method === "PUT")    return putInbox(request, env);
@@ -880,6 +882,13 @@ const CODE_MAX_TRIES = 5;                    // λάθη ανά κωδικό
 const CODE_PER_EMAIL_HOUR = 3;               // αποστολές ανά email/ώρα
 const CODE_PER_IP_HOUR = 10;                 // αποστολές ανά IP/ώρα (μόνο hash, ποτέ η IP)
 
+// v118 — «s•••@gmail.com»: λέμε ΠΟΥ πήγε ο κωδικός χωρίς να φανερώνουμε όλο το email.
+function maskEmail(e) {
+  const i = String(e || "").indexOf("@");
+  if (i < 1) return "";
+  return e.slice(0, 1) + "•••" + e.slice(i);
+}
+
 // «Είναι πιασμένο;» — null = ελεύθερο · 'taken' · 'pending_delete'.
 // Ο λογαριασμός σε αίτημα διαγραφής ΚΡΑΤΑΕΙ το email ως τη λήξη των 72 ωρών.
 async function emailBusy(env, email) {
@@ -920,10 +929,22 @@ async function tokenFor(env, raw, email) {
 
 async function emailCode(request, env) {
   const b = (await safeJson(request)) || {};
-  const email = normEmail(b.email);
-  if (!email) return json({ ok: false, error: "bad_email" }, 400);
-  const busy = await emailBusy(env, email);
-  if (busy) return json({ ok: false, error: busy }, 409);
+  // v118 · KM-OWN-PROOF — «απόδειξε ότι είσαι ο κάτοχος του email ΑΥΤΟΥ του
+  // λογαριασμού» (Brief Γ, 7/10/2026). Ο κωδικός πάει ΜΟΝΟ στο email του
+  // λογαριασμού που ζητά η ταυτότητα της συσκευής — ποτέ σε όποιο email γραφτεί.
+  const own = b.purpose === "own";
+  let email;
+  if (own) {
+    const a = await authed(request, env);
+    if (a.err) return a.err;
+    email = normEmail(a.acc.email);
+    if (!email) return json({ ok: false, error: "no_email" }, 409);
+  } else {
+    email = normEmail(b.email);
+    if (!email) return json({ ok: false, error: "bad_email" }, 400);
+    const busy = await emailBusy(env, email);
+    if (busy) return json({ ok: false, error: busy }, 409);
+  }
 
   const t = Date.now();
   const hourAgo = new Date(t - 3600 * 1000).toISOString();
@@ -945,14 +966,20 @@ async function emailCode(request, env) {
   ).bind(email, await sha256hex(email + ":" + code), new Date(t).toISOString(), new Date(t + CODE_TTL_MS).toISOString(), ipH).run();
   // Εδώ ΠΕΡΙΜΕΝΟΥΜΕ την αποστολή: χωρίς email ο χρήστης δεν προχωρά, άρα
   // πρέπει να ξέρει ΤΩΡΑ ότι απέτυχε — όχι να κοιτάει άδειο inbox.
-  const sent = await mailSend(env, "code", email, { code });
+  const sent = await mailSend(env, own ? "code_own" : "code", email, { code });
   if (!sent) return json({ ok: false, error: "mail_failed" }, 502);
-  return json({ ok: true, sent: true, ttl_min: CODE_TTL_MS / 60000 });
+  return json({ ok: true, sent: true, ttl_min: CODE_TTL_MS / 60000, to: own ? maskEmail(email) : undefined });
 }
 
 async function emailVerify(request, env) {
   const b = (await safeJson(request)) || {};
-  const email = normEmail(b.email);
+  const own = b.purpose === "own";   // v118 · KM-OWN-PROOF
+  let email = normEmail(b.email);
+  if (own) {
+    const a = await authed(request, env);
+    if (a.err) return a.err;
+    email = normEmail(a.acc.email);
+  }
   const code = String(b.code || "").replace(/\D/g, "");
   if (!email || code.length !== 6) return json({ ok: false, error: "bad_code" }, 400);
   const row = await env.DB.prepare(
@@ -966,8 +993,11 @@ async function emailVerify(request, env) {
     return json({ ok: false, error: "bad_code", left: Math.max(0, CODE_MAX_TRIES - row.attempts - 1) }, 400);
   }
   // Ξαναελέγχεται: στο μεταξύ κάποιος μπορεί να γράφτηκε με το ίδιο email.
-  const busy = await emailBusy(env, email);
-  if (busy) return json({ ok: false, error: busy }, 409);
+  // (v118: στην απόδειξη κατόχου το email ΕΙΝΑΙ πιασμένο — από τον ίδιο.)
+  if (!own) {
+    const busy = await emailBusy(env, email);
+    if (busy) return json({ ok: false, error: busy }, 409);
+  }
   await env.DB.prepare("DELETE FROM km_email_codes WHERE email = ?").bind(email).run();
   return json({ ok: true, email_token: await issueEmailToken(env, email) });
 }
@@ -1044,6 +1074,9 @@ function cookieVal(request, name) {
 
 async function oauthStart(request, env, prov) {
   const P = OAUTH[prov];
+  // v118 · KM-OWN-PROOF — ο σκοπός ταξιδεύει στη γραμμή του state (πεδίο provider
+  // «google:own»), ΟΧΙ σε cookie ή URL που αλλάζει ο χρήστης στη μέση.
+  const own = new URL(request.url).searchParams.get("purpose") === "own";
   const cid = env[P.idVar], sec = env[P.secVar];
   if (!cid || !sec) return oauthBack(env, oauthFrag("err", { code: "unavailable" }));
   const t = Date.now();
@@ -1059,7 +1092,7 @@ async function oauthStart(request, env, prov) {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const challenge = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
   await env.DB.prepare("INSERT INTO km_oauth_states (state_hash, provider, verifier, nonce, ip_h, created) VALUES (?, ?, ?, ?, ?, ?)")
-    .bind(await sha256hex(state), prov, verifier, nonce, ipH, new Date(t).toISOString()).run();
+    .bind(await sha256hex(state), own ? prov + ":own" : prov, verifier, nonce, ipH, new Date(t).toISOString()).run();
   const q = new URLSearchParams({
     client_id: cid, response_type: "code", scope: "openid email profile",
     redirect_uri: oauthOrigin(env) + "/api/km/auth/" + prov + "/callback",
@@ -1115,7 +1148,8 @@ async function oauthCallback(request, env, prov) {
   // Μία χρήση: η γραμμή σβήνεται ΤΗ ΣΤΙΓΜΗ που διαβάζεται.
   const row = await env.DB.prepare("DELETE FROM km_oauth_states WHERE state_hash = ? RETURNING *")
     .bind(await sha256hex(state)).first();
-  if (!row || row.provider !== prov || Date.parse(row.created) < Date.now() - OAUTH_TTL_MS) {
+  const own = !!row && row.provider === prov + ":own";   // v118 · KM-OWN-PROOF
+  if (!row || (row.provider !== prov && !own) || Date.parse(row.created) < Date.now() - OAUTH_TTL_MS) {
     return oauthBack(env, oauthFrag("err", { code: "state" }), true);
   }
   let claims;
@@ -1134,6 +1168,13 @@ async function oauthCallback(request, env, prov) {
   if (!email) return oauthBack(env, oauthFrag("err", { code: "no_email" }), true);
   if (!P.verified(claims)) return oauthBack(env, oauthFrag("verify", { e: email }), true);
   const busy = await emailBusy(env, email);
+  if (own) {
+    // Απόδειξη κατόχου: πρέπει να ΥΠΑΡΧΕΙ ζωντανός λογαριασμός με αυτό το email.
+    // Αν ο χρήστης διάλεξε άλλο λογαριασμό Google, το reclaim θα το απορρίψει
+    // ούτως ή άλλως (email ≠ λογαριασμού) — εδώ του το λέμε νωρίς.
+    if (busy !== "taken") return oauthBack(env, oauthFrag("err", { code: "own_mismatch", e: email, o: "1" }), true);
+    return oauthBack(env, oauthFrag("ok", { t: await issueEmailToken(env, email), e: email, p: prov, o: "1" }), true);
+  }
   if (busy) return oauthBack(env, oauthFrag("err", { code: busy, e: email }), true);
   return oauthBack(env, oauthFrag("ok", { t: await issueEmailToken(env, email), e: email, p: prov }), true);
 }
@@ -1668,7 +1709,7 @@ function manifestFor(request) {
 // wrapped_k (το Κ κλειδωμένο με τις λέξεις, 120 hex). Το folder_id είναι
 // τυχαίο από τη συσκευή, το X-Km-Auth είναι ο κωδικός της κλειδαριάς.
 // Για υπάρχοντα λογαριασμό με X-Km-Lock: η κλειδαριά πρέπει να ταιριάζει.
-async function register(request, env) {
+async function register(request, env, ctx) {
   const id = ident(request);
   if (!id) return json({ ok: false, error: "bad_identity" }, 400);
   const b = (await safeJson(request)) || {};
@@ -1745,6 +1786,12 @@ async function register(request, env) {
 
   // Υπάρχων λογαριασμός: αυτή η συσκευή γίνεται ενεργή. Το email ΔΕΝ αλλάζει από εδώ.
   const prev = await activeInfo(env, acc);
+  // v118 · (γ) — «Μπήκε νέα συσκευή με τις 12 λέξεις σου». Μόνο όταν ΑΛΛΗ
+  // συσκευή παίρνει τη σκυτάλη (όχι η ίδια που ξαναμπαίνει). Η αποτυχία του
+  // email δεν ακυρώνει την είσοδο.
+  if (acc.active_device_id && acc.active_device_id !== id.device) {
+    fireMail(env, ctx, "newdev", acc.email ? String(acc.email) : null, { device: clean(b.device_name, 60) });
+  }
   await env.DB.prepare(
     "UPDATE km_accounts SET active_device_id = ?, active_since = ?, has_key = MAX(has_key, ?) WHERE folder_id = ?"
   ).bind(id.device, ts, b.has_key ? 1 : 0, id.folder).run();
@@ -1830,6 +1877,13 @@ async function addLock(request, env, ctx) {
   if (accountAuth && !(kind === "words" && replace)) {
     return json({ ok: false, error: "account_auth_needs_words_replace" }, 400);
   }
+  // 🔴 v118 · KM-OWN-PROOF (β) — Η ΑΛΛΑΓΗ ΛΕΞΕΩΝ ΔΕΝ ΓΙΝΕΤΑΙ ΠΙΑ ΑΠΟ ΕΔΩ.
+  // Εδώ αρκούσε «ενεργή συσκευή + κλείδωμα συσκευής» — τα έχει ΚΑΙ ο κλέφτης
+  // που μπήκε με το χαρτί (μετρήθηκε 7/10/2026). Η αλλαγή ζει ΜΟΝΟ στο
+  // /api/km/words/reclaim, που θέλει ΚΑΙ απόδειξη email του λογαριασμού.
+  if (kind === "words" && replace) {
+    return json({ ok: false, error: "use_reclaim" }, 403);
+  }
 
   const taken = await env.DB.prepare("SELECT folder_id FROM km_locks WHERE lock_id = ?").bind(lockId).first();
   if (taken) return json({ ok: false, error: "lock_exists" }, 409);
@@ -1865,6 +1919,63 @@ async function addLock(request, env, ctx) {
   return json({ ok: true, lock_id: lockId, kind: kind, replaced: replace,
                 account_auth_closed: !!accountAuth,
                 locks: await lockSummary(env, a.id.folder) });
+}
+
+// ═══ v118 · ΑΛΛΑΓΗ 12 ΛΕΞΕΩΝ ΜΕ ΔΙΠΛΗ ΑΠΟΔΕΙΞΗ — KM-OWN-PROOF (Brief Γ, 7/10/2026) ═══
+// Αποφάσεις Stavros 7/10/2026:
+//  (α) Η συσκευή που ΒΓΗΚΕ ΕΚΤΟΣ (γιατί κάποιος μπήκε με τις λέξεις) παίρνει
+//      πίσω τον λογαριασμό ΧΩΡΙΣ να βάλει πρώτα τις 12 λέξεις.
+//  (β) Ίδια πράξη και από την ενεργή συσκευή («τις είδε κάποιος, τον προλαβαίνω»),
+//      με την ΙΔΙΑ διπλή απόδειξη: κλείδωμα συσκευής (στη συσκευή) + email του
+//      λογαριασμού (email_token από 6ψήφιο κωδικό ή Google/Microsoft, purpose=own).
+// Τι κάνει, σε ΜΙΑ πράξη: σβήνει ΟΛΕΣ τις κλειδαριές λέξεων · γράφει τη νέα
+// (ίδιο Κ, ο server δεν το βλέπει) · κλείνει τον παλιό κωδικό λογαριασμού ·
+// αυτή η συσκευή γίνεται η ΕΝΕΡΓΗ · το token καίγεται. Η συσκευή του κλέφτη
+// παίρνει 403 στην επόμενη κλήση της (η κλειδαριά της δεν υπάρχει).
+// Όριο που ΔΕΝ είναι σφάλμα (Stavros 7/10): όποιος έχει ΚΑΙ το χαρτί ΚΑΙ το
+// email του χρήστη δεν ξεχωρίζει από τον χρήστη.
+async function reclaimWords(request, env, ctx) {
+  const a = await authed(request, env);
+  if (a.err) return a.err;
+  if (!a.lock) return json({ ok: false, error: "needs_lock" }, 400);
+  const b = (await safeJson(request)) || {};
+  const lockId = (clean(b.lock_id, 64) || "").toLowerCase();
+  const auth = (clean(b.auth_token, 64) || "").toLowerCase();
+  const wrapped = (clean(b.wrapped_k, 130) || "").toLowerCase();
+  const accountAuth = (clean(b.account_auth, 64) || "").toLowerCase();
+  if (!HEX64.test(lockId) || !HEX64.test(auth) || !HEX64.test(accountAuth)) return json({ ok: false, error: "bad_lock" }, 400);
+  if (!HEX120.test(wrapped)) return json({ ok: false, error: "bad_wrapped_k" }, 400);
+  const params = clean(b.params, 200) || null;
+  if (params && !/^\{[\x20-\x7e]*\}$/.test(params)) return json({ ok: false, error: "bad_params" }, 400);
+  // Η συσκευή πρέπει να έχει ΗΔΗ περάσει από αυτόν τον λογαριασμό. Μια συσκευή
+  // που απλώς ξέρει τις λέξεις αλλά δεν μπήκε ποτέ δεν «παίρνει πίσω» τίποτα.
+  const linked = await env.DB.prepare("SELECT 1 AS x FROM km_device_links WHERE install_id = ? AND folder_id = ?")
+    .bind(a.id.device, a.id.folder).first();
+  if (!linked) return json({ ok: false, error: "unknown_device" }, 403);
+  // Η ΔΕΥΤΕΡΗ ΑΠΟΔΕΙΞΗ — το email του ΛΟΓΑΡΙΑΣΜΟΥ, όχι όποιο email.
+  const email = normEmail(a.acc.email);
+  const tok = email ? await tokenFor(env, b.email_token, email) : null;
+  if (!tok) return json({ ok: false, error: "email_unverified" }, 403);
+  const taken = await env.DB.prepare("SELECT folder_id FROM km_locks WHERE lock_id = ?").bind(lockId).first();
+  if (taken) return json({ ok: false, error: "lock_exists" }, 409);
+
+  const ts = now();
+  const prevActive = a.acc.active_device_id || null;
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM km_locks WHERE folder_id = ? AND kind = 'words'").bind(a.id.folder),
+    env.DB.prepare(
+      `INSERT INTO km_locks (lock_id, folder_id, kind, auth_hash, wrapped_k, created, created_by, label, params)
+       VALUES (?, ?, 'words', ?, ?, ?, ?, ?, ?)`
+    ).bind(lockId, a.id.folder, await sha256hex(auth), wrapped, ts, a.id.device, clean(b.label, 40), params),
+    env.DB.prepare("UPDATE km_accounts SET auth_hash = ?, active_device_id = ?, active_since = ? WHERE folder_id = ?")
+      .bind(await sha256hex(accountAuth), a.id.device, ts, a.id.folder),
+    env.DB.prepare("UPDATE km_email_tokens SET used = ? WHERE token_hash = ?").bind(ts, tok),
+  ]);
+  await touchDevice(env, request, a.id, null);
+  fireMail(env, ctx, "words", email);
+  const fresh = await env.DB.prepare("SELECT * FROM km_accounts WHERE folder_id = ?").bind(a.id.folder).first();
+  return json({ ok: true, lock_id: lockId, reclaimed: prevActive !== a.id.device,
+                state: pub(fresh), locks: await lockSummary(env, a.id.folder) });
 }
 
 async function status(request, env) {
@@ -3325,12 +3436,47 @@ function mailBody(kind, extra) {
       el: "Η διαγραφή του λογαριασμού σου στο Kostometro ακυρώθηκε στις " + when + " με τις 12 λέξεις σου." +
           " Ο λογαριασμός λειτουργεί κανονικά και ενεργή είναι μόνο η συσκευή από την οποία έγινε η ακύρωση." +
           " ΑΝ Η ΠΡΟΗΓΟΥΜΕΝΗ ΣΥΣΚΕΥΗ ΣΟΥ ΕΧΕΙ ΧΑΘΕΙ Ή ΚΛΑΠΕΙ, άλλαξε ΤΩΡΑ τις 12 λέξεις σου" +
-          " από τις Ρυθμίσεις — μέχρι τότε εκείνη η συσκευή μπορεί να ξαναπροσπαθήσει." +
+          " από τις Ρυθμίσεις → «Οι 12 λέξεις μου» — μέχρι τότε εκείνη η συσκευή μπορεί να ξαναπροσπαθήσει." +
           " Χρειάζεσαι βοήθεια; " + MAIL_SUPPORT,
       en: "Deletion of your Kostometro account was cancelled on " + when + " using your 12 words." +
           " The account works normally and only the device that cancelled is active." +
-          " IF YOUR PREVIOUS DEVICE IS LOST OR STOLEN, change your 12 words NOW in Settings —" +
+          " IF YOUR PREVIOUS DEVICE IS LOST OR STOLEN, change your 12 words NOW in Settings → \"My 12 words\" —" +
           " until then that device can try again." +
+          " Need help? " + MAIL_SUPPORT,
+    };
+  }
+
+  // v118 · KM-OWN-PROOF — ο κωδικός για την ΑΛΛΑΓΗ των 12 λέξεων.
+  if (kind === "code_own") {
+    return {
+      subject: "Κωδικός για αλλαγή των 12 λέξεων: " + x.code + " · Code to change your 12 words",
+      el: "Ο κωδικός σου για να αλλάξεις τις 12 λέξεις του Kostometro είναι: " + x.code + "." +
+          " Γράψ' τον στην εφαρμογή μέσα σε 15 λεπτά." +
+          " ΑΝ ΔΕΝ ΤΟΝ ΖΗΤΗΣΕΣ ΕΣΥ, κάποιος έχει τις 12 λέξεις σου: άνοιξε το Kostometro και πάτα" +
+          " «Πάρε πίσω τον λογαριασμό σου». Χρειάζεσαι βοήθεια; " + MAIL_SUPPORT,
+      en: "Your code to change your Kostometro 12 words is: " + x.code + "." +
+          " Enter it in the app within 15 minutes." +
+          " IF YOU DID NOT ASK FOR IT, someone has your 12 words: open Kostometro and tap" +
+          " \"Take your account back\". Need help? " + MAIL_SUPPORT,
+    };
+  }
+
+  // v118 · (γ) — μπήκε ΑΛΛΗ συσκευή με τις 12 λέξεις.
+  if (kind === "newdev") {
+    const dev = x.device ? " («" + x.device + "»)" : "";
+    return {
+      subject: "Μπήκε νέα συσκευή στο Kostometro σου · A new device signed in to your Kostometro",
+      el: "Στις " + when + " μπήκε συσκευή" + dev + " στον λογαριασμό σου στο Kostometro με τις 12 λέξεις σου," +
+          " και η προηγούμενη συσκευή σου πέρασε εκτός λειτουργίας." +
+          " Αν ήσουν εσύ, δεν χρειάζεται τίποτα." +
+          " ΑΝ ΔΕΝ ΗΣΟΥΝ ΕΣΥ: άνοιξε το Kostometro στην προηγούμενη συσκευή σου και πάτα" +
+          " «Δεν ήσουν εσύ; Πάρε πίσω τον λογαριασμό σου». Θα πάρεις νέες 12 λέξεις και η άλλη συσκευή θα βγει." +
+          " Χρειάζεσαι βοήθεια; " + MAIL_SUPPORT,
+      en: "On " + when + " (Cyprus time) a device" + dev + " signed in to your Kostometro account with your 12 words," +
+          " and your previous device was switched off." +
+          " If this was you, nothing to do." +
+          " IF THIS WAS NOT YOU: open Kostometro on your previous device and tap" +
+          " \"Not you? Take your account back\". You will get new 12 words and the other device will be signed out." +
           " Need help? " + MAIL_SUPPORT,
     };
   }
