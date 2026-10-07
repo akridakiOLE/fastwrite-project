@@ -1,0 +1,9 @@
+v121 - QR piso sti syskevi ektos leitourgias + keimeno koumpiou (Stavros 7/10/2026)
+
+- I syskevi EKTOS leitourgias dexetai QR tou IDIOU logariasmou (elegxos fakelou meta to anoigma).
+  I energi syskevi den dexetai QR. I othoni ektos leitourgias leei "skanare ton kodiko QR".
+- Koumpi: "Tis eide kapoios allos; Dimiourgise 12 kainouries lexeis kai apothikefse tes se ena kommati xarti".
+- tests/v121: 3 elegxoi + 3 metallaxeis · e2e 5/5.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019EMeqhx3XCsBFnmEjoGepE

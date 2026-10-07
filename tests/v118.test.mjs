@@ -32,7 +32,7 @@ const MUT = [
   // Μ10 · η συσκευή εκτός λειτουργίας δεν βλέπει ποτέ το «Πάρε πίσω»
   ["js", "    el('ro-reclaim').hidden = !locked;", "    el('ro-reclaim').hidden = true;"],
   // Μ11 · η αλλαγή μένει στις Ρυθμίσεις αντί για το «Οι 12 λέξεις μου»
-  ["html", "    <button class=\"btn ghost\" id=\"st-rotate\">Τις είδε κάποιος άλλος; Βγάλε νέες</button>", ""],
+  ["html", "    <button class=\"btn ghost\" id=\"st-rotate\">Τις είδε κάποιος άλλος; Δημιούργησε 12 καινούριες λέξεις και αποθήκευσέ τες σε ένα κομμάτι χαρτί</button>", ""],
 ];
 if (ONLY !== null) {
   const m = MUT[ONLY - 1]; const bag = { src, js, html };
