@@ -336,6 +336,7 @@
                  's-del','s-gone','s-dpend','s-faq','s-help','s-fb','s-case'];
   SCREENS.push('s-own');   // v118 · KM-OWN-PROOF — επιβεβαίωση κατόχου πριν από νέες 12 λέξεις
   SCREENS.push('s-iab', 's-qr', 's-qrin');   // v120 · Messenger · QR (Α) · QR (Β)
+  SCREENS.push('s-have', 's-scan');   // v122 · KM-V122-HAVE αναγνώριση email · KM-V122-SCAN σάρωση QR
   function show(id) {
     /* v120 · (4) στην κάμερα ο Κώστας ανεβαίνει πάνω από το κουμπί λήψης (δεν το σκεπάζει) */
     try { document.body.classList.toggle('on-cam', id === 's-cam'); } catch (e) {}
@@ -2162,7 +2163,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v121';
+  var APP_VER = 'φέτα 3 · v122';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -3403,9 +3404,26 @@
   function unsyncedClear() {
     try { localStorage.setItem(LS.unsy, '0'); } catch (e) {}
   }
+  /* v122 (KM-V122-DEVNAME) — όνομα που καταλαβαίνει ο άνθρωπος στο email
+     «μπήκε νέα συσκευή». Ως τη v121: «X11; Linux x86_64» (Chrome tablet). */
   function devName() {
-    var m = /\(([^)]+)\)/.exec(navigator.userAgent || '');
-    return (m ? m[1] : (navigator.platform || 'συσκευή')).slice(0, 60);
+    var ua = navigator.userAgent || '', touch = (navigator.maxTouchPoints || 0) > 0, dev, br, m;
+    if (/iPad/.test(ua) || (/Macintosh/.test(ua) && touch)) { dev = 'iPad'; }
+    else if (/iPhone/.test(ua)) { dev = 'iPhone'; }
+    else if ((m = /Android[^;)]*;\s*([^;)]+)\)/.exec(ua))) {
+      var mod = m[1].replace(/\s*Build\/.*$/, '').trim();
+      dev = (mod && mod !== 'K') ? 'Android · ' + mod : (/Mobile/.test(ua) ? 'Κινητό Android' : 'Tablet Android');
+    }
+    else if (/Android/.test(ua)) { dev = /Mobile/.test(ua) ? 'Κινητό Android' : 'Tablet Android'; }
+    else if (/Linux/.test(ua) && touch) { dev = 'Tablet Android'; }
+    else if (/Windows/.test(ua)) { dev = 'Υπολογιστής Windows'; }
+    else if (/Macintosh/.test(ua)) { dev = 'Mac'; }
+    else if (/Linux/.test(ua)) { dev = 'Υπολογιστής Linux'; }
+    else { dev = 'συσκευή'; }
+    br = /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /EdgA?\//.test(ua) ? 'Edge' :
+         /CriOS|Chrome\//.test(ua) ? 'Chrome' : /FxiOS|Firefox\//.test(ua) ? 'Firefox' :
+         /Safari\//.test(ua) ? 'Safari' : '';
+    return (dev + (br ? ' · ' + br : '')).slice(0, 60);
   }
 
   /* Αποθηκεύει λέξεις + παράγωγα ΤΟΠΙΚΑ. Το κλειδί δεν αποθηκεύεται —
@@ -3942,11 +3960,90 @@
                       encodeURIComponent('https://' + u) + ';end';
     };
   }
-  if (el('iab-stay')) {
-    el('iab-stay').onclick = function () {
-      try { sessionStorage.setItem('km_iab_stay', '1'); } catch (e) {}
-      show('s-acc');
-    };
+
+  /* ══ v122 · KM-V122-HAVE — «Έχεις ήδη λογαριασμό» (αναγνώριση από το email) ══
+     Το 'taken' του server ΔΕΝ είναι πια αδιέξοδο μήνυμα: οδηγεί στους δύο
+     δρόμους της απόφασης 8/10 — QR από την άλλη συσκευή (Σενάριο 1) ή
+     12 λέξεις μόνο αν η άλλη συσκευή χάθηκε (Σενάριο 2). */
+  var haveEmail = '';
+  function haveShow(email) {
+    if (email) { haveEmail = email; }
+    el('hv-email').textContent = haveEmail || 'email σου';
+    show('s-have');
+  }
+  if (el('hv-back'))  { el('hv-back').onclick  = function () { show('s-email'); }; }
+  if (el('hv-words')) { el('hv-words').onclick = function () {
+    openSignin('s-have');
+    if (haveEmail) { el('si-email').value = haveEmail; }
+  }; }
+  if (el('hv-scan'))  { el('hv-scan').onclick  = function () { scanStart(); }; }
+  if (el('scan-back')) { el('scan-back').onclick = function () { scanStop(); haveShow(); }; }
+
+  /* ══ v122 · KM-V122-SCAN — σάρωση QR με την κάμερα ΤΗΣ ΕΦΑΡΜΟΓΗΣ ══════
+     Η κάμερα του συστήματος ανοίγει τον σύνδεσμο στον browser — στο iPhone
+     ΑΛΛΗ μνήμη από την εφαρμογή (μετρήθηκε 23/9). Chrome Android: εγγενής
+     BarcodeDetector. iPhone/άλλα: qrscan.js (jsQR, Apache-2.0), φορτώνεται
+     μόνο όταν χρειαστεί. Ό,τι διαβαστεί περνά από το ΙΔΙΟ μονοπάτι με τον
+     σύνδεσμο #km_qr= (LS.qrIn → s-qrin → απόδειξη email → transfer/take). */
+  var scanStream = null, scanTimer = null, scanDetector = null, scanJsqr = null;
+  function scanStop() {
+    if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+    if (scanStream) { scanStream.getTracks().forEach(function (t) { t.stop(); }); scanStream = null; }
+  }
+  function scanFail(msg) { scanStop(); el('scan-err').textContent = msg; el('scan-err').hidden = false; }
+  function scanHit(text) {
+    var m = /#km_qr=([0-9a-f]{32})\.([A-Za-z0-9_-]{43})/.exec(String(text || ''));
+    if (!m) { return false; }
+    scanStop();
+    localStorage.setItem(LS.qrIn, JSON.stringify({ tid: m[1], t: m[2], at: Date.now() }));
+    qrInShow('');
+    return true;
+  }
+  function scanJsqrLoad() {
+    if (window.jsQR) { return Promise.resolve(window.jsQR); }
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = '/kostometro/qrscan.js';
+      s.onload = function () { window.jsQR ? res(window.jsQR) : rej(new Error('jsqr')); };
+      s.onerror = function () { rej(new Error('jsqr')); };
+      document.head.appendChild(s);
+    });
+  }
+  function scanStart() {
+    el('scan-err').hidden = true;
+    show('s-scan');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return scanFail('Ο browser δεν δίνει κάμερα εδώ. Στην άλλη συσκευή πάτα «ή στείλε τον σύνδεσμο» και άνοιξε τον σύνδεσμο σε αυτή τη συσκευή.');
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (st) {
+      scanStream = st;
+      var v = el('scan-video');
+      v.srcObject = st;
+      v.play().catch(function () {});
+      var ready = ('BarcodeDetector' in window)
+        ? Promise.resolve(new window.BarcodeDetector({ formats: ['qr_code'] })).then(function (det) { scanDetector = det; })
+        : scanJsqrLoad().then(function (f) { scanJsqr = f; });
+      return ready.then(function () {
+        var cv = document.createElement('canvas');
+        var cx = cv.getContext('2d', { willReadFrequently: true });
+        scanTimer = setInterval(function () {
+          if (!v.videoWidth || !scanStream) { return; }
+          if (scanDetector) {
+            scanDetector.detect(v).then(function (codes) {
+              if (codes && codes[0]) { scanHit(codes[0].rawValue); }
+            }).catch(function () {});
+            return;
+          }
+          cv.width = v.videoWidth; cv.height = v.videoHeight;
+          cx.drawImage(v, 0, 0);
+          var img = cx.getImageData(0, 0, cv.width, cv.height);
+          var hit = scanJsqr(img.data, img.width, img.height);
+          if (hit && hit.data) { scanHit(hit.data); }
+        }, 350);
+      }).catch(function () { scanFail('Η ανάγνωση QR δεν φόρτωσε — έλεγξε τη σύνδεση και δοκίμασε ξανά.'); });
+    }).catch(function () {
+      scanFail('Δεν άνοιξε η κάμερα. Δώσε άδεια κάμερας στην εφαρμογή και δοκίμασε ξανά.');
+    });
   }
 
   /* Μετά το τσεκάρισμα: παράγει ταυτότητα, αποθηκεύει, εγγράφει, προχωράει. */
@@ -5076,7 +5173,8 @@
     step('Πάτα τις <b>τρεις τελείες ⋮</b> πάνω δεξιά στον browser.');
     step('Διάλεξε <b>«Εγκατάσταση εφαρμογής»</b>. Αν ο browser σου γράφει «Προσθήκη στην αρχική οθόνη», πάτα αυτό και μετά διάλεξε <b>«Εγκατάσταση»</b>.');
     step('Άνοιξέ το μετά <b>από το εικονίδιο</b>.');
-    warn('Μη διαλέξεις <b>«Συντόμευση»</b>: βάζει το σήμα του browser πάνω στο εικονίδιο και η εφαρμογή ανοίγει <b>μέσα στον browser</b>, με γραμμή διευθύνσεων.');
+    warn('Μη διαλέξεις <b>«Συντόμευση»</b>: βάζει το σήμα του browser πάνω στο εικονίδιο και η εφαρμογή ανοίγει <b>μέσα στον browser</b>, με γραμμή διευθύνσεων.' +
+         '<br>Σε <b>ανώνυμη (incognito)</b> καρτέλα η εγκατάσταση δεν είναι διαθέσιμη — άνοιξε τη σελίδα σε κανονικό παράθυρο.');
   }
 
   function instClose() { if (el('inst')) { el('inst').hidden = true; } }
@@ -5096,24 +5194,28 @@
      εγκαταστήσει. Μόλις το κάνει, το `standalone` την κλείνει για πάντα.
      Αυτοπεριορίζεται: ενοχλεί ακριβώς όσους δεν έκαναν ακόμα το ζητούμενο.
 
-     ⚠ Το «Όχι τώρα» κλείνει την κάρτα ΓΙΑ ΑΥΤΗ ΤΗ ΦΟΡΤΩΣΗ και μόνο.
-     ΔΕΝ γράφεται τίποτα στον δίσκο: το επόμενο άνοιγμα την ξαναδείχνει. */
+     ⚠ v122: το «Κλείσιμο» (μόνο για συσκευές με λογαριασμό) κλείνει την κάρτα
+     ΓΙΑ ΑΥΤΗ ΤΗ ΦΟΡΤΩΣΗ και μόνο. ΔΕΝ γράφεται τίποτα στον δίσκο. */
   function maybeInstall() {
     if (instPlatform() === 'other') { return; }      /* υπολογιστής: δεν είναι το κοινό */
-    /* 🔴 v120 · (1) — ΑΝΑΚΑΛΕΙ ΤΟ 20/9 «ΣΕ ΚΑΘΕ ΑΝΟΙΓΜΑ» (απόφαση Stavros 7/10/2026):
-       ΠΟΤΕ πρώτη οθόνη. Η προτροπή βγαίνει ΜΟΝΟ αφού υπάρχει λογαριασμός — πρώτα
-       μαθαίνει τι είναι το προϊόν, μετά το βάζει στην αρχική οθόνη. */
-    if (!localStorage.getItem(LS.reg)) { return; }
+    /* 🔴 v122 (KM-V122-FIRST, απόφαση Stavros 8/10/2026) — Η ΕΓΚΑΤΑΣΤΑΣΗ ΕΙΝΑΙ
+       ΤΟ ΠΡΩΤΟ ΒΗΜΑ, ΠΡΙΝ ΤΟΝ ΛΟΓΑΡΙΑΣΜΟ, ΙΔΙΑ ΣΕ ANDROID ΚΑΙ iPHONE.
+       Ανακαλεί το v120 (1) «μόνο μετά τον λογαριασμό». Αιτία: στο iPhone η
+       εγκατεστημένη εφαρμογή έχει ΧΩΡΙΣΤΗ μνήμη από το Safari (μετρήθηκε 23/9) —
+       λογαριασμός φτιαγμένος στον browser χανόταν από το εικονίδιο. Ο λογαριασμός
+       φτιάχνεται πλέον ΜΟΝΟ μέσα στην εγκατεστημένη εφαρμογή: χωρίς λογαριασμό
+       η κάρτα δεν έχει «κλείσιμο» («ή εγκατάσταση τώρα ή ο χρήστης κρατά μόνος
+       του τον σύνδεσμο» — Stavros)· μόνο συσκευή με λογαριασμό στον browser
+       (παλιοί δοκιμαστές) παίρνει «Κλείσιμο», για να μη φράζονται τα δεδομένα της. */
     /* (2) μέσα σε Facebook/Messenger δεν εγκαθίσταται τίποτα — ποτέ κάρτα εκεί */
     if (iabName()) { return; }
     /* (3) Chrome στο Android: όταν μπορεί να εγκαταστήσει, ΣΤΕΛΝΕΙ beforeinstallprompt.
-       Σε incognito (ή ήδη εγκατεστημένο) δεν το στέλνει ΠΟΤΕ — εκεί η κάρτα θα ζητούσε
-       κάτι αδύνατο (εύρημα 29/9 στο tablet). Περιμένουμε έως 4″ και μετά αποφασίζουμε. */
-    if (instPlatform() === 'android' && instChromeAndroid() && !instDefer) {
-      if (!maybeInstall.waited) {
-        maybeInstall.waited = true;
-        setTimeout(maybeInstall, 4000);
-      }
+       Σε incognito δεν το στέλνει ΠΟΤΕ. Περιμένουμε έως 4″ — και μετά η κάρτα
+       βγαίνει ΟΥΤΩΣ Η ΑΛΛΩΣ (v122): χωρίς εγκατάσταση δεν υπάρχει εγγραφή,
+       άρα το incognito παίρνει οδηγία, όχι σιωπή. */
+    if (instPlatform() === 'android' && instChromeAndroid() && !instDefer && !maybeInstall.waited) {
+      maybeInstall.waited = true;
+      setTimeout(maybeInstall, 4000);
       return;
     }
     /* 🔴 v73 — ΓΙΑΤΙ ΔΕΝ ΓΡΑΦΕΤΑΙ `done` ΕΔΩ: η ένδειξη του browser είναι
@@ -5123,13 +5225,14 @@
     if (instStandalone()) { return; }
     if (instRead().done) { return; }
     instSteps();
+    if (el('inst-x')) { el('inst-x').hidden = !localStorage.getItem(LS.reg); }   /* KM-V122-FIRST */
     if (el('inst')) { el('inst').hidden = false; }
   }
 
-  if (el('inst-no')) {
-    el('inst-no').onclick = function () {
-      /* 🔴 v74 — ΚΑΜΙΑ ΕΓΓΡΑΦΗ. Ως τη v73 μετρούσε τα «όχι» και σκόπευε
-         να σωπάσει. Τώρα το κλείσιμο ισχύει ΜΟΝΟ για αυτή τη φόρτωση. */
+  if (el('inst-x')) {
+    el('inst-x').onclick = function () {
+      /* 🔴 v74 — ΚΑΜΙΑ ΕΓΓΡΑΦΗ. Το κλείσιμο ισχύει ΜΟΝΟ για αυτή τη φόρτωση,
+         και το κουμπί υπάρχει ΜΟΝΟ για συσκευή με λογαριασμό (v122). */
       instClose();
     };
   }
@@ -5212,7 +5315,7 @@
     /* λέξεις χωρίς email = ασύμφωνη κατάσταση· ξεκινάει από την αρχή */
     if (!hasEmail) {
       /* v120 · (2) Facebook/Messenger: πρώτα «Άνοιξε στον Chrome», με «Συνέχεια εδώ» */
-      if (iabName() && !sessionStorage.getItem('km_iab_stay')) { return iabShow(); }
+      if (iabName()) { return iabShow(); }   /* v122: χωρίς «Συνέχεια εδώ» */
       return show('s-acc');
     }
     if (!hasWords)                          { return startWords('auto'); }
@@ -5260,12 +5363,12 @@
     el('si-count').style.color = '';
     show('s-signin');
   }
-  el('acc-yes').onclick = function () { openSignin('s-acc'); };
   el('w-signin').onclick = function () { openSignin('s-words'); };
   el('si-back').onclick = function () {
     /* 🔴 ΟΧΙ startWords() εδώ: θα παρήγαγε ΑΛΛΕΣ 12 λέξεις, και όποιος
        τις είχε ήδη γράψει στο χαρτί θα κρατούσε λάθος κλειδί. Η οθόνη
        ξαναδείχνεται όπως ήταν — το pendingWords μένει άθικτο. */
+    if (signinFrom === 's-have') { haveShow(); return; }   /* v122 */
     if (signinFrom === 's-words') { show('s-words'); return; }
     if (signinFrom === 's-cam') { startCam(); return; }   // v120 — από τη συσκευή που βγήκε εκτός
     show('s-acc');
@@ -5382,10 +5485,9 @@
      ⚠ Το LS.email γράφεται ΜΟΝΟ μετά την επιβεβαίωση: αλλιώς το boot()
      (κλάδος «email χωρίς λέξεις») θα προσπερνούσε τον κωδικό σε ξαναάνοιγμα. */
   var codeEmail = '', codeWait = 0;
-  function emailMsg(text, have) {
+  function emailMsg(text) {
     el('email-msg').textContent = text || '';
     el('email-msg').hidden = !text;
-    el('email-have').hidden = !have;
   }
   function sendCode(email) {
     return kmFetch('email/code', {
@@ -5404,7 +5506,7 @@
     }, function () { return 'offline'; });
   }
   var CODE_TEXT = {
-    taken: 'Αυτό το email έχει ήδη λογαριασμό. Πάτα «Έχω ήδη λογαριασμό» και βάλε τις 12 λέξεις σου.',
+    taken: 'Αυτό το email έχει ήδη λογαριασμό.',
     pending_delete: 'Για τον λογαριασμό με αυτό το email εκκρεμεί διαγραφή. Αν θες να τον κρατήσεις: fastwrite.tech/akyrosi με τις 12 λέξεις σου.',
     too_many: 'Πολλές προσπάθειες σε λίγη ώρα — δοκίμασε ξανά σε λίγο.',
     mail_failed: 'Δεν μπορέσαμε να στείλουμε email αυτή τη στιγμή — δοκίμασε ξανά σε λίγο.',
@@ -5412,7 +5514,6 @@
     error: 'Κάτι πήγε στραβά — δοκίμασε ξανά.'
   };
   el('in-ref').oninput = function () { this.setAttribute('data-touched', '1'); el('err-ref').hidden = true; renderConsent(); };
-  el('email-have').onclick = function () { el('acc-yes').click(); };
   el('go-email').onclick = function () {
     var v = el('in-email').value.trim();
     if (!validEmail(v)) { el('err-email').hidden = false; return; }
@@ -5439,7 +5540,8 @@
       else { localStorage.removeItem(LS.refShare); }
       return sendCode(v).then(function (res) {
         btn.disabled = false;
-        if (res !== 'ok') { emailMsg(CODE_TEXT[res] || CODE_TEXT.error, res === 'taken'); return; }
+        if (res === 'taken') { return haveShow(v); }   /* v122 · KM-V122-HAVE */
+        if (res !== 'ok') { emailMsg(CODE_TEXT[res] || CODE_TEXT.error); return; }
         codeEmail = v;
         el('code-to').textContent = v;
         el('in-code').value = '';
@@ -5504,7 +5606,8 @@
     show('s-email');
     if (o.e && validEmail(o.e)) { el('in-email').value = o.e; }
     if (o.code === 'cancelled') { return; }
-    if (o.code === 'taken' || o.code === 'pending_delete') { emailMsg(CODE_TEXT[o.code], o.code === 'taken'); return; }
+    if (o.code === 'taken') { return haveShow(o.e && validEmail(o.e) ? o.e : ''); }   /* v122 */
+    if (o.code === 'pending_delete') { emailMsg(CODE_TEXT.pending_delete); return; }
     emailMsg(OAUTH_TEXT[o.kind === 'verify' ? 'verify' : o.code] || OAUTH_TEXT.provider);
   }
   function codeErr(text) { el('err-code').textContent = text; el('err-code').hidden = !text; }
@@ -5534,8 +5637,10 @@
           codeErr('Ο κωδικός έληξε — πάτα «Στείλε ξανά».');
         } else if (e === 'too_many') {
           codeErr('Πολλές λάθος προσπάθειες — πάτα «Στείλε ξανά» για νέο κωδικό.');
-        } else if (e === 'taken' || e === 'pending_delete') {
-          show('s-email'); emailMsg(CODE_TEXT[e], e === 'taken');
+        } else if (e === 'taken') {
+          haveShow(codeEmail);   /* v122 · KM-V122-HAVE */
+        } else if (e === 'pending_delete') {
+          show('s-email'); emailMsg(CODE_TEXT.pending_delete);
         } else { codeErr(CODE_TEXT.error); }
       });
     }, function () { btn.disabled = false; codeErr(CODE_TEXT.offline); });

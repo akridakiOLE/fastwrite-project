@@ -19,7 +19,7 @@
 <!-- ══ ΟΘΟΝΗ Α0 · ΕΧΕΤΕ ΛΟΓΑΡΙΑΣΜΟ; (Η.6) ═════════════════════ -->
 <!-- ══ v120 · (2) ΜΕΣΑ ΣΕ FACEBOOK / MESSENGER / INSTAGRAM (Brief «Μία πόρτα» Α, 5–7/10/2026) ══
      Ο browser της εφαρμογής δεν εγκαθιστά, δεν ξέρει τη σύνδεση Google του Chrome και
-     ξεχνάει όταν κλείσει. Πρώτα «Άνοιξε στο Chrome / Safari», αλλά ΠΑΝΤΑ με «Συνέχεια εδώ». -->
+     ξεχνάει όταν κλείσει. Μόνο «Άνοιξε στο Chrome / Safari» — v122: το «Συνέχεια εδώ» αφαιρέθηκε, γιατί μέσα στον browser εφαρμογής δεν γίνεται ούτε εγκατάσταση ούτε εγγραφή. -->
 <section id="s-iab" class="screen setup" hidden>
   <div class="setup-inner">
     <h1 class="logo">kosto<svg class="logo-mark" viewBox="0 0 34 46" aria-hidden="true"><path d="M6 30 L17 15 L28 30"/></svg>metro</h1>
@@ -29,7 +29,6 @@
       <li>Πάτα τις <b>τρεις τελείες ⋯</b> πάνω ή κάτω δεξιά.</li>
       <li>Διάλεξε <b>«Άνοιγμα σε εξωτερικό πρόγραμμα περιήγησης»</b> (ή «Άνοιγμα στο Safari»).</li>
     </ol>
-    <button class="btn ghost" id="iab-stay" type="button">Συνέχεια εδώ</button>
   </div>
 </section>
 
@@ -40,9 +39,8 @@
     <!-- v75 · Ο ΦΡΟΥΡΟΣ ΤΟΥ ΔΙΠΛΟΥ ΛΟΓΑΡΙΑΣΜΟΥ ΣΤΟ iPHONE (20/9/2026).
          Φαίνεται ΜΟΝΟ όταν: iPhone + εγκατεστημένη εφαρμογή + καμία
          τοπική εγγραφή. Η λογική στο accWarn(). -->
-    <p class="note warn" id="acc-warn" hidden><b>Μόλις έβαλες την εφαρμογή στην αρχική οθόνη;</b><br>Αν είχες <b>ήδη λογαριασμό</b> πριν την εγκατάσταση, <b>μην ξεκινήσεις από την αρχή</b>: πάτα «Έχω ήδη λογαριασμό» και βάλε τις <b>12 λέξεις</b> σου. Αλλιώς θα φτιάξεις <b>δεύτερο</b> λογαριασμό και τα τιμολόγιά σου θα μείνουν στον πρώτο.</p>
+    <p class="note warn" id="acc-warn" hidden><b>Μόλις έβαλες την εφαρμογή στην αρχική οθόνη;</b><br>Αν είχες <b>ήδη λογαριασμό</b>, πάτα «Ξεκινάω τώρα» με το <b>ίδιο email</b> — θα σε αναγνωρίσουμε και θα φέρεις τον λογαριασμό σου εδώ, με QR ή με τις 12 λέξεις.</p>
     <button class="btn primary" id="acc-no">Ξεκινάω τώρα</button>
-    <button class="btn ghost" id="acc-yes">Έχω ήδη λογαριασμό</button>
   </div>
 </section>
 
@@ -147,6 +145,36 @@
   </div>
 </section>
 
+<!-- ══ v122 · ΤΟ EMAIL ΕΧΕΙ ΗΔΗ ΛΟΓΑΡΙΑΣΜΟ (KM-V122-HAVE) ════════════
+     Ο χρήστης ΔΕΝ δηλώνει μόνος του «έχω λογαριασμό» — το email τον
+     αναγνωρίζει στο «Ξεκινάω τώρα». Κανονικός δρόμος: QR από την άλλη
+     συσκευή. Οι 12 λέξεις ΜΟΝΟ αν η άλλη συσκευή χάθηκε (Σενάριο 2). -->
+<section id="s-have" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h2>Έχεις ήδη λογαριασμό</h2>
+    <p class="lede">Το <b id="hv-email"></b> έχει ήδη λογαριασμό στο Kostometro. Φέρ᾽ τον <b>σε αυτή τη συσκευή</b>:</p>
+    <button class="btn primary" id="hv-scan" type="button">Σκάναρε το QR από την άλλη συσκευή σου</button>
+    <p class="note">Στην άλλη συσκευή: <b>Μενού → Μεταφορά σε νέα συσκευή (QR)</b>.</p>
+    <button class="btn ghost" id="hv-words" type="button">Δεν έχεις πια την άλλη συσκευή; Γράψε τις 12 λέξεις</button>
+    <button class="btn ghost" id="hv-back" type="button">Πίσω</button>
+  </div>
+</section>
+
+<!-- ══ v122 · ΣΑΡΩΣΗ QR ΜΕ ΤΗΝ ΚΑΜΕΡΑ ΤΗΣ ΕΦΑΡΜΟΓΗΣ (KM-V122-SCAN) ════
+     Η κάμερα του κινητού (εκτός εφαρμογής) ανοίγει τους συνδέσμους QR στον
+     browser — στο iPhone αυτό είναι ΑΛΛΗ μνήμη από την εφαρμογή (23/9).
+     Γι᾽ αυτό η εφαρμογή σκανάρει μόνη της: Chrome Android με BarcodeDetector,
+     iPhone με το qrscan.js (jsQR). -->
+<section id="s-scan" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h2>Σκάναρε το QR</h2>
+    <p class="lede">Στόχευσε το QR που δείχνει η <b>άλλη</b> συσκευή σου.</p>
+    <video id="scan-video" class="scan-video" playsinline muted></video>
+    <p class="err" id="scan-err" hidden></p>
+    <button class="btn ghost" id="scan-back" type="button">Πίσω</button>
+  </div>
+</section>
+
 <!-- ══ v118 · ΟΘΟΝΗ · ΕΠΙΒΕΒΑΙΩΣΗ ΚΑΤΟΧΟΥ ΠΡΙΝ ΑΠΟ ΝΕΕΣ 12 ΛΕΞΕΙΣ (KM-OWN-PROOF) ══
      Ανοίγει από το «Οι 12 λέξεις μου» ΚΑΙ από τη συσκευή εκτός λειτουργίας
      («Δεν ήσουν εσύ;»). Δεν δείχνει ΠΟΤΕ τις παλιές λέξεις. -->
@@ -234,7 +262,6 @@
     </div>
     <button class="btn primary" id="go-email">Συνέχεια</button>
     <p class="err" id="email-msg" hidden></p>
-    <button class="btn ghost" id="email-have" hidden>Έχω ήδη λογαριασμό</button>
     <!-- v76 · ΟΡΟΙ ΚΑΙ ΠΟΛΙΤΙΚΗ, ΠΡΙΝ ΤΗΝ ΕΓΓΡΑΦΗ (20/9/2026, ερώτημα Stavros).
          Ως τη v75 οι σύνδεσμοι υπήρχαν ΜΟΝΟ στο υποσέλιδο του Μενού —
          που είναι ΜΕΣΑ στην εφαρμογή, δηλαδή ΜΕΤΑ την εγγραφή.
@@ -840,8 +867,11 @@
     <ol class="inst-steps" id="inst-steps"></ol>
     <p class="note warn" id="inst-warn" hidden></p>
     <button class="btn primary" id="inst-go" hidden>Εγκατάσταση</button>
-    <button class="btn ghost" id="inst-no">Όχι τώρα</button>
-    <p class="fine hint">Θα το ξαναβρεις στο <b>Μενού → Ερωτήσεις</b>.</p>
+    <!-- v122 (KM-V122-FIRST): χωρίς λογαριασμό η κάρτα ΔΕΝ κλείνει — ή εγκατάσταση
+         τώρα ή ο χρήστης κρατά μόνος του τον σύνδεσμο (απόφαση Stavros 8/10/2026).
+         Το «Κλείσιμο» φαίνεται ΜΟΝΟ σε συσκευή που έχει ήδη λογαριασμό στον browser,
+         για να μη φράζει τα δεδομένα της. -->
+    <button class="btn ghost" id="inst-x" hidden>Κλείσιμο</button>
   </div>
 </div>
 

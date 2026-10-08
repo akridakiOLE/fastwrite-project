@@ -25,9 +25,10 @@ const MUT = [
   // Μ5 · 🔴 ο κωδικός «transfer» πάει σε όποιο email γράψει ο αιτών
   ["src", "    email = normEmail(t.email);\n    if (!email) return json({ ok: false, error: \"no_email\" }, 409);", "    email = normEmail(b.email) || normEmail(t.email);\n    if (!email) return json({ ok: false, error: \"no_email\" }, 409);"],
   // Μ6 · 🔴 (1) η κάρτα εγκατάστασης ξαναβγαίνει ΠΡΙΝ τον λογαριασμό
-  ["js", "    if (!localStorage.getItem(LS.reg)) { return; }\n    /* (2) μέσα σε Facebook", "    /* (2) μέσα σε Facebook"],
+  // v122: η κάρτα βγαίνει ΠΡΙΝ τον λογαριασμό — η Μ6 σβήνει πλέον την πύλη του Messenger ΜΕΣΑ στην κάρτα
+  ["js", "    /* (2) μέσα σε Facebook/Messenger δεν εγκαθίσταται τίποτα — ποτέ κάρτα εκεί */\n    if (iabName()) { return; }", "    "],
   // Μ7 · (2) καμία οθόνη «Άνοιξε στον Chrome» μέσα στο Messenger
-  ["js", "      if (iabName() && !sessionStorage.getItem('km_iab_stay')) { return iabShow(); }\n", ""],
+  ["js", "      if (iabName()) { return iabShow(); }   /* v122: χωρίς «Συνέχεια εδώ» */\n", ""],
   // Μ8 · (4) ο Κώστας ξαναπέφτει ΚΑΤΩ από το παράθυρο εγκατάστασης
   ["css", ".ag-fab{z-index:75;", ".ag-fab{z-index:60;"],
   // Μ9 · (5) η εγγραφή ξαναδείχνει την οθόνη των 12 λέξεων
@@ -135,15 +136,15 @@ await check("Q-5 · η Β μπαίνει με τα στοιχεία του πα�
   ok(!sent.some((m) => /Μπήκε νέα συσκευή/.test(m.subject)), "όχι το email «με τις 12 λέξεις»");
 });
 await check("U-1 · (1)(3) εγκατάσταση μόνο ΜΕΤΑ τον λογαριασμό, ποτέ μέσα σε Facebook, Chrome-incognito σιωπηλό", async () => {
-  const f = js.slice(js.indexOf("function maybeInstall()"), js.indexOf("if (el('inst-no'))"));
-  ok(f.includes("if (!localStorage.getItem(LS.reg)) { return; }"), "χωρίς λογαριασμό");
+  const f = js.slice(js.indexOf("function maybeInstall()"), js.indexOf("if (el('inst-x'))"));
+  ok(!/getItem\(LS\.reg\)[^\n]*\{ return; \}/.test(f), "v122: η κάρτα ΠΡΙΝ τον λογαριασμό — καμία πύλη reg");
   ok(f.includes("if (iabName()) { return; }"), "Facebook");
   ok(f.includes("instChromeAndroid() && !instDefer"), "Chrome χωρίς beforeinstallprompt");
   ok(js.includes("    setTimeout(maybeInstall, 600);   // v120 · (1)"), "μετά τον λογαριασμό");
 });
 await check("U-2 · (2) οθόνη «Άνοιξε στον Chrome» πριν από την πρώτη οθόνη, με «Συνέχεια εδώ»", async () => {
-  ok(html.includes('<section id="s-iab"') && html.includes('id="iab-stay"') && html.includes('id="iab-open"'), "html");
-  ok(js.includes("      if (iabName() && !sessionStorage.getItem('km_iab_stay')) { return iabShow(); }"), "boot");
+  ok(html.includes('<section id="s-iab"') && !html.includes('id="iab-stay"') && html.includes('id="iab-open"'), "html (v122: χωρίς «Συνέχεια εδώ»)");
+  ok(js.includes("      if (iabName()) { return iabShow(); }"), "boot");
   ok(js.includes("package=com.android.chrome"), "intent Chrome");
 });
 await check("U-3 · (4) ο Κώστας ΠΑΝΩ από το παράθυρο εγκατάστασης (70)", async () => {

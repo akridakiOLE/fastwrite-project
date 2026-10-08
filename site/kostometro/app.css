@@ -769,3 +769,6 @@ textarea.km-ta:focus{outline:none;border-color:var(--accent)}
 /* v120 · (4) στην κάμερα: πάνω από τα κουμπιά λήψης/δώρου · στο παράθυρο εγκατάστασης: χώρος να μη σκεπάζει κείμενο */
 body.on-cam .ag-fab{bottom:calc(150px + env(safe-area-inset-bottom));padding:12px 18px;font-size:15px}
 .inst{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+
+/* v122 · σάρωση QR */
+.scan-video{width:100%;max-width:420px;border-radius:12px;background:#000;display:block;margin:0 auto 14px}

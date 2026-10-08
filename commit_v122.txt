@@ -1,0 +1,19 @@
+v122 - Egkatastasi proto vima (Android+iPhone idia) + anagnorisi logariasmou apo email + sarosi QR (Stavros 8/10/2026)
+
+- I karta "Val' to stin arxiki othoni" einai to PROTO vima, prin ton logariasmo, se Android kai
+  iPhone. Xoris logariasmo den exei kleisimo (i tora i o xristis kratari mono tou ton syndesmo).
+  O logariasmos ftiaxnetai MESA stin egkatestimeni efarmogi - kleinei i pagida tou iPhone
+  (xoristi mnimi Safari/eikonidio, metrimeno 23/9). To "Oxi tora" afairethike.
+- Proti othoni: MONO "Xekinao tora". To "Exo idi logariasmo" afairethike - i efarmogi
+  anagnorizei to email ('taken') kai deixnei tous dyo dromous: QR apo tin alli syskevi
+  (Senario 1) i 12 lexeis an i alli syskevi xathike (Senario 2).
+- Sarosi QR MESA stin efarmogi: BarcodeDetector (Chrome Android) i qrscan.js (jsQR 1.4.0,
+  Apache-2.0) - idio monopati me ton syndesmo #km_qr= (transfer/take).
+- Messenger/Facebook: mono "Anoixe ston Chrome/Safari" - to "Synexeia edo" afairethike.
+- devName(): "Tablet Android - Chrome" anti "X11; Linux x86_64" sta email neas syskevis.
+- tests/v122: 27 elegxoi (me pragmatiko kyklo QR: qr.js ftiaxnei, qrscan.js diavazei) + 6
+  metallaxeis - v120 M6/M7 + install_ui E-8/E-8b/E-12/E-24 prosarmogi - e2e 35/35.
+- KAMIA allagi server, KAMIA allagi vasis.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019EMeqhx3XCsBFnmEjoGepE
