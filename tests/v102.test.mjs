@@ -102,7 +102,7 @@ await check("Ν102-8 · άρνηση του server («onboarded») σβήνει 
   const send = slice("  function agSend(e) {", "  function agInit() {");
   ok(send.includes("if (j && j.error === 'onboarded') { agLS(AG.gone, '1'); agLS(AG.grant, null); }"), "δεν γράφει gone");   // v106: + σβήνει την άδεια
   ok(js.includes("if (agInited || !el('ag-fab') || !agEnabled() || (agLS(AG.gone) === '1' && !agGrantOn())) { return; }"), "agInit αγνοεί gone");
-  ok(/function agClose\(\) \{[^}]*agDone\(\) \|\| agLS\(AG\.gone\) === '1'/.test(js), "agClose ξαναδείχνει το κουμπί");
+  ok(js.includes("    el('ag-fab').hidden = agDone() || agLS(AG.gone) === '1';"), "agClose ξαναδείχνει το κουμπί");   // v123: agClose σε πολλές γραμμές (KM-V123-FOLD)
 });
 if (ONLY) { if (failed) { console.log("Μ" + ONLY + " → κοκκίνισε ✔"); process.exit(0); } console.log("Μ" + ONLY + " ΠΕΡΑΣΕ — το τεστ δεν πιάνει τίποτα"); process.exit(1); }
 console.log(failed ? "ΑΠΕΤΥΧΑΝ " + failed : "✔ ΟΛΑ ΠΕΡΑΣΑΝ (8)"); process.exit(failed ? 1 : 0);

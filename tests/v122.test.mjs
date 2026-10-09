@@ -35,7 +35,7 @@ let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log("  ✔ " + m); } else { fail++; console.log("  ✘ " + m); } };
 const body = (name) => { const i = js.indexOf("  function " + name + "("); return js.slice(i, js.indexOf("\n  }\n", i) + 4); };
 
-ok(/APP_VER = 'φέτα 3 · v122'/.test(js), "έκδοση v122");
+ok(/APP_VER = 'φέτα 3 · v1(2[2-9]|[3-9]\d)'/.test(js), "έκδοση v122 ή νεότερη");   // v123: η έκδοση ανεβαίνει σε κάθε deploy
 ok(["KM-V122-FIRST", "KM-V122-HAVE", "KM-V122-SCAN", "KM-V122-DEVNAME"].every((k) => js.includes(k)), "οι 4 δείκτες v122");
 
 // (1) εγκατάσταση πρώτο βήμα — καμία πύλη λογαριασμού, καμία πύλη iPhone

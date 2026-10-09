@@ -1,0 +1,18 @@
+v123 - FAQ meta tis v113-v122 + to koumpi "Kostas - voitheia" mazevetai (Stavros 9/10/2026)
+
+- FAQ: "Pou paei i fotografia" leei pleon dyo dromous - me kleidi Gemini apeftheias stin Google,
+  me ton Kosta (doro 20) pernaei apo ton diakomisti mas xoris apothikefsi (Politiki v2.3 A9).
+  "Ti vlepete" idia exairesi. 12 lexeis = mono gia apoleia. Allagi kinitou = QR apo Rythmiseis.
+  Nees erotiseis: "Poios einai o Kostas", "To doro ton 20". Proplirromi Google 5 $ / 12 mines.
+  Epikoinonia: "Mila me ton Kosta". Xoris internet: kai me to doro.
+- I gnosi tou Kosta xanaxtistike apo to neo FAQ (build_knowledge.py).
+- s-have: "Rythmiseis -> Metafora se nea syskevi (QR)" (to Menou den exei afti tin epilogi).
+- KM-V123-FOLD: synomilia pou anoixe apo tin Ypostirixi (adeia epananoigmatos) - otan kleisei,
+  to koumpi DEN menei pano se oles tis othones. Xanaanoigei apo Ypostirixi -> "Mila me ton Kosta",
+  pou oso isxyei i adeia anoigei tin IDIA synomilia xoris na xodepsei neo apo ta 2 tou mina.
+  Stin egkatastasi (xoris adeia) tipota den allaxe.
+- tests/v123: 9 elegxoi + 7 metallaxeis - v122 (ekdosi >= v122) kai v102 (agClose se polles grammes) prosarmogi.
+- KAMIA allagi server, KAMIA allagi vasis.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Kqm4kkGr5TPDtp2jPCk4sS
