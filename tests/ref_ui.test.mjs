@@ -214,7 +214,7 @@ check("Ο-23 · 🔴 Η ΣΥΓΚΑΤΑΘΕΣΗ ΚΡΕΜΕΤΑΙ ΑΠΟ ΤΗ show
   /* v67: το hook είχε μπει στο render(id), που καλείται ΜΟΝΟ από την
      πλοήγηση του μενού. Η οθόνη email έρχεται από show('s-email'), άρα το
      κουτάκι δεν εμφανιζόταν ΠΟΤΕ. Το βρήκε ο Stavros στη ζωντανή. */
-  const showFn = js.slice(js.indexOf("function show(id)"), js.indexOf("function show(id)") + 1400);
+  const showFn = js.slice(js.indexOf("function show(id)"), js.indexOf("function show(id)") + 4000);   // v126: 1400 → 4000 (η show() μεγάλωσε, το τέλος της έβγαινε έξω)
   const body = showFn.slice(0, showFn.indexOf("\n  }") + 4);
   if (!body.includes("renderConsent()")) throw new Error("το hook ΔΕΝ είναι στη show()");
   const renderFn = js.slice(js.indexOf("function render(id)"), js.indexOf("function render(id)") + 1200);

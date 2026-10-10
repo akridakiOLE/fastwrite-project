@@ -1,0 +1,12 @@
+v126 - oi 12 lexeis MONO gia apoleia/klopi kinitou, se kathe keimeno (Stavros 10/10/2026)
+
+- "Oi 12 lexeis mou": "tis xreiazesai mono an xathei i klapei to kinito - allagi kinitou me QR".
+- Ypenthymisi stin kamera: "An xathei to kinito: oi 12 lexeis sou" (oxi entoli).
+- Othoni lexeon (palies diadromes): xoris "anoigeis se alli syskevi".
+- Adeia kameras: to iPhone pairnei "Na epitrepetai" (itan mono oi epiloges tou Android).
+- GNOSI TOU KOSTA: i roi tis 29/9 (12 lexeis mesa stin eggrafi, koumpi "Exo idi logariasmo"
+  pou den yparxei) antikatastathike me ti roi v124-v126 (Vima 1 / Vima 2, kamia 12ada stin eggrafi).
+- Tests: v126 (13 + 6 metallaxeis).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT
