@@ -1,0 +1,9 @@
+v125 - i karta egkatastasis xoraei stin orati othoni + "Kostas AI" (Stavros 10/10/2026)
+
+- Apeftheias ston Chrome (me to koumpi Egkatastasi) to "Vima 1 apo 2" kovotan kato apo ti grammi
+  dieftynseon: to 86vh metrage kai ti grammi. Tora max-height se dvh + scrollTop 0.
+- To koumpi tou voithou grafei "Kostas AI - voitheia" (apofasi 1/10: to AI kollimeno sto onoma).
+- Tests: v124 +3 elegxoi, +2 metallaxeis (M9, M10).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT

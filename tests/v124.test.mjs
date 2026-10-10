@@ -25,6 +25,10 @@ const MUT = [
   ["css", "body.on-iab .ag-fab{display:none!important}", ""],
   // Μ7 · το «Βήμα 2 από 2» φαίνεται και στον υπολογιστή / browser
   ["js", "    if (t) { t.hidden = !instStandalone(); }", "    if (t) { t.hidden = false; }"],
+  // Μ9 · v125 · η κάρτα ξαναμετράει και τη γραμμή διευθύνσεων — το «Βήμα 1 από 2» κόβεται
+  ["css", "max-height:calc(100dvh - 116px - env(safe-area-inset-bottom))", "max-height:86vh"],
+  // Μ10 · v125 · το κουμπί χάνει το «AI» (απόφαση Stavros 1/10: το AI κολλημένο στο όνομα)
+  ["html", "💬 Κώστας AI · βοήθεια", "💬 Κώστας · βοήθεια"],
   // Μ8 · η οθόνη του βήματος 1 εκτός SCREENS — αόρατη για πάντα
   ["js", "  SCREENS.push('s-step1');", "  //SCREENS.push('s-step1');"],
 ];
@@ -74,6 +78,11 @@ ok(js.includes("window.addEventListener('appinstalled', function () { instClose(
 ok(body("step1Render").includes("!!instRead().done"), "βήμα 1: η κατάσταση από το πραγματικό appinstalled");
 
 ok(html.includes('<p class="step-tag" id="inst-step" hidden>Βήμα 1 από 2') && mi.includes("el('inst-step').hidden = !!localStorage.getItem(LS.reg);"), "κάρτα: «Βήμα 1 από 2» (κρύβεται για παλιούς λογαριασμούς)");
+
+// v125 · KM-V125-FIT + «Κώστας AI»
+ok(css.includes("KM-V125-FIT") && /\.inst-card\{max-height:calc\(100vh - 140px\);max-height:calc\(100dvh - /.test(css), "v125: η κάρτα χωράει στο ΟΡΑΤΟ ύψος (dvh)");
+ok(js.includes("document.querySelector('#inst .inst-card').scrollTop = 0;"), "v125: η κάρτα ανοίγει από την κορυφή («Βήμα 1 από 2» ορατό)");
+ok(html.includes('data-agent="fab" hidden>💬 Κώστας AI · βοήθεια</button>'), "v125: το κουμπί γράφει «Κώστας AI»");
 
 // Messenger: χωρίς Κώστα
 ok(js.includes("document.body.classList.toggle('on-iab', id === 's-iab')") && css.includes("body.on-iab .ag-fab{display:none!important}"), "Messenger: ο Κώστας κρυφός");

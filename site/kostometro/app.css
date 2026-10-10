@@ -778,3 +778,8 @@ body.on-cam .ag-fab{bottom:calc(150px + env(safe-area-inset-bottom));padding:12p
 .step-tag[hidden]{display:none}
 body.on-iab .ag-fab{display:none!important}
 #inst-or{margin:2px 0 0}
+
+/* v125 · KM-V125-FIT — η κάρτα εγκατάστασης ΧΩΡΑΕΙ στην ορατή οθόνη (εύρημα Stavros 10/10: απευθείας
+   στον Chrome, με το κουμπί, το «Βήμα 1 από 2» κοβόταν κάτω από τη γραμμή διευθύνσεων — το 86vh
+   μετράει και τη γραμμή). Το dvh είναι το ορατό ύψος· όπου δεν υπάρχει, μένει το vh. */
+.inst-card{max-height:calc(100vh - 140px);max-height:calc(100dvh - 116px - env(safe-area-inset-bottom))}
