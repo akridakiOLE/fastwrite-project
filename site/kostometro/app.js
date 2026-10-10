@@ -337,9 +337,12 @@
   SCREENS.push('s-own');   // v118 · KM-OWN-PROOF — επιβεβαίωση κατόχου πριν από νέες 12 λέξεις
   SCREENS.push('s-iab', 's-qr', 's-qrin');   // v120 · Messenger · QR (Α) · QR (Β)
   SCREENS.push('s-have', 's-scan');   // v122 · KM-V122-HAVE αναγνώριση email · KM-V122-SCAN σάρωση QR
+  SCREENS.push('s-step1');   // v124 · KM-V124-ORDER — «Βήμα 1 από 2» στον browser
   function show(id) {
     /* v120 · (4) στην κάμερα ο Κώστας ανεβαίνει πάνω από το κουμπί λήψης (δεν το σκεπάζει) */
     try { document.body.classList.toggle('on-cam', id === 's-cam'); } catch (e) {}
+    /* v124 · μέσα στο Messenger ο Κώστας δεν βγαίνει: η συζήτηση χάνεται μόλις περάσει στον Chrome */
+    try { document.body.classList.toggle('on-iab', id === 's-iab'); } catch (e) {}
     var pv = el('preview');
     if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
     SCREENS.forEach(function (s) { el(s).hidden = (s !== id); });
@@ -352,6 +355,8 @@
        ΚΑΘΕ διαδρομή μπαίνει στο ΕΝΑ σημείο απ' όπου περνάνε όλες. */
     if (id === 's-email') { renderConsent(); }
     if (id === 's-acc')   { accWarn(); }
+    if (id === 's-acc')   { accStep(); }     // v124 · «Βήμα 2 από 2» μόνο στην εγκατεστημένη
+    if (id === 's-step1') { step1Render(); }  // v124
     if (id === 's-cam')   { updToast(); giftShow(); kwRender(); }
   }
   /* ══ v75 · Ο ΦΡΟΥΡΟΣ ΤΟΥ ΔΙΠΛΟΥ ΛΟΓΑΡΙΑΣΜΟΥ ΣΤΟ iPHONE (20/9/2026) ════
@@ -382,6 +387,27 @@
                 !localStorage.getItem(LS.email) &&
                 !localStorage.getItem(LS.words);
     w.hidden = !risky;
+  }
+
+  /* ══ v124 · KM-V124-ORDER — ΜΙΑ ΣΕΙΡΑ, ΠΑΝΤΑ ΙΔΙΑ (εύρημα Stavros 10/10/2026) ══
+     Δοκιμή από Messenger στο Android: το «Ξεκινάω τώρα» έβγαινε ΚΑΙ στον Chrome (πριν
+     την κάρτα, που ερχόταν έως 4″ αργότερα), ΚΑΙ ξανά στο εικονίδιο· η κάρτα είχε δύο
+     μορφές ανάλογα με το αν πρόλαβε ο Chrome. Από τη v124:
+       Messenger/Facebook → μόνο «Άνοιξε στον Chrome/Safari» (χωρίς Κώστα)
+       browser κινητού χωρίς λογαριασμό → ΒΗΜΑ 1: s-step1 + κάρτα αμέσως, ίδια βήματα πάντα
+       μετά την εγκατάσταση → «✓ Εγκαταστάθηκε — άνοιξε από το εικονίδιο»
+       εικονίδιο → ΒΗΜΑ 2: «Ξεκινάω τώρα» — το μόνο σημείο όπου φτιάχνεται λογαριασμός. */
+  function instNeedFirst() {
+    return instPlatform() !== 'other' && !instStandalone() && !iabName() && !localStorage.getItem(LS.reg);
+  }
+  function step1Render() {
+    var d = !!instRead().done;
+    if (el('st1-todo')) { el('st1-todo').hidden = d; }
+    if (el('st1-done')) { el('st1-done').hidden = !d; }
+  }
+  function accStep() {
+    var t = el('acc-step');
+    if (t) { t.hidden = !instStandalone(); }
   }
 
   /* 🔴 v49 — Ο ΦΡΑΓΜΟΣ ΤΟΥ ΚΛΕΙΔΩΜΑΤΟΣ, ΣΕ ΕΝΑ ΣΗΜΕΙΟ.
@@ -2163,7 +2189,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v123';
+  var APP_VER = 'φέτα 3 · v124';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5080,6 +5106,8 @@
     if (el('inst') && !el('inst').hidden) { instSteps(); }
   });
   window.addEventListener('appinstalled', function () { instState({ done: 1 }); });
+  /* v124 · μετά την εγκατάσταση η καρτέλα του browser ΔΕΝ μένει στο ίδιο σημείο: λέει «άνοιξε από το εικονίδιο» */
+  window.addEventListener('appinstalled', function () { instClose(); if (el('s-step1') && !el('s-step1').hidden) { step1Render(); } });
 
   function instRead() {
     try { return JSON.parse(localStorage.getItem(LS.inst) || '{}') || {}; } catch (e) { return {}; }
@@ -5126,7 +5154,7 @@
   }
 
   function instSteps() {
-    var p = instPlatform(), ol = el('inst-steps'), go = el('inst-go'), wn = el('inst-warn');
+    var p = instPlatform(), ol = el('inst-steps'), go = el('inst-go'), wn = el('inst-warn'), or = el('inst-or');
     if (!ol) { return; }
     ol.innerHTML = '';
     ol.className = 'inst-steps';   /* v75 — καθαρά πριν από κάθε ζωγράφισμα */
@@ -5156,13 +5184,13 @@
       warn('Αν δεν βρίσκεις την <b>«Προσθήκη στην οθόνη Αφετηρίας»</b>, το iPhone σου έχει παλιό λογισμικό: άνοιξε τη σελίδα στο <b>Safari</b> και ξαναδοκίμασε.');
       return;
     }
+    if (or) { or.hidden = true; }
     if (instDefer) {
-      /* v75 (εύρημα Stavros, 20/9/2026) — ΕΝΑ βήμα δεν αριθμείται.
-         Ένα «1.» χωρίς «2.» υπόσχεται συνέχεια που δεν υπάρχει. */
-      ol.className = 'inst-steps one';
-      step('Πάτα <b>Εγκατάσταση</b> και μετά <b>«Εγκατάσταση»</b> στο παράθυρο που θα βγει.');
+      /* v124 · KM-V124-ORDER — ΤΑ ΙΔΙΑ ΒΗΜΑΤΑ ΠΑΝΤΑ (εύρημα Stavros 10/10: δύο διαφορετικές
+         κάρτες, ανάλογα με το αν πρόλαβε ο Chrome). Το κουμπί είναι ΣΥΝΤΟΜΕΥΣΗ πάνω από
+         τα βήματα — όχι άλλη κάρτα. Δεν υπάρχει return εδώ: τα βήματα γράφονται πάντα. */
       go.hidden = false;
-      return;
+      if (or) { or.hidden = false; }
     }
     /* 🔴 Α440 (1/9/2026, μετρήθηκε σε δύο συσκευές με δύο browsers):
        ΕΓΚΑΤΑΣΤΑΣΗ → αληθινή εφαρμογή (WebAPK), καθαρό εικονίδιο.
@@ -5213,11 +5241,8 @@
        Σε incognito δεν το στέλνει ΠΟΤΕ. Περιμένουμε έως 4″ — και μετά η κάρτα
        βγαίνει ΟΥΤΩΣ Η ΑΛΛΩΣ (v122): χωρίς εγκατάσταση δεν υπάρχει εγγραφή,
        άρα το incognito παίρνει οδηγία, όχι σιωπή. */
-    if (instPlatform() === 'android' && instChromeAndroid() && !instDefer && !maybeInstall.waited) {
-      maybeInstall.waited = true;
-      setTimeout(maybeInstall, 4000);
-      return;
-    }
+    /* v124 · KM-V124-ORDER — ΚΑΜΙΑ ΑΝΑΜΟΝΗ 4″: η κάρτα βγαίνει ΑΜΕΣΩΣ με τα ίδια βήματα·
+       αν ο Chrome στείλει αργότερα το beforeinstallprompt, απλώς προστίθεται το κουμπί. */
     /* 🔴 v73 — ΓΙΑΤΙ ΔΕΝ ΓΡΑΦΕΤΑΙ `done` ΕΔΩ: η ένδειξη του browser είναι
        ΠΑΡΟΔΙΚΗ. Μία λάθος ανάγνωση δεν επιτρέπεται να σβήσει την προτροπή
        ΓΙΑ ΠΑΝΤΑ σε εκείνη τη συσκευή. Μόνη πηγή του `done` είναι το
@@ -5226,6 +5251,7 @@
     if (instRead().done) { return; }
     instSteps();
     if (el('inst-x')) { el('inst-x').hidden = !localStorage.getItem(LS.reg); }   /* KM-V122-FIRST */
+    if (el('inst-step')) { el('inst-step').hidden = !!localStorage.getItem(LS.reg); }   /* v124 · «Βήμα 1 από 2» και μέσα στην κάρτα */
     if (el('inst')) { el('inst').hidden = false; }
   }
 
@@ -5316,6 +5342,7 @@
     if (!hasEmail) {
       /* v120 · (2) Facebook/Messenger: πρώτα «Άνοιξε στον Chrome», με «Συνέχεια εδώ» */
       if (iabName()) { return iabShow(); }   /* v122: χωρίς «Συνέχεια εδώ» */
+      if (instNeedFirst()) { return show('s-step1'); }   /* v124 · KM-V124-ORDER — στον browser ΔΕΝ υπάρχει «Ξεκινάω τώρα» */
       return show('s-acc');
     }
     if (!hasWords)                          { return startWords('auto'); }

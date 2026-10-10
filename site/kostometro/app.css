@@ -772,3 +772,9 @@ body.on-cam .ag-fab{bottom:calc(150px + env(safe-area-inset-bottom));padding:12p
 
 /* v122 · σάρωση QR */
 .scan-video{width:100%;max-width:420px;border-radius:12px;background:#000;display:block;margin:0 auto 14px}
+
+/* v124 · KM-V124-ORDER — «Βήμα 1/2 από 2» · ο Κώστας κρυφός μέσα στο Messenger */
+.step-tag{color:var(--accent);font-weight:600;font-size:14px;letter-spacing:.02em;margin:0 0 6px}
+.step-tag[hidden]{display:none}
+body.on-iab .ag-fab{display:none!important}
+#inst-or{margin:2px 0 0}

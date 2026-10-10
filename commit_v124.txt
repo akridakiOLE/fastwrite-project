@@ -1,0 +1,14 @@
+v124 - mia seira, panta idia, Android + iPhone (Stavros 10/10/2026)
+
+- Messenger/Facebook: mono "Anoixe ston Chrome/Safari", o Kostas kryfos (i synomilia xanetai).
+- Browser kinitou xoris logariasmo: othoni "Vima 1 apo 2 - Egkatastasi" kai i karta AMESWS.
+  To "Xekinao tora" DEN yparxei pia ston browser (egrafi mono stin egkatestimeni).
+- Karta egkatastasis: ta idia vimata panta - to koumpi "Egkatastasi" einai syntomefsi pano tous,
+  oxi alli karta. Kamia anamoni 4".
+- Meta to appinstalled: "Egkatastathike - anoixe to apo to eikonidio".
+- Egkatestimeni: "Vima 2 apo 2 - Logariasmos" pano apo to "Xekinao tora".
+- Palioi dokimastes me logariasmo ston browser: opos prin (Kleisimo).
+- Tests: v124 (19 + 8 metallaxeis), install_ui E-20/M20, v120 U-1.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT

@@ -32,9 +32,25 @@
   </div>
 </section>
 
+<!-- ══ v124 · KM-V124-ORDER · ΒΗΜΑ 1 ΣΤΟΝ BROWSER ΤΟΥ ΚΙΝΗΤΟΥ ══
+     Πάνω της βγαίνει ΑΜΕΣΩΣ η κάρτα εγκατάστασης. Εδώ ΔΕΝ υπάρχει «Ξεκινάω τώρα»:
+     ο λογαριασμός φτιάχνεται μόνο μέσα στην εγκατεστημένη εφαρμογή (βήμα 2). -->
+<section id="s-step1" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h1 class="logo">kosto<svg class="logo-mark" viewBox="0 0 34 46" aria-hidden="true"><path d="M6 30 L17 15 L28 30"/></svg>metro</h1>
+    <p class="step-tag">Βήμα 1 από 2 · Εγκατάσταση</p>
+    <p class="lede" id="st1-todo">Πρώτα βάζεις το Kostometro στην αρχική οθόνη. Ο λογαριασμός φτιάχνεται μετά, μέσα στην εφαρμογή.</p>
+    <div id="st1-done" hidden>
+      <p class="lede"><b>✓ Εγκαταστάθηκε.</b></p>
+      <p class="lede">Κλείσε αυτή τη σελίδα και άνοιξε το <b>Kostometro</b> από το εικονίδιο στην αρχική οθόνη. Εκεί συνεχίζεις με το βήμα 2.</p>
+    </div>
+  </div>
+</section>
+
 <section id="s-acc" class="screen setup" hidden>
   <div class="setup-inner">
     <h1 class="logo">kosto<svg class="logo-mark" viewBox="0 0 34 46" aria-hidden="true"><path d="M6 30 L17 15 L28 30"/></svg>metro</h1>
+    <p class="step-tag" id="acc-step" hidden>Βήμα 2 από 2 · Λογαριασμός</p>
     <p class="lede">Φωτογραφίζεις το τιμολόγιο στην παραλαβή.<br>Κρατάς τι πλήρωσες, ανά προμηθευτή.</p>
     <!-- v75 · Ο ΦΡΟΥΡΟΣ ΤΟΥ ΔΙΠΛΟΥ ΛΟΓΑΡΙΑΣΜΟΥ ΣΤΟ iPHONE (20/9/2026).
          Φαίνεται ΜΟΝΟ όταν: iPhone + εγκατεστημένη εφαρμογή + καμία
@@ -862,11 +878,14 @@
      εφαρμογής, και θα ζητούσαμε εγκατάσταση κάτι που δεν είδε ακόμα. -->
 <div id="inst" class="inst" hidden>
   <div class="inst-card" role="dialog" aria-labelledby="inst-h" aria-modal="true">
+    <p class="step-tag" id="inst-step" hidden>Βήμα 1 από 2 · Εγκατάσταση</p>   <!-- v124 · KM-V124-ORDER -->
     <h2 id="inst-h">Βάλ&#39; το στην αρχική οθόνη</h2>
     <p class="lede">Ανοίγει σαν κανονική εφαρμογή — κάμερα με ένα άγγιγμα, χωρίς γραμμή διευθύνσεων. Καμία εγκατάσταση από Store.</p>
+    <!-- v124 · το κουμπί ΠΑΝΩ από τα βήματα — τα βήματα είναι πάντα τα ίδια -->
+    <button class="btn primary" id="inst-go" hidden>Εγκατάσταση</button>
+    <p class="fine" id="inst-or" hidden>…ή με το χέρι:</p>
     <ol class="inst-steps" id="inst-steps"></ol>
     <p class="note warn" id="inst-warn" hidden></p>
-    <button class="btn primary" id="inst-go" hidden>Εγκατάσταση</button>
     <!-- v122 (KM-V122-FIRST): χωρίς λογαριασμό η κάρτα ΔΕΝ κλείνει — ή εγκατάσταση
          τώρα ή ο χρήστης κρατά μόνος του τον σύνδεσμο (απόφαση Stavros 8/10/2026).
          Το «Κλείσιμο» φαίνεται ΜΟΝΟ σε συσκευή που έχει ήδη λογαριασμό στον browser,

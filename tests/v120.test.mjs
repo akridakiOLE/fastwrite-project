@@ -139,7 +139,7 @@ await check("U-1 · (1)(3) εγκατάσταση μόνο ΜΕΤΑ τον λο�
   const f = js.slice(js.indexOf("function maybeInstall()"), js.indexOf("if (el('inst-x'))"));
   ok(!/getItem\(LS\.reg\)[^\n]*\{ return; \}/.test(f), "v122: η κάρτα ΠΡΙΝ τον λογαριασμό — καμία πύλη reg");
   ok(f.includes("if (iabName()) { return; }"), "Facebook");
-  ok(f.includes("instChromeAndroid() && !instDefer"), "Chrome χωρίς beforeinstallprompt");
+  ok(f.includes("ΚΑΜΙΑ ΑΝΑΜΟΝΗ 4″") && !f.includes("setTimeout(maybeInstall, 4000)"), "v124: καμία αναμονή 4″ — η κάρτα βγαίνει αμέσως, ίδια πάντα");
   ok(js.includes("    setTimeout(maybeInstall, 600);   // v120 · (1)"), "μετά τον λογαριασμό");
 });
 await check("U-2 · (2) οθόνη «Άνοιξε στον Chrome» πριν από την πρώτη οθόνη, με «Συνέχεια εδώ»", async () => {
