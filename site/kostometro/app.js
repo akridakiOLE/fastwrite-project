@@ -1047,6 +1047,17 @@
   function proOn() {
     try { var s = JSON.parse(localStorage.getItem(LS.pro) || 'null'); return !!(s && s.pro); } catch (e) { return false; }
   }
+  /* KM-PRO-NOKEY (12/10/2026, Stavros) · Στο PRO διαβάζει ο Κώστας AI (ενσωματωμένο, χρέωση με
+     τηλεμετρία πέρα από τη συνδρομή). Η οθόνη «κλειδί Gemini ή Παράλειψη» ΔΕΝ εμφανίζεται ποτέ σε PRO.
+     Το δικό του κλειδί Gemini μένει προαιρετικό από το Μενού. */
+  function needKeyScreen() { return !localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip) && !proOn(); }
+  /* Περιμένει την απάντηση PRO το πολύ ms — αργό δίκτυο δεν κρατάει την οθόνη. */
+  function proReady(ms) {
+    return new Promise(function (res) {
+      var done = false, fin = function () { if (!done) { done = true; res(proOn()); } };
+      setTimeout(fin, ms); proRefresh().then(function (on) { document.body.classList.toggle('is-pro', on); fin(); }, fin);
+    });
+  }
   function proRefresh() {
     if (!localStorage.getItem(LS.reg) || !navigator.onLine) { return Promise.resolve(proOn()); }
     return kmFetch('pro/status', { headers: kmHead() }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
@@ -2614,7 +2625,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v192';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
+  var APP_VER = 'φέτα 3 · v193';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5408,9 +5419,11 @@
   /* Πού πάει ο χρήστης μόλις αποκτήσει λογαριασμό — η παλιά ροή, ίδια. */
   function afterAccount() {
     setTimeout(maybeInstall, 600);   // v120 · (1) — η προτροπή ΜΕΤΑ τον λογαριασμό
-    if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
-    if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
-    toCam();
+    proReady(2500).then(function () {   /* KM-PRO-NOKEY */
+      if (needKeyScreen()) { return show('s-key'); }
+      if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
+      toCam();
+    });
   }
 
   /* ══ v36 · Γ.3 — ΟΙ 12 ΛΕΞΕΙΣ ΜΟΥ, ΠΙΣΩ ΑΠΟ ΤΟ ΚΛΕΙΔΩΜΑ ΤΗΣ ΣΥΣΚΕΥΗΣ ══
@@ -5787,7 +5800,7 @@
     if (!localStorage.getItem(LS.reg))      { kmRegister(); }   // εκκρεμής εγγραφή
     lastPull = Date.now();
     refreshActive();      // v35 — ενεργή ή αναγνώστρια; πριν ανοίξει η κάμερα
-    proRefresh().then(function (on) { document.body.classList.toggle('is-pro', on); if (on) { schedule(1500); } });   // KM-PRO-F1
+    var proP = proReady(2500).then(function (on) { if (on) { schedule(1500); } return on; });   // KM-PRO-F1 · KM-PRO-NOKEY
     /* v47 · Η.13 — η μετανάστευση στη νέα βάση Κ τρέχει ΜΕΤΑ το κατέβασμα
        (τα τοπικά στοιχεία πρέπει να είναι η αλήθεια του φακέλου πριν
        ξαναγραφτούν) και ΠΡΙΝ ξεκινήσει ο κανονικός συγχρονισμός. Χωρίς
@@ -5803,10 +5816,12 @@
              .then(function (changed) { if (changed) { return pullNow(); } })
              .then(function () { return maybeFlush(); });
     scheduleSync(4000);   // v31 — …και μετά ό,τι έμεινε πίσω από εδώ
-    if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
-    if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
-    if (ownBack) { return ownResume(ownBack); }   // v118
-    toCam();
+    proP.then(function () {   /* KM-PRO-NOKEY */
+      if (needKeyScreen()) { return show('s-key'); }
+      if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
+      if (ownBack) { return ownResume(ownBack); }   // v118
+      toCam();
+    });
   }
 
   /* ── Χειριστές ── */

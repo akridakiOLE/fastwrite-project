@@ -1,0 +1,9 @@
+KM-PRO-NOKEY v193: το PRO δεν βλέπει ποτέ την οθόνη «κλειδί Gemini»
+
+- Στο PRO διαβάζει ο Κώστας AI (ενσωματωμένος) — απόφαση Stavros 12/10
+- needKeyScreen(): κλειδί/παράλειψη/PRO · κάθε δρόμος προς s-key περνά από εκεί
+- εκκίνηση και μετά-λογαριασμό: περιμένουν την απάντηση PRO έως 2,5″
+- τεστ + Μ12/Μ13
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT
