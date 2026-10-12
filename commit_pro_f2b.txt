@@ -1,0 +1,8 @@
+KM-PRO-F2b v192: διόρθωση «ίδιο με» — διπλό όνομα pidOf σκέπαζε το βιβλίο τιμών
+
+- bookPid (βιβλίο) ≠ pidOf (σελίδες φωτογραφίας): η 2η δήλωση σκέπαζε την 1η → «-pNaN», καμία ένωση προϊόντων
+- μέσος όρος με 3 δεκαδικά· όνομα προϊόντος αντί για σκέτο κωδικό
+- τεστ: καμία διπλή δήλωση συνάρτησης σε ΟΛΟ το app.js (+Μ9)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT

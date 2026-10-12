@@ -1229,12 +1229,14 @@
     return s + '|' + (ln.code ? 'c:' + norm(ln.code) : 'd:' + norm(ln.desc || ''));
   }
   function newPid() { return 'P' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase(); }
-  function pidOf(key) { var it = bookRead().items[key]; return it && it.pid ? it.pid : key; }
+  function bookPid(key) { var it = bookRead().items[key]; return it && it.pid ? it.pid : key; }
   function prodName(pid) {
     var b = bookRead();
     if (b.prods[pid]) { return b.prods[pid].name; }
     var it = b.items[pid];
-    return it ? it.name : pid.split('|').slice(1).join('|').replace(/^[cd]:/, '');
+    if (it && it.name) { return it.name; }
+    if (PIDX && PIDX[pid] && PIDX[pid].name) { return PIDX[pid].name; }
+    return pid.split('|').slice(1).join('|').replace(/^[cd]:/, '');
   }
   function bookApplyPack(sup, ln) {
     var it = bookRead().items[itemKey(sup, ln)];
@@ -1288,8 +1290,9 @@
         var ln = { code: ln0.code, desc: ln0.desc, unit_price: ln0.unit_price, disc_pct: ln0.disc_pct, pack: ln0.pack, base_price: ln0.base_price, qty: ln0.qty };
         bookApplyPack(r.supplier, ln);
         if (ln.base_price === null || ln.base_price === undefined || !ln.pack) { return; }
-        var key = itemKey(r.supplier, ln), pid = pidOf(key);
+        var key = itemKey(r.supplier, ln), pid = bookPid(key);
         var g = byPid[pid] || (byPid[pid] = { pid: pid, base: ln.pack.base, sups: {}, wsum: 0, wq: 0, n: 0 });
+        if (!g.name && ln.desc) { g.name = ln.desc; }
         var s = g.sups[r.supplier] || (g.sups[r.supplier] = { sup: r.supplier, last: null, lastAt: 0, keys: {} });
         s.keys[key] = 1;
         if (d >= s.lastAt) { s.lastAt = d; s.last = ln.base_price; s.recId = r.id; }
@@ -1303,7 +1306,7 @@
   function pct(a, b) { return b ? Math.round(((a - b) / b) * 1000) / 10 : 0; }
   function priceSignalHtml(r, ln) {
     if (!PIDX || ln.base_price === null || ln.base_price === undefined || !ln.pack) { return ''; }
-    var key = itemKey(r.supplier, ln), g = PIDX[pidOf(key)];
+    var key = itemKey(r.supplier, ln), g = PIDX[bookPid(key)];
     if (!g) { return '<span class="pro-sig new">🆕 πρώτη αγορά</span>'; }
     var out = '', me = g.sups[r.supplier];
     if (me && me.last !== null) {
@@ -1340,11 +1343,11 @@
       .sort(function (a, b) { return a.last - b.last; });
     return '<table class="pro-tbl"><tr><th>Προμηθευτής</th><th>Τελευταία</th><th>Ημ/νία</th></tr>' +
       sups.map(function (x, i) { return '<tr' + (i === 0 ? ' class="best"' : '') + '><td>' + escH(x.sup) + '</td><td>' + num(x.last) + '</td><td>' + dstr(x.lastAt) + '</td></tr>'; }).join('') +
-      '</table><p class="pro-avg">Μέσος όρος (σταθμισμένος): <b>' + (g.avg === null ? '—' : num(Math.round(g.avg * 10000) / 10000)) + ' ' + (PRO_BASE[g.base] || '') + '</b> · ' + g.n + ' αγορές</p>';
+      '</table><p class="pro-avg">Μέσος όρος (σταθμισμένος): <b>' + (g.avg === null ? '—' : num(Math.round(g.avg * 1000) / 1000)) + ' ' + (PRO_BASE[g.base] || '') + '</b> · ' + g.n + ' αγορές</p>';
   }
   function lineSheet(r, i) {
     var ln = r.proSug.lines[i];
-    var key = itemKey(r.supplier, ln), pid = pidOf(key);
+    var key = itemKey(r.supplier, ln), pid = bookPid(key);
     var linked = !!bookRead().prods[pid];
     var w = sheet('<h3>' + escH(ln.desc || ln.code || '') + '</h3>' +
       '<p class="fine">' + escH(r.supplier || '') + (ln.code ? ' · κωδ. ' + escH(ln.code) : '') +
@@ -1371,7 +1374,7 @@
   }
   function sameAsSheet(r, ln) {
     all().then(function (rows) {
-      var idx = PIDX || priceIndex(rows), me = pidOf(itemKey(r.supplier, ln));
+      var idx = PIDX || priceIndex(rows), me = bookPid(itemKey(r.supplier, ln));
       var opts = Object.keys(idx).filter(function (p) { return p !== me; }).map(function (p) { return { pid: p, name: prodName(p), g: idx[p] }; })
         .sort(function (a, b) { return a.name.localeCompare(b.name, 'el'); });
       var w = sheet('<h3>«' + escH(ln.desc || '') + '» είναι ίδιο με…</h3>' +
@@ -2611,7 +2614,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v191';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
+  var APP_VER = 'φέτα 3 · v192';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */

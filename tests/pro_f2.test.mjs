@@ -21,6 +21,8 @@ const MUT = [
   ["js", "      if (s === r.supplier) { return; }\n      var x = g.sups[s];", "      var x = g.sups[s];"],
   // Μ8 · 🔴 «1,5L × 6» γίνεται 6 τεμάχια αντί για 9 λίτρα
   ["js", "    if (!m) { return { per: n, base: 'pc' }; }\n    var v", "    return { per: n, base: 'pc' };\n    var v"],
+  // Μ9 · 🔴 (το σφάλμα της 12/10) δύο συναρτήσεις με το ΙΔΙΟ όνομα — η δεύτερη σκεπάζει την πρώτη
+  ["js", "  function pidOf(recId, slot) {", "  function bookPid(recId, slot) {"],
 ];
 if (ONLY !== null) {
   const m = MUT[ONLY - 1]; const bag = { js, html };
@@ -42,7 +44,7 @@ const escSrc = js.slice(js.indexOf("  function escH(t) {"), js.indexOf("\n", js.
 const store = {};
 const env = new Function("localStorage", "isPending", "dateOf", "dstr", "PRO_BASE", "LS",
   "var pulling = false;" + normSrc + numSrc + pfc + escSrc + js.slice(a, b) +
-  "\nreturn { bookRead, bookSave, bookMerge, bookForPush, itemKey, pidOf, bookLink, bookUnlink, bookSetPack, bookApplyPack, priceIndex, priceSignalHtml: function(r,ln,ix){ PIDX = ix; return priceSignalHtml(r,ln); }, packFromCount, prodName, reset: function(){ BOOK = null; } };");
+  "\nreturn { bookRead, bookSave, bookMerge, bookForPush, itemKey, bookPid, bookLink, bookUnlink, bookSetPack, bookApplyPack, priceIndex, priceSignalHtml: function(r,ln,ix){ PIDX = ix; return priceSignalHtml(r,ln); }, packFromCount, prodName, reset: function(){ BOOK = null; } };");
 const E = env({ getItem: (k) => store[k] || null, setItem: (k, v) => { store[k] = v; } },
   (r) => r.total === null, (r) => r.invDate || r.ts, (t) => new Date(t).toISOString().slice(0, 10),
   { kg: "€/κιλό", L: "€/λίτρο", pc: "€/τεμ." }, { book: "km_book" });
@@ -64,7 +66,7 @@ ok(ix[kA].sups["Α ΛΤΔ"].last === 1.6, "τελευταία τιμή = η νε
 // «είναι ίδιο με»
 const pid = E.bookLink("Β ΛΤΔ", { code: "G-77", desc: "ΓΑΛΑ ΦΡΕΣΚΟ 6x1LT" }, kA);
 ok(/^P[0-9A-Z]+$/.test(pid), "ο κοινός κωδικός τον ΔΙΝΕΙ το σύστημα (" + pid + ")");
-ok(E.pidOf(kA) === pid && E.pidOf(kB) === pid, "και οι δύο κωδικοί προμηθευτή → ίδιο κεντρικό προϊόν");
+ok(E.bookPid(kA) === pid && E.bookPid(kB) === pid, "και οι δύο κωδικοί προμηθευτή → ίδιο κεντρικό προϊόν");
 ix = E.priceIndex(rows);
 ok(Object.keys(ix).length === 1 && Object.keys(ix[pid].sups).length === 2, "ένα προϊόν, δύο προμηθευτές");
 ok(Math.abs(ix[pid].sups["Β ΛΤΔ"].last - 1.45) < 1e-9, "τιμή μονάδας Β: 8,70 / 6 λτ = 1,45 €/λτ");
@@ -90,7 +92,7 @@ ok(/από Θ ΛΤΔ/.test(sig3) && !/από Η ΛΤΔ/.test(sig3), "🔴 «φθ
 const book = E.bookRead();
 ok(book.log.some((x) => x.kind === "link" && x.item === kB && x.to === pid), "🔴 η αντιστοίχιση γράφτηκε στο ίχνος (ποιος/πότε/από-σε)");
 E.bookUnlink(kB);
-ok(E.pidOf(kB) === kB && book.log.some((x) => x.kind === "unlink" && x.from === pid), "«βγάλ' το»: επιστρέφει μόνο του + ίχνος");
+ok(E.bookPid(kB) === kB && book.log.some((x) => x.kind === "unlink" && x.from === pid), "«βγάλ' το»: επιστρέφει μόνο του + ίχνος");
 // συσκευασία μία φορά
 E.bookSetPack("Γ", { code: "W1", desc: "ΝΕΡΟ 1,5L" }, E.packFromCount("ΝΕΡΟ 1,5L", 6));
 const w = { code: "W1", desc: "ΝΕΡΟ 1,5L", unit_price: 2.7, disc_pct: null, pack: null, base_price: null };
@@ -109,6 +111,10 @@ ok(html.includes('<section id="s-prices"') && html.includes('id="m-prices-row" h
 ok(js.includes("if (el('m-prices-row')) { el('m-prices-row').hidden = !proOn(); }"), "«📊 Τιμές» μόνο σε PRO");
 ok(/SCREENS\.push\('s-prices'\)/.test(js), "s-prices στη SCREENS");
 
+// 🔴 ΟΛΟ το app.js: καμία συνάρτηση με διπλό όνομα (η 2η σκεπάζει σιωπηλά την 1η — έτσι χάλασε το «ίδιο με» 12/10)
+const fnames = [...js.matchAll(/^  function ([A-Za-z0-9_$]+)\(/gm)].map((m) => m[1]);
+const dup = fnames.filter((n, i) => fnames.indexOf(n) !== i);
+ok(!dup.length, "🔴 καμία διπλή δήλωση συνάρτησης στο app.js" + (dup.length ? " — ΔΙΠΛΕΣ: " + dup.join(", ") : ""));
 console.log("\n" + pass + " ✔ · " + fail + " ✘");
 if (ONLY !== null) process.exit(fail ? 0 : 1);
 process.exit(fail ? 1 : 0);
