@@ -49,7 +49,11 @@ function mailLogRun_(when, maxThreads) {
 }
 
 function mailItem_(m, th) {
-  var from = addr_(m.getFrom()), tos = (m.getTo() + ',' + m.getCc()).split(',').map(addr_).filter(Boolean);
+  // v130b · Google Group: με αυστηρό DMARC η ομάδα γράφει From «X via support <support@>» → ο πραγματικός αποστολέας στο X-Original-Sender
+  var from = addr_(m.getFrom()), orig = '';
+  try { orig = addr_(m.getHeader('X-Original-Sender') || ''); } catch (e) {}
+  if (orig && OURS_RE.test(from) && !ours_(orig)) { from = orig; }
+  var tos = (m.getTo() + ',' + m.getCc()).split(',').map(addr_).filter(Boolean);
   var all = [from].concat(tos);
   var box = MAIL_BOXES.filter(function (b) { return all.indexOf(b) >= 0; })[0];
   if (!box) { return null; }
@@ -62,7 +66,7 @@ function mailItem_(m, th) {
   var mid = '';
   try { mid = String(m.getHeader('Message-ID') || '').replace(/[<>\s]/g, '').slice(0, 64); } catch (e) {}
   return { auto: auto_(m) ? 1 : 0, msg_id: mid || m.getId(), thread_id: th.getId(), mailbox: box, dir: out ? 'out' : 'in', peer: peer,
-           peer_name: out ? '' : name_(m.getFrom()), subject: m.getSubject(), at: m.getDate().toISOString(), snippet: body };
+           peer_name: out ? '' : name_(m.getFrom()).replace(/\s+via\s+.*$/i, ''), subject: m.getSubject(), at: m.getDate().toISOString(), snippet: body };
 }
 
 function mailPost_(items) {
@@ -75,6 +79,9 @@ function mailPost_(items) {
 // v130 · αυτόματο μήνυμα (όχι άνθρωπος): ο server το απορρίπτει. Apple ID δεν έχει List-Unsubscribe → Return-Path do_not_reply.
 function auto_(m) {
   var h = function (n) { try { return String(m.getHeader(n) || ''); } catch (e) { return ''; } };
+  // v130b · το support@ είναι Google Group: ΚΑΘΕ μήνυμα πελάτη έρχεται με List-Id support.fastwrite.tech,
+  // List-Unsubscribe/Precedence list/Return-Path bounce της ομάδας → αυτά ΔΕΝ λένε τίποτα για τον αποστολέα.
+  if (/fastwrite\.tech/i.test(h('List-Id'))) { var as0 = h('Auto-Submitted').trim().toLowerCase(); return !!as0 && as0 !== 'no'; }
   if (h('List-Unsubscribe') || h('List-Id')) { return true; }
   var as = h('Auto-Submitted').trim().toLowerCase(); if (as && as !== 'no') { return true; }
   if (/^(bulk|list|junk)$/i.test(h('Precedence').trim())) { return true; }

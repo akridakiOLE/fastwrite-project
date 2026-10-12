@@ -1,0 +1,9 @@
+v130b: mail_log.gs — το support@ είναι Google Group
+
+- τα List-Id/List-Unsubscribe/Precedence/Return-Path της ομάδας support.fastwrite.tech ΔΕΝ σημαίνουν αυτόματο
+  (αλλιώς κάθε πελάτης θα κοβόταν)
+- «X via support»: ο πραγματικός αποστολέας από X-Original-Sender
+- tests/v130: 12 έλεγχοι + 9 μεταλλάξεις
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT

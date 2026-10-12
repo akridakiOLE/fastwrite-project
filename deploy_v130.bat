@@ -248,7 +248,7 @@ echo    OK
 echo [4/7] Souites + apodeixeis metallaxis...
 node --experimental-sqlite tests\v130.test.mjs
 if errorlevel 1 goto tf
-for %%N in (1 2 3 4 5 6 7) do (
+for %%N in (1 2 3 4 5 6 7 8 9) do (
   node --experimental-sqlite tests\v130.test.mjs --mutate=%%N
   if errorlevel 1 goto mf
 )

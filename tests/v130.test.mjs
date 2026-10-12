@@ -16,6 +16,8 @@ const MUT = [
   ["gs", "if (h('List-Unsubscribe') || h('List-Id')) { return true; }", ""],
   ["gs", "return /no[._-]?reply|do[._-]?not[._-]?reply|bounce|mailer-daemon/i.test(h('Return-Path'));", "return false;"],
   ["gs", "  return { auto: auto_(m) ? 1 : 0, msg_id:", "  return { msg_id:"],
+  ["gs", "if (orig && OURS_RE.test(from) && !ours_(orig)) { from = orig; }", ""],
+  ["gs", "  if (/fastwrite\\.tech/i.test(h('List-Id'))) {", "  if (false) {"],
 ];
 if (ONLY !== null) {
   const m = MUT[ONLY - 1]; const bag = { src, ui, gs };
@@ -67,6 +69,10 @@ ok(auto_(fake({ "List-Unsubscribe": "<https://x>" })) === true, "Instagram/Googl
 ok(auto_(fake({ "Return-Path": "<SRS0=5tf1=sg=id.apple.com=Do_not_reply@fastwrite.tech>" })) === true, "Apple ID: Return-Path Do_not_reply (μέσω Cloudflare) → αυτόματο");
 ok(auto_(fake({ "Auto-Submitted": "auto-replied" })) === true && auto_(fake({ "Auto-Submitted": "no" })) === false, "Auto-Submitted: auto → ναι · no → όχι");
 ok(auto_(fake({ "Return-Path": "<nicolaschristofi@live.com>", "Precedence": "" })) === false, "ο Nicolas ΔΕΝ είναι αυτόματος");
+const grp = { "List-Id": "<support.fastwrite.tech>", "List-Unsubscribe": "<mailto:googlegroups-manage+1+unsubscribe@googlegroups.com>", "Precedence": "list", "Return-Path": "<support+bncBDRK@fastwrite.tech>" };
+ok(auto_(fake(grp)) === false, "πελάτης μέσω της ομάδας support@ (Google Group) ΔΕΝ είναι αυτόματος");
+ok(auto_(fake(Object.assign({ "Auto-Submitted": "auto-replied" }, grp))) === true, "αυτόματη απάντηση μέσω της ομάδας → αυτόματο");
+ok(/if \(orig && OURS_RE\.test\(from\) && !ours_\(orig\)\) \{ from = orig; \}/.test(gs), "Google Group με «via support»: ο πελάτης βρίσκεται από το X-Original-Sender");
 ok(/auto: auto_\(m\) \? 1 : 0/.test(gs), "το Apps Script στέλνει το σημάδι auto στον server");
 console.log("\n" + pass + " ✔ · " + fail + " ✘");
 if (ONLY !== null) process.exit(fail ? 0 : 1);
