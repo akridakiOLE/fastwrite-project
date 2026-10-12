@@ -3237,7 +3237,30 @@ async function adminPinakas(request, env) {
        FROM km_leads${whereC("imported_at")}`, ...SA);
     const ls = await all("SELECT campaign, COUNT(*) AS n, SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END) AS ok FROM km_lead_sends" + whereC("at") + " GROUP BY campaign", ...SA);
     const lu = await all("SELECT email, name, unsub_at FROM km_leads WHERE unsub_at IS NOT NULL" + andC("unsub_at") + " ORDER BY unsub_at DESC LIMIT 50", ...SA);
-    leads = { total: Number(lt.total) || 0, unsub: Number(lt.unsub) || 0, stay: Number(lt.stay) || 0, sends: ls, unsub_list: lu };
+    // KM-PK-V128-LEADS (12/10/2026, Stavros): «190 έλαβαν email» ήταν ΑΠΟΣΤΟΛΕΣ, όχι άνθρωποι (97 άτομα,
+    // 93 πήραν 2). Τώρα: (α) μοναδικά email χωρίς τα δοκιμαστικά, (β) ανά προέλευση, (γ) πόσες φορές πήρε ο καθένας,
+    // (δ) ανά αποστολή με θέμα/ημερομηνία/επιτυχίες/αποτυχίες. Τα δοκιμαστικά (source 'test') ΔΕΝ μετράνε πουθενά.
+    const real = "SELECT email FROM km_leads WHERE source <> 'test'";
+    const bySrc = await all(
+      `SELECT source, COUNT(*) AS n, SUM(CASE WHEN unsub_at IS NOT NULL THEN 1 ELSE 0 END) AS unsub
+       FROM km_leads${whereC("imported_at")} GROUP BY source ORDER BY n DESC`, ...SA);
+    const uq = await one(`SELECT COUNT(DISTINCT email) AS n FROM km_lead_sends WHERE ok = 1 AND email IN (${real})` + andC("at"), ...SA);
+    const times = await all(
+      `SELECT c AS times, COUNT(*) AS people FROM (SELECT email, SUM(ok) AS c FROM km_lead_sends
+         WHERE email IN (${real})${andC("at")} GROUP BY email) WHERE c > 0 GROUP BY c ORDER BY c`, ...SA);
+    const camps = await all(
+      `SELECT campaign, MIN(at) AS first_at, MAX(at) AS last_at, SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END) AS ok,
+              SUM(CASE WHEN ok = 1 THEN 0 ELSE 1 END) AS fail
+       FROM km_lead_sends WHERE email IN (${real})${andC("at")} GROUP BY campaign ORDER BY first_at`, ...SA);
+    const test = bySrc.filter((r) => r.source === "test").reduce((a, r) => a + (Number(r.n) || 0), 0);
+    leads = { total: Number(lt.total) || 0, unsub: Number(lt.unsub) || 0, stay: Number(lt.stay) || 0, sends: ls, unsub_list: lu,
+              unique: (Number(lt.total) || 0) - test, test: test,
+              by_source: bySrc.filter((r) => r.source !== "test").map((r) => ({ source: r.source, label: leadSourceLabel(r.source), n: Number(r.n) || 0, unsub: Number(r.unsub) || 0 })),
+              recipients: Number(uq && uq.n) || 0,
+              times: times.map((r) => ({ times: Number(r.times), people: Number(r.people) })),
+              campaigns: camps.map((r) => ({ campaign: r.campaign, title: (LEAD_CAMPAIGNS[r.campaign] || {}).title || r.campaign,
+                subject: (LEAD_CAMPAIGNS[r.campaign] || {}).subject || "", first_at: r.first_at, last_at: r.last_at,
+                ok: Number(r.ok) || 0, fail: Number(r.fail) || 0 })) };
   } catch (e) { leads = null; }
 
   // v114 · KM-PK-KOSTAS — κάρτα «Κώστας (βοηθός)»: συνομιλίες, κόστος, παραδόσεις, ραντεβού (Α010 §2.3)
@@ -3740,6 +3763,22 @@ async function adminLeadsImport(request, env) {
     if (res && res.meta && res.meta.changes) inserted++; else known++;
   }
   return json({ ok: true, received: rows.length, inserted, known, invalid });
+}
+
+// KM-PK-V128-LEADS · ο κατάλογος των αποστολών όπως φαίνεται στον Πίνακα. ΚΑΘΕ νέα εκστρατεία μπαίνει ΕΔΩ
+// (το τεστ v128 αποτυγχάνει αν leadMail ξέρει εκστρατεία που δεν έχει γραμμή εδώ).
+const LEAD_CAMPAIGNS = {
+  "dianomi-1": { title: "Διανομή 1 · πρώτη επαφή", subject: "Το πρώτο βήμα είναι έτοιμο — και είσαι μέσα από την αρχή" },
+  "voithos-1": { title: "Κώστας 1 · οι 3 νέοι leads", subject: "Ο Κώστας σε περιμένει για να στήσετε μαζί το Kostometro" },
+  "voithos-2": { title: "Κώστας 2 · δεύτερη επαφή", subject: "Σου στήνουμε το Kostometro σε 5 λεπτά — μαζί με τον Κώστα" },
+};
+// Προέλευση lead → ελληνική ετικέτα. Από τη v128 κάθε εισαγωγή δηλώνει ΡΗΤΑ την πηγή (tools/leads_csv.mjs, 3ο όρισμα).
+function leadSourceLabel(src) {
+  const s = String(src || "");
+  if (s === "fb-form") return "Φόρμα Facebook · Fasi2";   // όλες οι εισαγωγές πριν τη v128 ήταν από τη Fasi2
+  const m = /^fb:(.+)$/.exec(s);
+  if (m) return "Φόρμα Facebook · " + m[1];
+  return s || "άγνωστη";
 }
 
 // Το κείμενο εγκρίθηκε από τον Stavros 26/9/2026 (Α250). Κάθε αλλαγή = νέα εκστρατεία.

@@ -1,10 +1,11 @@
 // KM-LEADS · CSV της Meta → σώμα εισαγωγής (26/9/2026)
-//   node tools/leads_csv.mjs "Claude outputs/dianomi/leads.csv" "Claude outputs/dianomi/leads_import.json"
+//   node tools/leads_csv.mjs "Claude outputs/dianomi/leads.csv" "Claude outputs/dianomi/leads_import.json" fasi3
+// v128 · το 3ο όρισμα (ΥΠΟΧΡΕΩΤΙΚΟ) = από ποια φόρμα/καμπάνια ήρθαν → στον Πίνακα «Φόρμα Facebook · fasi3».
 // Η Meta δίνει CSV σε UTF-16 με tab ή σε UTF-8 με κόμμα — δεχόμαστε και τα δύο.
 // Κρατάμε ΜΟΝΟ email, όνομα, ημερομηνία υποβολής. Η απάντηση της ερώτησης ΔΕΝ περνάει.
 import { readFileSync, writeFileSync } from "node:fs";
-const [inp, out] = process.argv.slice(2);
-if (!inp || !out) { console.log("χρήση: node tools/leads_csv.mjs <leads.csv> <leads_import.json>"); process.exit(2); }
+const [inp, out, form] = process.argv.slice(2);
+if (!inp || !out || !/^[a-z0-9_-]{2,24}$/i.test(form || "")) { console.log("χρήση: node tools/leads_csv.mjs <leads.csv> <leads_import.json> <φόρμα π.χ. fasi3>"); process.exit(2); }
 const buf = readFileSync(inp);
 let txt = (buf[0] === 0xff && buf[1] === 0xfe) ? buf.toString("utf16le") : buf.toString("utf8");
 txt = txt.replace(/^\uFEFF/, "");
@@ -36,6 +37,6 @@ for (const l of lines.slice(1)) {
   if (!email || seen.has(email)) continue; seen.add(email);
   rows.push({ email, name: iname >= 0 ? c[iname] : "", consent_at: itime >= 0 ? c[itime] : "" });
 }
-writeFileSync(out, JSON.stringify({ source: "fb-form", rows }));
+writeFileSync(out, JSON.stringify({ source: "fb:" + form.toLowerCase(), rows }));
 console.log("Στήλες: email=" + head[ie] + " · όνομα=" + (head[iname] || "—") + " · ημερομηνία=" + (head[itime] || "—"));
 console.log("Γραμμές CSV: " + (lines.length - 1) + " · μοναδικά email: " + rows.length + " → " + out);

@@ -1,0 +1,10 @@
+v128: Πίνακας — «Λίστα leads» σε ΑΤΟΜΑ, όχι αποστολές
+
+- Εύρημα Stavros 12/10: «190 έλαβαν email» ήταν αποστολές σε 97 άτομα (93 πήραν 2)
+- Μοναδικά email χωρίς τα δοκιμαστικά · ανά προέλευση με σύνολο · πόσα email πήρε ο καθένας
+- Ανά αποστολή: τίτλος, θέμα email, ημερομηνία, έλαβαν, απέτυχαν (κατάλογος LEAD_CAMPAIGNS)
+- tools/leads_csv.mjs: ΥΠΟΧΡΕΩΤΙΚΗ φόρμα προέλευσης (fb:fasi3 κ.λπ.)
+- tests/v128 + 6 μεταλλάξεις
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT

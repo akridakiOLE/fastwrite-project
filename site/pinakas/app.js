@@ -279,8 +279,18 @@
     }).join('') : '<tr><td colspan="10" class="muted">Κανείς ακόμα.</td></tr>';
     var ld = j.leads;
     if (ld) {
-      var sent = (ld.sends || []).reduce(function (a, r) { return a + (Number(r.ok) || 0); }, 0);
-      el('k-ld').textContent = ld.total; el('k-ld-sent').textContent = sent;
+      /* KM-PK-V128-LEADS — άτομα, ΟΧΙ αποστολές (το παλιό «190» ήταν αποστολές) */
+      el('k-ld').textContent = ld.unique; el('k-ld-sent').textContent = ld.recipients;
+      var bs = ld.by_source || [], bsT = bs.reduce(function (a, r) { return a + r.n; }, 0), bsU = bs.reduce(function (a, r) { return a + r.unsub; }, 0);
+      el('ld-src').innerHTML = bs.length ? bs.map(function (r) { return '<tr><td>' + esc(r.label) + '</td><td>' + r.n + '</td><td>' + r.unsub + '</td></tr>'; }).join('') +
+        '<tr><td><b>Σύνολο</b></td><td><b>' + bsT + '</b></td><td><b>' + bsU + '</b></td></tr>' : '<tr><td colspan="3" class="muted">Κανένα lead.</td></tr>';
+      var tm = ld.times || [];
+      el('ld-times').innerHTML = tm.length ? 'Πόσα email πήρε ο καθένας: ' + tm.map(function (r) { return '<b>' + r.times + '</b> email → <b>' + r.people + '</b> άτομα'; }).join(' · ') : '';
+      var cp = ld.campaigns || [];
+      el('ld-camp').innerHTML = cp.length ? cp.map(function (r) {
+        return '<tr><td>' + esc(r.title) + '</td><td>' + esc(r.subject) + '</td><td>' + fmtDate(r.first_at) + (r.last_at && String(r.last_at).slice(0, 10) !== String(r.first_at).slice(0, 10) ? ' – ' + fmtDate(r.last_at) : '') +
+          '</td><td>' + r.ok + '</td><td>' + (r.fail ? '<b>' + r.fail + '</b>' : '0') + '</td></tr>';
+      }).join('') : '<tr><td colspan="5" class="muted">Καμία αποστολή.</td></tr>';
       el('k-ld-un').textContent = ld.unsub; el('k-ld-st').textContent = ld.stay;
       var ul = ld.unsub_list || [];
       el('ld-un-wrap').hidden = !ul.length;
