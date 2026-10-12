@@ -57,12 +57,13 @@ const r = await (await post("sup", { items: [
   I("s1", "stavrosfkallenos@gmail.com"),
   I("s2", "pricelbkallenos@gmail.com", { mailbox: "support@fastwrite.tech" }),
   I("s3", "platiaenastavros@gmail.com"),
+  I("s4", "akrisway@gmail.com", { mailbox: "support@fastwrite.tech" }),
 ] })).json();
 const got = db.prepare("SELECT peer FROM km_corr ORDER BY msg_id").all().map((x) => x.peer);
-ok(r.saved === 3 && r.skipped === 10, "κρατάει 3 ανθρώπους · απορρίπτει 10 αυτόματα/δικά μας (πήρα " + r.saved + "/" + r.skipped + ")");
+ok(r.saved === 3 && r.skipped === 11, "κρατάει 3 ανθρώπους · απορρίπτει 11 αυτόματα/δικά μας (πήρα " + r.saved + "/" + r.skipped + ")");
 ok(got.includes("nicolaschristofi@live.com") && got.includes("customer@gmail.com") && got.includes("maria.reply@x.cy"), "ο Nicolas, πελάτης Gmail και «maria.reply» (άνθρωπος) μένουν");
 ok(!got.some((p) => /google|apple|instagram|github/.test(p)), "κανένα Google Play/Payments/Apple/Instagram/GitHub");
-ok(!got.some((p) => /kallenos|platiaenastavros/.test(p)), "κανένας από τους 3 λογαριασμούς του Stavros");
+ok(!got.some((p) => /kallenos|platiaenastavros|akrisway/.test(p)), "κανένας από τους 3 λογαριασμούς του Stavros");
 const fake = (hdr) => ({ getHeader: (n) => hdr[n] || "" });
 const auto_ = new Function(gs.match(/function auto_\(m\) \{[\s\S]*?\n\}/)[0] + "; return auto_;")();
 ok(auto_(fake({ "List-Unsubscribe": "<https://x>" })) === true, "Instagram/Google: List-Unsubscribe → αυτόματο");

@@ -16,7 +16,7 @@ var MAIL_SEARCH = '(from:support@fastwrite.tech OR to:support@fastwrite.tech OR 
 var OURS_RE = /@fastwrite\.tech$/i;
 // v129b · ο Stavros ΔΕΝ είναι επαφή (γράφει ως support@ από το Gmail του)
 // v130 · και οι άλλοι δύο προσωπικοί λογαριασμοί του Stavros (απόφαση 12/10)
-var SELF = ['stavrosfkallenos@gmail.com', 'pricelbkallenos@gmail.com', 'platiaenastavros@gmail.com'];
+var SELF = ['stavrosfkallenos@gmail.com', 'pricelbkallenos@gmail.com', 'platiaenastavros@gmail.com', 'akrisway@gmail.com'];
 function ours_(a) { return OURS_RE.test(a) || SELF.indexOf(a) >= 0; }
 
 function installMailLog() {

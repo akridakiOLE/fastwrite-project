@@ -488,7 +488,7 @@ const MAIL_OURS_RE = /@fastwrite\.tech$/i;
 // (α) οι προσωπικοί λογαριασμοί του Stavros ΔΕΝ είναι επαφές, (β) αυτόματοι αποστολείς όπου κι αν
 // έχουν το «noreply» (googleplay-noreply@, do_not_reply@, notifications@, bounce…), (γ) ό,τι το Apps Script
 // σημάδεψε auto (List-Unsubscribe / Auto-Submitted / Precedence bulk / Return-Path noreply — Instagram, Apple).
-const MAIL_SELF = ["stavrosfkallenos@gmail.com", "pricelbkallenos@gmail.com", "platiaenastavros@gmail.com"];
+const MAIL_SELF = ["stavrosfkallenos@gmail.com", "pricelbkallenos@gmail.com", "platiaenastavros@gmail.com", "akrisway@gmail.com"];  // v130c: akrisway = δοκιμαστικός λογαριασμός Kostometro
 const MAIL_AUTO_RE = /(^|[._+-])(no[._-]?reply|do[._-]?not[._-]?reply|donotreply|notifications?|mailer-daemon|postmaster|bounces?)([._+-]|@)/i;
 async function supportMailLog(request, env) {
   if (!supportKeyOk(request, env)) return new Response("Not found", { status: 404 });
