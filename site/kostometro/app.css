@@ -783,3 +783,17 @@ body.on-iab .ag-fab{display:none!important}
    στον Chrome, με το κουμπί, το «Βήμα 1 από 2» κοβόταν κάτω από τη γραμμή διευθύνσεων — το 86vh
    μετράει και τη γραμμή). Το dvh είναι το ορατό ύψος· όπου δεν υπάρχει, μένει το vh. */
 .inst-card{max-height:calc(100vh - 140px);max-height:calc(100dvh - 116px - env(safe-area-inset-bottom))}
+
+/* KM-PRO-F1 · γραμμές τιμολογίου στα «Εκκρεμή» */
+.pro-lines{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--border);padding-top:10px}
+.pro-h{font-size:14px;font-weight:700}
+.pro-h.ok{color:var(--accent)}
+.pro-h.warn{color:#f0a020}
+.pro-sup{font-size:12px;color:var(--text3)}
+.pro-ln{display:flex;flex-direction:column;gap:2px;text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font:inherit;cursor:pointer}
+.pro-ln.bad{border-color:#f0a020}
+.pro-d{font-size:14px}
+.pro-n{font-size:13px;color:var(--text2)}
+.pro-bp{font-size:12px;color:var(--accent)}
+.pro-ask{font-size:12px;color:#f0a020;font-weight:600}
+body.is-staging::before{content:"🧪 STAGING · δοκιμές PRO · όχι πραγματικά δεδομένα";position:fixed;top:0;left:0;right:0;z-index:200;background:#b45309;color:#fff;font:600 11px/1.6 sans-serif;text-align:center;pointer-events:none}

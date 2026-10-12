@@ -111,6 +111,13 @@ const DUE_BATCH = 200;
 
 export async function handleKm(request, env, ctx, path) {
   const method = request.method;
+  // KM-PRO-F1 (12/10/2026) — Kostometro PRO: όλα σε χωριστό αρχείο (src/km_pro.js)
+  if (path.startsWith("/api/km/pro/") || path.startsWith("/api/km/admin/pro/")) {
+    // δυναμικό import: τα τεστ φορτώνουν το km.js ως data: URL, όπου σχετική διαδρομή δεν λύνεται.
+    // Ο wrangler (esbuild) το ενσωματώνει κανονικά στο πακέτο.
+    const { handlePro } = await import("./km_pro.js");
+    return handlePro(request, env, path, { authed, json, safeJson, clean, now, adminOk, agentCall });
+  }
 
   if (path === "/api/km/lookup" && method === "GET") return lookup(request, env);
   if (path === "/api/km/register" && method === "POST") return register(request, env, ctx);

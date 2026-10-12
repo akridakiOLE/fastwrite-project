@@ -18,7 +18,10 @@ compatibility_date = "2024-11-01"
 
 # Explicit settings (εξαλείφουν warnings από το build log):
 workers_dev = true
-preview_urls = true
+preview_urls = false
+# PRO (12/10/2026): false στον κλάδο pro — το push του κλάδου στο GitHub ανεβάζει «προεπισκόπηση»
+# του ΠΑΡΑΓΩΓΙΚΟΥ worker με τις ΠΑΡΑΓΩΓΙΚΕΣ βάσεις. Χωρίς διεύθυνση, δεν φτάνει κανείς σε αυτή.
+# Στην ένωση με το master μένει false (δεν χρησιμοποιούμε προεπισκοπήσεις).
 # KM-OAUTH (29/9/2026): μην σβήσει το deploy μεταβλητές που τυχόν ορίστηκαν στο dashboard.
 keep_vars = true
 
@@ -99,4 +102,47 @@ name = "EMAIL"
 # μελλοντική ανάπτυξη να μην τα σβήσει σιωπηλά — χωρίς logs, μια αποτυχημένη
 # προγραμματισμένη εκτέλεση δεν γίνεται αντιληπτή από κανέναν.
 [observability]
+enabled = true
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🧪 STAGING — Ο ΧΩΡΟΣ ΔΟΚΙΜΩΝ ΤΟΥ PRO (Stavros 12/10/2026, Α400 §Δ1)
+# Ξεχωριστός worker, ΞΕΧΩΡΙΣΤΗ βάση (fastwrite-staging) και ΞΕΧΩΡΙΣΤΟΣ φάκελος
+# R2 (fastwrite-km-staging, ΕΕ). Τίποτα από εδώ δεν αγγίζει το Free ή τους χρήστες του.
+# Deploy ΜΟΝΟ από τον φάκελο fastwrite-pro:  npx wrangler deploy --env staging
+# ⚠ Οι δεσμεύσεις (D1, R2, vars, email) ΔΕΝ κληρονομούνται στα env — γράφονται ξανά εδώ.
+# ⚠ ΚΑΝΕΝΑ cron: οι προγραμματισμένες διαγραφές ζουν μόνο στην παραγωγή.
+# ⚠ ΧΩΡΙΣ Google/Microsoft: οι διευθύνσεις επιστροφής είναι γραμμένες για fastwrite.tech.
+#    Στο staging η είσοδος γίνεται με κωδικό email.
+# ═══════════════════════════════════════════════════════════════════════════
+[env.staging]
+name = "fastwrite-staging"
+workers_dev = true
+preview_urls = false
+
+[env.staging.assets]
+directory = "./site"
+binding = "ASSETS"
+not_found_handling = "404-page"
+run_worker_first = ["/api/*"]
+
+[env.staging.vars]
+PRO_LIVE = "1"
+AGENT_DAILY_USD = "2"
+READ_DAILY_USD = "2"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "fastwrite-staging"
+database_id = "ce2e7e05-151a-440e-9da7-461c1109bf5b"
+
+[[env.staging.r2_buckets]]
+binding = "FOLDERS"
+bucket_name = "fastwrite-km-staging"
+jurisdiction = "eu"
+
+[[env.staging.send_email]]
+name = "EMAIL"
+
+[env.staging.observability]
 enabled = true

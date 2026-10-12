@@ -9,6 +9,8 @@
   'use strict';
 
   var LS = {
+    /* KM-PRO-F1 · η τελευταία γνωστή κατάσταση PRO {pro, at} — από τον server, ποτέ από τη συσκευή */
+    pro: 'km_pro',
     /* v89 · KM-UPD-TOAST — ποια έκδοση είδε ο χρήστης τελευταία στην κάμερα */
     seenVer: 'km_seen_ver',
     /* v113 · KM-READ-GIFT — η τελευταία γνωστή κατάσταση του δώρου {active, left, at}.
@@ -399,6 +401,7 @@
        μετά την εγκατάσταση → «✓ Εγκαταστάθηκε — άνοιξε από το εικονίδιο»
        εικονίδιο → ΒΗΜΑ 2: «Ξεκινάω τώρα» — το μόνο σημείο όπου φτιάχνεται λογαριασμός. */
   function instNeedFirst() {
+    if (typeof location !== 'undefined' && /workers\.dev$/.test(location.hostname)) { return false; }   /* KM-PRO · staging: δοκιμές από browser */
     return instPlatform() !== 'other' && !instStandalone() && !iabName() && !localStorage.getItem(LS.reg);
   }
   function step1Render() {
@@ -992,8 +995,10 @@
        εξηγεί γιατί (v35 · Η.3). */
     var ab = amountsBlock(r, { after: function () { renderPending(); } });
     var amts = ab.node, inputs = ab.inputs;
+    var lb = (r.proSug && r.proSug.lines && r.proSug.lines.length) ? proLinesBlock(r) : null;   /* KM-PRO-F1 */
     if (ab.readOnly) {
       c.appendChild(head); c.appendChild(amts);
+      if (lb) { c.appendChild(lb); }
       return c;
     }
 
@@ -1006,6 +1011,7 @@
       r.total = t;
       r.vat = parseNum(inputs.vat.value);
       r.net = parseNum(inputs.net.value);
+      proConfirm(r);   /* KM-PRO-F1 — οι γραμμές γίνονται οριστικές ΜΟΝΟ με το πάτημα του ανθρώπου */
       put(r).then(function () { renderPending(); refreshCount(); });
     };
 
@@ -1022,8 +1028,142 @@
     acts.className = 'acts';
     acts.appendChild(save); acts.appendChild(trash);
 
-    c.appendChild(head); c.appendChild(amts); c.appendChild(acts);
+    c.appendChild(head); c.appendChild(amts);
+    if (lb) { c.appendChild(lb); }
+    c.appendChild(acts);
     return c;
+  }
+
+  /* ══ KM-PRO-F1 · ΚΟΣΤΟΜΕΤΡΟ PRO — ΑΝΑΓΝΩΣΗ ΑΝΑ ΓΡΑΜΜΗ (Brief PRO ↔ FastWrite 12/10/2026) ══
+     Λογαριασμός PRO (το λέει ΜΟΝΟ ο server: /pro/status): κάθε φωτογραφία διαβάζεται ανά γραμμή
+     (Sonnet — μετρήθηκε 12/10: 5/5 σωστά, το Haiku επινοούσε γραμμές). Στα «Εκκρεμή» ο Boss βλέπει
+     γραμμές + έλεγχο + τιμή μονάδας και επιβεβαιώνει. Συσκευασία που λείπει → ΡΩΤΑΜΕ (12/10). */
+  function proOn() {
+    try { var s = JSON.parse(localStorage.getItem(LS.pro) || 'null'); return !!(s && s.pro); } catch (e) { return false; }
+  }
+  function proRefresh() {
+    if (!localStorage.getItem(LS.reg) || !navigator.onLine) { return Promise.resolve(proOn()); }
+    return kmFetch('pro/status', { headers: kmHead() }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (j && j.ok) { localStorage.setItem(LS.pro, JSON.stringify({ pro: !!j.pro, at: Date.now() })); }
+      return proOn();
+    }).catch(function () { return proOn(); });
+  }
+  var proBusy = false, proWait = 0;
+  function proSweep() {
+    if (!proOn() || proBusy || !navigator.onLine) { return false; }
+    if (proWait > Date.now()) { schedule(proWait - Date.now() + 500); return true; }
+    proBusy = true; aiBusy = true;
+    all().then(function (rows) {
+      var q = rows.filter(function (r) { return isPending(r) && !r.proSug && (r.proTry || 0) < AI_MAX_TRY; })
+                  .sort(function (a, b) { return b.ts - a.ts; });
+      if (!q.length) { proBusy = false; aiBusy = false; return; }
+      var rec = q[0];
+      diag('PRO · διαβάζει ανά γραμμή…');
+      Promise.all(pagesOf(rec).map(giftShrink)).then(function (b64s) {
+        return kmFetch('pro/read', { method: 'POST', headers: kmHead(), body: JSON.stringify({ pages: b64s }) });
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          if (r.ok && j && j.ok) { return j; }
+          var e = new Error('http'); e.status = r.status; e.msg = (j && j.error) || ('σφάλμα ' + r.status);
+          e.retryAfter = ((j && j.retry_after) || 30) * 1000; throw e;
+        });
+      }).then(function (j) {
+        if (!j.lines || !j.lines.length) {
+          rec.proTry = (rec.proTry || 0) + 1;
+          diag('PRO · δεν διάβασε γραμμές (' + rec.proTry + '/3)');
+        } else {
+          rec.proSug = { supplier: j.supplier || {}, number: j.number || null, lines: j.lines, check: j.check || {}, at: Date.now() };
+          if (!rec.sug) { rec.sug = { net: aiNum(j.net), vat: aiNum(j.vat), total: aiNum(j.total), date: aiDate(j.date) }; rec.aiAt = Date.now(); rec.aiBy = 'pro'; }
+          diag('✓ PRO · ' + j.lines.length + ' γραμμές · ' + (j.check && j.check.approve === 'auto' ? 'κλείνει' : 'θέλει έλεγχο'));
+        }
+        return put(rec);
+      }).then(function () {
+        proBusy = false; aiBusy = false;
+        if (!el('s-pend').hidden) { renderPending(); }
+        schedule(AI_NEXT);
+      }).catch(function (err) {
+        proBusy = false; aiBusy = false;
+        aiErrLog('PRO · ' + (err.msg || err.message || 'δίκτυο'));
+        if (err.msg === 'not_pro') { localStorage.setItem(LS.pro, JSON.stringify({ pro: false, at: Date.now() })); schedule(AI_NEXT); return; }
+        proWait = Date.now() + (err.msg === 'month_cap' ? 3600000 : (err.retryAfter || 30000));
+        diag('PRO · αναμονή — ' + (err.msg || 'δίκτυο'));
+        schedule(proWait - Date.now() + 500);
+      });
+    }).catch(function () { proBusy = false; aiBusy = false; });
+    return true;
+  }
+  var PRO_BASE = { kg: '€/κιλό', L: '€/λίτρο', pc: '€/τεμ.' };
+  function proMoney(v) { return v === null || v === undefined ? '—' : num(v); }
+  function proLinesBlock(r) {
+    var s = r.proSug, ck = s.check || {};
+    var box = document.createElement('div');
+    box.className = 'pro-lines';
+    var h = document.createElement('div');
+    h.className = 'pro-h ' + (ck.approve === 'auto' ? 'ok' : 'warn');
+    h.textContent = '📋 ' + s.lines.length + ' γραμμές · ' +
+      (ck.approve === 'auto' ? '✓ κλείνει με το καθαρό' : '⚠ έλεγξε — άθροισμα ' + proMoney(ck.lines_sum) + ' €');
+    box.appendChild(h);
+    if (s.supplier && (s.supplier.name || s.supplier.vat_no)) {
+      var sp = document.createElement('div');
+      sp.className = 'pro-sup';
+      sp.textContent = 'Στο χαρτί: ' + [s.supplier.name, s.supplier.vat_no, s.number].filter(Boolean).join(' · ');
+      box.appendChild(sp);
+    }
+    s.lines.forEach(function (ln, i) {
+      var row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'pro-ln' + (ln.ok ? '' : ' bad');
+      var unitTxt = ln.base_price !== null && ln.base_price !== undefined && ln.pack
+        ? '<span class="pro-bp">' + num(ln.base_price) + ' ' + (PRO_BASE[ln.pack.base] || '') + '</span>'
+        : (ln.pack ? '' : '<span class="pro-ask">📦 πόσα έχει 1 ' + escH(ln.unit || 'συσκ.') + ';</span>');
+      row.innerHTML = '<span class="pro-d"><b>' + escH(ln.code || '') + '</b> ' + escH(ln.desc || '') + '</span>' +
+        '<span class="pro-n">' + (ln.qty === null ? '—' : String(ln.qty).replace('.', ',')) + ' ' + escH(ln.unit || '') +
+        ' × ' + proMoney(ln.unit_price) + ' = <b>' + proMoney(ln.line_net) + '</b> ' + (ln.ok ? '✓' : '⚠') + '</span>' + unitTxt;
+      row.onclick = function () { proEditLine(r, i); };
+      box.appendChild(row);
+    });
+    var note = document.createElement('p');
+    note.className = 'fine hint';
+    note.textContent = 'Πάτα μια γραμμή για διόρθωση. Οι γραμμές γράφονται μόνο με την «Αποθήκευση».';
+    box.appendChild(note);
+    return box;
+  }
+  function escH(t) { return String(t === null || t === undefined ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  /* Διόρθωση γραμμής — απλή στη Φ1 (οι πλήρεις οθόνες στη Φ2 μαζί με το βιβλίο τιμών). */
+  function proEditLine(r, i) {
+    var ln = r.proSug.lines[i];
+    if (!ln.pack) {
+      var n = prompt('📦 ' + (ln.desc || '') + '\n\nΠόσα τεμάχια έχει 1 ' + (ln.unit || 'συσκευασία') + ';\n(γράψε αριθμό — π.χ. 24)', '');
+      if (n !== null && parseNum(n) > 0) {
+        var per = parseNum(n);
+        ln.pack = { per: per, base: 'pc', sure: true, why: 'user' };
+        if (ln.unit_price !== null) { ln.base_price = Math.round((ln.unit_price * (1 - (ln.disc_pct || 0) / 100) / per) * 10000) / 10000; }
+        put(r).then(renderPending);
+      }
+      return;
+    }
+    var q = prompt('Ποσότητα — ' + (ln.desc || ''), ln.qty === null ? '' : String(ln.qty).replace('.', ','));
+    if (q === null) { return; }
+    var p = prompt('Τιμή μονάδας (€)', ln.unit_price === null ? '' : String(ln.unit_price).replace('.', ','));
+    if (p === null) { return; }
+    ln.qty = parseNum(q); ln.unit_price = parseNum(p);
+    if (ln.qty !== null && ln.unit_price !== null) { ln.line_net = Math.round(ln.qty * ln.unit_price * (1 - (ln.disc_pct || 0) / 100) * 100) / 100; }
+    ln.ok = ln.qty !== null && ln.unit_price !== null; ln.edited = true;
+    if (ln.pack && ln.pack.per > 0 && ln.unit_price !== null) { ln.base_price = Math.round((ln.unit_price * (1 - (ln.disc_pct || 0) / 100) / ln.pack.per) * 10000) / 10000; }
+    var sum = r.proSug.lines.reduce(function (a, l) { return a + (l.line_net || 0); }, 0);
+    r.proSug.check.lines_sum = Math.round(sum * 100) / 100;
+    r.proSug.check.approve = 'manual';
+    put(r).then(renderPending);
+  }
+  /* Με την «Αποθήκευση»: οι γραμμές γίνονται οριστικές, με σημάδι ΠΩΣ εγκρίθηκαν (Α350 §9.8 Ε). */
+  function proConfirm(r) {
+    if (!r.proSug || !r.proSug.lines) { return; }
+    r.lines = r.proSug.lines;
+    r.proInfo = { number: r.proSug.number || null, sup_name: (r.proSug.supplier || {}).name || null,
+                  sup_vat: (r.proSug.supplier || {}).vat_no || null,
+                  checks: r.proSug.check && r.proSug.check.approve === 'auto' ? 'pass' : 'fail',
+                  approved: 'manual', at: Date.now() };
+    delete r.proSug;
   }
 
   /* ══ Ο ΠΡΟΜΗΘΕΥΤΗΣ ΜΟΥ ══ */
@@ -2198,7 +2338,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v126';
+  var APP_VER = 'φέτα 3 · v190';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -2712,6 +2852,7 @@
     /* v113 · KM-READ-GIFT — όσο υπάρχει δώρο, πρώτα ο Κώστας (Brief §2.4). */
     if (isReader()) { diag('μόνο ανάγνωση — γράφει η ενεργή συσκευή'); return; }
     if (aiBusy) { return; }
+    if (proSweep()) { return; }      /* KM-PRO-F1 — λογαριασμός PRO: ανάγνωση ανά γραμμή, πριν από δώρο/κλειδί */
     if (giftSweep()) { return; }
     aiSweepKey();
   }
@@ -4291,7 +4432,8 @@
   function metaOf(r) {
     return { id: r.id, ts: r.ts, supplier: r.supplier, invDate: r.invDate,
              net: r.net, vat: r.vat, total: r.total,
-             pages: 1 + ((r.pages && r.pages.length) || 0) };
+             pages: 1 + ((r.pages && r.pages.length) || 0),
+             lines: r.lines || undefined, proInfo: r.proInfo || undefined };   /* KM-PRO-F1 */
   }
   /* Τα id των φωτογραφιών ενός τιμολογίου: η πρώτη σελίδα παίρνει το id του
      τιμολογίου, οι υπόλοιπες <id>-p2, <id>-p3… Σταθερά, ώστε να μην
@@ -4491,6 +4633,7 @@
                   var m = news[k++];
                   return put({ id: m.id, ts: m.ts, supplier: m.supplier, invDate: m.invDate,
                                net: m.net, vat: m.vat, total: m.total,
+                               lines: m.lines || undefined, proInfo: m.proInfo || undefined,   /* KM-PRO-F1 */
                                pages: [], srvPages: m.pages || 1 })
                     .then(function () { added++; return one(); });
                 };
@@ -4591,7 +4734,8 @@
      «εκκρεμές» για πάντα, ενώ στην ενεργή ήταν κλεισμένο. */
   function metaDiffers(a, b) {
     return a.supplier !== b.supplier || a.invDate !== b.invDate ||
-           a.net !== b.net || a.vat !== b.vat || a.total !== b.total;
+           a.net !== b.net || a.vat !== b.vat || a.total !== b.total ||
+           JSON.stringify(a.lines || null) !== JSON.stringify(b.lines || null);   /* KM-PRO-F1 */
   }
 
   function pullMeta(key) {
@@ -4864,6 +5008,7 @@
             if (!cur) {
               return put({ id: m.id, ts: m.ts, supplier: m.supplier, invDate: m.invDate,
                            net: m.net, vat: m.vat, total: m.total,
+                           lines: m.lines || undefined, proInfo: m.proInfo || undefined,   /* KM-PRO-F1 */
                            pages: [], srvPages: m.pages || 1 })
                 .then(function () { pullInfo.added++; return step(i + 1); });
             }
@@ -4882,6 +5027,7 @@
               fresh.net = m.net;
               fresh.vat = m.vat;
               fresh.total = m.total;
+              fresh.lines = m.lines || undefined; fresh.proInfo = m.proInfo || undefined;   /* KM-PRO-F1 */
               fresh.srvPages = m.pages || fresh.srvPages || 1;
               return put(fresh).then(function () { pullInfo.upd++; });
             }).then(function () { return step(i + 1); });
@@ -5234,7 +5380,7 @@
      ⚠ v122: το «Κλείσιμο» (μόνο για συσκευές με λογαριασμό) κλείνει την κάρτα
      ΓΙΑ ΑΥΤΗ ΤΗ ΦΟΡΤΩΣΗ και μόνο. ΔΕΝ γράφεται τίποτα στον δίσκο. */
   function maybeInstall() {
-    if (instPlatform() === 'other') { return; }      /* υπολογιστής: δεν είναι το κοινό */
+    if (instPlatform() === 'other' || /workers\.dev$/.test(location.hostname)) { return; }      /* υπολογιστής: δεν είναι το κοινό · KM-PRO: ούτε το staging */
     /* 🔴 v122 (KM-V122-FIRST, απόφαση Stavros 8/10/2026) — Η ΕΓΚΑΤΑΣΤΑΣΗ ΕΙΝΑΙ
        ΤΟ ΠΡΩΤΟ ΒΗΜΑ, ΠΡΙΝ ΤΟΝ ΛΟΓΑΡΙΑΣΜΟ, ΙΔΙΑ ΣΕ ANDROID ΚΑΙ iPHONE.
        Ανακαλεί το v120 (1) «μόνο μετά τον λογαριασμό». Αιτία: στο iPhone η
@@ -5286,6 +5432,8 @@
   }
 
   function boot() {
+    /* KM-PRO-F1 · ο server δοκιμών φαίνεται ΠΑΝΤΑ ως δοκιμές — να μην μπερδευτεί ποτέ με το πραγματικό */
+    if (/workers\.dev$/.test(location.hostname)) { document.body.classList.add('is-staging'); }
     askPersist();
     if (!localStorage.getItem(LS.id)) {
       localStorage.setItem(LS.id, 'km_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
@@ -5362,6 +5510,7 @@
     if (!localStorage.getItem(LS.reg))      { kmRegister(); }   // εκκρεμής εγγραφή
     lastPull = Date.now();
     refreshActive();      // v35 — ενεργή ή αναγνώστρια; πριν ανοίξει η κάμερα
+    proRefresh().then(function (on) { document.body.classList.toggle('is-pro', on); if (on) { schedule(1500); } });   // KM-PRO-F1
     /* v47 · Η.13 — η μετανάστευση στη νέα βάση Κ τρέχει ΜΕΤΑ το κατέβασμα
        (τα τοπικά στοιχεία πρέπει να είναι η αλήθεια του φακέλου πριν
        ξαναγραφτούν) και ΠΡΙΝ ξεκινήσει ο κανονικός συγχρονισμός. Χωρίς

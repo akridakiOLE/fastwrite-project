@@ -1,0 +1,14 @@
+PRO F1 (staging) - anagnosi ana grammi + xoros dokimon (Stavros 12/10/2026)
+
+- wrangler.toml: [env.staging] = worker fastwrite-staging, DIKI tou D1 (fastwrite-staging) kai R2
+  (fastwrite-km-staging, EE), xoris cron, xoris Google/Microsoft. preview_urls=false ston kladho pro.
+- src/km_pro.js: /api/km/pro/status, /api/km/pro/read (Sonnet - metrisi 12/10: 5/5 sosta, to Haiku
+  epinoouse grammes), elegxoi grammis/athroismatos, protasi syskevasias + timi monadas,
+  kostos ana logariasmo ana mina (km_pro_usage, tavani PRO_MONTHLY_USD), admin grant MONO me PRO_LIVE=1.
+- app.js: PRO prwto stin oura anagnosis, grammes sta "Ekkremi", "posa exei 1 KIB;" otan leipei i
+  syskevasia, oi grammes ginontai oristikes MONO me tin "Apothikefsi" kai taxidevoun ston fakelo.
+- Staging: sima "STAGING" panta, xoris to vima egkatastasis (dokimes apo browser). Ekdosi v190.
+- tests/pro_f1.test.mjs (23 + 8 metallaxeis).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT
