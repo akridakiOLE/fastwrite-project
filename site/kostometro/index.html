@@ -473,6 +473,7 @@
   <div class="pg-body">
     <div class="grp">Τα τιμολόγιά μου</div>
     <button class="row" data-go="s-pend"><span class="row-l"><span class="row-t">Εκκρεμή</span><span class="row-sub">περιμένουν ποσά</span></span><span class="row-b" id="m-pend">0</span></button>
+    <button class="row" data-go="s-prices" id="m-prices-row" hidden><span class="row-l"><span class="row-t">📊 Τιμές</span><span class="row-sub">PRO · τελευταίες τιμές ανά προϊόν και προμηθευτή</span></span><span class="row-b">→</span></button>   <!-- KM-PRO-F2 -->
     <button class="row" data-go="s-sup"><span class="row-l"><span class="row-t">Προμηθευτές</span><span class="row-sub">όλα τα τιμολόγια ανά προμηθευτή</span></span><span class="row-b" id="m-sup">0</span></button>
     <div class="grp">Βοήθεια</div>
     <button class="row" data-go="s-faq"><span class="row-l"><span class="row-t">Ερωτήσεις &amp; απαντήσεις</span><span class="row-sub">ό,τι ρωτάνε όλοι</span></span><span class="row-b">→</span></button>
@@ -493,6 +494,15 @@
      απόφασης της 16/9. Κρατώντας το έξω «μέχρι τη δοκιμή» εγγυόμασταν ΔΕΥΤΕΡΗ
      δοκιμή. Τώρα ο δοκιμαστής το ακολουθεί και η ίδια η δοκιμή το επαληθεύει.
      Τα κείμενα ζουν στο app.js (FAQ), ώστε οι 🔗 σύνδεσμοι να οδηγούν σε οθόνες. -->
+<!-- ══ KM-PRO-F2 · «📊 Τιμές» — η λίστα της διαπραγμάτευσης (PRO) ══ -->
+<section id="s-prices" class="screen page" hidden>
+  <header class="pg-head">
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
+    <h2>📊 Τιμές</h2>
+  </header>
+  <div class="pg-body" id="prices-body"></div>
+</section>
+
 <section id="s-faq" class="screen page" hidden>
   <header class="pg-head">
     <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>

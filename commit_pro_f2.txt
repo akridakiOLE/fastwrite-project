@@ -1,0 +1,15 @@
+PRO F2 (staging) - vivlio timon (Stavros 10-12/10/2026)
+
+- Kentriko proion: kodikos pou DINEI TO SYSTIMA, koinos gia olous tous promitheftes.
+  "Einai idio me..." -> lista -> ena patima. Xoris patima kathe kodikos promithefti menei xoristos.
+- Syskevasia MIA fora ana kodiko promithefti, meta aftomata ("1,5L" x 6 = 9 litra).
+- Sima stin paralavi ana grammi: anti tin teleftaia tou IDIOU promithefti (+/- %) kai
+  "Fthinotera: X apo B" (ALLOS promitheftis).
+- Parathyro olon ton timon ana promithefti + mesos oros STATHMISMENOS me tin posotita.
+- "Timi" (menou, mono PRO): anazitisi kodikou/onomatos, filtro promithefti - lista diapragmatefsis.
+- Ixnos kathe allagis (link/unlink/pack) kai "Prosfates allages".
+- To vivlio taxidevei ston sfragismeno fakelo (pedio book) - grafei mono i energi syskevi.
+- Ekdosi v191. tests/pro_f2.test.mjs (22 + 8 metallaxeis, trexei ton pragmatiko kodika).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT

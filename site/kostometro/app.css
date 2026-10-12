@@ -797,3 +797,23 @@ body.on-iab .ag-fab{display:none!important}
 .pro-bp{font-size:12px;color:var(--accent)}
 .pro-ask{font-size:12px;color:#f0a020;font-weight:600}
 body.is-staging::before{content:"🧪 STAGING · δοκιμές PRO · όχι πραγματικά δεδομένα";position:fixed;top:0;left:0;right:0;z-index:200;background:#b45309;color:#fff;font:600 11px/1.6 sans-serif;text-align:center;pointer-events:none}
+
+/* KM-PRO-F2 · βιβλίο τιμών */
+.pro-sig{display:block;font-size:12px;font-weight:600}
+.pro-sig.up{color:#f05252}.pro-sig.down{color:var(--accent)}.pro-sig.same{color:var(--text3)}
+.pro-sig.alt{color:#f0a020}.pro-sig.new{color:var(--text3);font-weight:400}
+.pro-sheet{position:fixed;inset:0;z-index:90;background:rgba(4,8,14,.74);display:flex;align-items:flex-end;justify-content:center;padding:12px}
+.pro-sheet-c{width:100%;max-width:460px;max-height:calc(100dvh - 40px);overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.pro-sheet-c h3{margin:0;font-size:17px}
+.pro-tbl{width:100%;border-collapse:collapse;font-size:14px}
+.pro-tbl th{text-align:left;color:var(--text3);font-weight:500;font-size:12px;padding:4px 2px}
+.pro-tbl td{padding:6px 2px;border-top:1px solid var(--border)}
+.pro-tbl tr.best td{color:var(--accent);font-weight:700}
+.pro-avg{font-size:13px;color:var(--text2);margin:4px 0 0}
+.pro-find,.pro-sel{width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font:inherit;margin-bottom:8px}
+.pro-opts{display:flex;flex-direction:column;gap:6px;max-height:50dvh;overflow-y:auto}
+.pro-opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font:inherit;cursor:pointer}
+.pro-opt span{font-size:12px;color:var(--text3)}
+.pro-pid{font-size:11px;color:var(--text3);font-weight:400}
+.pro-log{font-size:12px;color:var(--text2);background:var(--bg3);border-radius:10px;padding:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:4px}
+.pro-card{gap:6px}

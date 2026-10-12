@@ -11,6 +11,8 @@
   var LS = {
     /* KM-PRO-F1 · η τελευταία γνωστή κατάσταση PRO {pro, at} — από τον server, ποτέ από τη συσκευή */
     pro: 'km_pro',
+    /* KM-PRO-F2 · το βιβλίο τιμών: κεντρικά προϊόντα, αντιστοιχίσεις, συσκευασίες, ίχνος — ταξιδεύει στον φάκελο */
+    book: 'km_book',
     /* v89 · KM-UPD-TOAST — ποια έκδοση είδε ο χρήστης τελευταία στην κάμερα */
     seenVer: 'km_seen_ver',
     /* v113 · KM-READ-GIFT — η τελευταία γνωστή κατάσταση του δώρου {active, left, at}.
@@ -339,6 +341,7 @@
   SCREENS.push('s-own');   // v118 · KM-OWN-PROOF — επιβεβαίωση κατόχου πριν από νέες 12 λέξεις
   SCREENS.push('s-iab', 's-qr', 's-qrin');   // v120 · Messenger · QR (Α) · QR (Β)
   SCREENS.push('s-have', 's-scan');   // v122 · KM-V122-HAVE αναγνώριση email · KM-V122-SCAN σάρωση QR
+  SCREENS.push('s-prices');   // KM-PRO-F2 · «📊 Τιμές»
   SCREENS.push('s-step1');   // v124 · KM-V124-ORDER — «Βήμα 1 από 2» στον browser
   function show(id) {
     /* v120 · (4) στην κάμερα ο Κώστας ανεβαίνει πάνω από το κουμπί λήψης (δεν το σκεπάζει) */
@@ -481,6 +484,7 @@
     if (id === 's-ref')      { renderRef(); }
     if (id === 's-dpend')    { dpStart(); } else { dpStop(); }
     if (id === 's-settings') { renderSettings(); }
+    if (id === 's-prices')   { renderPrices(); }   /* KM-PRO-F2 */
   }
 
   /* ── Μορφοποίηση ── */
@@ -585,6 +589,7 @@
       var supNames = {};
       rows.forEach(function (r) { if (r.supplier) { supNames[r.supplier] = 1; } });
       el('m-sup').textContent = Object.keys(supNames).length;
+      if (el('m-prices-row')) { el('m-prices-row').hidden = !proOn(); }   /* KM-PRO-F2 */
     });
     hpLoad();   // v95 · κουκκίδα «νέα απάντηση» στην Υποστήριξη
   }
@@ -650,6 +655,7 @@
         });
         list.sort(function (a, b) { return seen[a.id] - seen[b.id]; });
       }
+      PIDX = proOn() ? priceIndex(rows) : null;   /* KM-PRO-F2 */
       list.forEach(function (r) { body.appendChild(pendCard(r)); });
 
       /* Καθαρισμός επιλογών που δεν υπάρχουν πια (π.χ. αποθηκεύτηκαν) */
@@ -1116,17 +1122,31 @@
       var unitTxt = ln.base_price !== null && ln.base_price !== undefined && ln.pack
         ? '<span class="pro-bp">' + num(ln.base_price) + ' ' + (PRO_BASE[ln.pack.base] || '') + '</span>'
         : (ln.pack ? '' : '<span class="pro-ask">📦 πόσα έχει 1 ' + escH(ln.unit || 'συσκ.') + ';</span>');
+      bookApplyPack(r.supplier, ln);   /* KM-PRO-F2 — συσκευασία που επιβεβαίωσε ο Boss για αυτόν τον κωδικό */
+      if (ln.base_price !== null && ln.base_price !== undefined && ln.pack) {
+        unitTxt = '<span class="pro-bp">' + num(ln.base_price) + ' ' + (PRO_BASE[ln.pack.base] || '') + '</span>';
+      }
       row.innerHTML = '<span class="pro-d"><b>' + escH(ln.code || '') + '</b> ' + escH(ln.desc || '') + '</span>' +
         '<span class="pro-n">' + (ln.qty === null ? '—' : String(ln.qty).replace('.', ',')) + ' ' + escH(ln.unit || '') +
-        ' × ' + proMoney(ln.unit_price) + ' = <b>' + proMoney(ln.line_net) + '</b> ' + (ln.ok ? '✓' : '⚠') + '</span>' + unitTxt;
-      row.onclick = function () { proEditLine(r, i); };
+        ' × ' + proMoney(ln.unit_price) + ' = <b>' + proMoney(ln.line_net) + '</b> ' + (ln.ok ? '✓' : '⚠') + '</span>' + unitTxt +
+        priceSignalHtml(r, ln);   /* KM-PRO-F2 — σήμα στην παραλαβή */
+      row.onclick = function () { lineSheet(r, i); };
       box.appendChild(row);
     });
     var note = document.createElement('p');
     note.className = 'fine hint';
-    note.textContent = 'Πάτα μια γραμμή για διόρθωση. Οι γραμμές γράφονται μόνο με την «Αποθήκευση».';
+    note.textContent = 'Πάτα μια γραμμή: τιμές, «είναι ίδιο με…», συσκευασία, διόρθωση. Οι γραμμές γράφονται μόνο με την «Αποθήκευση».';
     box.appendChild(note);
     return box;
+  }
+  /* KM-PRO-F2 · «ΝΕΡΟ 1,5L» · 1 ΚΙΒ = 6 → 9 λίτρα (όχι 6 τεμάχια): το μέγεθος από την περιγραφή. */
+  function packFromCount(desc, n) {
+    var m = /(\d+(?:[.,]\d+)?)\s*(ml|cl|lt|ltr|l|λτ|kg|κιλ|gr|g|γρ)(?![a-zα-ω])/i.exec(String(desc || ''));
+    if (!m) { return { per: n, base: 'pc' }; }
+    var v = parseFloat(m[1].replace(',', '.')), u = m[2].toLowerCase();
+    var sz = /^(ml)$/.test(u) ? v / 1000 : u === 'cl' ? v / 100 : /^(gr|g|γρ)$/.test(u) ? v / 1000 : v;
+    var base = /^(kg|κιλ|gr|g|γρ)$/.test(u) ? 'kg' : 'L';
+    return { per: Math.round(sz * n * 1000) / 1000, base: base };
   }
   function escH(t) { return String(t === null || t === undefined ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   /* Διόρθωση γραμμής — απλή στη Φ1 (οι πλήρεις οθόνες στη Φ2 μαζί με το βιβλίο τιμών). */
@@ -1135,8 +1155,9 @@
     if (!ln.pack) {
       var n = prompt('📦 ' + (ln.desc || '') + '\n\nΠόσα τεμάχια έχει 1 ' + (ln.unit || 'συσκευασία') + ';\n(γράψε αριθμό — π.χ. 24)', '');
       if (n !== null && parseNum(n) > 0) {
-        var per = parseNum(n);
-        ln.pack = { per: per, base: 'pc', sure: true, why: 'user' };
+        var pk0 = packFromCount(ln.desc, parseNum(n)), per = pk0.per;   /* KM-PRO-F2 */
+        ln.pack = { per: per, base: pk0.base, sure: true, why: 'user' };
+        bookSetPack(r.supplier, ln, ln.pack);   /* KM-PRO-F2 — μία φορά ανά κωδικό προμηθευτή (απόφαση 11/10) */
         if (ln.unit_price !== null) { ln.base_price = Math.round((ln.unit_price * (1 - (ln.disc_pct || 0) / 100) / per) * 10000) / 10000; }
         put(r).then(renderPending);
       }
@@ -1164,6 +1185,258 @@
                   checks: r.proSug.check && r.proSug.check.approve === 'auto' ? 'pass' : 'fail',
                   approved: 'manual', at: Date.now() };
     delete r.proSug;
+  }
+
+
+  /* ══ KM-PRO-F2 · ΒΙΒΛΙΟ ΤΙΜΩΝ (Brief PRO ↔ FastWrite §3 Φ2 · αποφάσεις Stavros 10–12/10/2026) ══
+     · ΚΕΝΤΡΙΚΟ ΠΡΟΪΟΝ: κωδικός που ΔΙΝΕΙ ΤΟ ΣΥΣΤΗΜΑ (ποτέ πληκτρολόγηση), κοινός για όλους τους
+       προμηθευτές. «Είναι ίδιο με…» → λίστα → ένα πάτημα. Χωρίς αντιστοίχιση κάθε κωδικός
+       προμηθευτή είναι δικό του προϊόν — ΠΟΤΕ «ίδιο» χωρίς πάτημα ανθρώπου.
+     · ΣΥΣΚΕΥΑΣΙΑ: ΜΙΑ φορά ανά κωδικό προμηθευτή, μετά αυτόματα.
+     · ΙΧΝΟΣ: κάθε αλλαγή αντιστοίχισης/συσκευασίας γράφεται (ποιος, πότε, από τι σε τι) και φαίνεται.
+     · Τα στοιχεία ζουν στον σφραγισμένο φάκελο (πεδίο «book»)· γράφει ΜΟΝΟ η ενεργή συσκευή.
+     · Μέσος όρος = ΣΤΑΘΜΙΣΜΕΝΟΣ με την ποσότητα, στη μονάδα σύγκρισης (€/κιλό, €/λίτρο, €/τεμ.). */
+  var BOOK = null, PIDX = null;
+  function bookRead() {
+    if (BOOK) { return BOOK; }
+    try { BOOK = JSON.parse(localStorage.getItem(LS.book) || 'null'); } catch (e) { BOOK = null; }
+    if (!BOOK || BOOK.v !== 1) { BOOK = { v: 1, ver: 0, prods: {}, items: {}, log: [] }; }
+    return BOOK;
+  }
+  function bookSave(kind, item, from, to) {
+    var b = bookRead();
+    b.ver = Date.now();
+    if (kind) {
+      b.log.push({ at: b.ver, kind: kind, item: item, from: from === undefined ? null : from, to: to === undefined ? null : to, by: 'boss' });
+      if (b.log.length > 1000) { b.log = b.log.slice(-1000); }
+    }
+    try { localStorage.setItem(LS.book, JSON.stringify(b)); } catch (e) {}
+    if (!pulling && typeof unsyncedBump === 'function') { unsyncedBump(); }
+    if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
+  }
+  function bookForPush() { var b = bookRead(); return b.ver ? b : undefined; }
+  /* Ένας γράφει (η ενεργή συσκευή): το νεότερο βιβλίο κερδίζει ολόκληρο. */
+  function bookMerge(remote) {
+    if (!remote || remote.v !== 1) { return; }
+    var b = bookRead();
+    if ((remote.ver || 0) > (b.ver || 0)) {
+      BOOK = remote;
+      try { localStorage.setItem(LS.book, JSON.stringify(remote)); } catch (e) {}
+    }
+  }
+  function itemKey(sup, ln) {
+    var s = norm(sup || '');
+    return s + '|' + (ln.code ? 'c:' + norm(ln.code) : 'd:' + norm(ln.desc || ''));
+  }
+  function newPid() { return 'P' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase(); }
+  function pidOf(key) { var it = bookRead().items[key]; return it && it.pid ? it.pid : key; }
+  function prodName(pid) {
+    var b = bookRead();
+    if (b.prods[pid]) { return b.prods[pid].name; }
+    var it = b.items[pid];
+    return it ? it.name : pid.split('|').slice(1).join('|').replace(/^[cd]:/, '');
+  }
+  function bookApplyPack(sup, ln) {
+    var it = bookRead().items[itemKey(sup, ln)];
+    if (it && it.pack && it.pack.per > 0) {
+      ln.pack = { per: it.pack.per, base: it.pack.base, sure: true, why: 'book' };
+      if (ln.unit_price !== null && ln.unit_price !== undefined) {
+        ln.base_price = Math.round((ln.unit_price * (1 - (ln.disc_pct || 0) / 100) / it.pack.per) * 10000) / 10000;
+      }
+    }
+  }
+  function bookItem(sup, ln) {
+    var b = bookRead(), k = itemKey(sup, ln);
+    if (!b.items[k]) { b.items[k] = { sup: sup, code: ln.code || null, name: ln.desc || ln.code || '', pid: null, pack: null }; }
+    return b.items[k];
+  }
+  function bookSetPack(sup, ln, pack) {
+    var it = bookItem(sup, ln), was = it.pack;
+    it.pack = { per: pack.per, base: pack.base };
+    bookSave('pack', itemKey(sup, ln), was, it.pack);
+  }
+  /* «Είναι ίδιο με…»: ο κωδικός του ΣΥΣΤΗΜΑΤΟΣ. Αν ο στόχος δεν έχει ακόμα κεντρικό προϊόν,
+     δημιουργείται τώρα και μπαίνουν ΚΑΙ οι δύο κωδικοί προμηθευτή μέσα. */
+  function bookLink(sup, ln, targetPid) {
+    var b = bookRead(), it = bookItem(sup, ln), key = itemKey(sup, ln);
+    var pid = targetPid;
+    if (!b.prods[pid]) {
+      var other = b.items[targetPid];              // implicit: ο στόχος είναι κωδικός προμηθευτή χωρίς προϊόν
+      pid = newPid();
+      b.prods[pid] = { name: (other && other.name) || it.name, at: Date.now() };
+      if (other) { other.pid = pid; }
+      else { b.items[targetPid] = { sup: targetPid.split('|')[0], code: null, name: prodName(targetPid), pid: pid, pack: null }; }
+    }
+    var was = it.pid;
+    it.pid = pid;
+    bookSave('link', key, was, pid);
+    return pid;
+  }
+  function bookUnlink(key) {
+    var b = bookRead(), it = b.items[key];
+    if (!it || !it.pid) { return; }
+    var was = it.pid; it.pid = null;
+    bookSave('unlink', key, was, null);
+  }
+  /* Ο ΔΕΙΚΤΗΣ: κάθε επιβεβαιωμένη γραμμή, ομαδοποιημένη ανά κεντρικό προϊόν. */
+  function priceIndex(rows) {
+    var byPid = {};
+    rows.forEach(function (r) {
+      if (!r.lines || !r.lines.length || isPending(r)) { return; }
+      var d = dateOf(r);
+      r.lines.forEach(function (ln0) {
+        var ln = { code: ln0.code, desc: ln0.desc, unit_price: ln0.unit_price, disc_pct: ln0.disc_pct, pack: ln0.pack, base_price: ln0.base_price, qty: ln0.qty };
+        bookApplyPack(r.supplier, ln);
+        if (ln.base_price === null || ln.base_price === undefined || !ln.pack) { return; }
+        var key = itemKey(r.supplier, ln), pid = pidOf(key);
+        var g = byPid[pid] || (byPid[pid] = { pid: pid, base: ln.pack.base, sups: {}, wsum: 0, wq: 0, n: 0 });
+        var s = g.sups[r.supplier] || (g.sups[r.supplier] = { sup: r.supplier, last: null, lastAt: 0, keys: {} });
+        s.keys[key] = 1;
+        if (d >= s.lastAt) { s.lastAt = d; s.last = ln.base_price; s.recId = r.id; }
+        var q = (ln.qty || 1) * ln.pack.per;
+        g.wsum += ln.base_price * q; g.wq += q; g.n++;
+      });
+    });
+    Object.keys(byPid).forEach(function (k) { var g = byPid[k]; g.avg = g.wq ? g.wsum / g.wq : null; });
+    return byPid;
+  }
+  function pct(a, b) { return b ? Math.round(((a - b) / b) * 1000) / 10 : 0; }
+  function priceSignalHtml(r, ln) {
+    if (!PIDX || ln.base_price === null || ln.base_price === undefined || !ln.pack) { return ''; }
+    var key = itemKey(r.supplier, ln), g = PIDX[pidOf(key)];
+    if (!g) { return '<span class="pro-sig new">🆕 πρώτη αγορά</span>'; }
+    var out = '', me = g.sups[r.supplier];
+    if (me && me.last !== null) {
+      var p = pct(ln.base_price, me.last);
+      out += p > 0.5 ? '<span class="pro-sig up">🔺 +' + String(p).replace('.', ',') + '% από την τελευταία (' + num(me.last) + ', ' + dstr(me.lastAt) + ')</span>'
+           : p < -0.5 ? '<span class="pro-sig down">🔻 ' + String(p).replace('.', ',') + '% από την τελευταία (' + num(me.last) + ')</span>'
+           : '<span class="pro-sig same">= ίδια με την τελευταία</span>';
+    }
+    var best = null;
+    Object.keys(g.sups).forEach(function (s) {
+      if (s === r.supplier) { return; }
+      var x = g.sups[s];
+      if (x.last !== null && (!best || x.last < best.last)) { best = x; }
+    });
+    if (best && best.last < ln.base_price) {
+      out += '<span class="pro-sig alt">Φθηνότερα: ' + num(best.last) + ' ' + (PRO_BASE[g.base] || '') + ' από ' + escH(best.sup) + ' (' + dstr(best.lastAt) + ')</span>';
+    }
+    return out;
+  }
+  /* ── φύλλο γραμμής: τιμές · «ίδιο με…» · συσκευασία · διόρθωση ── */
+  function sheet(html) {
+    var old = el('pro-sheet'); if (old) { old.remove(); }
+    var w = document.createElement('div');
+    w.id = 'pro-sheet'; w.className = 'pro-sheet';
+    w.innerHTML = '<div class="pro-sheet-c">' + html + '<button class="btn ghost" data-x>Κλείσιμο</button></div>';
+    w.onclick = function (e) { if (e.target === w || e.target.hasAttribute('data-x')) { w.remove(); } };
+    document.body.appendChild(w);
+    return w;
+  }
+  function pricesHtml(pid) {
+    var g = PIDX && PIDX[pid];
+    if (!g) { return '<p class="fine">Δεν υπάρχει ακόμα άλλη αγορά αυτού του προϊόντος.</p>'; }
+    var sups = Object.keys(g.sups).map(function (k) { return g.sups[k]; }).filter(function (x) { return x.last !== null; })
+      .sort(function (a, b) { return a.last - b.last; });
+    return '<table class="pro-tbl"><tr><th>Προμηθευτής</th><th>Τελευταία</th><th>Ημ/νία</th></tr>' +
+      sups.map(function (x, i) { return '<tr' + (i === 0 ? ' class="best"' : '') + '><td>' + escH(x.sup) + '</td><td>' + num(x.last) + '</td><td>' + dstr(x.lastAt) + '</td></tr>'; }).join('') +
+      '</table><p class="pro-avg">Μέσος όρος (σταθμισμένος): <b>' + (g.avg === null ? '—' : num(Math.round(g.avg * 10000) / 10000)) + ' ' + (PRO_BASE[g.base] || '') + '</b> · ' + g.n + ' αγορές</p>';
+  }
+  function lineSheet(r, i) {
+    var ln = r.proSug.lines[i];
+    var key = itemKey(r.supplier, ln), pid = pidOf(key);
+    var linked = !!bookRead().prods[pid];
+    var w = sheet('<h3>' + escH(ln.desc || ln.code || '') + '</h3>' +
+      '<p class="fine">' + escH(r.supplier || '') + (ln.code ? ' · κωδ. ' + escH(ln.code) : '') +
+      (linked ? ' · <b>κεντρικό προϊόν ' + escH(pid) + '</b>' : '') + '</p>' +
+      pricesHtml(pid) +
+      '<button class="btn primary" data-a="same">🔗 Είναι ίδιο με…</button>' +
+      (linked ? '<button class="btn ghost" data-a="unlink">✂ Δεν είναι ίδιο — βγάλ’ το</button>' : '') +
+      '<button class="btn ghost" data-a="pack">📦 Συσκευασία' + (ln.pack ? ': ' + String(ln.pack.per).replace('.', ',') + ' ' + ({ kg: 'κιλ.', L: 'λτ', pc: 'τεμ.' }[ln.pack.base] || '') : ' — λείπει') + '</button>' +
+      '<button class="btn ghost" data-a="edit">✏ Διόρθωση ποσότητας / τιμής</button>');
+    w.querySelector('[data-a="same"]').onclick = function () { w.remove(); sameAsSheet(r, ln); };
+    var u = w.querySelector('[data-a="unlink"]');
+    if (u) { u.onclick = function () { if (confirm('Να βγει από το κεντρικό προϊόν ' + pid + ';')) { bookUnlink(key); w.remove(); renderPending(); } }; }
+    w.querySelector('[data-a="pack"]').onclick = function () {
+      w.remove();
+      var n = prompt('📦 ' + (ln.desc || '') + '\n\nΠόσα τεμάχια έχει 1 ' + (ln.unit || 'συσκευασία') + ';\n(αριθμός — π.χ. 24)', ln.pack ? String(ln.pack.per).replace('.', ',') : '');
+      if (n === null || !(parseNum(n) > 0)) { return; }
+      var pk = packFromCount(ln.desc, parseNum(n));
+      ln.pack = { per: pk.per, base: pk.base, sure: true, why: 'user' };
+      bookSetPack(r.supplier, ln, pk);
+      bookApplyPack(r.supplier, ln);
+      put(r).then(renderPending);
+    };
+    w.querySelector('[data-a="edit"]').onclick = function () { w.remove(); proEditLine(r, i); };
+  }
+  function sameAsSheet(r, ln) {
+    all().then(function (rows) {
+      var idx = PIDX || priceIndex(rows), me = pidOf(itemKey(r.supplier, ln));
+      var opts = Object.keys(idx).filter(function (p) { return p !== me; }).map(function (p) { return { pid: p, name: prodName(p), g: idx[p] }; })
+        .sort(function (a, b) { return a.name.localeCompare(b.name, 'el'); });
+      var w = sheet('<h3>«' + escH(ln.desc || '') + '» είναι ίδιο με…</h3>' +
+        '<input class="pro-find" type="search" placeholder="Αναζήτηση κωδικού ή ονόματος…">' +
+        '<div class="pro-opts"></div>' +
+        '<p class="fine">Το σύστημα δίνει τον κοινό κωδικό. Μπορείς να το αλλάξεις αργότερα — η αλλαγή καταγράφεται.</p>');
+      var box = w.querySelector('.pro-opts'), f = w.querySelector('.pro-find');
+      function draw() {
+        var q = norm(f.value);
+        box.innerHTML = '';
+        opts.filter(function (o) { return !q || norm(o.name + ' ' + o.pid + ' ' + Object.keys(o.g.sups).join(' ')).indexOf(q) >= 0; }).slice(0, 80).forEach(function (o) {
+          var b = document.createElement('button');
+          b.type = 'button'; b.className = 'pro-opt';
+          b.innerHTML = '<b>' + escH(o.name) + '</b><span>' + escH(Object.keys(o.g.sups).join(' · ')) + '</span>';
+          b.onclick = function () {
+            if (!confirm('«' + (ln.desc || '') + '» = «' + o.name + '»;\n\nΘα συγκρίνονται μαζί, σε ' + (PRO_BASE[o.g.base] || '') + '.')) { return; }
+            bookLink(r.supplier, ln, o.pid);
+            w.remove(); renderPending();
+          };
+          box.appendChild(b);
+        });
+        if (!box.children.length) { box.innerHTML = '<p class="fine">Τίποτα. Αν είναι νέο προϊόν, δεν χρειάζεται τίποτα — μένει μόνο του.</p>'; }
+      }
+      f.oninput = draw; draw();
+    });
+  }
+  /* ── «📊 Τιμές» — η λίστα για τη διαπραγμάτευση (απόφαση 10/10 σημείο 5) ── */
+  function renderPrices() {
+    var body = el('prices-body');
+    body.innerHTML = '';
+    all().then(function (rows) {
+      PIDX = priceIndex(rows);
+      var b = bookRead();
+      var f = document.createElement('input');
+      f.type = 'search'; f.className = 'pro-find'; f.placeholder = 'Κωδικός ή όνομα προϊόντος…';
+      var sel = document.createElement('select'); sel.className = 'pro-sel';
+      var sups = {};
+      Object.keys(PIDX).forEach(function (p) { Object.keys(PIDX[p].sups).forEach(function (s) { sups[s] = 1; }); });
+      sel.innerHTML = '<option value="">Όλοι οι προμηθευτές</option>' + Object.keys(sups).sort().map(function (s) { return '<option>' + escH(s) + '</option>'; }).join('');
+      var list = document.createElement('div');
+      body.appendChild(f); body.appendChild(sel); body.appendChild(list);
+      var recent = b.log.slice(-5).reverse();
+      if (recent.length) {
+        var lg = document.createElement('div'); lg.className = 'pro-log';
+        lg.innerHTML = '<b>🔁 Πρόσφατες αλλαγές</b>' + recent.map(function (x) {
+          var what = x.kind === 'link' ? 'μπήκε στο ' + escH(prodName(x.to)) : x.kind === 'unlink' ? 'βγήκε από ' + escH(prodName(x.from)) : 'συσκευασία ' + (x.to ? String(x.to.per).replace('.', ',') : '—');
+          return '<div>' + dstr(x.at) + ' · ' + escH(String(x.item).split('|').slice(1).join(' ').replace(/^[cd]:/, '')) + ' — ' + what + '</div>';
+        }).join('');
+        body.insertBefore(lg, f);
+      }
+      function draw() {
+        var q = norm(f.value), s = sel.value;
+        list.innerHTML = '';
+        var ps = Object.keys(PIDX).map(function (p) { return PIDX[p]; })
+          .filter(function (g) { return (!s || g.sups[s]) && (!q || norm(prodName(g.pid) + ' ' + g.pid + ' ' + Object.keys(g.sups).map(function (k) { return Object.keys(g.sups[k].keys).join(' '); }).join(' ')).indexOf(q) >= 0); })
+          .sort(function (a, b) { return prodName(a.pid).localeCompare(prodName(b.pid), 'el'); });
+        if (!ps.length) { list.innerHTML = '<p class="empty">' + (Object.keys(PIDX).length ? 'Τίποτα με αυτό το φίλτρο.' : 'Δεν υπάρχουν ακόμα αποθηκευμένες γραμμές.<br>Φωτογράφισε τιμολόγια — οι τιμές μαζεύονται εδώ μόνες τους.') + '</p>'; return; }
+        ps.slice(0, 300).forEach(function (g) {
+          var c = document.createElement('div'); c.className = 'card pro-card';
+          c.innerHTML = '<div class="card-sup">' + escH(prodName(g.pid)) + (bookRead().prods[g.pid] ? ' <span class="pro-pid">' + escH(g.pid) + '</span>' : '') + '</div>' + pricesHtml(g.pid);
+          list.appendChild(c);
+        });
+      }
+      f.oninput = draw; sel.onchange = draw; draw();
+    });
   }
 
   /* ══ Ο ΠΡΟΜΗΘΕΥΤΗΣ ΜΟΥ ══ */
@@ -2338,7 +2611,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v190';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
+  var APP_VER = 'φέτα 3 · v191';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -4467,7 +4740,7 @@
   function pushMeta(rows, key, baseVer) {
     /* v43 — «gone»: τα id όσων διαγράφηκαν. Παλιότερες εκδόσεις αγνοούν
        άγνωστο πεδίο, οπότε ο φάκελος μένει συμβατός προς τα πίσω. */
-    var payload = new TextEncoder().encode(JSON.stringify({ v: 1, shots: rows.map(metaOf), gone: goneRead() }));
+    var payload = new TextEncoder().encode(JSON.stringify({ v: 1, shots: rows.map(metaOf), gone: goneRead(), book: bookForPush() }));
     return kmSeal(key, payload).then(function (sealed) {
       var h = kmHead();
       h['Content-Type'] = 'application/octet-stream';
@@ -4747,7 +5020,7 @@
       if (!plain) { return null; }
       var data = JSON.parse(new TextDecoder().decode(plain));
       if (!data) { return null; }
-      return { shots: data.shots || [], gone: data.gone || [] };
+      return { shots: data.shots || [], gone: data.gone || [], book: data.book || null };   /* KM-PRO-F2 */
     }).catch(function (e) {
       pullInfo.msg = 'δεν άνοιξε ο φάκελος: ' + (e && e.message ? e.message : e);
       return null;
@@ -4982,6 +5255,7 @@
            άλλη συσκευή εκτελείται εδώ, και η δική μας δεν χάνεται όταν
            ανέβει ξανά ο φάκελος. */
         goneAdd(folder.gone || []);
+        bookMerge(folder.book);   /* KM-PRO-F2 */
         var dead = goneMap();
         shots = shots.filter(function (m) { return !dead[m.id]; });
         return all().then(function (rows) {
