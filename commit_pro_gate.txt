@@ -1,0 +1,9 @@
+KM-PRO-STAGING-LOGIN: πόρτα δοκιμών μόνο στο staging (σύνδεσμος μίας χρήσης)
+
+- /api/km/auth/test/callback: ΜΟΝΟ με STAGING_LOGIN=1 (μόνο [env.staging]) · κλειδί μίας χρήσης, 30', στη βάση μόνο hash
+- μετά ακολουθεί η ίδια διαδρομή με την επιστροφή από Google (ίδιος έλεγχος email, ίδιο token)
+- KM_PUBLIC_ORIGIN στο staging: η σύνδεση δεν γυρίζει πια στο fastwrite.tech (εκεί έπεφτε στη Free)
+- τεστ + Μ10/Μ11
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT

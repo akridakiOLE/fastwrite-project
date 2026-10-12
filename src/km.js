@@ -131,6 +131,9 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/read/activate" && method === "POST") return readActivate(request, env);
   if (path === "/api/km/read" && method === "POST") return readInvoice(request, env);
   // KM-OAUTH (29/9/2026) — Σύνδεση με Google / Microsoft
+  // KM-PRO-STAGING-LOGIN (12/10/2026) · πόρτα ΜΟΝΟ του server δοκιμών (STAGING_LOGIN=1 μόνο στο [env.staging]).
+  // Στην παραγωγή η μεταβλητή ΔΕΝ υπάρχει → η διαδρομή δεν υπάρχει (404 όπως κάθε άγνωστη).
+  if (path === "/api/km/auth/test/callback" && method === "GET" && String(env.STAGING_LOGIN || "") === "1") return stagingLogin(request, env);
   { const m = /^\/api\/km\/auth\/(google|microsoft)\/(start|callback)$/.exec(path);
     if (m && method === "GET") return m[2] === "start" ? oauthStart(request, env, m[1]) : oauthCallback(request, env, m[1]); }
   if (path === "/api/km/ref/check" && method === "GET") return refCheck(request, env);
@@ -1156,6 +1159,23 @@ export async function oauthVerifyIdToken(idToken, P, clientId, nonce) {
   if (typeof claims.exp !== "number" || claims.exp * 1000 < Date.now() - 60000) throw new Error("expired");
   if (claims.nonce !== nonce) throw new Error("bad_nonce");
   return claims;
+}
+
+// KM-PRO-STAGING-LOGIN · σύνδεσμος ΜΙΑΣ χρήσης, 30 λεπτά, που φτιάχνει το bat του Stavros
+// (deploy_v000_pro_login.bat → γραμμή «test:<email>» στο km_oauth_states, μόνο το hash του κλειδιού).
+// Μετά ακολουθεί ΑΚΡΙΒΩΣ η ίδια διαδρομή με την επιστροφή από Google: ίδιος έλεγχος email, ίδιο token.
+const STAGING_LOGIN_TTL_MS = 30 * 60 * 1000;
+async function stagingLogin(request, env) {
+  const k = new URL(request.url).searchParams.get("k") || "";
+  if (!/^[0-9a-f]{64}$/.test(k)) return oauthBack(env, oauthFrag("err", { code: "state" }), false);
+  const row = await env.DB.prepare("DELETE FROM km_oauth_states WHERE state_hash = ? AND provider LIKE 'test:%' RETURNING *")
+    .bind(await sha256hex(k)).first();
+  if (!row || Date.parse(row.created) < Date.now() - STAGING_LOGIN_TTL_MS) return oauthBack(env, oauthFrag("err", { code: "state" }), false);
+  const email = normEmail(String(row.provider).slice(5));
+  if (!email) return oauthBack(env, oauthFrag("err", { code: "no_email" }), false);
+  const busy = await emailBusy(env, email);
+  if (busy) return oauthBack(env, oauthFrag("err", { code: busy, e: email }), false);
+  return oauthBack(env, oauthFrag("ok", { t: await issueEmailToken(env, email), e: email, p: "google" }), false);
 }
 
 async function oauthCallback(request, env, prov) {

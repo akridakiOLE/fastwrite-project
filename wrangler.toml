@@ -128,6 +128,8 @@ run_worker_first = ["/api/*"]
 
 [env.staging.vars]
 PRO_LIVE = "1"
+STAGING_LOGIN = "1"
+KM_PUBLIC_ORIGIN = "https://fastwrite-staging.stavrosfkallenos.workers.dev"
 AGENT_DAILY_USD = "2"
 READ_DAILY_USD = "2"
 

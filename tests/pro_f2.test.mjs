@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 const ONLY = (() => { const a = process.argv.find((x) => x.startsWith("--mutate=")); return a ? Number(a.split("=")[1]) : null; })();
 let js = readFileSync("site/kostometro/app.js", "utf8");
 let html = readFileSync("site/kostometro/index.html", "utf8");
+let km = readFileSync("src/km.js", "utf8");
+const toml = readFileSync("wrangler.toml", "utf8");
 const MUT = [
   // Μ1 · 🔴 μέσος όρος ΧΩΡΙΣ στάθμιση με την ποσότητα
   ["js", "var q = (ln.qty || 1) * ln.pack.per;", "var q = 1;"],
@@ -23,11 +25,15 @@ const MUT = [
   ["js", "    if (!m) { return { per: n, base: 'pc' }; }\n    var v", "    return { per: n, base: 'pc' };\n    var v"],
   // Μ9 · 🔴 (το σφάλμα της 12/10) δύο συναρτήσεις με το ΙΔΙΟ όνομα — η δεύτερη σκεπάζει την πρώτη
   ["js", "  function pidOf(recId, slot) {", "  function bookPid(recId, slot) {"],
+  // Μ10 · 🔴 η πόρτα δοκιμών ανοίγει και ΧΩΡΙΣ τη μεταβλητή του staging (= και στην παραγωγή)
+  ["km", ' && String(env.STAGING_LOGIN || "") === "1") return stagingLogin', ") return stagingLogin"],
+  // Μ11 · 🔴 ο σύνδεσμος δοκιμών ξαναχρησιμοποιείται (διαβάζεται χωρίς να σβηστεί)
+  ["km", "DELETE FROM km_oauth_states WHERE state_hash = ? AND provider LIKE 'test:%' RETURNING *", "SELECT * FROM km_oauth_states WHERE state_hash = ? AND provider LIKE 'test:%'"],
 ];
 if (ONLY !== null) {
-  const m = MUT[ONLY - 1]; const bag = { js, html };
+  const m = MUT[ONLY - 1]; const bag = { js, html, km };
   if (!m || !bag[m[0]].includes(m[1])) { console.log("Η ΜΕΤΑΛΛΑΞΗ Μ" + ONLY + " ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ"); process.exit(1); }
-  bag[m[0]] = bag[m[0]].replace(m[1], m[2]); ({ js, html } = bag);
+  bag[m[0]] = bag[m[0]].replace(m[1], m[2]); ({ js, html, km } = bag);
 }
 let pass = 0, fail = 0;
 // κατάρρευση = ο κώδικας έσπασε: σε --mutate ΜΕΤΡΑΕΙ ως «πιάστηκε», κανονικά ως αποτυχία
@@ -115,6 +121,12 @@ ok(/SCREENS\.push\('s-prices'\)/.test(js), "s-prices στη SCREENS");
 const fnames = [...js.matchAll(/^  function ([A-Za-z0-9_$]+)\(/gm)].map((m) => m[1]);
 const dup = fnames.filter((n, i) => fnames.indexOf(n) !== i);
 ok(!dup.length, "🔴 καμία διπλή δήλωση συνάρτησης στο app.js" + (dup.length ? " — ΔΙΠΛΕΣ: " + dup.join(", ") : ""));
+// 🔴 πόρτα δοκιμών: υπάρχει ΜΟΝΟ στο staging, μία χρήση
+ok(km.includes('path === "/api/km/auth/test/callback" && method === "GET" && String(env.STAGING_LOGIN || "") === "1") return stagingLogin'), "🔴 πόρτα δοκιμών μόνο με STAGING_LOGIN=1");
+ok(km.includes("DELETE FROM km_oauth_states WHERE state_hash = ? AND provider LIKE 'test:%' RETURNING *"), "🔴 ο σύνδεσμος δοκιμών σβήνεται τη στιγμή που χρησιμοποιείται");
+const stg = toml.indexOf("[env.staging]");
+ok(stg > 0 && toml.indexOf("STAGING_LOGIN") > stg && toml.lastIndexOf("STAGING_LOGIN") === toml.indexOf("STAGING_LOGIN"), "🔴 STAGING_LOGIN γραμμένο ΜΟΝΟ μέσα στο [env.staging]");
+ok(toml.indexOf("KM_PUBLIC_ORIGIN") > stg, "η επιστροφή σύνδεσης του staging μένει στο staging (όχι στο fastwrite.tech)");
 console.log("\n" + pass + " ✔ · " + fail + " ✘");
 if (ONLY !== null) process.exit(fail ? 0 : 1);
 process.exit(fail ? 1 : 0);
