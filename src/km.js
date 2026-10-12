@@ -182,6 +182,7 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/support/thread" && method === "POST") return supportThread(request, env);
   if (path === "/api/km/support/close" && method === "POST") return supportClose(request, env);
   if (path === "/api/km/support/inbound" && method === "POST") return supportInbound(request, env);
+  if (path === "/api/km/support/mail-log" && method === "POST") return supportMailLog(request, env);   // v129 · KM-MAIL-LOG
   // Η.11β: GET = ποιοι ΘΑ σβήνονταν τώρα · POST = σβήνει. Ιδιο μοτίβο με το
   // admin/cleanup, και για τον ίδιο λόγο: δεν εμπιστεύεσαι αυτόματη διαγραφή
   // που δεν μπορείς να δεις πρώτα. Το ?now= επιτρέπει στα τεστ να «γεράσουν»
@@ -475,6 +476,35 @@ async function supportClose(request, env) {
   ).bind(now(), code, a.id.folder).run();
   if (!(r && r.meta && r.meta.changes)) return json({ ok: false, error: "unknown_case" }, 404);
   return json({ ok: true, status: "closed" });
+}
+
+// ── v129 · KM-MAIL-LOG (12/10/2026, Stavros: «ΔΕΝ γνωρίζουμε τίποτα» — περίπτωση Nicolas) ────────────
+// POST /api/km/support/mail-log {items:[{msg_id, thread_id, mailbox, dir:'in'|'out', peer, peer_name, subject, at, snippet}]}
+// ΜΟΝΟ το Apps Script του admin@ (KM_SUPPORT_KEY). Κάθε μήνυμα ΜΙΑ φορά (msg_id). Κρατάμε μεταδεδομένα + 200
+// χαρακτήρες — τα κείμενα μένουν στο Gmail· ο Πίνακας δίνει σύνδεσμο στη συζήτηση.
+const MAIL_LOG_MAX = 200;
+const MAIL_OURS_RE = /@fastwrite\.tech$/i;
+async function supportMailLog(request, env) {
+  if (!supportKeyOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const items = Array.isArray(b.items) ? b.items.slice(0, MAIL_LOG_MAX) : [];
+  let saved = 0, skipped = 0;
+  for (const x of items) {
+    const msg = clean(x && x.msg_id, 64), th = clean(x && x.thread_id, 64);
+    const box = (clean(x && x.mailbox, 80) || "").toLowerCase();
+    const dir = x && x.dir === "out" ? "out" : (x && x.dir === "in" ? "in" : null);
+    const peer = normEmail(x && x.peer);
+    const at = clean(x && x.at, 40);
+    // ποτέ «επαφή» ο εαυτός μας ή αυτόματος αποστολέας
+    if (!msg || !th || !dir || !peer || !MAIL_OURS_RE.test(box) || MAIL_OURS_RE.test(peer) || !at || isNaN(Date.parse(at))
+        || /^(no-?reply|mailer-daemon|postmaster)@/i.test(peer)) { skipped++; continue; }
+    const r = await env.DB.prepare(
+      `INSERT OR IGNORE INTO km_corr (msg_id, thread_id, mailbox, dir, peer, peer_name, subject, at, snippet)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(msg, th, box, dir, peer, clean(x.peer_name, 80), clean(x.subject, 200), new Date(at).toISOString(), clean(x.snippet, 200)).run();
+    if (r && r.meta && r.meta.changes) saved++; else skipped++;
+  }
+  return json({ ok: true, saved, skipped });
 }
 
 // POST /api/km/support/inbound {code, from, text, kind:'in'|'out'} — ΜΟΝΟ το Apps Script (KM_SUPPORT_KEY).
@@ -2902,6 +2932,7 @@ const RETENTION = {
   leads_months: 24,
   // v93 · KM-SUP-ARRIVED — αριθμοί αιτημάτων που έφτασαν (μόνο αριθμός + ώρες)
   support_months: 24,
+  mail_months: 24,   // v129 · KM-MAIL-LOG
 };
 const CLEANUP_BATCH = 500;
 
@@ -2956,6 +2987,7 @@ export async function kmCleanup(env, nowIso) {
     lead_sends:      await wipe("km_lead_sends", "email IN (SELECT email FROM km_leads WHERE consent_at < ?)", monthsAgo(RETENTION.leads_months, nowIso)),
     leads:           await wipe("km_leads", "consent_at < ?", monthsAgo(RETENTION.leads_months, nowIso)),
     support_tickets: await wipe("km_support_tickets", "issued_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
+    mail_log:        await wipe("km_corr", "at < ?", monthsAgo(RETENTION.mail_months, nowIso)),
     // v95 · KM-SUP-THREAD — ΠΡΩΤΑ τα μηνύματα, μετά τα αιτήματα
     support_messages: await wipe("km_support_messages", "code IN (SELECT code FROM km_support_cases WHERE status = 'closed' AND closed_at < ?)", monthsAgo(RETENTION.support_months, nowIso)),
     support_cases: await wipe("km_support_cases", "status = 'closed' AND closed_at < ?", monthsAgo(RETENTION.support_months, nowIso)),
@@ -3225,7 +3257,20 @@ async function adminPinakas(request, env) {
   } catch (e) { /* πριν τη μετάβαση της βάσης ο Πίνακας ΔΕΝ πέφτει */ }
 
   // v97 · KM-FUNNEL — χωνί 30 ημερών ανά προέλευση + κάρτα leads (διαγραφές από τη λίστα)
-  let funnel = [], leads = null;
+  let funnel = [], leads = null, mlog = null;
+  try {   // v129 · KM-MAIL-LOG — μία γραμμή ανά επαφή, τελευταία πρώτα
+    const mp = await all(
+      `SELECT peer, MAX(peer_name) AS peer_name, MIN(at) AS first_at, MAX(at) AS last_at,
+              SUM(CASE WHEN dir = 'in' THEN 1 ELSE 0 END) AS n_in, SUM(CASE WHEN dir = 'out' THEN 1 ELSE 0 END) AS n_out,
+              (SELECT subject FROM km_corr z WHERE z.peer = m.peer ORDER BY at DESC LIMIT 1) AS last_subject,
+              (SELECT thread_id FROM km_corr z WHERE z.peer = m.peer ORDER BY at DESC LIMIT 1) AS last_thread,
+              (SELECT dir FROM km_corr z WHERE z.peer = m.peer ORDER BY at DESC LIMIT 1) AS last_dir,
+              GROUP_CONCAT(DISTINCT mailbox) AS boxes
+       FROM km_corr m${whereC("at")} GROUP BY peer ORDER BY last_at DESC LIMIT 200`, ...SA);
+    mlog = { peers: mp.map((r) => ({ peer: r.peer, name: r.peer_name || "", first_at: r.first_at, last_at: r.last_at,
+      n_in: Number(r.n_in) || 0, n_out: Number(r.n_out) || 0, last_subject: r.last_subject || "", last_thread: r.last_thread || "",
+      last_dir: r.last_dir, boxes: String(r.boxes || "").split(",").filter(Boolean) })) };
+  } catch (e) { mlog = null; }
   try {
     funnel = await all("SELECT src, step, COUNT(*) AS n FROM km_funnel WHERE at >= ? GROUP BY src, step", s0 || d30);
   } catch (e) { funnel = []; }
@@ -3333,7 +3378,7 @@ async function adminPinakas(request, env) {
     mail_30d: { sent: mail.sent || 0, ok: mail.ok || 0, failed: mail.failed || 0 },
     feedback: { n: fb.n || 0, avg_stars: fb.avg_stars ? Number(fb.avg_stars).toFixed(2) : null, want_reply: fb.want_reply || 0 },
     support: sup,
-    funnel: funnel, leads: leads,
+    funnel: funnel, leads: leads, mail: mlog,
     read_gift: readGift,   // v113 · KM-READ-GIFT
     kostas: kostas,        // v114 · KM-PK-KOSTAS
     accounts: list.rows,

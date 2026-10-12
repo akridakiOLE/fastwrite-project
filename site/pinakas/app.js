@@ -297,6 +297,22 @@
       el('ld-un').innerHTML = ul.map(function (r) { return '<tr><td>' + esc(r.email) + '</td><td>' + esc(r.name || '') + '</td><td>' + fmtDate(r.unsub_at) + '</td></tr>'; }).join('');
     }
 
+    /* v129 · KM-MAIL-LOG — κάρτα «Αλληλογραφία» */
+    var ml = j.mail, mp = (ml && ml.peers) || [];
+    el('ml-card').hidden = !ml;
+    if (ml) {
+      el('k-ml-p').textContent = mp.length;
+      el('k-ml-in').textContent = mp.reduce(function (a, r) { return a + r.n_in; }, 0);
+      el('k-ml-out').textContent = mp.reduce(function (a, r) { return a + r.n_out; }, 0);
+      el('k-ml-wait').textContent = mp.filter(function (r) { return r.last_dir === 'in'; }).length;
+      el('ml').innerHTML = mp.length ? mp.map(function (r) {
+        var g = r.last_thread ? 'https://mail.google.com/mail/?authuser=admin@fastwrite.tech#all/' + encodeURIComponent(r.last_thread) : '';
+        return '<tr' + (r.last_dir === 'in' ? ' class="hot"' : '') + '><td>' + esc(r.name ? r.name + ' · ' : '') + esc(r.peer) + '</td><td>' + fmtDate(r.first_at) + '</td><td>' + fmtDate(r.last_at) +
+          '</td><td>' + r.n_in + '</td><td>' + r.n_out + '</td><td>' + (r.last_dir === 'in' ? '↓ ' : '↑ ') + esc(r.last_subject) + '</td><td>' +
+          (g ? '<a href="' + g + '" target="_blank" rel="noopener">Gmail ↗</a>' : '') + '</td></tr>';
+      }).join('') : '<tr><td colspan="7" class="muted">Τίποτα ακόμα — το Apps Script στέλνει κάθε 10 λεπτά.</td></tr>';
+    }
+
     /* v114 · KM-PK-KOSTAS — κάρτα «Κώστας (βοηθός)» */
     var ks = j.kostas;
     el('ks-card').hidden = !ks;

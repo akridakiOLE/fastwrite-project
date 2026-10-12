@@ -1,0 +1,11 @@
+v129: Πίνακας — κάρτα «Αλληλογραφία» (support@ / stavros@)
+
+- Απόφαση Stavros 12/10 (περίπτωση Nicolas: «ΔΕΝ γνωρίζουμε τίποτα»)
+- POST /api/km/support/mail-log (ΜΟΝΟ KM_SUPPORT_KEY): μεταδεδομένα + 200 χαρακτήρες, κάθε μήνυμα μία φορά
+- νέος πίνακας km_corr · διαγραφή μετά από 24 μήνες
+- Πίνακας: μία γραμμή ανά επαφή — πρώτη/τελευταία, ήρθαν/στείλαμε, «περιμένουν απάντηση», σύνδεσμος Gmail
+- tools/support/mail_log.gs: Apps Script του admin@, κάθε 10′, ιστορικό 90 ημερών στην εγκατάσταση
+- tests/v129 + 6 μεταλλάξεις
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT

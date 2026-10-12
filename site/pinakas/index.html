@@ -82,6 +82,7 @@
   .tag.acc{background:var(--accent-dim);color:var(--accent)}
   .fine{font-size:13px;color:var(--text2)}
   .fine.hint{color:var(--text3);font-size:12px}
+  tr.hot td{background:rgba(255,170,0,.08)}   /* v129 · περιμένουν απάντηση */
   .sub-h{font-size:14px;margin:16px 0 6px;color:var(--text2);font-weight:600}   /* KM-PK-V128-LEADS */
   .err{color:var(--danger);font-size:14px;margin-top:8px}
   .muted{color:var(--text3)}
@@ -294,6 +295,19 @@ html:not([data-gate]) #s-data  { display: none !important; }
     <h3 class="sub-h">Αποστολές</h3>
     <div class="scroll"><table><thead><tr><th>αποστολή</th><th>θέμα</th><th>ημερομηνία</th><th>έλαβαν</th><th>απέτυχαν</th></tr></thead><tbody id="ld-camp"></tbody></table></div>
     <div class="scroll" id="ld-un-wrap" hidden><h3 class="sub-h">Βγήκαν από τη λίστα</h3><table><thead><tr><th>email</th><th>όνομα</th><th>βγήκε</th></tr></thead><tbody id="ld-un"></tbody></table></div>
+  </section>
+
+  <!-- v129 · KM-MAIL-LOG — ΑΛΛΗΛΟΓΡΑΦΙΑ support@ / stavros@ (Apps Script του admin@, κάθε 10′) -->
+  <section class="card" id="ml-card">
+    <h2>Αλληλογραφία <span class="muted">support@ · stavros@ · μία γραμμή ανά επαφή</span></h2>
+    <div class="grid">
+      <div class="kpi"><div class="n" id="k-ml-p">—</div><div class="l">επαφές</div></div>
+      <div class="kpi"><div class="n" id="k-ml-in">—</div><div class="l">ήρθαν</div></div>
+      <div class="kpi"><div class="n" id="k-ml-out">—</div><div class="l">στείλαμε</div></div>
+      <div class="kpi"><div class="n" id="k-ml-wait">—</div><div class="l">περιμένουν απάντηση μας</div></div>
+    </div>
+    <div class="scroll"><table><thead><tr><th>επαφή</th><th>πρώτη</th><th>τελευταία</th><th>ήρθαν</th><th>στείλαμε</th><th>τελευταίο θέμα</th><th></th></tr></thead><tbody id="ml"></tbody></table></div>
+    <p class="fine hint">Άνοιγμα και κλικ: τα δείχνει το Mailtrack μέσα στο Gmail, πάνω σε κάθε email. «Περιμένουν» = το τελευταίο μήνυμα ήρθε από την επαφή.</p>
   </section>
 
   <!-- v114 · KM-PK-KOSTAS — ο βοηθός: συνομιλίες, κόστος, παραδόσεις, ραντεβού -->
