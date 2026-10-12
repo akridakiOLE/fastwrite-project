@@ -1,0 +1,11 @@
+v130: «Αλληλογραφία» — ΜΟΝΟ άνθρωποι
+
+- Απόφαση Stavros 12/10: ο πίνακας μετρούσε Google Play/Payments/Instagram/Apple ως επαφές
+- server: απορρίπτει noreply όπου κι αν βρίσκεται (googleplay-noreply@, do_not_reply@, notifications@, bounce)
+  και τους 3 προσωπικούς λογαριασμούς του Stavros
+- mail_log.gs: σημάδι auto (List-Unsubscribe / List-Id / Auto-Submitted / Precedence / Return-Path noreply)
+- καθαρισμός km_corr μετά το deploy · το Apps Script ξαναστέλνει 90 ημέρες καθαρά
+- tests/v130 + 7 μεταλλάξεις
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT

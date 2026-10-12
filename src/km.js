@@ -484,6 +484,12 @@ async function supportClose(request, env) {
 // χαρακτήρες — τα κείμενα μένουν στο Gmail· ο Πίνακας δίνει σύνδεσμο στη συζήτηση.
 const MAIL_LOG_MAX = 200;
 const MAIL_OURS_RE = /@fastwrite\.tech$/i;
+// v130 · KM-CORR-V130 — ΜΟΝΟ άνθρωποι στην «Αλληλογραφία» (Stavros 12/10).
+// (α) οι προσωπικοί λογαριασμοί του Stavros ΔΕΝ είναι επαφές, (β) αυτόματοι αποστολείς όπου κι αν
+// έχουν το «noreply» (googleplay-noreply@, do_not_reply@, notifications@, bounce…), (γ) ό,τι το Apps Script
+// σημάδεψε auto (List-Unsubscribe / Auto-Submitted / Precedence bulk / Return-Path noreply — Instagram, Apple).
+const MAIL_SELF = ["stavrosfkallenos@gmail.com", "pricelbkallenos@gmail.com", "platiaenastavros@gmail.com"];
+const MAIL_AUTO_RE = /(^|[._+-])(no[._-]?reply|do[._-]?not[._-]?reply|donotreply|notifications?|mailer-daemon|postmaster|bounces?)([._+-]|@)/i;
 async function supportMailLog(request, env) {
   if (!supportKeyOk(request, env)) return new Response("Not found", { status: 404 });
   const b = (await safeJson(request)) || {};
@@ -497,7 +503,7 @@ async function supportMailLog(request, env) {
     const at = clean(x && x.at, 40);
     // ποτέ «επαφή» ο εαυτός μας ή αυτόματος αποστολέας
     if (!msg || !th || !dir || !peer || !MAIL_OURS_RE.test(box) || MAIL_OURS_RE.test(peer) || !at || isNaN(Date.parse(at))
-        || /^(no-?reply|mailer-daemon|postmaster)@/i.test(peer)) { skipped++; continue; }
+        || MAIL_AUTO_RE.test(peer) || MAIL_SELF.indexOf(peer) >= 0 || (x && x.auto)) { skipped++; continue; }
     const r = await env.DB.prepare(
       `INSERT OR IGNORE INTO km_corr (msg_id, thread_id, mailbox, dir, peer, peer_name, subject, at, snippet)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
