@@ -1,0 +1,9 @@
+v127: οδηγία iPhone για iOS 26 — το «Κοινοποίηση» είναι μέσα στις «···» κάτω δεξιά
+
+- Εύρημα σε πραγματικό iPhone 16 · iOS 26.5 (TestingBot, 12/10/2026)
+- Ίδια οδηγία σε: οθόνη εγκατάστασης, Ερωτήσεις & απαντήσεις, γνώση του Κώστα
+- install_ui Ε-3: επιτρέπεται «τρεις τελείες «···»» (iOS 26)· απαγορεύεται μόνο το ⋮ του Chrome Android
+- tests/v127 + 4 μεταλλάξεις
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT
