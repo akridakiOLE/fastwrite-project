@@ -1,0 +1,8 @@
+KM-PRO-V194: γραμμές PRO — 3 δεκαδικά, αβέβαιη συσκευασία ρωτάει, «Κώστας AI» αντί Gemini
+
+- proUnitTxt: τιμή μονάδας 3 δεκαδικά · αβέβαιη συσκευασία → «1 εξάδ. = 9 λτ;» (ήταν σιωπή)
+- σημείωση ανάγνωσης στο PRO: «Διαβάστηκαν από τον Κώστα AI»
+- τεστ + Μ14 · από τη δοκιμή του Stavros 12/10 (Deigma_4/5)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz9KE7hmTwh3Rdgco3pgQT

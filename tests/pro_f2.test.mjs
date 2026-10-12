@@ -33,6 +33,8 @@ const MUT = [
   ["js", "!localStorage.getItem(LS.skip) && !proOn(); }", "!localStorage.getItem(LS.skip); }"],
   // Μ13 · 🔴 η εκκίνηση αποφασίζει για την οθόνη κλειδιού ΠΡΙΝ μάθει αν είναι PRO
   ["js", "    proP.then(function () {   /* KM-PRO-NOKEY */\n      if (needKeyScreen())", "    (function (f) { f(); })(function () {\n      if (needKeyScreen())"],
+  // Μ14 · 🔴 αβέβαιη συσκευασία → σιωπή (ούτε τιμή ούτε ερώτηση)
+  ["js", "    if (ln.pack && ln.pack.per > 0) {\n      return '<span class=\"pro-ask\">", "    if (ln.pack && ln.pack.per > 0) {\n      return ''; return '<span class=\"pro-ask\">"],
 ];
 if (ONLY !== null) {
   const m = MUT[ONLY - 1]; const bag = { js, html, km };
@@ -135,6 +137,14 @@ ok(toml.indexOf("KM_PUBLIC_ORIGIN") > stg, "η επιστροφή σύνδεση
 ok(/function needKeyScreen\(\) \{ return !localStorage\.getItem\(LS\.key\) && !localStorage\.getItem\(LS\.skip\) && !proOn\(\); \}/.test(js), "🔴 PRO δεν βλέπει την οθόνη «κλειδί Gemini»");
 ok((js.match(/show\('s-key'\)/g) || []).length === (js.match(/if \(needKeyScreen\(\)\) \{ return show\('s-key'\); \}/g) || []).length, "🔴 ΚΑΘΕ δρόμος προς την οθόνη κλειδιού περνά από τον έλεγχο PRO");
 ok(js.includes("    proP.then(function () {   /* KM-PRO-NOKEY */\n      if (needKeyScreen())"), "🔴 η εκκίνηση περιμένει την απάντηση PRO (έως 2,5″) πριν δείξει την οθόνη κλειδιού");
+// v194 · γραμμή: τιμή μονάδας 3 δεκαδικά · αβέβαιη συσκευασία = ερώτηση
+{ const a2 = js.indexOf("  var PRO_PER = {"), b2 = js.indexOf("  function proConfirm(r) {");
+  const U = new Function("num", "escH", "PRO_BASE", js.slice(a2, b2) + "\nreturn proUnitTxt;")(
+    (v) => String(v).replace(".", ","), (x) => String(x), { L: "€/λίτρο", kg: "€/κιλό", pc: "€/τεμ." });
+  ok(/1,273 €\/λίτρο/.test(U({ base_price: 1.2727, pack: { per: 7.92, base: "L", sure: true } })), "τιμή μονάδας με 3 δεκαδικά (1,273 όχι 1,2727)");
+  ok(/📦 1 εξάδ\. = 9 λτ;/.test(U({ base_price: null, unit: "εξάδ.", pack: { per: 9, base: "L", sure: false } })), "🔴 αβέβαιη συσκευασία → «1 εξάδ. = 9 λτ;» (ποτέ σιωπή)");
+  ok(/πόσα έχει 1 κιβ\.;/.test(U({ base_price: null, unit: "κιβ.", pack: null })), "άγνωστη συσκευασία → «πόσα έχει 1 κιβ.;»"); }
+ok(js.includes("(proOn() ? 'τον Κώστα AI' : 'το Gemini')"), "στο PRO γράφει «Διαβάστηκαν από τον Κώστα AI», όχι Gemini");
 console.log("\n" + pass + " ✔ · " + fail + " ✘");
 if (ONLY !== null) process.exit(fail ? 0 : 1);
 process.exit(fail ? 1 : 0);

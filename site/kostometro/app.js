@@ -923,7 +923,7 @@
     if (prefilled) {
       var note = document.createElement('p');
       note.className = 'ai-note';
-      note.textContent = 'Διαβάστηκαν από το Gemini — έλεγξε με τη φωτογραφία και πάτα Αποθήκευση.';
+      note.textContent = 'Διαβάστηκαν από ' + (proOn() ? 'τον Κώστα AI' : 'το Gemini') + ' — έλεγξε με τη φωτογραφία και πάτα Αποθήκευση.';   /* KM-PRO-V194 */
       amts.appendChild(note);
     }
 
@@ -1130,13 +1130,8 @@
       var row = document.createElement('button');
       row.type = 'button';
       row.className = 'pro-ln' + (ln.ok ? '' : ' bad');
-      var unitTxt = ln.base_price !== null && ln.base_price !== undefined && ln.pack
-        ? '<span class="pro-bp">' + num(ln.base_price) + ' ' + (PRO_BASE[ln.pack.base] || '') + '</span>'
-        : (ln.pack ? '' : '<span class="pro-ask">📦 πόσα έχει 1 ' + escH(ln.unit || 'συσκ.') + ';</span>');
       bookApplyPack(r.supplier, ln);   /* KM-PRO-F2 — συσκευασία που επιβεβαίωσε ο Boss για αυτόν τον κωδικό */
-      if (ln.base_price !== null && ln.base_price !== undefined && ln.pack) {
-        unitTxt = '<span class="pro-bp">' + num(ln.base_price) + ' ' + (PRO_BASE[ln.pack.base] || '') + '</span>';
-      }
+      var unitTxt = proUnitTxt(ln);   /* KM-PRO-V194 */
       row.innerHTML = '<span class="pro-d"><b>' + escH(ln.code || '') + '</b> ' + escH(ln.desc || '') + '</span>' +
         '<span class="pro-n">' + (ln.qty === null ? '—' : String(ln.qty).replace('.', ',')) + ' ' + escH(ln.unit || '') +
         ' × ' + proMoney(ln.unit_price) + ' = <b>' + proMoney(ln.line_net) + '</b> ' + (ln.ok ? '✓' : '⚠') + '</span>' + unitTxt +
@@ -1188,6 +1183,18 @@
     put(r).then(renderPending);
   }
   /* Με την «Αποθήκευση»: οι γραμμές γίνονται οριστικές, με σημάδι ΠΩΣ εγκρίθηκαν (Α350 §9.8 Ε). */
+  /* KM-PRO-V194 · τιμή μονάδας με 3 δεκαδικά· συσκευασία που ΔΕΝ είναι σίγουρη → ερώτηση, ποτέ σιωπή
+     (12/10: «Νερό 1,5L (6x1,5L)» δεν έδειχνε ούτε τιμή ούτε ερώτηση). */
+  var PRO_PER = { L: 'λτ', kg: 'κιλά', pc: 'τεμ.' };
+  function proUnitTxt(ln) {
+    if (ln.base_price !== null && ln.base_price !== undefined && ln.pack) {
+      return '<span class="pro-bp">' + num(Math.round(ln.base_price * 1000) / 1000) + ' ' + (PRO_BASE[ln.pack.base] || '') + '</span>';
+    }
+    if (ln.pack && ln.pack.per > 0) {
+      return '<span class="pro-ask">📦 1 ' + escH(ln.unit || 'συσκ.') + ' = ' + num(ln.pack.per) + ' ' + (PRO_PER[ln.pack.base] || '') + '; — πάτα να το επιβεβαιώσεις</span>';
+    }
+    return '<span class="pro-ask">📦 πόσα έχει 1 ' + escH(ln.unit || 'συσκ.') + ';</span>';
+  }
   function proConfirm(r) {
     if (!r.proSug || !r.proSug.lines) { return; }
     r.lines = r.proSug.lines;
@@ -2625,7 +2632,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v193';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
+  var APP_VER = 'φέτα 3 · v194';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
