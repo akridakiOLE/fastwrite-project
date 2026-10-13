@@ -13,6 +13,9 @@
     pro: 'km_pro',
     /* KM-PRO-F2 · το βιβλίο τιμών: κεντρικά προϊόντα, αντιστοιχίσεις, συσκευασίες, ίχνος — ταξιδεύει στον φάκελο */
     book: 'km_book',
+    /* KM-PRO-F3 · η ομάδα: team = κλειδιά Boss + S/H (ταξιδεύουν στον φάκελο) · member = αυτή η συσκευή είναι ΜΕΛΟΣ (όχι λογαριασμός) */
+    team: 'km_team', member: 'km_member', mkey: 'km_member_key', slipCache: 'km_slip', histCache: 'km_hist',
+    slipH: 'km_slip_hash', histH: 'km_hist_hash', decQ: 'km_team_decq', msent: 'km_member_sent',
     /* v89 · KM-UPD-TOAST — ποια έκδοση είδε ο χρήστης τελευταία στην κάμερα */
     seenVer: 'km_seen_ver',
     /* v113 · KM-READ-GIFT — η τελευταία γνωστή κατάσταση του δώρου {active, left, at}.
@@ -342,7 +345,8 @@
   SCREENS.push('s-iab', 's-qr', 's-qrin');   // v120 · Messenger · QR (Α) · QR (Β)
   SCREENS.push('s-have', 's-scan');   // v122 · KM-V122-HAVE αναγνώριση email · KM-V122-SCAN σάρωση QR
   SCREENS.push('s-prices');   // KM-PRO-F2 · «📊 Τιμές»
-  SCREENS.push('s-step1');   // v124 · KM-V124-ORDER — «Βήμα 1 από 2» στον browser
+  SCREENS.push('s-step1');
+  SCREENS.push('s-team', 's-mstate');   // KM-PRO-F3 · «👥 Ομάδα» · κατάσταση μέλους   // v124 · KM-V124-ORDER — «Βήμα 1 από 2» στον browser
   function show(id) {
     /* v120 · (4) στην κάμερα ο Κώστας ανεβαίνει πάνω από το κουμπί λήψης (δεν το σκεπάζει) */
     try { document.body.classList.toggle('on-cam', id === 's-cam'); } catch (e) {}
@@ -485,6 +489,7 @@
     if (id === 's-dpend')    { dpStart(); } else { dpStop(); }
     if (id === 's-settings') { renderSettings(); }
     if (id === 's-prices')   { renderPrices(); }   /* KM-PRO-F2 */
+    if (id === 's-team')     { renderTeam(); }     /* KM-PRO-F3 */
   }
 
   /* ── Μορφοποίηση ── */
@@ -557,7 +562,7 @@
       b.className = 'sup';
       b.textContent = s.name;
       var n = document.createElement('span');
-      n.className = 'sup-n'; n.textContent = s.n + ' τιμ.';
+      n.className = 'sup-n'; n.textContent = s.n === null ? '' : s.n + ' τιμ.';
       b.appendChild(n);
       b.onclick = function () { assign(s.name); };   /* v57: fromList — δες assign() */
       box.appendChild(b);
@@ -566,7 +571,7 @@
   }
   function renderSuppliers() {
     return all().then(function (rows) {
-      whoNames = supplierNames(rows);
+      whoNames = memberMode() ? ((SLIP && SLIP.sups) || []).map(function (n) { return { name: n, n: null }; }) : supplierNames(rows);   /* KM-PRO-F3 */
       el('who-find').value = '';
       drawSuppliers();
       whoMode(whoNames.length ? 'list' : 'new');
@@ -590,6 +595,12 @@
       rows.forEach(function (r) { if (r.supplier) { supNames[r.supplier] = 1; } });
       el('m-sup').textContent = Object.keys(supNames).length;
       if (el('m-prices-row')) { el('m-prices-row').hidden = !proOn(); }   /* KM-PRO-F2 */
+      /* KM-PRO-F3 · «👥 Ομάδα»: Boss σε PRO · manager με «διαχείριση». Μέλος: μόνο Εκκρεμή, Τιμές, (Ομάδα), Αποσύνδεση */
+      var mm = memberMode(), mi = memberInfo();
+      if (el('m-team-row')) { el('m-team-row').hidden = mm ? !(mi && mi.manage) : !proOn(); }
+      if (el('m-leave-row')) { el('m-leave-row').hidden = !mm; }
+      Array.prototype.forEach.call(document.querySelectorAll('#s-menu [data-go="s-pend"], #m-prices-row, #m-team-row, #m-leave-row, #s-menu .menu-foot'), function (x) { x.classList.add('mem-ok'); });
+      if (mm && el('m-prices-row')) { el('m-prices-row').querySelector('.row-sub').textContent = 'τελευταίες τιμές ανά προμηθευτή'; }
     });
     hpLoad();   // v95 · κουκκίδα «νέα απάντηση» στην Υποστήριξη
   }
@@ -604,12 +615,14 @@
   var UNDO_MS = 10000;
   function renderPending() {
     aiSweep();
+    if (!memberMode() && proOn() && teamRead()) { teamSoon(400); }   /* KM-PRO-F3 — φέρε ό,τι έστειλε η ομάδα */
     var body = el('pend-body');
     body.innerHTML = '';
     all().then(function (rows) {
       var list = rows.filter(isPending);
       if (!list.length) {
-        body.innerHTML = '<p class="empty">Δεν έχεις εκκρεμή.<br>Ό,τι φωτογράφισες έχει ποσά.</p>';
+        body.innerHTML = memberMode() ? '<p class="empty">Τίποτα για αποστολή.</p>' : '<p class="empty">Δεν έχεις εκκρεμή.<br>Ό,τι φωτογράφισες έχει ποσά.</p>';
+        if (memberMode()) { body.appendChild(memberSentBlock()); }   /* KM-PRO-F3 */
         pendOrder = null;
         return;
       }
@@ -655,8 +668,9 @@
         });
         list.sort(function (a, b) { return seen[a.id] - seen[b.id]; });
       }
-      PIDX = proOn() ? priceIndex(rows) : null;   /* KM-PRO-F2 */
+      PIDX = memberMode() ? slipIndex() : proOn() ? priceIndex(rows) : null;   /* KM-PRO-F2 · F3: στο μέλος, από το δελτίο */
       list.forEach(function (r) { body.appendChild(pendCard(r)); });
+      if (memberMode()) { body.appendChild(memberSentBlock()); return; }   /* KM-PRO-F3 — χωρίς μαζικές ενέργειες */
 
       /* Καθαρισμός επιλογών που δεν υπάρχουν πια (π.χ. αποθηκεύτηκαν) */
       var alive = {};
@@ -842,7 +856,7 @@
            έβγαινε από την ουρά και καμία διαδρομή δεν το ξανάβαζε. */
         var again = document.createElement('button');
         again.className = 'btn ghost retry-btn';
-        again.hidden = isReader();
+        again.hidden = roMode();   /* KM-PRO-F3 */
         again.textContent = '🔄 Δοκίμασε ξανά';
         again.onclick = function () {
           again.disabled = true;
@@ -923,14 +937,15 @@
     if (prefilled) {
       var note = document.createElement('p');
       note.className = 'ai-note';
-      note.textContent = 'Διαβάστηκαν από ' + (proOn() ? 'τον Κώστα AI' : 'το Gemini') + ' — έλεγξε με τη φωτογραφία και πάτα Αποθήκευση.';   /* KM-PRO-V194 */
+      note.textContent = memberMode() ? 'Διαβάστηκαν από τον Κώστα AI — δες τη σύγκριση τιμών και πάτα «📤 Αποστολή».' :   /* KM-PRO-F3 */
+        'Διαβάστηκαν από ' + (proOn() ? 'τον Κώστα AI' : 'το Gemini') + ' — έλεγξε με τη φωτογραφία και πάτα Αποθήκευση.';   /* KM-PRO-V194 */
       amts.appendChild(note);
     }
 
     /* Η ανάγνωση τρέχει ΜΕΤΑ την αποθήκευση, άρα η ημερομηνία που διάβασε
        το Gemini εμφανίζεται εδώ — όχι στην προεπισκόπηση, όπου δεν την ξέρουμε
        ακόμα. Πρόταση με ένα πάτημα, ποτέ αυτόματη αλλαγή. */
-    if (sug && sug.date && !isReader() && Math.abs(sug.date - dateOf(r)) > 86400000) {
+    if (sug && sug.date && !roMode() && Math.abs(sug.date - dateOf(r)) > 86400000) {
       var ds = document.createElement('div');
       ds.className = 'date-sug';
       var dt = document.createElement('span');
@@ -951,18 +966,18 @@
        Τα πεδία μένουν ορατά (ο χρήστης θέλει να ΔΕΙ τα ποσά) αλλά κλειστά,
        και μια γραμμή λέει γιατί — κουμπί που εξαφανίστηκε χωρίς εξήγηση
        διαβάζεται ως σφάλμα της εφαρμογής. */
-    if (isReader()) {
+    if (roMode()) {   /* KM-PRO-F3 — και στο μέλος: τα ποσά τα ελέγχει ο ιδιοκτήτης */
       ['net', 'vat', 'total'].forEach(function (k) {
         inputs[k].readOnly = true;
         inputs[k].tabIndex = -1;
       });
       var ron = document.createElement('p');
       ron.className = 'ro-note';
-      ron.textContent = 'Μόνο ανάγνωση — η επεξεργασία γίνεται στην ενεργή συσκευή.';
+      ron.textContent = memberMode() ? 'Τα ποσά τα ελέγχει ο ιδιοκτήτης όταν το παραλάβει.' : 'Μόνο ανάγνωση — η επεξεργασία γίνεται στην ενεργή συσκευή.';
       amts.appendChild(ron);
     }
 
-    return { node: amts, inputs: inputs, readOnly: isReader() };
+    return { node: amts, inputs: inputs, readOnly: roMode() };   /* KM-PRO-F3 */
   }
 
   function pendCard(r) {
@@ -978,6 +993,12 @@
     meta.innerHTML = '<div class="card-sup"></div><div class="card-date"></div>';
     meta.querySelector('.card-sup').textContent = r.supplier;
     meta.querySelector('.card-date').textContent = dstr(dateOf(r));
+    if (r.from) {   /* KM-PRO-F3 — πρόταση μέλους της ομάδας */
+      var fr = document.createElement('div');
+      fr.className = 'card-from';
+      fr.textContent = '📥 από ' + (r.from.n || 'μέλος') + ' (' + (MEMBER_ROLE[r.from.r] || 'ομάδα') + ') · ' + dstr(r.from.at) + ' ' + new Date(r.from.at).toTimeString().slice(0, 5);
+      meta.appendChild(fr);
+    }
     var thumb = document.createElement('span');
     thumb.className = 'thumb';
     thumb.appendChild(img);
@@ -986,7 +1007,7 @@
     var cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.className = 'pend-cb';
-    cb.hidden = isReader();          // v35 — χωρίς μαζική διαγραφή, χωρίς επιλογή
+    cb.hidden = roMode();            // v35 — χωρίς μαζική διαγραφή, χωρίς επιλογή · F3: ούτε στο μέλος
     cb.checked = !!pendPick[r.id];
     cb.setAttribute('aria-label', 'Επίλεξε τιμολόγιο ' + r.supplier);
     cb.onchange = function () {
@@ -1002,6 +1023,22 @@
     var ab = amountsBlock(r, { after: function () { renderPending(); } });
     var amts = ab.node, inputs = ab.inputs;
     var lb = (r.proSug && r.proSug.lines && r.proSug.lines.length) ? proLinesBlock(r) : null;   /* KM-PRO-F1 */
+    if (ab.readOnly && memberMode()) {   /* KM-PRO-F3 — το μέλος ΔΕΝ επεξεργάζεται: στέλνει ή σβήνει τη λήψη του */
+      var send = document.createElement('button');
+      send.className = 'btn primary m-send';
+      send.textContent = '📤 Αποστολή στον ιδιοκτήτη';
+      send.onclick = function () { memberSend(r, send); };
+      var mdel = document.createElement('button');
+      mdel.className = 'btn ghost del';
+      mdel.textContent = 'Διαγραφή';
+      mdel.onclick = function () { if (confirm('Να σβηστεί αυτή η φωτογραφία; Δεν έχει σταλεί.')) { del(r.id).then(function () { renderPending(); refreshCount(); }); } };
+      var macts = document.createElement('div'); macts.className = 'acts';
+      macts.appendChild(send); macts.appendChild(mdel);
+      c.appendChild(head); c.appendChild(amts);
+      if (lb) { c.appendChild(lb); }
+      c.appendChild(macts);
+      return c;
+    }
     if (ab.readOnly) {
       c.appendChild(head); c.appendChild(amts);
       if (lb) { c.appendChild(lb); }
@@ -1018,7 +1055,8 @@
       r.vat = parseNum(inputs.vat.value);
       r.net = parseNum(inputs.net.value);
       proConfirm(r);   /* KM-PRO-F1 — οι γραμμές γίνονται οριστικές ΜΟΝΟ με το πάτημα του ανθρώπου */
-      put(r).then(function () { renderPending(); refreshCount(); });
+      if (r.from) { teamDecide(r.from.p, 'approved'); }   /* KM-PRO-F3 — Αποθήκευση = έγκριση */
+      put(r).then(function () { renderPending(); refreshCount(); teamSoon(); });
     };
 
     var trash = document.createElement('button');
@@ -1027,6 +1065,7 @@
     trash.onclick = function () {
       if (!confirm('Διαγραφή αυτού του τιμολογίου;\n\n' + r.supplier + ' · ' + dstr(r.ts) +
                    '\n\nΣβήνεται και η φωτογραφία. Δεν επιστρέφει.')) { return; }
+      if (r.from) { teamDecide(r.from.p, 'rejected'); }   /* KM-PRO-F3 — Διαγραφή = απόρριψη */
       del(r.id).then(function () { renderPending(); refreshCount(); });
     };
 
@@ -1077,6 +1116,7 @@
       var rec = q[0];
       diag('PRO · διαβάζει ανά γραμμή…');
       Promise.all(pagesOf(rec).map(giftShrink)).then(function (b64s) {
+        if (memberMode()) { return mFetch('pro/m/read', { method: 'POST', body: JSON.stringify({ pages: b64s }) }); }   /* KM-PRO-F3 */
         return kmFetch('pro/read', { method: 'POST', headers: kmHead(), body: JSON.stringify({ pages: b64s }) });
       }).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
@@ -1136,12 +1176,13 @@
         '<span class="pro-n">' + (ln.qty === null ? '—' : String(ln.qty).replace('.', ',')) + ' ' + escH(ln.unit || '') +
         ' × ' + proMoney(ln.unit_price) + ' = <b>' + proMoney(ln.line_net) + '</b> ' + (ln.ok ? '✓' : '⚠') + '</span>' + unitTxt +
         priceSignalHtml(r, ln);   /* KM-PRO-F2 — σήμα στην παραλαβή */
-      row.onclick = function () { lineSheet(r, i); };
+      row.onclick = memberMode() ? null : function () { lineSheet(r, i); };   /* KM-PRO-F3 — το μέλος δεν αλλάζει τίποτα */
       box.appendChild(row);
     });
     var note = document.createElement('p');
     note.className = 'fine hint';
-    note.textContent = 'Πάτα μια γραμμή: τιμές, «είναι ίδιο με…», συσκευασία, διόρθωση. Οι γραμμές γράφονται μόνο με την «Αποθήκευση».';
+    note.textContent = memberMode() ? '🔺/🔻 = σύγκριση με την τελευταία τιμή. Ό,τι στέλνεις το ελέγχει ο ιδιοκτήτης.' :   /* KM-PRO-F3 */
+      'Πάτα μια γραμμή: τιμές, «είναι ίδιο με…», συσκευασία, διόρθωση. Οι γραμμές γράφονται μόνο με την «Αποθήκευση».';
     box.appendChild(note);
     return box;
   }
@@ -1254,6 +1295,7 @@
     try { localStorage.setItem(LS.book, JSON.stringify(b)); } catch (e) {}
     if (!pulling && typeof unsyncedBump === 'function') { unsyncedBump(); }
     if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
+    if (!pulling && typeof teamSoon === 'function' && teamRead()) { teamSoon(); }   /* KM-PRO-F3 — νέο δελτίο */
   }
   function bookForPush() { var b = bookRead(); return b.ver ? b : undefined; }
   /* Ένας γράφει (η ενεργή συσκευή): το νεότερο βιβλίο κερδίζει ολόκληρο. */
@@ -1417,7 +1459,10 @@
       .sort(function (a, b) { return a.last - b.last; });
     return '<table class="pro-tbl"><tr><th>Προμηθευτής</th><th>Τελευταία</th><th>Ημ/νία</th></tr>' +
       sups.map(function (x, i) { return '<tr' + (i === 0 ? ' class="best"' : '') + '><td>' + escH(x.sup) + '</td><td>' + num(x.last) + '</td><td>' + dstr(x.lastAt) + '</td></tr>'; }).join('') +
-      '</table><p class="pro-avg">Μέσος όρος (σταθμισμένος): <b>' + (g.avg === null ? '—' : num(Math.round(g.avg * 1000) / 1000)) + ' ' + (PRO_BASE[g.base] || '') + '</b> · ' + g.n + ' αγορές</p>';
+      '</table>' + (g.avg === undefined ? '' :   /* KM-PRO-F3 — υπάλληλος: ΧΩΡΙΣ μέσο όρο (ιστορικό) */
+      '<p class="pro-avg">Μέσος όρος (σταθμισμένος): <b>' + (g.avg === null ? '—' : num(Math.round(g.avg * 1000) / 1000)) + ' ' + (PRO_BASE[g.base] || '') + '</b> · ' + g.n + ' αγορές</p>') +
+      (g.buys && g.buys.length ? '<details class="pro-buys"><summary>Όλες οι αγορές (' + g.buys.length + ')</summary>' +
+        g.buys.slice(0, 50).map(function (x) { return '<div>' + dstr(x.d) + ' · ' + escH(x.s) + ' · ' + num(Math.round(x.p * 1000) / 1000) + '</div>'; }).join('') + '</details>' : '');
   }
   function lineSheet(r, i) {
     var ln = r.proSug.lines[i];
@@ -1480,7 +1525,7 @@
     var body = el('prices-body');
     body.innerHTML = '';
     all().then(function (rows) {
-      PIDX = priceIndex(rows);
+      PIDX = memberMode() ? slipIndex() : priceIndex(rows);   /* KM-PRO-F3 — μέλος: από το δελτίο */
       var b = bookRead();
       var f = document.createElement('input');
       f.type = 'search'; f.className = 'pro-find'; f.placeholder = 'Κωδικός ή όνομα προϊόντος…';
@@ -1520,6 +1565,589 @@
       }
       f.oninput = draw; sel.onchange = draw; draw();
     });
+  }
+
+
+  /* ══ KM-PRO-F3 · Η ΟΜΑΔΑ — Boss / manager / υπάλληλος (13/10/2026) ══════════════════════
+     Α350 §9.9 · Α320 6/9 · Brief PRO ↔ FastWrite 12/10 (Φ3). Server: src/km_team.js.
+     · Ο ΦΑΚΕΛΟΣ ΕΧΕΙ ΕΝΑΝ ΣΥΓΓΡΑΦΕΑ — τη συσκευή του Boss. Μέλη ΔΕΝ έχουν ποτέ το Κ ούτε 12 λέξεις.
+     · Το μέλος στέλνει ΠΡΟΤΑΣΗ σφραγισμένη προς το δημόσιο κλειδί του Boss (γράφει, δεν διαβάζει).
+       Στη συσκευή του Boss η πρόταση γίνεται κάρτα στα «Εκκρεμή» («📥 από Νίκο»): Αποθήκευση = έγκριση,
+       Διαγραφή = απόρριψη — με όλα τα εργαλεία της Φ2 (ίδιο με, συσκευασία, διόρθωση).
+     · ΔΕΛΤΙΟ ΤΙΜΩΝ: τελευταία τιμή ανά προμηθευτή/προϊόν, σφραγισμένο με S. Το S φτάνει σε κάθε μέλος
+       κλειδωμένο με το δημόσιο κλειδί ΤΟΥ. Ανάκληση μέλους → νέο S (ό,τι δημοσιευτεί μετά, δεν το ανοίγει).
+     · ΙΣΤΟΡΙΚΟ (μέσος όρος, όλες οι αγορές): ΧΩΡΙΣΤΟ σφράγισμα με H, ΜΟΝΟ για manager με διακόπτη
+       (4/9: «το αποφασίζει ο ιδιοκτήτης»). Κλείνει ο διακόπτης → νέο H.
+     · Το κλειδί του Boss (ιδιωτικό), το S και το H ζουν ΜΕΣΑ στον σφραγισμένο φάκελο (πεδίο «team») —
+       κάθε συσκευή Boss τα έχει, ο server ποτέ. */
+  var TEAM = null, TEAM_PRIV = null, teamBusy = false, teamTimer = null, TEAMV = null;
+  var SLIP = null, HIST = null, ME = null, memberTimer = null;
+  var MEMBER_ROLE = { user: 'Υπάλληλος', admin: 'Manager' };
+
+  function memberMode() { return !!localStorage.getItem(LS.member) && !localStorage.getItem(LS.folder); }
+  function memberInfo() { try { return JSON.parse(localStorage.getItem(LS.member) || 'null'); } catch (e) { return null; } }
+  function roMode() { return isReader() || memberMode(); }
+  function hexOf(bytes) { return Array.prototype.map.call(new Uint8Array(bytes), function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); }
+  function sha256Hex(str) { return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(hexOf); }
+  function chain(fns) { return fns.reduce(function (p, f) { return p.then(f); }, Promise.resolve()); }
+
+  /* ── το αντικείμενο «team» του φακέλου (μόνο Boss) ── */
+  function teamRead() {
+    if (TEAM) { return TEAM; }
+    try { TEAM = JSON.parse(localStorage.getItem(LS.team) || 'null'); } catch (e) { TEAM = null; }
+    return TEAM;
+  }
+  function teamSave(t) {
+    t.ver = Date.now(); TEAM = t; TEAM_PRIV = null;
+    try { localStorage.setItem(LS.team, JSON.stringify(t)); } catch (e) {}
+    if (!pulling && typeof unsyncedBump === 'function') { unsyncedBump(); }
+    if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
+  }
+  function teamForPush() { var t = teamRead(); return t && t.ver ? t : undefined; }
+  function teamMerge(remote) {
+    if (!remote || remote.v !== 1) { return; }
+    var t = teamRead();
+    if (!t || (remote.ver || 0) > (t.ver || 0)) {
+      TEAM = remote; TEAM_PRIV = null;
+      try { localStorage.setItem(LS.team, JSON.stringify(remote)); } catch (e) {}
+    }
+  }
+  function teamPriv() {
+    if (TEAM_PRIV) { return Promise.resolve(TEAM_PRIV); }
+    return kmEcImportPriv(teamRead().priv).then(function (k) { TEAM_PRIV = k; return k; });
+  }
+  function rnd32() { return hexOf(crypto.getRandomValues(new Uint8Array(32))); }
+  /* Μία φορά ανά φάκελο, ΜΕΤΑ από κατέβασμα (αλλιώς δεύτερη συσκευή Boss θα έφτιαχνε δεύτερο κλειδί). */
+  function teamEnsure() {
+    if (teamRead()) { return teamSetupServer(); }
+    return pullNow().then(function () {
+      if (teamRead()) { return teamSetupServer(); }
+      return kmEcNew().then(function (kp) {
+        return Promise.all([kmEcPubRaw(kp.publicKey), kmEcPrivJwk(kp.privateKey)]).then(function (x) {
+          teamSave({ v: 1, pub: kmB64(x[0]), priv: x[1], s: rnd32(), sv: 1, hk: rnd32(), hv: 1 });
+          return syncNow().then(teamSetupServer).then(function (r) { teamStart(); return r; });
+        });
+      });
+    });
+  }
+  function teamSetupServer() {
+    return teamJson('pro/team/setup', { method: 'POST', body: JSON.stringify({ boss_pub: teamRead().pub }) }).then(function (j) {
+      if (j && j.ok) { return true; }
+      throw new Error(j && j.error === 'boss_pub_exists' ? 'Η ομάδα στήθηκε από άλλη συσκευή σου — άνοιξε την εφαρμογή εκεί μία φορά με δίκτυο.' : 'Δεν απάντησε ο server (' + ((j && j.error) || 'δίκτυο') + ').');
+    });
+  }
+  function teamJson(path, opts) {
+    opts = opts || {};
+    opts.headers = kmHead();
+    return kmFetch(path, opts).then(function (r) { return r.json().catch(function () { return { ok: false, error: 'http ' + r.status }; }); });
+  }
+  /* Ανάκληση ή κλείσιμο ιστορικού → ΝΕΟ κλειδί: ό,τι δημοσιευτεί μετά, το παλιό δεν το ανοίγει. */
+  function teamRotate(which) {
+    var t = JSON.parse(JSON.stringify(teamRead()));
+    if (which !== 'h') { t.s = rnd32(); t.sv = (t.sv || 1) + 1; }
+    if (which !== 's') { t.hk = rnd32(); t.hv = (t.hv || 1) + 1; }
+    teamSave(t);
+    try { localStorage.removeItem(LS.slipH); localStorage.removeItem(LS.histH); } catch (e) {}
+  }
+
+  /* ── ο κύκλος του Boss: κλειδιά σε όσους μπήκαν · προτάσεις → Εκκρεμή · δελτίο · αποφάσεις ── */
+  function teamSoon(ms) { if (teamTimer) { clearTimeout(teamTimer); } teamTimer = setTimeout(function () { teamTimer = null; teamTick(); }, ms || 2500); }
+  function teamTick() {
+    if (teamBusy || memberMode() || !proOn() || isReader() || !navigator.onLine || !teamRead()) { return Promise.resolve(); }
+    teamBusy = true;
+    var fin = function () { teamBusy = false; };
+    return teamJson('pro/team').then(function (j) {
+      if (!j || !j.ok) { return; }
+      TEAMV = j;
+      var t = teamRead();
+      var jobs = (j.members || []).filter(function (m) {
+        return m.pub && (m.status === 'joined' || m.status === 'active') &&
+               (!m.has_key || m.s_ver !== t.sv || (m.role === 'admin' && m.hist && m.h_ver !== t.hv));
+      }).map(function (m) { return function () { return teamGiveKey(m); }; });
+      return chain(jobs).then(function () { return j.pending ? teamImport() : null; });
+    }).then(function () { return teamPublish(); }).then(function () { return teamDecFlush(); })
+      .then(fin, function (e) { fin(); diag('ομάδα · ' + (e && e.message || 'σφάλμα')); });
+  }
+  function teamGiveKey(m) {
+    var t = teamRead(), pub = kmUnB64(m.pub);
+    var give = [kmSealTo(pub, kmHexToBytes(t.s))];
+    var hist = m.role === 'admin' && m.hist;
+    if (hist) { give.push(kmSealTo(pub, kmHexToBytes(t.hk))); }
+    return Promise.all(give).then(function (w) {
+      var b = { member_id: m.member_id, wrap_s: kmB64(w[0]), s_ver: t.sv };
+      if (hist) { b.wrap_h = kmB64(w[1]); b.h_ver = t.hv; }
+      return teamJson('pro/team/key', { method: 'POST', body: JSON.stringify(b) });
+    });
+  }
+  /* Οι προτάσεις γίνονται ΚΑΡΤΕΣ στα Εκκρεμή του Boss (σφραγισμένες πλέον με το Κ, όπως κάθε τιμολόγιο). */
+  function teamImport() {
+    return teamJson('pro/team/proposals').then(function (j) {
+      if (!j || !j.ok || !j.proposals || !j.proposals.length) { return; }
+      return teamPriv().then(function (priv) {
+        return chain(j.proposals.map(function (p) { return function () { return teamImportOne(priv, p).catch(function (e) { diag('πρόταση ' + p.id.slice(0, 6) + ' · ' + (e && e.message)); }); }; }));
+      }).then(function () {
+        refreshCount();
+        if (!el('s-pend').hidden) { renderPending(); }
+      });
+    });
+  }
+  function teamImportOne(priv, p) {
+    var at = Date.parse(p.created_at) || Date.now();
+    var rid = at + '-t' + p.id.slice(0, 8);
+    return get(rid).then(function (have) {
+      if (have) { return teamJson('pro/team/decide', { method: 'POST', body: JSON.stringify({ id: p.id, decision: 'taken' }) }); }
+      return kmOpenWith(priv, kmUnB64(p.meta)).then(function (bytes) {
+        var meta = JSON.parse(new TextDecoder().decode(bytes));
+        var pages = [];
+        for (var n = 0; n < p.pages; n++) { pages.push(n); }
+        return chain(pages.map(function (n) { return function () {
+          return kmFetch('pro/team/page?id=' + p.id + '&n=' + n, { headers: kmHead() }).then(function (r) {
+            if (!r.ok) { throw new Error('σελίδα ' + n + ' · ' + r.status); }
+            return r.arrayBuffer();
+          }).then(function (buf) { return kmOpenWith(priv, buf); }).then(function (img) { pages[n] = new Blob([img], { type: 'image/jpeg' }); });
+        }; })).then(function () {
+          var rec = { id: rid, ts: at, supplier: String(meta.supplier || '—').slice(0, 80), invDate: meta.invDate || at,
+                      blob: pages[0], pages: pages.slice(1), net: null, vat: null, total: null,
+                      from: { m: p.member_id, n: p.name || meta.by || '', r: p.role || 'user', p: p.id, at: at } };
+          if (meta.sug) { rec.sug = meta.sug; rec.aiAt = Date.now(); rec.aiBy = 'pro'; }
+          if (meta.proSug && meta.proSug.lines) { rec.proSug = meta.proSug; }
+          return put(rec);
+        }).then(function () {
+          return teamJson('pro/team/decide', { method: 'POST', body: JSON.stringify({ id: p.id, decision: 'taken' }) });
+        });
+      });
+    });
+  }
+  /* Απόφαση για πρόταση: ουρά, ώστε χωρίς δίκτυο να μη χάνεται (φεύγει στον επόμενο κύκλο). */
+  function teamDecide(pid, d) {
+    var q = []; try { q = JSON.parse(localStorage.getItem(LS.decQ) || '[]'); } catch (e) {}
+    q.push({ id: pid, d: d }); localStorage.setItem(LS.decQ, JSON.stringify(q.slice(-500)));
+    teamSoon(800);
+  }
+  function teamDecFlush() {
+    var q = []; try { q = JSON.parse(localStorage.getItem(LS.decQ) || '[]'); } catch (e) {}
+    if (!q.length) { return Promise.resolve(); }
+    var left = [];
+    return chain(q.map(function (x) { return function () {
+      return teamJson('pro/team/decide', { method: 'POST', body: JSON.stringify({ id: x.id, decision: x.d }) })
+        .then(function (j) { if (!j || (!j.ok && j.error !== 'no_proposal')) { left.push(x); } }, function () { left.push(x); });
+    }; })).then(function () { localStorage.setItem(LS.decQ, JSON.stringify(left)); });
+  }
+  /* ΔΕΛΤΙΟ: ό,τι χρειάζεται η πόρτα — και ΤΙΠΟΤΑ παραπάνω (χωρίς μέσο όρο, χωρίς ποσότητες, χωρίς ποσά τιμολογίων). */
+  function slipBuild(rows) {
+    var ix = priceIndex(rows), b = bookRead(), sups = {}, items = {}, groups = {};
+    rows.forEach(function (r) { if (r.supplier && !isPending(r)) { sups[r.supplier] = 1; } });
+    Object.keys(b.items).forEach(function (k) {
+      var it = b.items[k];
+      if (it.pid || it.pack) { items[k] = { pid: it.pid || null, pack: it.pack ? { per: it.pack.per, base: it.pack.base } : null }; }
+    });
+    Object.keys(ix).forEach(function (pid) {
+      var g = ix[pid], s = {};
+      Object.keys(g.sups).forEach(function (n) { var x = g.sups[n]; if (x.last !== null) { s[n] = { l: x.last, a: x.lastAt, k: Object.keys(x.keys) }; } });
+      groups[pid] = { n: (b.prods[pid] && b.prods[pid].name) || g.name || prodName(pid), b: g.base, s: s };
+    });
+    return { v: 1, sups: Object.keys(sups).sort(function (a, c) { return a.localeCompare(c, 'el'); }), items: items, groups: groups };
+  }
+  /* ΙΣΤΟΡΙΚΟ (μόνο manager με διακόπτη): μέσος όρος και οι αγορές ανά προμηθευτή — όχι τα τιμολόγια. */
+  function histBuild(rows) {
+    var ix = priceIndex(rows), out = { v: 1, groups: {} };
+    Object.keys(ix).forEach(function (pid) { var g = ix[pid]; out.groups[pid] = { avg: g.avg, n: g.n, buys: [] }; });
+    rows.forEach(function (r) {
+      if (!r.lines || isPending(r)) { return; }
+      r.lines.forEach(function (ln0) {
+        var ln = { code: ln0.code, desc: ln0.desc, unit_price: ln0.unit_price, disc_pct: ln0.disc_pct, pack: ln0.pack, base_price: ln0.base_price, qty: ln0.qty };
+        bookApplyPack(r.supplier, ln);
+        if (ln.base_price === null || ln.base_price === undefined || !ln.pack) { return; }
+        var g = out.groups[bookPid(itemKey(r.supplier, ln))];
+        if (g) { g.buys.push({ s: r.supplier, d: dateOf(r), p: ln.base_price, q: Math.round((ln.qty || 1) * ln.pack.per * 1000) / 1000 }); }
+      });
+    });
+    Object.keys(out.groups).forEach(function (k) { var g = out.groups[k]; g.buys.sort(function (a, c) { return c.d - a.d; }); g.buys = g.buys.slice(0, 200); });
+    return out;
+  }
+  function teamPublish() {
+    var t = teamRead();
+    if (!t) { return Promise.resolve(); }
+    return all().then(function (rows) {
+      var jobs = [];
+      [['slip', slipBuild(rows), t.s, t.sv, LS.slipH], ['hist', histBuild(rows), t.hk, t.hv, LS.histH]].forEach(function (x) {
+        var body = JSON.stringify(x[1]);
+        jobs.push(function () {
+          return sha256Hex(body + '|' + x[3]).then(function (hh) {
+            if (localStorage.getItem(x[4]) === hh) { return; }
+            return kmImportK(kmHexToBytes(x[2])).then(function (key) {
+              return kmSeal(key, new TextEncoder().encode(JSON.stringify(Object.assign({ at: Date.now(), kv: x[3] }, x[1]))));
+            }).then(function (sealed) {
+              var h = kmHead(); h['Content-Type'] = 'application/octet-stream'; h['X-Km-Slip-Ver'] = String(Math.floor(Date.now() / 1000));
+              return kmFetch('pro/team/' + x[0], { method: 'PUT', headers: h, body: sealed });
+            }).then(function (r) { if (r.ok) { localStorage.setItem(x[4], hh); } });
+          });
+        });
+      });
+      return chain(jobs);
+    });
+  }
+  function teamStart() {
+    if (memberMode() || !proOn()) { return; }   // ο κύκλος ξεκινά ΚΑΙ πριν στηθεί η ομάδα — ο teamTick ελέγχει μόνος του
+    if (teamRead()) { teamSoon(3000); }
+    if (!window.__kmTeamIv) { window.__kmTeamIv = setInterval(function () { if (!document.hidden) { teamTick(); } }, 30000); }
+  }
+
+  /* ── «👥 Ομάδα»: Boss (όλα) · manager με «διαχείριση» (μόνο υπάλληλοι: πρόσκληση, βάρδια, λήξη) ── */
+  function teamStatusTxt(m) {
+    if (m.status === 'invited') { return '⏳ Πρόσκληση — ισχύει ως ' + dstr(Date.parse(m.invite_exp)) + ' ' + new Date(Date.parse(m.invite_exp)).toTimeString().slice(0, 5); }
+    if (m.status === 'joined') { return '⏳ Μπήκε — ενεργοποιείται μόλις ανοίξει η δική σου εφαρμογή'; }
+    if (m.duty_ok) { return '🟢 Σε βάρδια'; }
+    if (m.on_duty && m.until) { return '⚪ Έληξε ' + dstr(Date.parse(m.until)); }
+    return '⚪ Εκτός βάρδιας';
+  }
+  var TEAM_LOG_TXT = { setup: 'η ομάδα στήθηκε', invite: 'πρόσκληση', join: 'μπήκε', activate: 'ενεργοποιήθηκε', member: 'αλλαγή', revoke: 'ανάκληση',
+                       propose: 'έστειλε τιμολόγιο', approve: 'εγκρίθηκε τιμολόγιο', reject: 'απορρίφθηκε τιμολόγιο' };
+  function teamLogLine(x, names) {
+    var who = x.actor === 'boss' ? 'Εσύ' : (names[x.actor.slice(2)] || 'μέλος');
+    var d = {}; try { d = JSON.parse(x.detail || '{}') || {}; } catch (e) {}
+    var whom = x.member_id ? (names[x.member_id] || d.name || '') : '';
+    var extra = '';
+    if (x.kind === 'member') {
+      extra = [d.on_duty === true ? 'σε βάρδια' : d.on_duty === false ? 'εκτός βάρδιας' : '',
+               d.until !== undefined ? (d.until ? 'λήξη ' + dstr(Date.parse(d.until)) : 'χωρίς λήξη') : '',
+               d.hist === true ? 'βλέπει ιστορικό' : d.hist === false ? 'ΔΕΝ βλέπει ιστορικό' : '',
+               d.manage === true ? 'διαχειρίζεται υπαλλήλους' : d.manage === false ? 'χωρίς διαχείριση' : '',
+               d.name ? 'όνομα «' + d.name + '»' : ''].filter(Boolean).join(', ');
+    }
+    var t = new Date(Date.parse(x.at));
+    return dstr(t.getTime()) + ' ' + t.toTimeString().slice(0, 5) + ' · ' + escH(who) + ' — ' + (TEAM_LOG_TXT[x.kind] || x.kind) +
+      (whom && x.actor.slice(2) !== x.member_id ? ' «' + escH(whom) + '»' : '') + (extra ? ': ' + escH(extra) : '');
+  }
+  function renderTeam() {
+    var body = el('team-body');
+    body.innerHTML = '<p class="fine">Φόρτωση…</p>';
+    var mgr = memberMode();
+    var load = mgr ? mJson('pro/m/team') : teamEnsure().then(function () { return teamJson('pro/team'); });
+    load.then(function (j) {
+      if (!j || !j.ok) { throw new Error((j && j.error) || 'δίκτυο'); }
+      if (!mgr) { TEAMV = j; teamSoon(500); }
+      drawTeam(j, mgr);
+    }).catch(function (e) {
+      body.innerHTML = '';
+      var p = document.createElement('p'); p.className = 'err'; p.textContent = 'Δεν φόρτωσε η ομάδα: ' + (e && e.message || e);
+      body.appendChild(p);
+    });
+  }
+  function drawTeam(j, mgr) {
+    var body = el('team-body');
+    body.innerHTML = '';
+    var intro = document.createElement('p');
+    intro.className = 'fine';
+    intro.innerHTML = 'Έως <b>' + (j.max || 5) + ' άτομα</b> σε αυτό το σημείο. Ο <b>υπάλληλος</b> φωτογραφίζει στην παραλαβή και βλέπει μόνο τις <b>τελευταίες τιμές</b> — δεν βλέπει ιστορικό και δεν αλλάζει τίποτα. Ό,τι στέλνει έρχεται στα δικά σου <b>Εκκρεμή</b> για έγκριση.';
+    body.appendChild(intro);
+    if (!mgr && j.pending) {
+      var pb = document.createElement('button');
+      pb.className = 'btn primary'; pb.textContent = '📥 ' + j.pending + ' τιμολόγια από την ομάδα — άνοιξε τα Εκκρεμή';
+      pb.onclick = function () { teamImport().then(function () { goto('s-pend'); }); };
+      body.appendChild(pb);
+    }
+    var names = j.names || {};
+    (j.members || []).forEach(function (m) { names[m.member_id] = m.name; });
+    (j.members || []).forEach(function (m) { body.appendChild(teamCard(m, mgr)); });
+    if (!(j.members || []).length) {
+      var e0 = document.createElement('p'); e0.className = 'empty'; e0.textContent = 'Δεν έχεις ακόμα κανέναν στην ομάδα.'; body.appendChild(e0);
+    }
+    var used = mgr ? (j.used || 0) : (j.members || []).length, full = used >= (j.max || 5);
+    var hasAdmin = (j.members || []).some(function (m) { return m.role === 'admin'; });
+    [['user', '+ Πρόσκληση υπαλλήλου'], ['admin', '+ Πρόσκληση manager']].forEach(function (x) {
+      if (x[0] === 'admin' && (mgr || hasAdmin)) { return; }
+      var b = document.createElement('button');
+      b.className = 'btn ' + (x[0] === 'user' ? 'primary' : 'ghost');
+      b.id = 'team-inv-' + x[0];
+      b.textContent = x[1] + (full ? ' (γεμάτο)' : '');
+      b.disabled = full;
+      b.onclick = function () { teamInvite(x[0], mgr); };
+      body.appendChild(b);
+    });
+    if (!mgr && j.log && j.log.length) {
+      var lg = document.createElement('div');
+      lg.className = 'pro-log team-log';
+      lg.innerHTML = '<b>🧾 Ίχνος</b>' + j.log.slice(0, 30).map(function (x) { return '<div>' + teamLogLine(x, names) + '</div>'; }).join('');
+      body.appendChild(lg);
+    }
+  }
+  function teamCard(m, mgr) {
+    var c = document.createElement('div');
+    c.className = 'card team-card';
+    c.setAttribute('data-member', m.member_id);
+    c.innerHTML = '<div class="card-sup"></div><div class="team-st"></div>';
+    c.querySelector('.card-sup').textContent = m.name + ' · ' + (MEMBER_ROLE[m.role] || m.role);
+    c.querySelector('.team-st').textContent = teamStatusTxt(m);
+    var api = mgr ? 'pro/m/team/member' : 'pro/team/member';
+    var call = mgr ? mJson : teamJson;
+    function set(b) {
+      b.member_id = m.member_id;
+      return call(api, { method: 'POST', body: JSON.stringify(b) }).then(function (j) {
+        if (!j || !j.ok) { alert('Δεν αποθηκεύτηκε: ' + ((j && j.error) || 'δίκτυο')); }
+        if (!mgr && b.hist === false) { teamRotate('h'); }
+        if (!mgr) { teamSoon(300); }
+        renderTeam();
+      });
+    }
+    function sw(label, on, cls, f) {
+      var l = document.createElement('label'); l.className = 'team-sw ' + cls;
+      var i = document.createElement('input'); i.type = 'checkbox'; i.checked = !!on;
+      i.onchange = function () { f(i.checked); };
+      l.appendChild(i); l.appendChild(document.createTextNode(' ' + label));
+      c.appendChild(l);
+    }
+    if (m.status !== 'invited') {
+      sw('Σε βάρδια', m.on_duty, 'sw-duty', function (v) { set({ on_duty: v }); });
+      var dl = document.createElement('label'); dl.className = 'team-sw sw-until';
+      dl.appendChild(document.createTextNode('Λήξη πρόσβασης: '));
+      var di = document.createElement('input'); di.type = 'date';
+      if (m.until) { var u = new Date(Date.parse(m.until)); di.value = u.getFullYear() + '-' + ('0' + (u.getMonth() + 1)).slice(-2) + '-' + ('0' + u.getDate()).slice(-2); }
+      di.onchange = function () { set({ until: di.value ? new Date(di.value + 'T23:59:59').toISOString() : null }); };
+      dl.appendChild(di);
+      c.appendChild(dl);
+      if (m.role === 'admin' && !mgr) {
+        sw('Βλέπει ιστορικό τιμών (μέσος όρος, όλες οι αγορές)', m.hist, 'sw-hist', function (v) { set({ hist: v }); });
+        sw('Διαχειρίζεται υπαλλήλους (πρόσκληση, βάρδιες)', m.manage, 'sw-manage', function (v) { set({ manage: v }); });
+      }
+    }
+    if (!mgr) {
+      var rv = document.createElement('button');
+      rv.className = 'btn ghost del team-revoke';
+      rv.textContent = m.status === 'invited' ? 'Ακύρωση πρόσκλησης' : 'Ανάκληση πρόσβασης';
+      rv.onclick = function () {
+        if (!confirm((m.status === 'invited' ? 'Ακύρωση της πρόσκλησης για «' : 'Ανάκληση της πρόσβασης του/της «') + m.name + '»;\n\n' +
+                     'Από τώρα δεν μπαίνει και δεν βλέπει τίποτα καινούριο. Ό,τι έχει ήδη στείλει μένει στα Εκκρεμή σου.')) { return; }
+        teamJson('pro/team/revoke', { method: 'POST', body: JSON.stringify({ member_id: m.member_id }) }).then(function (j) {
+          if (!j || !j.ok) { alert('Δεν έγινε: ' + ((j && j.error) || 'δίκτυο')); return; }
+          if (m.status !== 'invited') { teamRotate(); }
+          teamSoon(300);
+          renderTeam();
+        });
+      };
+      c.appendChild(rv);
+    }
+    return c;
+  }
+  function teamInvite(role, mgr) {
+    var name = prompt(role === 'admin' ? 'Όνομα του manager (π.χ. Μαρία)' : 'Όνομα του υπαλλήλου (π.χ. Νίκος)', '');
+    if (name === null || !name.trim()) { return; }
+    (mgr ? mJson : teamJson)(mgr ? 'pro/m/team/invite' : 'pro/team/invite', { method: 'POST', body: JSON.stringify({ role: role, name: name.trim() }) }).then(function (j) {
+      if (!j || !j.ok) {
+        alert(j && j.error === 'team_full' ? 'Η ομάδα είναι γεμάτη (' + j.max + ').' : j && j.error === 'admin_exists' ? 'Υπάρχει ήδη manager.' : 'Δεν έγινε: ' + ((j && j.error) || 'δίκτυο'));
+        return;
+      }
+      var url = location.origin + '/kostometro/#km_inv=' + j.code;
+      var qr = '';
+      try { var q = qrcode(0, 'M'); q.addData(url); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (e) {}
+      var w = sheet('<h3>Πρόσκληση για «' + escH(name.trim()) + '»</h3>' +
+        '<p class="fine">Στείλε αυτόν τον σύνδεσμο ή δείξε το QR στο κινητό του/της. <b>Ανοίγει μία φορά</b> και ισχύει <b>48 ώρες</b>. Δεν χρειάζεται email ούτε κωδικός.</p>' +
+        '<div class="team-qr">' + qr + '</div>' +
+        '<p class="team-link" id="team-link"></p>' +
+        '<button class="btn primary" data-a="copy">Αντιγραφή συνδέσμου</button>' +
+        (navigator.share ? '<button class="btn ghost" data-a="share">Κοινοποίηση…</button>' : ''));
+      w.querySelector('#team-link').textContent = url;
+      w.querySelector('[data-a="copy"]').onclick = function () {
+        try { navigator.clipboard.writeText(url).then(function () { alert('Αντιγράφηκε.'); }, function () { prompt('Αντέγραψε τον σύνδεσμο:', url); }); } catch (e) { prompt('Αντέγραψε τον σύνδεσμο:', url); }
+      };
+      var sh = w.querySelector('[data-a="share"]');
+      if (sh) { sh.onclick = function () { navigator.share({ title: 'Kostometro', text: 'Πρόσκληση στην ομάδα', url: url }).catch(function () {}); }; }
+      renderTeam();
+    });
+  }
+
+  /* ══ ΜΕΛΟΣ (υπάλληλος / manager): χωρίς λογαριασμό, χωρίς Κ, χωρίς 12 λέξεις ══ */
+  function mHead(json) {
+    var mi = memberInfo() || {};
+    var h = { 'X-Km-Member': mi.id || '', 'X-Km-Member-Auth': mi.auth || '' };
+    if (json !== false) { h['Content-Type'] = 'application/json'; }
+    return h;
+  }
+  /* 🔴 ΟΧΙ kmFetch: εκεί το 410 = «ο λογαριασμός διαγράφηκε» και το 423 = «εκκρεμεί διαγραφή» του Boss. */
+  function mFetch(path, opts) { opts = opts || {}; opts.headers = Object.assign(mHead(!(opts.body instanceof Uint8Array)), opts.headers || {}); return fetch(KM_API + path, opts); }
+  function mJson(path, opts) { return mFetch(path, opts).then(function (r) { return r.json().catch(function () { return { ok: false, error: 'http ' + r.status }; }).then(function (j) { j.__st = r.status; return j; }); }); }
+  function mState(kind, msg) {
+    var T = {
+      join:    ['Πρόσκληση στην ομάδα', 'Ο ιδιοκτήτης του καταστήματος σε προσκάλεσε στο Kostometro. Πάτα «Σύνδεση» — δεν χρειάζεσαι email, κωδικό ή 12 λέξεις.'],
+      wait:    ['Περιμένεις ενεργοποίηση', 'Μπήκες στην ομάδα. Ενεργοποιείσαι αυτόματα μόλις ανοίξει την εφαρμογή ο ιδιοκτήτης (ή ο manager). Δεν χρειάζεται να κάνεις τίποτα.'],
+      off:     ['Εκτός βάρδιας', 'Η πρόσβασή σου είναι κλειστή αυτή τη στιγμή. Την ανοίγει ο ιδιοκτήτης ή ο manager.'],
+      expired: ['Η πρόσβαση έληξε', 'Η πρόσβασή σου είχε ημερομηνία λήξης. Αν πρέπει να συνεχίσεις, πες το στον ιδιοκτήτη.'],
+      revoked: ['Η πρόσβαση ανακλήθηκε', 'Δεν είσαι πια στην ομάδα αυτού του καταστήματος. Τίποτα από αυτήν δεν έμεινε στο κινητό σου.'],
+      nopro:   ['Το PRO δεν είναι ενεργό', 'Η συνδρομή PRO του καταστήματος δεν είναι ενεργή αυτή τη στιγμή.'],
+      err:     ['Δεν υπάρχει σύνδεση', 'Δεν μιλήσαμε με τον server. Έλεγξε το ίντερνετ και ξαναδοκίμασε.']
+    }[kind] || ['Kostometro', ''];
+    el('ms-title').textContent = T[0];
+    el('ms-text').textContent = T[1];
+    el('ms-err').hidden = !msg; el('ms-err').textContent = msg || '';
+    el('ms-go').hidden = kind !== 'join';
+    el('ms-retry').hidden = kind === 'join' || kind === 'revoked';
+    el('ms-leave').hidden = kind === 'join';
+    stopCam();
+    show('s-mstate');
+  }
+  function memberJoinShow(code) {
+    mState('join');
+    el('ms-go').textContent = 'Σύνδεση';
+    el('ms-go').onclick = function () {
+      el('ms-go').disabled = true;
+      var auth = rnd32();
+      kmEcNew().then(function (kp) {
+        return Promise.all([kmEcPubRaw(kp.publicKey), kmEcPrivJwk(kp.privateKey)]).then(function (x) {
+          return fetch(KM_API + 'pro/m/join', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code, member_auth: auth, pub: kmB64(x[0]), device: devName() }) })
+            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (j) {
+              if (!j.ok) { throw new Error(j.error === 'invite_expired' ? 'Η πρόσκληση έληξε (48 ώρες). Ζήτα νέα.' : j.error === 'bad_invite' ? 'Η πρόσκληση δεν ισχύει ή χρησιμοποιήθηκε ήδη. Ζήτα νέα.' : 'Σφάλμα: ' + (j.error || 'δίκτυο')); }
+              localStorage.setItem(LS.mkey, JSON.stringify(x[1]));
+              localStorage.setItem(LS.member, JSON.stringify({ id: j.member_id, auth: auth, role: j.role, name: j.name, boss_pub: j.boss_pub, at: Date.now() }));
+              memberBoot();
+            });
+        });
+      }).catch(function (e) { el('ms-go').disabled = false; mState('join', e.message); el('ms-go').textContent = 'Σύνδεση'; });
+    };
+  }
+  if (el('m-leave-row')) { el('m-leave-row').onclick = function () { memberLeave(false); }; }
+  function memberLeave(silent) {
+    if (!silent && !confirm('Αποσύνδεση από την ομάδα;\n\nΘα χρειαστείς νέα πρόσκληση για να ξαναμπείς. Ό,τι δεν έχεις στείλει θα χαθεί.')) { return; }
+    [LS.member, LS.mkey, LS.slipCache, LS.histCache, LS.msent, LS.pro].forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+    SLIP = null; HIST = null; ME = null; BOOK = null; PIDX = null;
+    all().then(function (rows) { return Promise.all(rows.map(function (r) { return del(r.id); })); }).then(function () {
+      document.body.classList.remove('is-member', 'is-pro');
+      location.replace(location.pathname);
+    });
+  }
+  function memberBoot() {
+    document.body.classList.add('is-member');
+    el('ms-retry').onclick = function () { memberCheck(true); };
+    el('ms-leave').onclick = function () { memberLeave(false); };
+    memberCheck(true);
+    if (!memberTimer) { memberTimer = setInterval(function () { if (!document.hidden) { memberCheck(false); } }, 60000); }
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && memberMode()) { memberCheck(false); } });
+  }
+  function memberKey() { return kmEcImportPriv(JSON.parse(localStorage.getItem(LS.mkey))); }
+  function memberCheck(toCamToo) {
+    return mJson('pro/m/me').then(function (j) {
+      if (j.__st === 410 || j.__st === 403) { memberLeaveRevoked(); return; }   // ανακλήθηκε / ο κωδικός της συσκευής δεν ισχύει
+      if (!j.ok) { if (!SLIP) { mState('err', j.error); } return; }
+      ME = j.me;
+      var mi = memberInfo(); mi.role = ME.role; mi.name = ME.name; mi.manage = !!ME.manage; mi.boss_pub = j.boss_pub || mi.boss_pub;
+      localStorage.setItem(LS.member, JSON.stringify(mi));
+      if (!j.pro) { return mState('nopro'); }
+      if (ME.status !== 'active' || !ME.wrap_s) {   // αναμονή: ξαναρωτάει κάθε 10″ (όχι 60″) — ο υπάλληλος στέκεται μπροστά στον Boss
+        if (!window.__kmWaitT) { window.__kmWaitT = setTimeout(function () { window.__kmWaitT = null; memberCheck(true); }, 10000); }
+        return mState('wait');
+      }
+      if (!ME.duty_ok) { return mState(ME.on_duty && ME.until ? 'expired' : 'off'); }
+      localStorage.setItem(LS.pro, JSON.stringify({ pro: true, at: Date.now() }));
+      document.body.classList.add('is-pro');
+      return memberSlip(j).then(function () {
+        if (ME.manage) { memberMgrKeys(); }
+        if (toCamToo || !el('s-mstate').hidden) { toCam(); }
+      });
+    }, function () { if (!SLIP) { mState('err'); } });
+  }
+  function memberLeaveRevoked() {
+    [LS.member, LS.mkey, LS.slipCache, LS.histCache, LS.msent, LS.pro].forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+    SLIP = null; HIST = null; BOOK = null; PIDX = null;
+    all().then(function (rows) { return Promise.all(rows.map(function (r) { return del(r.id); })); }).then(function () { mState('revoked'); });
+  }
+  /* Το δελτίο: κατεβαίνει μόνο όταν άλλαξε· ανοίγει με το S (ξεκλειδωμένο με το ιδιωτικό κλειδί του μέλους). */
+  function memberSlip(j) {
+    var cache = null; try { cache = JSON.parse(localStorage.getItem(LS.slipCache) || 'null'); } catch (e) {}
+    var jobs = [function () {
+      if (cache && cache.ver === j.slip_ver && cache.sv === ME.s_ver && SLIP) { return; }
+      return memberOpenBlob('pro/m/slip', ME.wrap_s).then(function (o) {
+        if (!o) { return; }
+        SLIP = o; memberApplySlip();
+        try { localStorage.setItem(LS.slipCache, JSON.stringify({ ver: j.slip_ver, sv: ME.s_ver })); } catch (e) {}
+      });
+    }];
+    if (ME.role === 'admin' && ME.hist && ME.wrap_h) {
+      jobs.push(function () { return memberOpenBlob('pro/m/hist', ME.wrap_h).then(function (o) { HIST = o; }); });
+    } else { HIST = null; }
+    return chain(jobs);
+  }
+  function memberOpenBlob(path, wrap) {
+    return Promise.all([memberKey(), mFetch(path).then(function (r) { if (r.status === 404) { return null; } if (!r.ok) { throw new Error(path + ' ' + r.status); } return r.arrayBuffer(); })])
+      .then(function (x) {
+        if (!x[1]) { return null; }
+        return kmOpenWith(x[0], kmUnB64(wrap)).then(kmImportK).then(function (key) { return kmOpen(key, x[1]); })
+          .then(function (b) { return JSON.parse(new TextDecoder().decode(b)); });
+      });
+  }
+  /* Στη συσκευή του μέλους το «βιβλίο» είναι ΜΟΝΟ ό,τι έχει το δελτίο (κανείς δεν γράφει εδώ). */
+  function memberApplySlip() {
+    BOOK = { v: 1, k: 2, ver: 0, prods: {}, items: (SLIP && SLIP.items) || {}, log: [] };
+    PIDX = slipIndex();
+  }
+  function slipIndex() {
+    var out = {};
+    if (!SLIP) { return out; }
+    Object.keys(SLIP.groups || {}).forEach(function (pid) {
+      var g = SLIP.groups[pid], s = {};
+      Object.keys(g.s).forEach(function (n) { var k = {}; (g.s[n].k || []).forEach(function (x) { k[x] = 1; }); s[n] = { sup: n, last: g.s[n].l, lastAt: g.s[n].a, keys: k }; });
+      var hg = HIST && HIST.groups && HIST.groups[pid];
+      out[pid] = { pid: pid, base: g.b, name: g.n, sups: s, avg: hg ? hg.avg : undefined, n: hg ? hg.n : undefined, buys: hg ? hg.buys : undefined };
+    });
+    return out;
+  }
+  /* manager με «διαχείριση»: δίνει κι αυτός το S σε υπάλληλο που μπήκε (αν ο Boss δεν έχει ανοίξει ακόμα). */
+  function memberMgrKeys() {
+    return mJson('pro/m/team').then(function (j) {
+      if (!j || !j.ok) { return; }
+      var need = (j.members || []).filter(function (m) { return m.pub && (m.status === 'joined' || (m.status === 'active' && m.s_ver !== ME.s_ver)); });
+      if (!need.length) { return; }
+      return memberKey().then(function (priv) { return kmOpenWith(priv, kmUnB64(ME.wrap_s)); }).then(function (S) {
+        return chain(need.map(function (m) { return function () {
+          return kmSealTo(kmUnB64(m.pub), S).then(function (w) {
+            return mJson('pro/m/team/key', { method: 'POST', body: JSON.stringify({ member_id: m.member_id, wrap_s: kmB64(w), s_ver: ME.s_ver }) });
+          });
+        }; }));
+      });
+    }).catch(function () {});
+  }
+  /* «📤 Αποστολή»: σφράγισμα προς τον Boss → ανέβασμα → τίποτα δεν μένει στο κινητό (χωρίς ιστορικό, 4/9). */
+  function memberSend(r, btn) {
+    var mi = memberInfo();
+    if (!mi || !mi.boss_pub) { alert('Δεν βρέθηκε το κλειδί του ιδιοκτήτη. Ξαναδοκίμασε σε λίγο.'); return; }
+    btn.disabled = true; btn.textContent = 'Στέλνεται…';
+    var pid = rnd32().slice(0, 32);
+    var meta = { v: 1, supplier: r.supplier, invDate: r.invDate, ts: r.ts, by: mi.name, sug: r.sug || null, proSug: r.proSug || null };
+    var pages = [r.blob].concat(r.pages || []);
+    var bossPub = kmUnB64(mi.boss_pub);
+    kmSealTo(bossPub, new TextEncoder().encode(JSON.stringify(meta))).then(function (sm) {
+      return mJson('pro/m/proposal', { method: 'POST', body: JSON.stringify({ id: pid, meta: kmB64(sm), pages: pages.length }) });
+    }).then(function (j) {
+      if (!j.ok) { throw new Error(j.error === 'off_duty' ? 'Είσαι εκτός βάρδιας — η αποστολή δεν έγινε.' : 'Σφάλμα: ' + (j.error || 'δίκτυο')); }
+      return chain(pages.map(function (b, n) { return function () {
+        return b.arrayBuffer().then(function (buf) { return kmSealTo(bossPub, new Uint8Array(buf)); }).then(function (sealed) {
+          return mFetch('pro/m/page?id=' + pid + '&n=' + n, { method: 'PUT', body: sealed, headers: { 'Content-Type': 'application/octet-stream' } });
+        }).then(function (rr) { if (!rr.ok) { throw new Error('σελίδα ' + (n + 1) + ' · ' + rr.status); } });
+      }; }));
+    }).then(function () {
+      var sent = []; try { sent = JSON.parse(localStorage.getItem(LS.msent) || '[]'); } catch (e) {}
+      sent.unshift({ id: pid, sup: r.supplier, at: Date.now() });
+      localStorage.setItem(LS.msent, JSON.stringify(sent.slice(0, 15)));
+      return del(r.id);
+    }).then(function () { renderPending(); refreshCount(); }).catch(function (e) {
+      btn.disabled = false; btn.textContent = '📤 Αποστολή στον ιδιοκτήτη';
+      alert('Δεν στάλθηκε: ' + (e && e.message || e) + '\n\nΤο τιμολόγιο έμεινε εδώ — ξαναδοκίμασε.');
+    });
+  }
+  function memberSentBlock() {
+    var box = document.createElement('div');
+    box.className = 'pro-log m-sent';
+    var sent = []; try { sent = JSON.parse(localStorage.getItem(LS.msent) || '[]'); } catch (e) {}
+    if (!sent.length) { return box; }
+    box.innerHTML = '<b>📤 Στάλθηκαν</b>' + sent.map(function (x) {
+      return '<div data-sent="' + x.id + '">' + dstr(x.at) + ' ' + new Date(x.at).toTimeString().slice(0, 5) + ' · ' + escH(x.sup) + ' — <span class="m-st">…</span></div>';
+    }).join('');
+    mJson('pro/m/proposals').then(function (j) {
+      var st = {}; ((j && j.proposals) || []).forEach(function (p) { st[p.id] = p.status; });
+      var T = { upload: '⏳ ανεβαίνει', pending: '⏳ περιμένει τον ιδιοκτήτη', taken: '📥 το παρέλαβε ο ιδιοκτήτης', approved: '✓ εγκρίθηκε', rejected: '✗ απορρίφθηκε' };
+      Array.prototype.forEach.call(box.querySelectorAll('[data-sent]'), function (d) { d.querySelector('.m-st').textContent = T[st[d.getAttribute('data-sent')]] || '—'; });
+    });
+    return box;
   }
 
   /* ══ Ο ΠΡΟΜΗΘΕΥΤΗΣ ΜΟΥ ══ */
@@ -2696,7 +3324,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v195';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
+  var APP_VER = 'φέτα 3 · v196';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -4791,7 +5419,7 @@
     return { id: r.id, ts: r.ts, supplier: r.supplier, invDate: r.invDate,
              net: r.net, vat: r.vat, total: r.total,
              pages: 1 + ((r.pages && r.pages.length) || 0),
-             lines: r.lines || undefined, proInfo: r.proInfo || undefined };   /* KM-PRO-F1 */
+             lines: r.lines || undefined, proInfo: r.proInfo || undefined, from: r.from || undefined };   /* KM-PRO-F1 · F3 */
   }
   /* Τα id των φωτογραφιών ενός τιμολογίου: η πρώτη σελίδα παίρνει το id του
      τιμολογίου, οι υπόλοιπες <id>-p2, <id>-p3… Σταθερά, ώστε να μην
@@ -4825,7 +5453,7 @@
   function pushMeta(rows, key, baseVer) {
     /* v43 — «gone»: τα id όσων διαγράφηκαν. Παλιότερες εκδόσεις αγνοούν
        άγνωστο πεδίο, οπότε ο φάκελος μένει συμβατός προς τα πίσω. */
-    var payload = new TextEncoder().encode(JSON.stringify({ v: 1, shots: rows.map(metaOf), gone: goneRead(), book: bookForPush() }));
+    var payload = new TextEncoder().encode(JSON.stringify({ v: 1, shots: rows.map(metaOf), gone: goneRead(), book: bookForPush(), team: teamForPush() }));
     return kmSeal(key, payload).then(function (sealed) {
       var h = kmHead();
       h['Content-Type'] = 'application/octet-stream';
@@ -4991,7 +5619,7 @@
                   var m = news[k++];
                   return put({ id: m.id, ts: m.ts, supplier: m.supplier, invDate: m.invDate,
                                net: m.net, vat: m.vat, total: m.total,
-                               lines: m.lines || undefined, proInfo: m.proInfo || undefined,   /* KM-PRO-F1 */
+                               lines: m.lines || undefined, proInfo: m.proInfo || undefined, from: m.from || undefined,   /* KM-PRO-F1 · F3 */
                                pages: [], srvPages: m.pages || 1 })
                     .then(function () { added++; return one(); });
                 };
@@ -5105,7 +5733,7 @@
       if (!plain) { return null; }
       var data = JSON.parse(new TextDecoder().decode(plain));
       if (!data) { return null; }
-      return { shots: data.shots || [], gone: data.gone || [], book: data.book || null };   /* KM-PRO-F2 */
+      return { shots: data.shots || [], gone: data.gone || [], book: data.book || null, team: data.team || null };   /* KM-PRO-F2 · F3 */
     }).catch(function (e) {
       pullInfo.msg = 'δεν άνοιξε ο φάκελος: ' + (e && e.message ? e.message : e);
       return null;
@@ -5341,6 +5969,7 @@
            ανέβει ξανά ο φάκελος. */
         goneAdd(folder.gone || []);
         bookMerge(folder.book);   /* KM-PRO-F2 */
+        teamMerge(folder.team);   /* KM-PRO-F3 */
         var dead = goneMap();
         shots = shots.filter(function (m) { return !dead[m.id]; });
         return all().then(function (rows) {
@@ -5367,7 +5996,7 @@
             if (!cur) {
               return put({ id: m.id, ts: m.ts, supplier: m.supplier, invDate: m.invDate,
                            net: m.net, vat: m.vat, total: m.total,
-                           lines: m.lines || undefined, proInfo: m.proInfo || undefined,   /* KM-PRO-F1 */
+                           lines: m.lines || undefined, proInfo: m.proInfo || undefined, from: m.from || undefined,   /* KM-PRO-F1 · F3 */
                            pages: [], srvPages: m.pages || 1 })
                 .then(function () { pullInfo.added++; return step(i + 1); });
             }
@@ -5386,7 +6015,7 @@
               fresh.net = m.net;
               fresh.vat = m.vat;
               fresh.total = m.total;
-              fresh.lines = m.lines || undefined; fresh.proInfo = m.proInfo || undefined;   /* KM-PRO-F1 */
+              fresh.lines = m.lines || undefined; fresh.proInfo = m.proInfo || undefined; fresh.from = m.from || undefined;   /* KM-PRO-F1 · F3 */
               fresh.srvPages = m.pages || fresh.srvPages || 1;
               return put(fresh).then(function () { pullInfo.upd++; });
             }).then(function () { return step(i + 1); });
@@ -5800,6 +6429,16 @@
       localStorage.setItem(LS.id, 'km_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
     }
     /* Πηγή εγκατάστασης και σύσταση — ο κανόνας ζει στο refCaptureSrc(). */
+    /* KM-PRO-F3 · ΠΡΟΣΚΛΗΣΗ ΟΜΑΔΑΣ (#km_inv=…) και συσκευή-μέλος: ΠΡΙΝ από κάθε ροή λογαριασμού.
+       Το μέλος δεν έχει λογαριασμό, email, 12 λέξεις ή Κ — δεν μπαίνει ποτέ σε εκείνες τις οθόνες. */
+    var inv = /[#&]km_inv=([0-9a-f]{32})/.exec(String(location.hash || ''));
+    if (inv) {
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (ei) {}
+      if (localStorage.getItem(LS.reg) || localStorage.getItem(LS.folder)) {
+        setTimeout(function () { alert('Αυτή η συσκευή έχει ήδη δικό της λογαριασμό Kostometro. Η πρόσκληση της ομάδας ανοίγει σε κινητό ΧΩΡΙΣ λογαριασμό.'); }, 300);
+      } else if (!localStorage.getItem(LS.member)) { return memberJoinShow(inv[1]); }
+    }
+    if (memberMode()) { return memberBoot(); }
     var newSrc = refCaptureSrc(location.search, !!localStorage.getItem(LS.reg),
                                localStorage.getItem(LS.src));
     if (newSrc !== null) { localStorage.setItem(LS.src, newSrc); }
@@ -5887,6 +6526,7 @@
              .then(function (changed) { if (changed) { return pullNow(); } })
              .then(function () { return maybeFlush(); });
     scheduleSync(4000);   // v31 — …και μετά ό,τι έμεινε πίσω από εδώ
+    proP.then(function (on) { if (on) { teamStart(); } });   /* KM-PRO-F3 — ο κύκλος της ομάδας */
     proP.then(function () {   /* KM-PRO-NOKEY */
       if (needKeyScreen()) { return show('s-key'); }
       if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }

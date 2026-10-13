@@ -474,6 +474,7 @@
     <div class="grp">Τα τιμολόγιά μου</div>
     <button class="row" data-go="s-pend"><span class="row-l"><span class="row-t">Εκκρεμή</span><span class="row-sub">περιμένουν ποσά</span></span><span class="row-b" id="m-pend">0</span></button>
     <button class="row" data-go="s-prices" id="m-prices-row" hidden><span class="row-l"><span class="row-t">📊 Τιμές</span><span class="row-sub">PRO · τελευταίες τιμές ανά προϊόν και προμηθευτή</span></span><span class="row-b">→</span></button>   <!-- KM-PRO-F2 -->
+    <button class="row" data-go="s-team" id="m-team-row" hidden><span class="row-l"><span class="row-t">👥 Ομάδα</span><span class="row-sub">PRO · υπάλληλοι, βάρδιες, προσκλήσεις</span></span><span class="row-b">→</span></button>   <!-- KM-PRO-F3 -->
     <button class="row" data-go="s-sup"><span class="row-l"><span class="row-t">Προμηθευτές</span><span class="row-sub">όλα τα τιμολόγια ανά προμηθευτή</span></span><span class="row-b" id="m-sup">0</span></button>
     <div class="grp">Βοήθεια</div>
     <button class="row" data-go="s-faq"><span class="row-l"><span class="row-t">Ερωτήσεις &amp; απαντήσεις</span><span class="row-sub">ό,τι ρωτάνε όλοι</span></span><span class="row-b">→</span></button>
@@ -482,6 +483,7 @@
     <div class="grp">Μοιράσου</div>
     <button class="row" data-go="s-ref"><span class="row-l"><span class="row-t">Κάλεσε</span><span class="row-sub">ο σύνδεσμός σου και η επιβράβευση</span></span><span class="row-b">→</span></button>
     <div class="sep"></div>
+    <button class="row" id="m-leave-row" hidden><span class="row-l"><span class="row-t">Αποσύνδεση από την ομάδα</span><span class="row-sub">θα χρειαστείς νέα πρόσκληση</span></span><span class="row-b">→</span></button>   <!-- KM-PRO-F3 -->
     <button class="row" data-go="s-settings"><span class="row-l"><span class="row-t">Ρυθμίσεις</span></span><span class="row-b">→</span></button>
     <p class="menu-foot"><a href="/legal/privacy" target="_blank" rel="noopener">Πολιτική απορρήτου</a> · <a href="/legal/terms" target="_blank" rel="noopener">Όροι χρήσης</a> · <span id="m-ver"></span></p>
   </div>
@@ -495,6 +497,26 @@
      δοκιμή. Τώρα ο δοκιμαστής το ακολουθεί και η ίδια η δοκιμή το επαληθεύει.
      Τα κείμενα ζουν στο app.js (FAQ), ώστε οι 🔗 σύνδεσμοι να οδηγούν σε οθόνες. -->
 <!-- ══ KM-PRO-F2 · «📊 Τιμές» — η λίστα της διαπραγμάτευσης (PRO) ══ -->
+<!-- ══ KM-PRO-F3 · «👥 Ομάδα» (Boss · manager με διαχείριση) ══ -->
+<section id="s-team" class="screen page" hidden>
+  <header class="pg-head">
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
+    <h2>👥 Ομάδα</h2>
+  </header>
+  <div class="pg-body" id="team-body"></div>
+</section>
+<!-- ══ KM-PRO-F3 · κατάσταση συσκευής-μέλους (πρόσκληση · αναμονή · εκτός βάρδιας · ανάκληση) ══ -->
+<section id="s-mstate" class="screen setup" hidden>
+  <div class="setup-inner">
+    <h1 class="logo">kosto<svg class="logo-mark" viewBox="0 0 34 46" aria-hidden="true"><path d="M6 30 L17 15 L28 30"/></svg>metro</h1>
+    <h2 id="ms-title"></h2>
+    <p class="lede" id="ms-text"></p>
+    <p class="err" id="ms-err" hidden></p>
+    <button class="btn primary" id="ms-go" hidden>Σύνδεση</button>
+    <button class="btn ghost" id="ms-retry" hidden>Δοκίμασε ξανά</button>
+    <button class="btn ghost" id="ms-leave" hidden>Αποσύνδεση από την ομάδα</button>
+  </div>
+</section>
 <section id="s-prices" class="screen page" hidden>
   <header class="pg-head">
     <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>

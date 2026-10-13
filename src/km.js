@@ -116,7 +116,7 @@ export async function handleKm(request, env, ctx, path) {
     // δυναμικό import: τα τεστ φορτώνουν το km.js ως data: URL, όπου σχετική διαδρομή δεν λύνεται.
     // Ο wrangler (esbuild) το ενσωματώνει κανονικά στο πακέτο.
     const { handlePro } = await import("./km_pro.js");
-    return handlePro(request, env, path, { authed, json, safeJson, clean, now, adminOk, agentCall });
+    return handlePro(request, env, path, { authed, json, safeJson, clean, now, adminOk, agentCall, sha256hex });
   }
 
   if (path === "/api/km/lookup" && method === "GET") return lookup(request, env);
@@ -2434,6 +2434,11 @@ async function wipeFolder(env, folderId) {
   try { await env.DB.prepare("DELETE FROM km_read_gift WHERE folder_id = ?").bind(folderId).run(); } catch (e) {}
   // v120 · KM-QR — εκκρεμές κλειδωμένο πακέτο μεταφοράς φεύγει κι αυτό (ίδιο μοτίβο, ίδιος λόγος).
   try { await env.DB.prepare("DELETE FROM km_transfers WHERE folder_id = ?").bind(folderId).run(); } catch (e) {}
+  // KM-PRO-F3 · η ομάδα φεύγει με τον λογαριασμό: μέλη (ονόματα, κλειδιά), προτάσεις, ίχνος (ίδιο μοτίβο:
+  // στην παραγωγή οι πίνακες δεν υπάρχουν ακόμα — η διαγραφή του Free ΔΕΝ πέφτει γι' αυτό). Το R2 (team/) έφυγε με το wipeR2.
+  for (const t of ["km_proposals", "km_team_log", "km_members", "km_team"]) {
+    try { await env.DB.prepare("DELETE FROM " + t + " WHERE folder_id = ?").bind(folderId).run(); } catch (e) {}
+  }
 
   return {
     folder_id: folderId,

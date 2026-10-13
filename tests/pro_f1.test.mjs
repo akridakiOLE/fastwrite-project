@@ -18,7 +18,7 @@ const MUT = [
   // Μ4 · 🔴 το grant δουλεύει και στην παραγωγή (χωρίς PRO_LIVE)
   ["pro", "  if (String(env.PRO_LIVE || \"\") !== \"1\") return h.json({ ok: false, error: \"pro_not_live\" }, 409);\n", ""],
   // Μ5 · 🔴 οι γραμμές δεν ταξιδεύουν στον φάκελο
-  ["js", "             lines: r.lines || undefined, proInfo: r.proInfo || undefined };   /* KM-PRO-F1 */", "             };"],
+  ["js", "             lines: r.lines || undefined, proInfo: r.proInfo || undefined, from: r.from || undefined };   /* KM-PRO-F1 · F3 */", "             };"],
   // Μ6 · 🔴 οι γραμμές γίνονται οριστικές χωρίς πάτημα ανθρώπου
   ["js", "      proConfirm(r);   /* KM-PRO-F1", "      /* */ (function(){})(r);   /* KM-PRO-F1"],
   // Μ7 · 🔴 το staging δείχνει στην ΠΑΡΑΓΩΓΙΚΗ βάση
@@ -64,7 +64,7 @@ ok(pro.includes('error: "month_cap"'), "ταβάνι μήνα ανά λογαρ�
 ok(km.includes('const { handlePro } = await import("./km_pro.js");') && km.includes('path.startsWith("/api/km/pro/")'), "km.js → km_pro.js (δυναμικά)");
 
 // κινητό
-ok(js.includes("             lines: r.lines || undefined, proInfo: r.proInfo || undefined };   /* KM-PRO-F1 */"), "🔴 metaOf: οι γραμμές ταξιδεύουν στον φάκελο");
+ok(js.includes("             lines: r.lines || undefined, proInfo: r.proInfo || undefined, from: r.from || undefined };   /* KM-PRO-F1 · F3 */"), "🔴 metaOf: οι γραμμές ταξιδεύουν στον φάκελο");
 ok((js.match(/lines: m\.lines \|\| undefined, proInfo: m\.proInfo \|\| undefined/g) || []).length === 2, "κατέβασμα: οι γραμμές επιστρέφουν (2 σημεία)");
 ok(js.includes("      proConfirm(r);   /* KM-PRO-F1"), "🔴 οριστικές ΜΟΝΟ με «Αποθήκευση»");
 ok(js.includes("    if (proSweep()) { return; }"), "PRO πρώτο στην ουρά ανάγνωσης");

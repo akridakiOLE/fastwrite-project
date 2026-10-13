@@ -14,7 +14,7 @@ const MUT = [
   // Μ3 · 🔴 η αλλαγή αντιστοίχισης ΔΕΝ καταγράφεται
   ["js", "    bookSave('link', key, was, pid);", "    bookSave(null);"],
   // Μ4 · 🔴 το βιβλίο δεν ταξιδεύει στον φάκελο
-  ["js", "gone: goneRead(), book: bookForPush() })", "gone: goneRead() })"],
+  ["js", "gone: goneRead(), book: bookForPush(), team: teamForPush() })", "gone: goneRead(), team: teamForPush() })"],
   // Μ5 · 🔴 παλιό βιβλίο από τον server πατάει νεότερο τοπικό
   ["js", "if ((remote.ver || 0) > (b.ver || 0)) {", "if (true) {"],
   // Μ6 · η γραμμή «📊 Τιμές» φαίνεται και σε Free
@@ -128,7 +128,7 @@ E.bookMerge({ v: 1, ver: before - 1000, prods: {}, items: {}, log: [] });
 ok(E.bookRead().ver === before, "🔴 παλιό βιβλίο από τον server ΔΕΝ πατάει νεότερο τοπικό");
 E.bookMerge({ v: 1, ver: before + 1000, prods: { X: { name: "x" } }, items: {}, log: [] });
 ok(E.bookRead().prods.X, "νεότερο βιβλίο από τον server κερδίζει");
-ok(js.includes("gone: goneRead(), book: bookForPush() })"), "🔴 το βιβλίο ταξιδεύει στον σφραγισμένο φάκελο");
+ok(js.includes("gone: goneRead(), book: bookForPush(), team: teamForPush() })"), "🔴 το βιβλίο ταξιδεύει στον σφραγισμένο φάκελο");
 ok(js.includes("        bookMerge(folder.book);   /* KM-PRO-F2 */"), "το βιβλίο έρχεται με το κατέβασμα");
 // οθόνη
 ok(html.includes('<section id="s-prices"') && html.includes('id="m-prices-row" hidden'), "«📊 Τιμές»: οθόνη + γραμμή μενού κρυφή εξ αρχής");

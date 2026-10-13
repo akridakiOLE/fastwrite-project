@@ -316,3 +316,46 @@ async function kmRecoveryKek(r1Hex, r2) {
   var kekBits = await kmHkdf(seedKey, "recovery-kek", 256);
   return crypto.subtle.importKey("raw", kekBits, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
+
+// ── KM-PRO-F3 · ΑΣΥΜΜΕΤΡΑ ΚΛΕΙΔΙΑ ΤΗΣ ΟΜΑΔΑΣ (13/10/2026 · Α350 §9.9.3) ─────────
+// «Ο υπάλληλος γράφει χωρίς να διαβάζει»: σφραγίζει ΠΡΟΣ το δημόσιο κλειδί του Boss
+// και μόνο ο Boss ανοίγει. Το ίδιο σχήμα κλειδώνει το S του δελτίου προς κάθε μέλος.
+// P-256 ECDH (εφήμερο κλειδί ανά σφράγισμα) → HKDF-SHA256 → AES-GCM (kmSeal).
+// Μορφή: εφήμερο δημόσιο κλειδί (65 bytes) + IV (12) + κείμενο + tag (16).
+var KM_EC = { name: "ECDH", namedCurve: "P-256" };
+async function kmEcNew() { return crypto.subtle.generateKey(KM_EC, true, ["deriveBits"]); }
+async function kmEcPubRaw(pub) { return new Uint8Array(await crypto.subtle.exportKey("raw", pub)); }
+async function kmEcPrivJwk(priv) { return crypto.subtle.exportKey("jwk", priv); }
+async function kmEcImportPriv(jwk) { return crypto.subtle.importKey("jwk", jwk, KM_EC, false, ["deriveBits"]); }
+async function kmEcImportPub(raw) { return crypto.subtle.importKey("raw", raw, KM_EC, true, []); }
+async function kmEcAes(priv, pub, ephRaw) {
+  var bits = await crypto.subtle.deriveBits({ name: "ECDH", public: pub }, priv, 256);
+  var hk = await crypto.subtle.importKey("raw", bits, "HKDF", false, ["deriveBits"]);
+  var k = await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: ephRaw, info: new TextEncoder().encode("kostometro/team-seal") }, hk, 256);
+  return crypto.subtle.importKey("raw", k, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+async function kmSealTo(pubRaw, bytes) {
+  var eph = await kmEcNew(), ephRaw = await kmEcPubRaw(eph.publicKey);
+  var key = await kmEcAes(eph.privateKey, await kmEcImportPub(pubRaw), ephRaw);
+  var sealed = await kmSeal(key, bytes);
+  var out = new Uint8Array(65 + sealed.length);
+  out.set(ephRaw, 0); out.set(sealed, 65);
+  return out;
+}
+async function kmOpenWith(priv, blob) {
+  var b = new Uint8Array(blob);
+  if (b.length < 65 + 28) throw new Error("Το σφραγισμένο κομμάτι είναι πολύ μικρό.");
+  var ephRaw = b.slice(0, 65);
+  var key = await kmEcAes(priv, await kmEcImportPub(ephRaw), ephRaw);
+  return kmOpen(key, b.subarray(65));
+}
+function kmB64(bytes) {
+  var s = "", b = new Uint8Array(bytes);
+  for (var i = 0; i < b.length; i += 0x8000) { s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); }
+  return btoa(s);
+}
+function kmUnB64(s) {
+  var x = atob(s), b = new Uint8Array(x.length);
+  for (var i = 0; i < x.length; i++) { b[i] = x.charCodeAt(i); }
+  return b;
+}

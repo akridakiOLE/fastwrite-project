@@ -198,6 +198,12 @@ export async function handlePro(request, env, path, h) {
   if (path === "/api/km/pro/read" && method === "POST") return proRead(request, env, h);
   if (path === "/api/km/admin/pro/grant" && method === "POST") return proGrant(request, env, h);
   if (path === "/api/km/admin/pro/read-test" && method === "POST") return proReadTest(request, env, h);
+  // KM-PRO-F3 · η ομάδα (Boss / admin / user) — src/km_team.js
+  if (path === "/api/km/pro/team" || path.startsWith("/api/km/pro/team/") || path.startsWith("/api/km/pro/m/")) {
+    const { handleTeam } = await import("./km_team.js");
+    const r = await handleTeam(request, env, path, h, { proRow, proActive, readFor: proReadFor });
+    if (r) return r;
+  }
   return h.json({ ok: false, error: "not_found" }, 404);
 }
 
@@ -215,7 +221,11 @@ async function proRead(request, env, h) {
   const a = await h.authed(request, env);
   if (a.err) return a.err;
   if (a.acc.active_device_id && a.acc.active_device_id !== a.id.device) return h.json({ ok: false, error: "not_active" }, 409);
-  const t = h.now(), folder = a.id.folder, month = t.slice(0, 7);
+  return proReadFor(request, env, h, a.id.folder);
+}
+// KM-PRO-F3 · η ίδια ανάγνωση και για μέλος της ομάδας (υπάλληλο) — το κόστος γράφεται στον ΦΑΚΕΛΟ
+export async function proReadFor(request, env, h, folder) {
+  const t = h.now(), month = t.slice(0, 7);
   if (!proActive(env, await proRow(env, folder), t)) return h.json({ ok: false, error: "not_pro" }, 403);
   const b = await h.safeJson(request);
   const bad = pagesOk(b && b.pages);
