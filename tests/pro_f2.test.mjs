@@ -10,7 +10,7 @@ const MUT = [
   // Μ1 · 🔴 μέσος όρος ΧΩΡΙΣ στάθμιση με την ποσότητα
   ["js", "var q = (ln.qty || 1) * ln.pack.per;", "var q = 1;"],
   // Μ2 · 🔴 «ίδιο» χωρίς πάτημα: κάθε κωδικός με ίδια περιγραφή ενώνεται σιωπηλά
-  ["js", "return s + '|' + (ln.code ? 'c:' + norm(ln.code) : 'd:' + norm(ln.desc || ''));", "return 'd:' + norm(ln.desc || '');"],
+  ["js", "return s + '|' + (ck ? 'c:' + ck : 'd:' + norm(ln.desc || ''));", "return 'd:' + norm(ln.desc || '');"],
   // Μ3 · 🔴 η αλλαγή αντιστοίχισης ΔΕΝ καταγράφεται
   ["js", "    bookSave('link', key, was, pid);", "    bookSave(null);"],
   // Μ4 · 🔴 το βιβλίο δεν ταξιδεύει στον φάκελο
@@ -35,6 +35,18 @@ const MUT = [
   ["js", "    proP.then(function () {   /* KM-PRO-NOKEY */\n      if (needKeyScreen())", "    (function (f) { f(); })(function () {\n      if (needKeyScreen())"],
   // Μ14 · 🔴 αβέβαιη συσκευασία → σιωπή (ούτε τιμή ούτε ερώτηση)
   ["js", "    if (ln.pack && ln.pack.per > 0) {\n      return '<span class=\"pro-ask\">", "    if (ln.pack && ln.pack.per > 0) {\n      return ''; return '<span class=\"pro-ask\">"],
+  // Μ15 · 🔴 v195: «Κ100» (ελληνικό) ≠ «K100» (λατινικό) — το ιστορικό σπάει σιωπηλά (μετρημένο 13/10)
+  ["js", ".replace(/[ΑΒΕΖΗΙΚΜΝΟΡΤΥΧ]/g, function (x) { return CODE_LOOK[x]; })", ""],
+  // Μ16 · 🔴 v195: η μετονομασία προμηθευτή αφήνει το βιβλίο ορφανό
+  ["js", "else { it.sup = newName; b.items[nk] = it; undo.made.push(nk); }", "else { undo.made.push(nk); }"],
+  // Μ17 · v195: το κεντρικό προϊόν παίρνει το όνομα της γραμμής που πατήθηκε, όχι αυτής που διαλέχτηκε
+  ["js", "(other && other.name) || targetName || prodName(targetPid) || it.name", "(other && other.name) || it.name"],
+  // Μ18 · 🔴 v195: βιβλίο της v194 (κλειδιά «Κ100») δεν μεταφέρεται στη νέα μορφή
+  ["js", "    bookKeys2(BOOK);\n", ""],
+  // Μ19 · 🔴 v195: η «↩ Αναίρεση» μετονομασίας δεν γυρίζει πίσω το βιβλίο
+  ["js", "      bookRenameUndo(renameBook); renameBook = null;", "      renameBook = null;"],
+  // Μ20 · 🔴 v195: η αναίρεση ένωσης αφήνει σιωπηλό «ίδιο με» στον στόχο
+  ["js", "if (f.pid) { t.pid = null; } ", ""],
 ];
 if (ONLY !== null) {
   const m = MUT[ONLY - 1]; const bag = { js, html, km };
@@ -56,7 +68,7 @@ const escSrc = js.slice(js.indexOf("  function escH(t) {"), js.indexOf("\n", js.
 const store = {};
 const env = new Function("localStorage", "isPending", "dateOf", "dstr", "PRO_BASE", "LS",
   "var pulling = false;" + normSrc + numSrc + pfc + escSrc + js.slice(a, b) +
-  "\nreturn { bookRead, bookSave, bookMerge, bookForPush, itemKey, bookPid, bookLink, bookUnlink, bookSetPack, bookApplyPack, priceIndex, priceSignalHtml: function(r,ln,ix){ PIDX = ix; return priceSignalHtml(r,ln); }, packFromCount, prodName, reset: function(){ BOOK = null; } };");
+  "\nreturn { codeKey, bookKeys2, bookRenameSup, bookRenameUndo, bookRead, bookSave, bookMerge, bookForPush, itemKey, bookPid, bookLink, bookUnlink, bookSetPack, bookApplyPack, priceIndex, priceSignalHtml: function(r,ln,ix){ PIDX = ix; return priceSignalHtml(r,ln); }, packFromCount, prodName, reset: function(){ BOOK = null; } };");
 const E = env({ getItem: (k) => store[k] || null, setItem: (k, v) => { store[k] = v; } },
   (r) => r.total === null, (r) => r.invDate || r.ts, (t) => new Date(t).toISOString().slice(0, 10),
   { kg: "€/κιλό", L: "€/λίτρο", pc: "€/τεμ." }, { book: "km_book" });
@@ -145,6 +157,49 @@ ok(js.includes("    proP.then(function () {   /* KM-PRO-NOKEY */\n      if (need
   ok(/📦 1 εξάδ\. = 9 λτ;/.test(U({ base_price: null, unit: "εξάδ.", pack: { per: 9, base: "L", sure: false } })), "🔴 αβέβαιη συσκευασία → «1 εξάδ. = 9 λτ;» (ποτέ σιωπή)");
   ok(/πόσα έχει 1 κιβ\.;/.test(U({ base_price: null, unit: "κιβ.", pack: null })), "άγνωστη συσκευασία → «πόσα έχει 1 κιβ.;»"); }
 ok(js.includes("(proOn() ? 'τον Κώστα AI' : 'το Gemini')"), "στο PRO γράφει «Διαβάστηκαν από τον Κώστα AI», όχι Gemini");
+// ══ v195 · ΕΥΡΗΜΑΤΑ ΤΗΣ ΕΠΑΛΗΘΕΥΣΗΣ Φ2 (13/10/2026, tools/pro/f2check.mjs στο staging) ══
+ok(E.itemKey("ΟΡΙΖΩΝ", { code: "Κ100" }) === E.itemKey("ΟΡΙΖΩΝ", { code: "K100" }), "🔴 v195: «Κ100» (ελληνικό Κ) = «K100» (λατινικό) — ίδιο προϊόν");
+ok(E.itemKey("Β", { code: "G-77" }) === E.itemKey("Β", { code: "g 77" }) && E.itemKey("Β", { code: "G.77" }) === E.itemKey("Β", { code: "G77" }), "v195: «G-77» = «g 77» = «G.77» = «G77»");
+ok(E.itemKey("ΟΡΙΖΩΝ", { code: "K100" }) !== E.itemKey("ΟΡΙΖΩΝ", { code: "K200" }), "v195: διαφορετικοί κωδικοί μένουν διαφορετικοί");
+ok(E.itemKey("Β", { code: "-", desc: "ΨΩΜΙ" }) === E.itemKey("Β", { code: null, desc: "ΨΩΜΙ" }), "v195: κωδικός χωρίς χαρακτήρες → η περιγραφή, ποτέ κενό κλειδί");
+// μετανάστευση βιβλίου της v194
+store.km_book = JSON.stringify({ v: 1, ver: 5, prods: { POLD: { name: "ΓΑΛΑ" } }, items: { "ΟΡΙΖΩΝ|c:Κ100": { sup: "ΟΡΙΖΩΝ", code: "Κ100", name: "ΓΑΛΑ", pid: "POLD", pack: { per: 1, base: "L" } } }, log: [] });
+E.reset();
+ok(E.bookPid(E.itemKey("ΟΡΙΖΩΝ", { code: "K100" })) === "POLD", "🔴 v195: βιβλίο της v194 με «Κ100» → βρίσκεται και με «K100» (μετανάστευση κλειδιών)");
+ok(E.bookRead().k === 2, "v195: σημάδι νέας μορφής (k: 2)");
+{ const old = { v: 1, ver: Date.now() + 99999, prods: {}, items: { "Α|c:Τ-1": { pid: "PX" }, "Α|c:T1": { pack: { per: 6, base: "L" } } }, log: [] };
+  E.bookMerge(old);
+  const it = E.bookRead().items["Α|c:T1"];
+  ok(it && it.pid === "PX" && it.pack && it.pack.per === 6 && !E.bookRead().items["Α|c:Τ-1"], "v195: βιβλίο από άλλη συσκευή με «Τ-1» + «T1» → ΕΝΑ, κρατά και προϊόν και συσκευασία"); }
+// μετονομασία προμηθευτή
+store.km_book = null; E.reset();
+const kO = E.itemKey("ΟΡΙΖΩΝ", { code: "K100" });
+const pidR = E.bookLink("ΑΚΤΗ", { code: "G-77", desc: "ΓΑΛΑ 6x1LT" }, kO, "ΓΑΛΑ ΦΡΕΣΚΟ 1LT");
+ok(E.bookRead().prods[pidR].name === "ΓΑΛΑ ΦΡΕΣΚΟ 1LT", "v195: το κεντρικό προϊόν παίρνει το όνομα που ΔΙΑΛΕΞΕ ο χρήστης (όχι «6x1LT»)");
+E.bookSetPack("ΟΡΙΖΩΝ", { code: "K200", desc: "ΑΛΕΥΡΙ" }, { per: 25, base: "kg" });
+const und = E.bookRenameSup("ΟΡΙΖΩΝ", "ΟΡΙΖΩΝ ΤΡΟΦΙΜΑ");
+const kN = E.itemKey("ΟΡΙΖΩΝ ΤΡΟΦΙΜΑ", { code: "K100" });
+ok(E.bookPid(kN) === pidR && E.bookPid(kO) === kO, "🔴 v195: μετονομασία → το «ίδιο με» ακολουθεί τον προμηθευτή");
+{ const w = { code: "K200", desc: "ΑΛΕΥΡΙ", unit_price: 20, disc_pct: null, pack: null, base_price: null };
+  E.bookApplyPack("ΟΡΙΖΩΝ ΤΡΟΦΙΜΑ", w);
+  ok(w.pack && w.pack.per === 25 && w.base_price === 0.8, "🔴 v195: μετονομασία → η συσκευασία ακολουθεί (20 € / 25 κιλά = 0,8)"); }
+ok(E.bookRead().log.some((x) => x.kind === "rename" && x.from === "ΟΡΙΖΩΝ" && x.to === "ΟΡΙΖΩΝ ΤΡΟΦΙΜΑ"), "v195: η μετονομασία γράφτηκε στο ίχνος");
+E.bookRenameUndo(und);
+ok(E.bookPid(kO) === pidR && E.bookPid(kN) === kN, "v195: «↩ Αναίρεση» → το βιβλίο γυρίζει στο παλιό όνομα");
+// μετονομασία ΠΑΝΩ σε υπάρχοντα προμηθευτή (ένωση): ό,τι είχε ο στόχος μένει, τα κενά γεμίζουν
+store.km_book = null; E.reset();
+E.bookSetPack("Χ", { code: "W1", desc: "ΝΕΡΟ" }, { per: 9, base: "L" });
+const pidY = E.bookLink("Ψ", { code: "W1", desc: "ΝΕΡΟ" }, E.itemKey("Ω", { code: "Q" }), "ΝΕΡΟ 1,5L");
+const u2 = E.bookRenameSup("Ψ", "Χ");
+const itX = E.bookRead().items[E.itemKey("Χ", { code: "W1" })];
+ok(itX.pack.per === 9 && itX.pid === pidY, "v195: ένωση προμηθευτών → συσκευασία του στόχου μένει, το «ίδιο με» έρχεται");
+E.bookRenameUndo(u2);
+ok(E.bookPid(E.itemKey("Ψ", { code: "W1" })) === pidY, "v195: αναίρεση ένωσης → ο Ψ ξαναβρίσκει το «ίδιο με» του");
+ok(E.bookPid(E.itemKey("Χ", { code: "W1" })) === E.itemKey("Χ", { code: "W1" }) && E.bookRead().items[E.itemKey("Χ", { code: "W1" })].pack.per === 9, "🔴 v195: αναίρεση ένωσης → ο Χ ΔΕΝ μένει σιωπηλά «ίδιο με» (ό,τι γέμισε, αδειάζει)");
+ok(js.includes("        renameBook = bookRenameSup(old, name);") && js.includes("      bookRenameUndo(renameBook); renameBook = null;"), "🔴 v195: η μετονομασία της οθόνης Προμηθευτές καλεί το βιβλίο (και η αναίρεση)");
+ok(js.includes("bookLink(r.supplier, ln, o.pid, o.name);"), "v195: το «ίδιο με» περνά το όνομα που είδε ο χρήστης");
+ok(js.includes("if (x.kind === 'rename')"), "v195: «Πρόσφατες αλλαγές» δείχνει τη μετονομασία");
+ok(js.includes("return hay.indexOf(q) >= 0 || (!!qc && hay.indexOf(qc) >= 0);"), "v195: «Τιμές» — αναζήτηση «G-77» βρίσκει τον κωδικό στη νέα μορφή «G77» (το έπιασε το f2check)");
 console.log("\n" + pass + " ✔ · " + fail + " ✘");
 if (ONLY !== null) process.exit(fail ? 0 : 1);
 process.exit(fail ? 1 : 0);
