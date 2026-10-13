@@ -832,3 +832,5 @@ body.is-staging::before{content:"🧪 STAGING · δοκιμές PRO · όχι π
 .pro-buys { margin-top: .4rem; font-size: .88rem; }
 .pro-buys div { margin-top: .2rem; opacity: .9; }
 body.is-member #s-menu .pg-body > *:not(.mem-ok) { display: none !important; }
+/* το μέλος δεν έχει λογαριασμό: ο Κώστας-βοηθός (συνομιλία υποστήριξης του λογαριασμού) δεν εμφανίζεται — ούτε σκεπάζει την «📤 Αποστολή» */
+body.is-member #ag-fab, body.is-member #ag { display: none !important; }

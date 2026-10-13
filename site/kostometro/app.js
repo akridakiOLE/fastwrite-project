@@ -1898,7 +1898,7 @@
       c.appendChild(l);
     }
     if (m.status !== 'invited') {
-      sw('Σε βάρδια', m.on_duty, 'sw-duty', function (v) { set({ on_duty: v }); });
+      sw('Πρόσβαση ανοιχτή (βάρδια)', m.on_duty, 'sw-duty', function (v) { set({ on_duty: v }); });
       var dl = document.createElement('label'); dl.className = 'team-sw sw-until';
       dl.appendChild(document.createTextNode('Λήξη πρόσβασης: '));
       var di = document.createElement('input'); di.type = 'date';
@@ -3324,7 +3324,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v196';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
+  var APP_VER = 'φέτα 3 · v197';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
