@@ -9,7 +9,18 @@ CREATE TABLE IF NOT EXISTS km_oauth_states (
   verifier   TEXT NOT NULL,
   nonce      TEXT NOT NULL,
   ip_h       TEXT,
-  created    TEXT NOT NULL
+  created    TEXT NOT NULL,
+  app_ch     TEXT            -- K3 (14/10/2026): hash του μυστικού της εφαρμογής καταστήματος· NULL = browser
 );
 CREATE INDEX IF NOT EXISTS idx_km_oauth_states_created ON km_oauth_states(created);
 CREATE INDEX IF NOT EXISTS idx_km_oauth_states_ip ON km_oauth_states(ip_h, created);
+
+-- K3 (14/10/2026) · εφαρμογή καταστήματος: κωδικός επιστροφής μιας χρήσης (2′).
+-- Στο σχήμα tech.fastwrite.kostometro:// πάει ΜΟΝΟ το h· το αποτέλεσμα βγαίνει με POST {h, v}.
+CREATE TABLE IF NOT EXISTS km_oauth_handoff (
+  h_hash  TEXT PRIMARY KEY,
+  app_ch  TEXT NOT NULL,
+  frag    TEXT NOT NULL,
+  created TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_km_oauth_handoff_created ON km_oauth_handoff(created);

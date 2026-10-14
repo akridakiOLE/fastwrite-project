@@ -15,9 +15,9 @@ const MUT = [
   ["src", "verified: (c) => c.email_verified === true || c.email_verified === \"true\",", "verified: (c) => true,"],   // 4 · 🔴 ανεπιβεβαίωτο Google email δεκτό
   ["src", "verified: (c) => c.tid === MS_CONSUMER_TID ||", "verified: (c) => true ||"],                               // 5 · 🔴 εταιρικό MS χωρίς επιβεβαίωση δεκτό
   ["src", "DELETE FROM km_oauth_states WHERE state_hash = ? RETURNING *", "SELECT * FROM km_oauth_states WHERE state_hash = ?"], // 6 · 🔴 επανάληψη state
-  ["src", " || cookieVal(request, \"km_oauth\") !== state", ""],                                                     // 7 · 🔴 state χωρίς cookie (CSRF σύνδεσης)
+  ["src", " && cookieVal(request, \"km_oauth\") === state;", ";"],                                                   // 7 · 🔴 state χωρίς cookie (CSRF σύνδεσης) — v131: K3 έγραψε τον έλεγχο θετικά
   ["src", "code_challenge: challenge, code_challenge_method: \"S256\"", "code_challenge: verifier, code_challenge_method: \"plain\""], // 8 · PKCE plain
-  ["src", "  if (busy) return oauthBack(env, oauthFrag(\"err\", { code: busy, e: email }), true);\n", ""],           // 9 · 🔴 δεύτερος λογαριασμός στο ίδιο email
+  ["src", "  if (busy) return back(oauthFrag(\"err\", { code: busy, e: email }));\n", ""],                            // 9 · 🔴 δεύτερος λογαριασμός στο ίδιο email — v131: K3 back()
   ["js", "    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}\n", ""],   // 10 · 🔴 token μένει στη διεύθυνση
   ["src", " oauth_google: 1, oauth_microsoft: 1 };", " };"],                                                         // 11 · το χωνί δεν μετράει τα πατήματα
   ["js", "      if (refIn) { localStorage.setItem(LS.src, 'ref:' + refIn); }\n      else if (/^ref:/.test(src)) { localStorage.setItem(LS.src, 'direct'); }\n      var ck = el('ref-consent-ok');", "      var ck = el('ref-consent-ok');"], // 12 · 🔴 σύσταση χάνεται στο Google

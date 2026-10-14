@@ -124,6 +124,8 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/read/activate" && method === "POST") return readActivate(request, env);
   if (path === "/api/km/read" && method === "POST") return readInvoice(request, env);
   // KM-OAUTH (29/9/2026) — Σύνδεση με Google / Microsoft
+  // K3 (13/10/2026) · εφαρμογή καταστήματος: εξαργύρωση του κωδικού επιστροφής
+  if (path === "/api/km/auth/app/redeem" && method === "POST") return oauthAppRedeem(request, env);
   { const m = /^\/api\/km\/auth\/(google|microsoft)\/(start|callback)$/.exec(path);
     if (m && method === "GET") return m[2] === "start" ? oauthStart(request, env, m[1]) : oauthCallback(request, env, m[1]); }
   if (path === "/api/km/ref/check" && method === "GET") return refCheck(request, env);
@@ -939,6 +941,19 @@ async function emailBusy(env, email) {
   return row.delete_due_at ? "pending_delete" : "taken";
 }
 
+// ── v131 · KM-REVIEW — ΛΟΓΑΡΙΑΣΜΟΣ ΕΛΕΓΧΟΥ ΚΑΤΑΣΤΗΜΑΤΩΝ (14/10/2026) ─────────
+// Apple 2.1(α) «demo account» · Google Play «App access». Ο ελεγκτής γράφεται
+// με appreview+<ετικέτα>@fastwrite.tech και τον ΣΤΑΘΕΡΟ κωδικό του secret
+// KM_REVIEW_CODE (6 ψηφία) — κανένα email δεν φεύγει. Χωρίς το secret η λειτουργία
+// ΔΕΝ υπάρχει (ασφαλής προεπιλογή). Κάθε νέα επαλήθευση της ΙΔΙΑΣ διεύθυνσης
+// σβήνει τον προηγούμενο λογαριασμό ελέγχου της (ένα email = ένας λογαριασμός):
+// δύο ελεγκτές (apple / google) δεν συγκρούονται γιατί έχουν άλλη ετικέτα.
+const REVIEW_EMAIL = /^appreview(\+[a-z0-9]{1,20})?@fastwrite\.tech$/;
+function reviewCode(env, email) {
+  const c = String(env.KM_REVIEW_CODE || "");
+  return REVIEW_EMAIL.test(email) && /^\d{6}$/.test(c) ? c : "";
+}
+
 function sixDigits() {
   const a = new Uint32Array(1);
   crypto.getRandomValues(a);
@@ -988,6 +1003,8 @@ async function emailCode(request, env) {
   } else {
     email = normEmail(b.email);
     if (!email) return json({ ok: false, error: "bad_email" }, 400);
+    // v131 · KM-REVIEW: καμία αποστολή, καμία γραμμή κωδικού — ο κωδικός είναι σταθερός.
+    if (reviewCode(env, email)) return json({ ok: true, sent: true, ttl_min: CODE_TTL_MS / 60000 });
     const busy = await emailBusy(env, email);
     if (busy) return json({ ok: false, error: busy }, 409);
   }
@@ -1033,6 +1050,13 @@ async function emailVerify(request, env) {
   }
   const code = String(b.code || "").replace(/\D/g, "");
   if (!email || code.length !== 6) return json({ ok: false, error: "bad_code" }, 400);
+  const rc = (!own && !qr) ? reviewCode(env, email) : "";
+  if (rc) {   // v131 · KM-REVIEW
+    if ((await sha256hex("r:" + code)) !== (await sha256hex("r:" + rc))) return json({ ok: false, error: "bad_code" }, 400);
+    const old = await env.DB.prepare("SELECT folder_id FROM km_accounts WHERE email = ? AND deleted IS NULL").bind(email).all();
+    for (const r of (old.results || [])) await wipeFolder(env, r.folder_id);
+    return json({ ok: true, email_token: await issueEmailToken(env, email) });
+  }
   const row = await env.DB.prepare(
     "SELECT * FROM km_email_codes WHERE email = ? ORDER BY id DESC LIMIT 1"
   ).bind(email).first();
@@ -1117,6 +1141,57 @@ function oauthFrag(kind, fields) {
   const p = new URLSearchParams(Object.assign({ km_oauth: kind }, fields || {}));
   return p.toString();
 }
+// ── K3 · ΕΦΑΡΜΟΓΗ ΚΑΤΑΣΤΗΜΑΤΟΣ (13/10/2026) ─────────────────────────────
+// Η εφαρμογή ανοίγει το /start στον browser του συστήματος με app=1 και
+// ac = base64url(SHA-256(v)), όπου v ένα μυστικό που ΜΕΝΕΙ στην εφαρμογή
+// (RFC 8252 / PKCE για εφαρμογές κινητού). Στο τέλος ο server ΔΕΝ στέλνει το
+// email_token στο σχήμα tech.fastwrite.kostometro:// — άλλη εφαρμογή θα
+// μπορούσε να το αρπάξει. Στέλνει μόνο κωδικό μιας χρήσης h (2 λεπτά)· το
+// αποτέλεσμα βγαίνει ΜΟΝΟ με POST /api/km/auth/app/redeem {h, v}.
+const APP_SCHEME = "tech.fastwrite.kostometro";
+const APP_HANDOFF_TTL_MS = 2 * 60 * 1000;
+const B64URL43 = /^[A-Za-z0-9_-]{43}$/;
+function appReturnPage(target) {
+  // Σελίδα αντί για σκέτο 302 προς το σχήμα: αν ο browser δεν ανοίξει μόνος
+  // του την εφαρμογή, ο χρήστης έχει κουμπί. Κανένα μυστικό μέσα.
+  const t = target.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  const html = '<!doctype html><html lang="el"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta http-equiv="refresh" content="0;url=' + t + '"><title>Kostometro</title>' +
+    '<style>body{margin:0;background:#12151a;color:#e8eaed;font-family:system-ui,sans-serif;display:flex;' +
+    'min-height:100vh;align-items:center;justify-content:center;text-align:center;padding:16px}' +
+    'a{display:inline-block;margin-top:16px;padding:14px 22px;border-radius:10px;background:#4fc3a1;color:#12151a;' +
+    'text-decoration:none;font-weight:600}</style></head><body><div><div style="font-size:40px;color:#4fc3a1">k^</div>' +
+    '<p>Επιστροφή στο Kostometro…</p><a href="' + t + '">Άνοιξε την εφαρμογή</a></div></body></html>';
+  return new Response(html, { status: 200, headers: {
+    "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
+    "Set-Cookie": "km_oauth=; Path=/api/km/auth/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+  } });
+}
+async function appBack(env, appCh, frag) {
+  const h = randHex(32);
+  await env.DB.prepare("DELETE FROM km_oauth_handoff WHERE created < ?")
+    .bind(new Date(Date.now() - 3600 * 1000).toISOString()).run();
+  await env.DB.prepare("INSERT INTO km_oauth_handoff (h_hash, app_ch, frag, created) VALUES (?, ?, ?, ?)")
+    .bind(await sha256hex(h), appCh, frag, new Date().toISOString()).run();
+  return appReturnPage(APP_SCHEME + "://oauth?h=" + h);
+}
+function appErr(code) {
+  // Σφάλμα ΠΡΙΝ υπάρξει γραμμή state: μόνο ο κωδικός σφάλματος, κανένα στοιχείο χρήστη.
+  return appReturnPage(APP_SCHEME + "://oauth?err=" + encodeURIComponent(code));
+}
+async function oauthAppRedeem(request, env) {
+  const b = await safeJson(request);
+  const h = String((b && b.h) || "").toLowerCase(), v = String((b && b.v) || "");
+  if (!HEX64.test(h) || !B64URL43.test(v)) return json({ ok: false, error: "bad_request" }, 400);
+  const row = await env.DB.prepare("DELETE FROM km_oauth_handoff WHERE h_hash = ? RETURNING *")
+    .bind(await sha256hex(h)).first();   // μία χρήση, όπως το state
+  if (!row || Date.parse(row.created) < Date.now() - APP_HANDOFF_TTL_MS) return json({ ok: false, error: "expired" }, 410);
+  const ch = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v))));
+  if (ch !== row.app_ch) return json({ ok: false, error: "mismatch" }, 403);
+  return json(Object.assign({ ok: true }, Object.fromEntries(new URLSearchParams(row.frag))));
+}
+
 function cookieVal(request, name) {
   const raw = request.headers.get("Cookie") || "";
   for (const part of raw.split(";")) { const i = part.indexOf("="); if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim(); }
@@ -1128,8 +1203,12 @@ async function oauthStart(request, env, prov) {
   // v118 · KM-OWN-PROOF — ο σκοπός ταξιδεύει στη γραμμή του state (πεδίο provider
   // «google:own»), ΟΧΙ σε cookie ή URL που αλλάζει ο χρήστης στη μέση.
   const own = new URL(request.url).searchParams.get("purpose") === "own";
+  // K3 · εφαρμογή καταστήματος: app=1 + ac (hash του μυστικού της εφαρμογής)
+  const sp = new URL(request.url).searchParams;
+  const appCh = sp.get("app") === "1" ? String(sp.get("ac") || "") : "";
+  if (sp.get("app") === "1" && !B64URL43.test(appCh)) return appErr("bad_request");
   const cid = env[P.idVar], sec = env[P.secVar];
-  if (!cid || !sec) return oauthBack(env, oauthFrag("err", { code: "unavailable" }));
+  if (!cid || !sec) return appCh ? appErr("unavailable") : oauthBack(env, oauthFrag("err", { code: "unavailable" }));
   const t = Date.now();
   await env.DB.prepare("DELETE FROM km_oauth_states WHERE created < ?").bind(new Date(t - 3600 * 1000).toISOString()).run();
   const ip = request.headers.get("CF-Connecting-IP") || "";
@@ -1137,13 +1216,13 @@ async function oauthStart(request, env, prov) {
   if (ipH) {
     const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_oauth_states WHERE ip_h = ? AND created >= ?")
       .bind(ipH, new Date(t - 3600 * 1000).toISOString()).first();
-    if (n && n.n >= OAUTH_PER_IP_HOUR) return oauthBack(env, oauthFrag("err", { code: "too_many" }));
+    if (n && n.n >= OAUTH_PER_IP_HOUR) return appCh ? appErr("too_many") : oauthBack(env, oauthFrag("err", { code: "too_many" }));
   }
   const state = randHex(32), nonce = randHex(16);
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const challenge = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
-  await env.DB.prepare("INSERT INTO km_oauth_states (state_hash, provider, verifier, nonce, ip_h, created) VALUES (?, ?, ?, ?, ?, ?)")
-    .bind(await sha256hex(state), own ? prov + ":own" : prov, verifier, nonce, ipH, new Date(t).toISOString()).run();
+  await env.DB.prepare("INSERT INTO km_oauth_states (state_hash, provider, verifier, nonce, ip_h, created, app_ch) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(await sha256hex(state), own ? prov + ":own" : prov, verifier, nonce, ipH, new Date(t).toISOString(), appCh || null).run();
   const q = new URLSearchParams({
     client_id: cid, response_type: "code", scope: "openid email profile",
     redirect_uri: oauthOrigin(env) + "/api/km/auth/" + prov + "/callback",
@@ -1190,18 +1269,21 @@ export async function oauthVerifyIdToken(idToken, P, clientId, nonce) {
 async function oauthCallback(request, env, prov) {
   const P = OAUTH[prov];
   const u = new URL(request.url);
-  if (u.searchParams.get("error")) return oauthBack(env, oauthFrag("err", { code: "cancelled" }), true);
   const code = u.searchParams.get("code") || "";
   const state = u.searchParams.get("state") || "";
-  if (!code || !/^[0-9a-f]{64}$/.test(state) || cookieVal(request, "km_oauth") !== state) {
-    return oauthBack(env, oauthFrag("err", { code: "state" }), true);
-  }
-  // Μία χρήση: η γραμμή σβήνεται ΤΗ ΣΤΙΓΜΗ που διαβάζεται.
-  const row = await env.DB.prepare("DELETE FROM km_oauth_states WHERE state_hash = ? RETURNING *")
-    .bind(await sha256hex(state)).first();
+  // K3: η γραμμή state διαβάζεται ΠΡΩΤΑ (αν το state είναι έγκυρο και ταιριάζει
+  // με το cookie), ώστε και η ακύρωση στη Google να γυρίζει στην εφαρμογή.
+  // Μία χρήση: η γραμμή σβήνεται ΤΗ ΣΤΙΓΜΗ που διαβάζεται — όπως πριν.
+  const stateOk = /^[0-9a-f]{64}$/.test(state) && cookieVal(request, "km_oauth") === state;
+  const row = stateOk ? await env.DB.prepare("DELETE FROM km_oauth_states WHERE state_hash = ? RETURNING *")
+    .bind(await sha256hex(state)).first() : null;
+  const appCh = row && row.app_ch ? String(row.app_ch) : "";
+  const back = (frag) => appCh ? appBack(env, appCh, frag) : oauthBack(env, frag, true);
+  if (u.searchParams.get("error")) return back(oauthFrag("err", { code: "cancelled" }));
+  if (!code || !stateOk) return back(oauthFrag("err", { code: "state" }));
   const own = !!row && row.provider === prov + ":own";   // v118 · KM-OWN-PROOF
   if (!row || (row.provider !== prov && !own) || Date.parse(row.created) < Date.now() - OAUTH_TTL_MS) {
-    return oauthBack(env, oauthFrag("err", { code: "state" }), true);
+    return back(oauthFrag("err", { code: "state" }));
   }
   let claims;
   try {
@@ -1213,21 +1295,21 @@ async function oauthCallback(request, env, prov) {
     claims = await oauthVerifyIdToken(j.id_token, P, env[P.idVar], row.nonce);
   } catch (e) {
     console.error("oauth " + prov + ":", e && e.message);
-    return oauthBack(env, oauthFrag("err", { code: "provider" }), true);
+    return back(oauthFrag("err", { code: "provider" }));
   }
   const email = normEmail(claims.email);
-  if (!email) return oauthBack(env, oauthFrag("err", { code: "no_email" }), true);
-  if (!P.verified(claims)) return oauthBack(env, oauthFrag("verify", { e: email }), true);
+  if (!email) return back(oauthFrag("err", { code: "no_email" }));
+  if (!P.verified(claims)) return back(oauthFrag("verify", { e: email }));
   const busy = await emailBusy(env, email);
   if (own) {
     // Απόδειξη κατόχου: πρέπει να ΥΠΑΡΧΕΙ ζωντανός λογαριασμός με αυτό το email.
     // Αν ο χρήστης διάλεξε άλλο λογαριασμό Google, το reclaim θα το απορρίψει
     // ούτως ή άλλως (email ≠ λογαριασμού) — εδώ του το λέμε νωρίς.
-    if (busy !== "taken") return oauthBack(env, oauthFrag("err", { code: "own_mismatch", e: email, o: "1" }), true);
-    return oauthBack(env, oauthFrag("ok", { t: await issueEmailToken(env, email), e: email, p: prov, o: "1" }), true);
+    if (busy !== "taken") return back(oauthFrag("err", { code: "own_mismatch", e: email, o: "1" }));
+    return back(oauthFrag("ok", { t: await issueEmailToken(env, email), e: email, p: prov, o: "1" }));
   }
-  if (busy) return oauthBack(env, oauthFrag("err", { code: busy, e: email }), true);
-  return oauthBack(env, oauthFrag("ok", { t: await issueEmailToken(env, email), e: email, p: prov }), true);
+  if (busy) return back(oauthFrag("err", { code: busy, e: email }));
+  return back(oauthFrag("ok", { t: await issueEmailToken(env, email), e: email, p: prov }));
 }
 
 // ═══ KM-AGENT · ΒΟΗΘΟΣ KOSTOMETRO — ΦΑΣΗ 1 (29/9/2026) ═══════════════════════
@@ -1794,7 +1876,7 @@ async function register(request, env, ctx) {
       ).bind(
         id.folder, h, email, ts,
         (request.cf && request.cf.country) || null,
-        clean(b.source, 20) || "direct",   // KM-SRC-DIRECT 25/9: όχι «link»
+        REVIEW_EMAIL.test(email) ? "review" : (clean(b.source, 20) || "direct"),   // KM-SRC-DIRECT 25/9 · v131 KM-REVIEW
         normRef(b.ref),
         b.has_key ? 1 : 0,
         id.device, ts,

@@ -123,14 +123,29 @@ export default {
 
     // Kostometro — μητρώο + σφραγισμένος φάκελος (Brief Α, Η.1). Όλα στο src/km.js.
     if (path.startsWith("/api/km/")) {
+      // K3 (14/10/2026) · CORS ΜΟΝΟ για το κέλυφος της εφαρμογής καταστήματος
+      // (https://localhost Android, capacitor://localhost iOS). Ακριβής προέλευση
+      // + Credentials, ποτέ «*» (μετρημένο: με «*» το fetch με credentials αποτυγχάνει).
+      // Ο browser (PWA) δεν στέλνει αυτές τις προελεύσεις → καμία κεφαλίδα, ίδια συμπεριφορά.
+      const appOrigin = kmAppOrigin(request);
+      if (appOrigin && request.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: kmCorsHeaders(appOrigin, true) });
+      }
+      let res;
       try {
-        return await handleKm(request, env, ctx, path);
+        res = await handleKm(request, env, ctx, path);
       } catch (err) {
         console.error("km failed:", err);
-        return new Response(JSON.stringify({ ok: false, error: "server_error" }), {
+        res = new Response(JSON.stringify({ ok: false, error: "server_error" }), {
           status: 500, headers: { "Content-Type": "application/json; charset=utf-8" },
         });
       }
+      if (!appOrigin) return res;
+      const out = new Response(res.body, res);
+      const h = kmCorsHeaders(appOrigin, false);
+      for (const k of Object.keys(h)) out.headers.set(k, h[k]);
+      out.headers.append("Vary", "Origin");
+      return out;
     }
 
     return env.ASSETS.fetch(request);
@@ -498,4 +513,27 @@ Meta, που είναι στατιστικό μοντέλο. Ένας άνθρω
       "x-robots-tag": "noindex, nofollow",
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// K3 · CORS για την εφαρμογή καταστήματος (14/10/2026)
+// ---------------------------------------------------------------------------
+const KM_APP_ORIGINS = ["https://localhost", "capacitor://localhost"];
+function kmAppOrigin(request) {
+  const o = request.headers.get("Origin") || "";
+  return KM_APP_ORIGINS.includes(o) ? o : "";
+}
+function kmCorsHeaders(origin, preflight) {
+  const h = {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Expose-Headers": "X-Km-Active-Device, X-Km-Active-Since, X-Km-Version, X-Km-Base-Version",
+  };
+  if (preflight) {
+    h["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+    h["Access-Control-Allow-Headers"] = "Content-Type, X-Km-Lock, X-Km-Auth, X-Km-Folder, X-Km-Device, X-Km-Unsynced, X-Km-Base-Version, X-Km-Version, X-Km-Support, X-Km-This-Device-Active";
+    h["Access-Control-Max-Age"] = "600";
+    h["Vary"] = "Origin";
+  }
+  return h;
 }

@@ -1,0 +1,10 @@
+v131: K3 είσοδος από την εφαρμογή καταστήματος (RFC 8252) + CORS κελύφους + λογαριασμός ελέγχου appreview@
+
+- km.js: κωδικός επιστροφής μιας χρήσης (2′) στο tech.fastwrite.kostometro:// — στο σχήμα πάει ΜΟΝΟ το h, το αποτέλεσμα με POST {h, v}
+- km.js: KM_REVIEW_CODE — appreview(+ετικέτα)@fastwrite.tech με σταθερό 6ψήφιο από secret, κανένα email δεν φεύγει
+- worker.js: CORS μόνο για τις προελεύσεις του κελύφους, με Credentials
+- schema: km_oauth_states.app_ch + km_oauth_handoff (km_k3.sql = μετάβαση παραγωγής)
+- tests: v131 (9 + 10 μεταλλάξεις) · v98 νέες άγκυρες Μ7/Μ9
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013L8KzPMVkm4Do8yBqjyWon
