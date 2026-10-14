@@ -2435,8 +2435,9 @@ async function wipeFolder(env, folderId) {
   // v120 · KM-QR — εκκρεμές κλειδωμένο πακέτο μεταφοράς φεύγει κι αυτό (ίδιο μοτίβο, ίδιος λόγος).
   try { await env.DB.prepare("DELETE FROM km_transfers WHERE folder_id = ?").bind(folderId).run(); } catch (e) {}
   // KM-PRO-F3 · η ομάδα φεύγει με τον λογαριασμό: μέλη (ονόματα, κλειδιά), προτάσεις, ίχνος (ίδιο μοτίβο:
+  // KM-PRO-F4 · και ο λογιστής: σύνδεση, γραμματοκιβώτιο, διορθώσεις — το R2 (acct/) φεύγει με το wipeR2.
   // στην παραγωγή οι πίνακες δεν υπάρχουν ακόμα — η διαγραφή του Free ΔΕΝ πέφτει γι' αυτό). Το R2 (team/) έφυγε με το wipeR2.
-  for (const t of ["km_proposals", "km_team_log", "km_members", "km_team"]) {
+  for (const t of ["km_proposals", "km_team_log", "km_members", "km_team", "km_acct_fix", "km_acct_mail", "km_acct"]) {
     try { await env.DB.prepare("DELETE FROM " + t + " WHERE folder_id = ?").bind(folderId).run(); } catch (e) {}
   }
 

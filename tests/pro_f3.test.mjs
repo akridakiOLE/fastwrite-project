@@ -283,7 +283,7 @@ ok(/SCREENS\.push\('s-team', 's-mstate'\)/.test(js), "s-team, s-mstate στη SC
 const fnames = [...js.matchAll(/^  function ([A-Za-z0-9_$]+)\(/gm)].map((m) => m[1]);
 const dup = fnames.filter((n, i) => fnames.indexOf(n) !== i);
 ok(!dup.length, "🔴 καμία διπλή δήλωση συνάρτησης" + (dup.length ? " — " + dup.join(", ") : ""));
-ok(readFileSync("src/km.js", "utf8").includes('for (const t of ["km_proposals", "km_team_log", "km_members", "km_team"]) {'), "🔴 διαγραφή λογαριασμού → φεύγει και η ομάδα (μέλη, προτάσεις, ίχνος)");
+ok(readFileSync("src/km.js", "utf8").includes('for (const t of ["km_proposals", "km_team_log", "km_members", "km_team"'), "🔴 διαγραφή λογαριασμού → φεύγει και η ομάδα (μέλη, προτάσεις, ίχνος)");
 ok(pro.includes('const { handleTeam } = await import("./km_team.js");') && pro.includes("export async function proReadFor("), "km_pro → km_team · κοινή ανάγνωση για Boss και μέλος");
 console.log("\n" + pass + " ✔ · " + fail + " ✘");
 if (ONLY !== null) process.exit(fail ? 0 : 1);

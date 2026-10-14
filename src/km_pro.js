@@ -204,6 +204,12 @@ export async function handlePro(request, env, path, h) {
     const r = await handleTeam(request, env, path, h, { proRow, proActive, readFor: proReadFor });
     if (r) return r;
   }
+  // KM-PRO-F4 · ο λογιστής (FastWrite «γραμματοκιβώτιο») — src/km_acct.js
+  if (path === "/api/km/pro/acct" || path.startsWith("/api/km/pro/acct/") || path.startsWith("/api/km/pro/a/")) {
+    const { handleAcct } = await import("./km_acct.js");
+    const r = await handleAcct(request, env, path, h, { proRow, proActive });
+    if (r) return r;
+  }
   return h.json({ ok: false, error: "not_found" }, 404);
 }
 

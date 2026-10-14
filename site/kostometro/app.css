@@ -834,3 +834,12 @@ body.is-staging::before{content:"🧪 STAGING · δοκιμές PRO · όχι π
 body.is-member #s-menu .pg-body > *:not(.mem-ok) { display: none !important; }
 /* το μέλος δεν έχει λογαριασμό: ο Κώστας-βοηθός (συνομιλία υποστήριξης του λογαριασμού) δεν εμφανίζεται — ούτε σκεπάζει την «📤 Αποστολή» */
 body.is-member #ag-fab, body.is-member #ag { display: none !important; }
+
+/* KM-PRO-F4 · ο λογιστής (FastWrite «γραμματοκιβώτιο») */
+.acct-sec { margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--line, #2a3042); }
+.acct-sec h3 { margin: 0 0 .4rem; }
+.acct-mail { margin-top: .5rem; }
+.acct-fix { margin: .8rem 0; padding: .7rem .8rem; border-radius: 10px; background: var(--bg3, #1a1f2e); display: flex; flex-direction: column; gap: .45rem; }
+.acct-fix-row { font-size: .9rem; line-height: 1.35; }
+.acct-fix-row.undone { opacity: .7; }
+.acct-undo { align-self: flex-start; }

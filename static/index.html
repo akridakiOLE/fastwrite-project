@@ -316,6 +316,7 @@ select.form-input option{background:var(--bg2);}
 @keyframes xero-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 </style>
 <script src="/static/i18n.js"></script>
+<script src="/static/km_mailbox.js"></script>
 </head>
 <body>
 
@@ -339,6 +340,11 @@ select.form-input option{background:var(--bg2);}
       <button class="nav-item" onclick="showPage('documents')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         <span data-i18n="sidebar_documents">Έγγραφα</span>
+      </button>
+      <!-- KM-PRO-F4 · Kostometro PRO → FastWrite «γραμματοκιβώτιο» -->
+      <button class="nav-item" id="nav-kostometro" onclick="showPage('kostometro')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 20V9"/></svg>
+        <span>Kostometro</span>
       </button>
       <!-- Batch Processing page αφαιρέθηκε — ιστορικό μεταφέρθηκε στο Upload & Extract -->
       <div class="nav-section" data-i18n="sidebar_settings_group">Ρυθμίσεις</div>
@@ -664,6 +670,47 @@ select.form-input option{background:var(--bg2);}
 
 
     <!-- TEMPLATES -->
+    <!-- KM-PRO-F4 · KOSTOMETRO (γραμματοκιβώτιο) -->
+    <div id="page-kostometro" class="page" style="display:none">
+      <div class="topbar">
+        <div class="page-title">Kostometro</div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary btn-sm" onclick="kmShowConnect()">+ Σύνδεση επιχείρησης</button>
+          <button class="btn btn-primary btn-sm" id="km-sync" onclick="kmSyncNow()">↻ Λήψη τώρα</button>
+        </div>
+      </div>
+      <div class="content">
+        <div id="km-connect" class="card" style="display:none;padding:14px;margin-bottom:12px">
+          <div class="card-title">Σύνδεση με επιχείρηση που έχει Kostometro PRO</div>
+          <p style="font-size:12px;color:var(--text2)">Ο πελάτης σου πατάει στο κινητό του «👥 Ομάδα → 📒 Λογιστής → Πρόσκληση λογιστή» και σου στέλνει έναν σύνδεσμο. Επικόλλησέ τον εδώ. Παίρνεις κλειδί <b>μόνο ανάγνωσης</b>: βλέπεις τα τιμολόγια με γραμμές και φωτογραφία· ό,τι διορθώσεις ισχύει αμέσως εδώ και φτάνει στον πελάτη.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input class="form-input" id="km-c-link" placeholder="Σύνδεσμος πρόσκλησης (…#km_acct=…)" style="flex:2;min-width:280px">
+            <input class="form-input" id="km-c-office" placeholder="Όνομα γραφείου (το βλέπει ο πελάτης)" style="flex:1;min-width:180px">
+            <button class="btn btn-primary btn-sm" id="km-c-go" onclick="kmConnect()">Σύνδεση</button>
+          </div>
+          <div id="km-c-msg" style="font-size:12px;margin-top:8px;color:var(--text2)"></div>
+        </div>
+        <div id="km-links"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0">
+          <input class="form-input" id="km-f-q" placeholder="🔍 Προμηθευτής, αριθμός, κωδικός, περιγραφή…" oninput="kmFilter()" style="flex:2;min-width:240px">
+          <select class="form-input" id="km-f-link" onchange="kmFilter()" style="flex:1;min-width:160px"><option value="">Όλες οι επιχειρήσεις</option></select>
+          <input class="form-input" type="date" id="km-f-from" onchange="kmFilter()" title="από">
+          <input class="form-input" type="date" id="km-f-to" onchange="kmFilter()" title="έως">
+          <select class="form-input" id="km-f-flag" onchange="kmFilter()"><option value="">Όλα</option><option value="map">⚠ Άλλαξε η αντιστοίχιση</option><option value="fix">✏️ Με διόρθωση</option></select>
+          <select class="form-input" id="km-f-mode" onchange="kmFilter()"><option value="inv">Τιμολόγια</option><option value="lines">Γραμμές</option></select>
+        </div>
+        <div class="table-wrap"><table id="km-table"></table></div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
+          <button class="btn btn-secondary btn-sm" id="km-prev" onclick="kmPage(-1)">‹ Προηγούμενη</button>
+          <span id="km-pager" style="font-size:12px;color:var(--text2)"></span>
+          <button class="btn btn-secondary btn-sm" id="km-next" onclick="kmPage(1)">Επόμενη ›</button>
+        </div>
+      </div>
+      <div id="km-modal" class="modal-overlay" onclick="if(event.target===this)kmClose()">
+        <div class="modal" id="km-detail" style="max-width:1200px;width:96vw;padding:0"></div>
+      </div>
+    </div>
+
     <div id="page-templates" class="page" style="display:none">
       <div class="topbar">
         <div class="page-title"><span data-i18n="page_templates">Ετικέτες</span></div>
@@ -1715,13 +1762,14 @@ function showPage(name, fromEvent) {
   if (fromEvent !== false && typeof event !== 'undefined' && event && event.currentTarget) {
     event.currentTarget.classList.add('active');
   } else {
-    const pageNames = ['dashboard','upload','documents','templates','settings','billing','faq'];
+    const pageNames = ['dashboard','upload','documents','kostometro','templates','settings','billing','faq'];   // KM-PRO-F4
     const idx = pageNames.indexOf(name);
     const btns = document.querySelectorAll('.nav-item');
     if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
   }
   if (name==='dashboard') loadDashboard();
   if (name==='documents') loadDocuments();
+  if (name==='kostometro' && window.loadKostometro) loadKostometro();   // KM-PRO-F4
   if (name==='templates') loadTemplates();
   if (name==='settings')  loadSettings();
   if (name==='upload')    { loadSchemas(); }

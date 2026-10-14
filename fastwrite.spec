@@ -92,6 +92,7 @@ hiddenimports += [
 
 # Project's own modules — τα κάνουμε explicit για ασφάλεια
 hiddenimports += [
+    "km_mailbox",          # KM-PRO-F4 · Kostometro PRO → FastWrite «γραμματοκιβώτιο»
     "main_api",
     "perf_config",
     "db_manager",

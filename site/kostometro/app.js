@@ -16,6 +16,9 @@
     /* KM-PRO-F3 · η ομάδα: team = κλειδιά Boss + S/H (ταξιδεύουν στον φάκελο) · member = αυτή η συσκευή είναι ΜΕΛΟΣ (όχι λογαριασμός) */
     team: 'km_team', member: 'km_member', mkey: 'km_member_key', slipCache: 'km_slip', histCache: 'km_hist',
     slipH: 'km_slip_hash', histH: 'km_hist_hash', decQ: 'km_team_decq', msent: 'km_member_sent',
+    /* KM-PRO-F4 · ο λογιστής: για ποιον φάκελο «σπάρθηκε» η τοπική κατάσταση από τον server · ουρά «εφαρμόστηκε/αναιρέθηκε/απορρίφθηκε»
+       (το «τι στάλθηκε» ζει σε δική του IndexedDB «km_acct» — κλίμακα, όχι localStorage) */
+    acctSeed: 'km_acct_seed', acctFixQ: 'km_acct_fixq',
     /* v89 · KM-UPD-TOAST — ποια έκδοση είδε ο χρήστης τελευταία στην κάμερα */
     seenVer: 'km_seen_ver',
     /* v113 · KM-READ-GIFT — η τελευταία γνωστή κατάσταση του δώρου {active, left, at}.
@@ -195,6 +198,7 @@
          κατέβασμα ΔΕΝ μετράει: ήρθε από τον server, δεν του χρωστάμε τίποτα. */
       if (!pulling && typeof unsyncedBump === 'function') { unsyncedBump(); }
       if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
+      if (typeof acctMark === 'function') { acctMark(rec.id); }   /* KM-PRO-F4 — ο λογιστής: αυτό το τιμολόγιο άλλαξε */
       return r;
     });
   }
@@ -266,6 +270,7 @@
          κατέβασμα ΔΕΝ μετράει: ήρθε από τον server, δεν του χρωστάμε τίποτα. */
       if (!pulling && typeof unsyncedBump === 'function') { unsyncedBump(); }
       if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
+      if (typeof acctMark === 'function') { acctMark(id); }   /* KM-PRO-F4 */
       return r;
     });
   }
@@ -1296,6 +1301,7 @@
     if (!pulling && typeof unsyncedBump === 'function') { unsyncedBump(); }
     if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
     if (!pulling && typeof teamSoon === 'function' && teamRead()) { teamSoon(); }   /* KM-PRO-F3 — νέο δελτίο */
+    if (typeof acctMark === 'function') { acctMark(); }   /* KM-PRO-F4 — νέα αντιστοίχιση για τον λογιστή */
   }
   function bookForPush() { var b = bookRead(); return b.ver ? b : undefined; }
   /* Ένας γράφει (η ενεργή συσκευή): το νεότερο βιβλίο κερδίζει ολόκληρο. */
@@ -1599,6 +1605,7 @@
   }
   function teamSave(t) {
     t.ver = Date.now(); TEAM = t; TEAM_PRIV = null;
+    if (typeof acctBookDirty !== 'undefined') { acctBookDirty = true; }   /* KM-PRO-F4 — επιχείρηση / κλειδιά */
     try { localStorage.setItem(LS.team, JSON.stringify(t)); } catch (e) {}
     if (!pulling && typeof unsyncedBump === 'function') { unsyncedBump(); }
     if (!pulling && typeof scheduleSync === 'function') { scheduleSync(); }
@@ -1666,7 +1673,8 @@
       }).map(function (m) { return function () { return teamGiveKey(m); }; });
       return chain(jobs).then(function () { return j.pending ? teamImport() : null; });
     }).then(function () { return teamPublish(); }).then(function () { return teamDecFlush(); })
-      .then(fin, function (e) { fin(); diag('ομάδα · ' + (e && e.message || 'σφάλμα')); });
+      .then(fin, function (e) { fin(); diag('ομάδα · ' + (e && e.message || 'σφάλμα')); })
+      .then(function () { return acctTick(); });   /* KM-PRO-F4 — ο λογιστής */
   }
   function teamGiveKey(m) {
     var t = teamRead(), pub = kmUnB64(m.pub);
@@ -1793,6 +1801,501 @@
     if (!window.__kmTeamIv) { window.__kmTeamIv = setInterval(function () { if (!document.hidden) { teamTick(); } }, 30000); }
   }
 
+  /* ══ KM-PRO-F4 · Ο ΛΟΓΙΣΤΗΣ — FastWrite «γραμματοκιβώτιο» (Brief PRO ↔ FastWrite Φ4 · Α350 §9.8 Ε · §9.9.4 · Α320 9/10) ══
+     · Ο λογιστής ΔΙΑΒΑΖΕΙ: παίρνει κλειδί ΜΟΝΟ ανάγνωσης A (ίδιο σχήμα με το H του manager), κλειδωμένο
+       προς το δημόσιο κλειδί του υπολογιστή του. ΠΟΤΕ το Κ, ΠΟΤΕ οι 12 λέξεις.
+     · Το A το παίρνει ΜΟΝΟ αφού ο Boss πατήσει «✓ Ενεργοποίηση» (βλέπει γραφείο, συσκευή, κωδικό επιβεβαίωσης):
+       ο λογιστής βλέπει ΟΛΟ το ιστορικό — σύνδεσμος που διέρρευσε δεν πρέπει να φτάνει.
+     · Η συσκευή του Boss (ο μόνος συγγραφέας) στέλνει κάθε ΕΓΚΕΚΡΙΜΕΝΟ τιμολόγιο ως σφραγισμένο γράμμα:
+       κεφαλίδα + γραμμές + αντιστοίχιση + οι φωτογραφίες ξανασφραγισμένες με A. Αλλάζει κάτι → νέο γράμμα.
+     · ΔΙΟΡΘΩΣΗ ΛΟΓΙΣΤΗ (Α320 9/10): εδώ περνά ΧΩΡΙΣ πάτημα — ΑΦΟΥ επαληθευτεί ότι τη σφράγισε κάτοχος του A
+       (HMAC: ο server δεν μπορεί να πλαστογραφήσει) και ΜΟΝΟ όπου η τιμή είναι ακόμα αυτή που είδε ο λογιστής.
+       «↩ Αναίρεση» = γυρίζουν ΜΟΝΟ τα πεδία της διόρθωσης, και μόνο όσα δεν άλλαξαν στο μεταξύ.
+     · Τα κλειδιά A (όλες οι εκδόσεις) ζουν στο TEAM — ταξιδεύουν στον σφραγισμένο φάκελο. Ανάκληση → νέο A.
+     · ΚΛΙΜΑΚΑ: τι στάλθηκε ζει σε δική του IndexedDB (km_acct), μία εγγραφή ανά τιμολόγιο — όχι localStorage. */
+  var ACCT = null, acctBusy = false, acctTimer = null;
+  var ACCT_TICK_MAX = 40;                          // γράμματα ανά κύκλο (30″) — το κινητό δεν «κολλάει» σε μεγάλο φάκελο
+  var ACCT_HDR = { number: 1, invDate: 1, net: 1, vat: 1, total: 1, sup_vat: 1 };
+  var ACCT_LN = { code: 1, desc: 1, unit: 1, qty: 1, unit_price: 1, disc_pct: 1, line_net: 1, vat_pct: 1 };
+  /* «Βρώμικο»: ποια τιμολόγια άλλαξαν (put/del), αν άλλαξε το βιβλίο (= ξανασάρωση όλων) ή η επιχείρηση/κλειδιά. */
+  var acctDirtyIds = {}, acctFull = true, acctBookDirty = true;
+  function acctMark(id) { if (id) { acctDirtyIds[id] = 1; } else { acctFull = true; } }
+  function acctFp(str) {
+    var h1 = 0x811c9dc5, h2 = 0x01000193 ^ 0x5bd1e995;
+    for (var i = 0; i < str.length; i++) {
+      var c = str.charCodeAt(i);
+      h1 ^= c; h1 = Math.imul(h1, 0x01000193) >>> 0;
+      h2 ^= c; h2 = Math.imul(h2, 0x5bd1e995) >>> 0; h2 ^= h2 >>> 15;
+    }
+    return ('0000000' + h1.toString(16)).slice(-8) + ('0000000' + (h2 >>> 0).toString(16)).slice(-8);
+  }
+  /* ── ΜΙΚΡΗ ΒΑΣΗ ΚΑΤΑΣΤΑΣΗΣ: «sent» (rid → δακτυλικό) · «ph» (φωτογραφίες που έχει ήδη ο λογιστής) ── */
+  var acctDbP = null;
+  function acctDb() {
+    if (acctDbP) { return acctDbP; }
+    acctDbP = new Promise(function (res, rej) {
+      var q = indexedDB.open('km_acct', 1);
+      q.onupgradeneeded = function () { var d = q.result; if (!d.objectStoreNames.contains('sent')) { d.createObjectStore('sent'); } if (!d.objectStoreNames.contains('ph')) { d.createObjectStore('ph'); } };
+      q.onsuccess = function () { res(q.result); };
+      q.onerror = function () { acctDbP = null; rej(q.error); };
+    });
+    return acctDbP;
+  }
+  function acctIdb(store, mode, fn) {
+    return acctDb().then(function (d) {
+      return new Promise(function (res, rej) {
+        var t = d.transaction(store, mode), s = t.objectStore(store), out = fn(s);
+        t.oncomplete = function () { res(out && 'result' in out ? out.result : undefined); };
+        t.onerror = function () { rej(t.error); };
+      });
+    });
+  }
+  function acctSentAll() {
+    return Promise.all([acctIdb('sent', 'readonly', function (s) { return s.getAllKeys(); }), acctIdb('sent', 'readonly', function (s) { return s.getAll(); })])
+      .then(function (x) { var m = {}; (x[0] || []).forEach(function (k, i) { m[k] = x[1][i]; }); return m; });
+  }
+  function acctSentPut(rid, fp) { return acctIdb('sent', 'readwrite', function (s) { if (fp === null) { s.delete(rid); } else { s.put(fp, rid); } }); }
+  function acctPhHas(id) { return acctIdb('ph', 'readonly', function (s) { return s.get(id); }).then(function (v) { return !!v; }); }
+  function acctPhPut(id, on) { return acctIdb('ph', 'readwrite', function (s) { if (on) { s.put(1, id); } else { s.delete(id); } }); }
+  function acctPhKeys() { return acctIdb('ph', 'readonly', function (s) { return s.getAllKeys(); }); }
+  /* Νέα συσκευή Boss (άδεια «sent»): ρωτά τον server τι έχει ήδη το γραμματοκιβώτιο — ΔΕΝ ξαναστέλνει τα πάντα. */
+  function acctSeed() {
+    if (localStorage.getItem(LS.acctSeed) === (localStorage.getItem(LS.folder) || '')) { return Promise.resolve(); }
+    function page(after) {
+      return acctJson('pro/acct/fps?after=' + after).then(function (j) {
+        if (!j || !j.ok) { throw new Error('fps'); }
+        return chain(j.items.filter(function (x) { return x.fp && x.kind !== 'del'; }).map(function (x) { return function () { return acctSentPut(x.rid, x.fp); }; }))
+          .then(function () { return j.more ? page(j.next) : null; });
+      });
+    }
+    return acctJson('pro/acct/photos').then(function (j) {
+      return chain(((j && j.photos) || []).map(function (id) { return function () { return acctPhPut(id, true); }; }));
+    }).then(function () { return page(0); }).then(function () { localStorage.setItem(LS.acctSeed, localStorage.getItem(LS.folder) || ''); });
+  }
+  /* «2026-10-09» → ms τοπικό μεσημέρι (ποτέ μεσάνυχτα UTC: στην Κύπρο θα έπεφτε την προηγούμενη μέρα) */
+  function acctDay(v) {
+    if (typeof v === 'number' && isFinite(v)) { return v; }
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || ''));
+    return m ? new Date(+m[1], +m[2] - 1, +m[3], 12).getTime() : null;
+  }
+  function acctYmd(ms) { var d = new Date(ms); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function acctKeyNow() { var t = teamRead(); return t && t.ak ? { k: t.ak, v: t.av || 1 } : null; }
+  function acctEnsureKey() {
+    var t = teamRead();
+    if (!t || t.ak) { return; }
+    t = JSON.parse(JSON.stringify(t));
+    t.ak = rnd32(); t.av = 1; t.akeys = { 1: t.ak };
+    teamSave(t);
+  }
+  /* Ανάκληση λογιστή → ΝΕΟ A: ό,τι σταλεί μετά, ο ανακλημένος δεν το ανοίγει. Οι παλιές εκδόσεις μένουν
+     στο «μπρελόκ», ώστε ο λογιστής που ΜΕΝΕΙ (ή έρχεται) να διαβάζει και τα παλιά γράμματα. */
+  function acctRotate() {
+    var t = JSON.parse(JSON.stringify(teamRead()));
+    if (!t.ak) { return; }
+    t.av = (t.av || 1) + 1; t.ak = rnd32(); t.akeys = t.akeys || {}; t.akeys[t.av] = t.ak;
+    teamSave(t);
+  }
+  /* Ο κωδικός επιβεβαίωσης: ίδιος στο κινητό και στο FastWrite (sha256 του δημόσιου κλειδιού του υπολογιστή). */
+  function acctCode(pubB64) {
+    return crypto.subtle.digest('SHA-256', kmUnB64(pubB64)).then(function (d) {
+      var h = hexOf(d).slice(0, 8).toUpperCase(); return h.slice(0, 4) + '-' + h.slice(4);
+    });
+  }
+  function acctOk(id) { var t = teamRead(); return !!(t && t.aok && t.aok[id]); }
+  function acctConfirm(a) {
+    var t = JSON.parse(JSON.stringify(teamRead()));
+    t.aok = t.aok || {}; t.aok[a.acct_id] = Date.now();
+    teamSave(t);
+    acctEnsureKey();
+    return acctGiveKey(a);
+  }
+  function acctSoon(ms) { if (acctTimer) { clearTimeout(acctTimer); } acctTimer = setTimeout(function () { acctTimer = null; acctTick(); }, ms || 2500); }
+  function acctJson(path, opts) { return teamJson(path, opts); }
+  function acctTick() {
+    if (acctBusy || memberMode() || !proOn() || isReader() || !navigator.onLine || !teamRead()) { return Promise.resolve(); }
+    acctBusy = true;
+    var fin = function () { acctBusy = false; };
+    return acctJson('pro/acct').then(function (j) {
+      if (!j || !j.ok) { return; }
+      ACCT = j;
+      var t = teamRead();
+      /* κλειδί ΜΟΝΟ σε ό,τι ενεργοποίησε ο Boss με πάτημα · ξανά-κλειδί (νέο A) σε όσους είναι ήδη ενεργοί */
+      var keyed = (j.accts || []).filter(function (a) { return a.pub && (a.status === 'active' || (a.status === 'joined' && acctOk(a.acct_id))); });
+      if (!keyed.length) { return; }
+      acctEnsureKey(); t = teamRead();
+      var jobs = keyed.filter(function (a) { return !a.has_key || a.a_ver !== t.av; }).map(function (a) { return function () { return acctGiveKey(a); }; });
+      return chain(jobs).then(acctSeed).then(acctPublish).then(function () { return j.fixes ? acctFixesPull() : null; });
+    }).then(acctFixFlush).then(fin, function (e) { fin(); diag('λογιστής · ' + (e && e.message || 'σφάλμα')); });
+  }
+  function acctGiveKey(a) {
+    var t = teamRead();
+    return kmSealTo(kmUnB64(a.pub), new TextEncoder().encode(JSON.stringify(t.akeys || {}))).then(function (w) {
+      return acctJson('pro/acct/key', { method: 'POST', body: JSON.stringify({ acct_id: a.acct_id, wrap_a: kmB64(w), a_ver: t.av }) });
+    });
+  }
+  /* Το βιβλίο όπως το χρειάζεται ο λογιστής: ποια γραμμή είναι ποιο προϊόν και με ποια συσκευασία.
+     ΚΛΙΜΑΚΑ: ΕΝΑ μικρό γράμμα ανά κωδικό (kind «item») — μια αλλαγή «ίδιο με» στέλνει ~200 bytes, όχι όλο το βιβλίο. */
+  function acctBookBody() { var t = teamRead() || {}; return { v: 1, kind: 'book', biz: t.biz || null }; }
+  function acctItemRid(key) { return 'i_' + acctFp(key); }
+  function acctItemBodies() {
+    var b = bookRead(), out = [];
+    Object.keys(b.items).forEach(function (k) {
+      var it = b.items[k], pid = it.pid || k;
+      out.push({ v: 1, kind: 'item', rid: acctItemRid(k), key: k, sup: it.sup || null, code: it.code || null, name: it.name || null,
+                 pid: pid, pname: it.pid ? prodName(it.pid) : (it.name || prodName(k)), pack: it.pack ? { per: it.pack.per, base: it.pack.base } : null });
+    });
+    return out;
+  }
+  function acctPhotoIds(r) {
+    var n = Math.max(pageCount(r), r.srvPages || 1), out = [];
+    for (var i = 0; i < n; i++) { out.push(pidOf(r.id, i)); }
+    return out;
+  }
+  function acctRecBody(r) {
+    var pi = r.proInfo || {};
+    var lines = (r.lines || []).map(function (l0) {
+      var ln = { code: l0.code || null, desc: l0.desc || null, unit: l0.unit || null, qty: l0.qty, unit_price: l0.unit_price,
+                 disc_pct: l0.disc_pct || null, line_net: l0.line_net, vat_pct: l0.vat_pct === undefined ? null : l0.vat_pct,
+                 pack: l0.pack ? { per: l0.pack.per, base: l0.pack.base } : null, base_price: l0.base_price === undefined ? null : l0.base_price,
+                 afix: l0.afix || null };
+      bookApplyPack(r.supplier, ln);
+      var key = itemKey(r.supplier, ln), pid = bookPid(key);
+      /* κωδικός χωρίς κεντρικό προϊόν: το όνομά του είναι η περιγραφή της γραμμής (όχι το σκέτο «G77») */
+      ln.key = key; ln.pid = pid; ln.pname = pid === key ? (ln.desc || prodName(pid)) : prodName(pid);
+      if (ln.pack) { ln.pack = { per: ln.pack.per, base: ln.pack.base }; }
+      return ln;
+    });
+    return { v: 1, kind: 'inv', rid: r.id,
+             rec: { supplier: r.supplier, sup_vat: pi.sup_vat || null, number: pi.number || null, invDate: dateOf(r), date: acctYmd(dateOf(r)), ts: r.ts,
+                    net: r.net, vat: r.vat, total: r.total, lines: lines,
+                    approved: pi.checks === 'pass' && pi.approved === 'auto' ? 'auto' : 'manual',
+                    by: r.from ? (r.from.n || null) : null,
+                    fixes: (r.afix || []).map(function (f) { return { id: f.id, by: f.by, at: f.at, st: f.st, what: f.what || null }; }) },
+             ph: acctPhotoIds(r) };
+  }
+  /* 🔴 Σφράγισμα με το A — ΠΟΤΕ με το Κ του φακέλου (ο λογιστής δεν το έχει και δεν πρέπει να το έχει). */
+  function acctSealMail(obj, fp) {
+    var bytes = new TextEncoder().encode(JSON.stringify(obj));
+    return kmImportK(kmHexToBytes(acctKeyNow().k)).then(function (key) { return kmSeal(key, bytes); })
+      .then(function (sealed) {
+        var h = kmHead(); h['Content-Type'] = 'application/octet-stream'; h['X-Km-A-Ver'] = String(acctKeyNow().v);
+        if (fp) { h['X-Km-Fp'] = fp; }
+        return kmFetch('pro/acct/mail?rid=' + encodeURIComponent(obj.rid || '_book') + '&kind=' + obj.kind, { method: 'PUT', headers: h, body: sealed });
+      }).then(function (res) { if (!res.ok) { throw new Error('γράμμα ' + res.status); } return res; });
+  }
+  /* Μία φωτογραφία προς τον λογιστή: από το κινητό αν υπάρχει, αλλιώς από τον server (ανοίγει με το Κ ΕΔΩ),
+     και ξανασφραγίζεται με A. Η τοπική κρυφή μνήμη φωτογραφιών ΔΕΝ αγγίζεται. */
+  function acctPhotoBytes(r, slot) {
+    var have = slot === 0 ? r.blob : (r.pages && r.pages[slot - 1]);
+    if (have) { return blobBytes(have); }
+    if (!r.srvPages) { return Promise.resolve(null); }
+    return kmKeyReady().then(function (key) {
+      return kmFetch('photo?id=' + encodeURIComponent(pidOf(r.id, slot)), { headers: kmHead() }).then(function (res) {
+        if (!res.ok) { return null; }
+        return res.arrayBuffer().then(function (buf) { return kmOpenAny(key, buf); });
+      });
+    });
+  }
+  function acctSendPhotos(r) {
+    var ids = acctPhotoIds(r), ok = true;
+    return chain(ids.map(function (id, slot) { return function () {
+      return acctPhHas(id).then(function (has) {
+        if (has) { return; }
+        return acctPhotoBytes(r, slot).then(function (bytes) {
+          if (!bytes) { ok = false; return; }   // δεν έχει ανέβει ακόμα ούτε στον φάκελο — ξανά στον επόμενο κύκλο
+          return kmImportK(kmHexToBytes(acctKeyNow().k)).then(function (key) { return kmSeal(key, bytes); }).then(function (sealed) {
+            var h = kmHead(); h['Content-Type'] = 'application/octet-stream';
+            return kmFetch('pro/acct/photo?id=' + encodeURIComponent(id), { method: 'PUT', headers: h, body: sealed });
+          }).then(function (res) { if (!res.ok) { ok = false; return; } return acctPhPut(id, true); });
+        });
+      });
+    }; })).then(function () { return ok; });
+  }
+  function acctPublish() {
+    if (!acctKeyNow()) { return Promise.resolve(); }
+    var full = acctFull, ids = Object.keys(acctDirtyIds), book = acctBookDirty || full;
+    if (!full && !ids.length && !book) { return Promise.resolve(); }
+    acctFull = false; acctDirtyIds = {}; acctBookDirty = false;   // ό,τι γραφτεί ΚΑΤΑ τη διάρκεια, το ξανασηκώνει
+    var n = 0, work = [], again = function () { if (full) { acctFull = true; } else { ids.forEach(function (id) { acctDirtyIds[id] = 1; }); } if (book) { acctBookDirty = true; } };
+    return acctSentAll().then(function (sent) {
+      function one(rid, body, after) {
+        var fp = acctFp(JSON.stringify(body));
+        if (sent[rid] === fp) { return null; }
+        return function () {
+          if (n >= ACCT_TICK_MAX) { again(); return; }   // όριο γύρου — τα υπόλοιπα στον επόμενο
+          n++;
+          return (after ? after() : Promise.resolve(true)).then(function (okPh) {
+            return acctSealMail(body, fp).then(function () { if (okPh !== false) { sent[rid] = fp; return acctSentPut(rid, fp); } again(); });
+          });
+        };
+      }
+      if (book) {
+        var j0 = one('_book', Object.assign({ rid: '_book' }, acctBookBody()));
+        if (j0) { work.push(j0); }
+        acctItemBodies().forEach(function (it) { var j = one(it.rid, it); if (j) { work.push(j); } });
+      }
+      function rec(r, rid) {
+        if (r && !isPending(r)) {   // 🔴 μόνο ΕΓΚΕΚΡΙΜΕΝΑ (με Σύνολο) — τα Εκκρεμή δεν φεύγουν στον λογιστή
+          var j = one(r.id, acctRecBody(r), function () { return acctSendPhotos(r); });
+          if (j) { work.push(j); }
+          return;
+        }
+        /* σβησμένο ή ξανά «εκκρεμές» → γράμμα «del» · και οι φωτογραφίες του φεύγουν από το γραμματοκιβώτιο */
+        if (!sent[rid]) { return; }
+        work.push(function () {
+          if (n >= ACCT_TICK_MAX) { again(); return; }
+          n++;
+          return acctSealMail({ v: 1, kind: 'del', rid: rid }).then(acctPhKeys).then(function (keys) {
+            return chain((keys || []).filter(function (id) { return id === rid || id.indexOf(rid + '-p') === 0; }).map(function (id) { return function () {
+              return kmFetch('pro/acct/photo?id=' + encodeURIComponent(id), { method: 'DELETE', headers: kmHead() }).then(function () { return acctPhPut(id, false); });
+            }; }));
+          }).then(function () { delete sent[rid]; return acctSentPut(rid, null); });
+        });
+      }
+      var rows = full ? all() : Promise.all(ids.map(function (id) { return get(id).then(function (r) { return { id: id, r: r }; }); }));
+      return rows.then(function (list) {
+        if (full) {
+          var seen = {};
+          list.forEach(function (r) { seen[r.id] = 1; rec(r, r.id); });
+          Object.keys(sent).forEach(function (rid) { if (rid !== '_book' && rid.indexOf('i_') !== 0 && !seen[rid]) { rec(null, rid); } });
+        } else {
+          list.forEach(function (x) { rec(x.r, x.id); });
+        }
+        return chain(work).catch(function (e) { again(); throw e; });
+      });
+    });
+  }
+  /* ── ΔΙΟΡΘΩΣΕΙΣ ΤΟΥ ΛΟΓΙΣΤΗ: περνούν ΧΩΡΙΣ πάτημα (Α320 9/10) — μετά από έλεγχο ── */
+  function acctFixesPull() {
+    return acctJson('pro/acct/fixes').then(function (j) {
+      if (!j || !j.ok || !j.fixes || !j.fixes.length) { return; }
+      return teamPriv().then(function (priv) {
+        return chain(j.fixes.map(function (f) { return function () {
+          return acctApplyFix(priv, f).catch(function (e) { diag('διόρθωση ' + f.id.slice(0, 6) + ' · ' + (e && e.message)); acctFixQ(f.id, 'rejected'); });
+        }; }));
+      }).then(function () { refreshCount(); });
+    });
+  }
+  function acctFixQ(id, st) {
+    var q = []; try { q = JSON.parse(localStorage.getItem(LS.acctFixQ) || '[]'); } catch (e) {}
+    q.push({ id: id, st: st }); try { localStorage.setItem(LS.acctFixQ, JSON.stringify(q.slice(-500))); } catch (e) {}
+  }
+  function acctFixFlush() {
+    var q = []; try { q = JSON.parse(localStorage.getItem(LS.acctFixQ) || '[]'); } catch (e) {}
+    if (!q.length) { return Promise.resolve(); }
+    var left = [];
+    return chain(q.map(function (x) { return function () {
+      return acctJson('pro/acct/fixdone', { method: 'POST', body: JSON.stringify({ id: x.id, status: x.st }) })
+        .then(function (j) { if (!j || (!j.ok && j.error !== 'no_fix' && j.error !== 'not_pending')) { left.push(x); } }, function () { left.push(x); });
+    }; })).then(function () { try { localStorage.setItem(LS.acctFixQ, JSON.stringify(left)); } catch (e) {} });
+  }
+  var ACCT_NAMES = { number: 'Αριθμός', invDate: 'Ημερομηνία', net: 'Καθαρό', vat: 'ΦΠΑ', total: 'Σύνολο', sup_vat: 'Αρ. ΦΠΑ προμηθευτή',
+                     code: 'κωδικός', desc: 'περιγραφή', unit: 'μονάδα', qty: 'ποσότητα', unit_price: 'τιμή', disc_pct: 'έκπτωση %', line_net: 'αξία', vat_pct: 'ΦΠΑ %' };
+  function acctVal(v) { return v === null || v === undefined || v === '' ? '—' : typeof v === 'number' ? String(v).replace('.', ',') : String(v); }
+  function acctFixWhat(ch, skipped) {
+    var out = [];
+    Object.keys(ch.h || {}).forEach(function (k) { out.push((ACCT_NAMES[k] || k) + ' ' + acctVal(k === 'invDate' ? (ch.h[k][0] ? dstr(ch.h[k][0]) : null) : ch.h[k][0]) + ' → ' + acctVal(k === 'invDate' ? dstr(ch.h[k][1]) : ch.h[k][1])); });
+    (ch.l || []).forEach(function (x) { out.push('γραμμή ' + (x.i + 1) + ' ' + (ACCT_NAMES[x.f] || x.f) + ' ' + acctVal(x.o) + ' → ' + acctVal(x.n)); });
+    if (skipped) { out.push('⚠ ' + skipped + ' αλλαγή(ές) δεν πέρασαν — είχαν αλλάξει στο μεταξύ'); }
+    return out.join(' · ').slice(0, 400);
+  }
+  /* ίδια τιμή; (αριθμοί με ανοχή μισού λεπτού · κενό = null) */
+  function acctSame(a, b) {
+    var na = (a === '' || a === undefined) ? null : a, nb = (b === '' || b === undefined) ? null : b;
+    if (na === null || nb === null) { return na === nb; }
+    if (typeof na === 'number' || typeof nb === 'number') { var x = Number(na), y = Number(nb); return isFinite(x) && isFinite(y) && Math.abs(x - y) < 0.005; }
+    return String(na) === String(nb);
+  }
+  function acctHdrGet(r, k) { return k === 'number' || k === 'sup_vat' ? (r.proInfo || {})[k] : k === 'invDate' ? (r.invDate === undefined ? null : r.invDate) : r[k]; }
+  function acctHdrSet(r, k, v) {
+    if (k === 'number' || k === 'sup_vat') { r.proInfo = r.proInfo || {}; r.proInfo[k] = v; }
+    else if (k === 'invDate') { if (v === null || v === undefined) { delete r.invDate; } else { r.invDate = v; } }
+    else { r[k] = v; }
+  }
+  function acctLnPrice(ln) {
+    if (ln.pack && ln.pack.per > 0 && ln.unit_price !== null && ln.unit_price !== undefined) {
+      ln.base_price = Math.round((ln.unit_price * (1 - (ln.disc_pct || 0) / 100) / ln.pack.per) * 10000) / 10000;
+    }
+  }
+  function acctHmac(keyHex, txt) {
+    return crypto.subtle.importKey('raw', kmHexToBytes(keyHex), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+      .then(function (k) { return crypto.subtle.sign('HMAC', k, new TextEncoder().encode(txt)); }).then(hexOf);
+  }
+  function acctApplyFix(priv, f) {
+    return kmOpenWith(priv, kmUnB64(f.meta)).then(function (bytes) {
+      var env = JSON.parse(new TextDecoder().decode(bytes)), t = teamRead() || {};
+      var key = t.akeys && t.akeys[env.av];
+      /* 🔴 ΜΟΝΟ κάτοχος του A (ο λογιστής) φτιάχνει έγκυρη διόρθωση· το δημόσιο κλειδί του Boss το ξέρει και ο server */
+      if (!key || typeof env.p !== 'string') { throw new Error('χωρίς υπογραφή'); }
+      return acctHmac(key, env.p).then(function (mac) {
+        if (mac !== env.mac) { throw new Error('λάθος υπογραφή'); }
+        var m = JSON.parse(env.p);
+        if (m.id !== f.id) { throw new Error('άλλο id'); }
+        return get(m.rid).then(function (r) {
+          if (!r) {
+            if (goneMap()[m.rid]) { acctFixQ(f.id, 'rejected'); }   // σβήστηκε στο μεταξύ — δεν έχει πού να περάσει
+            return;                                                  // αλλιώς: δεν έχει έρθει ακόμα σε αυτή τη συσκευή — ξανά αργότερα
+          }
+          if ((r.afix || []).some(function (x) { return x.id === f.id; })) { acctFixQ(f.id, 'applied'); return; }
+          var ch = { h: {}, l: [] }, skipped = 0;
+          Object.keys(m.h || {}).forEach(function (k) {
+            if (!ACCT_HDR[k] || !Array.isArray(m.h[k])) { return; }
+            var cur = acctHdrGet(r, k), old = k === 'invDate' ? acctDay(m.h[k][0]) : m.h[k][0], nv = k === 'invDate' ? acctDay(m.h[k][1]) : m.h[k][1];
+            if (k === 'invDate' ? (acctYmd(dateOf(r)) !== String(m.h[k][0])) : !acctSame(cur, old)) { skipped++; return; }
+            if (k !== 'invDate' && nv !== null && typeof cur === 'number') { nv = typeof nv === 'number' ? nv : parseNum(String(nv)); }
+            ch.h[k] = [cur, nv]; acctHdrSet(r, k, nv);
+          });
+          (m.l || []).forEach(function (x) {
+            if (!x || !Number.isInteger(x.i) || x.i < 0 || !r.lines || x.i >= r.lines.length || !ACCT_LN[x.f]) { skipped++; return; }
+            var ln = r.lines[x.i];
+            if (!acctSame(ln[x.f], x.o)) { skipped++; return; }
+            ch.l.push({ i: x.i, f: x.f, o: ln[x.f] === undefined ? null : ln[x.f], n: x.n });
+            ln[x.f] = x.n; ln.afix = f.id; acctLnPrice(ln);
+          });
+          if (!Object.keys(ch.h).length && !ch.l.length) { acctFixQ(f.id, 'rejected'); return; }   // τίποτα δεν ισχύει πια
+          r.afix = (r.afix || []).concat([{ id: f.id, by: f.name || m.by || 'λογιστής', at: Date.parse(f.created_at) || Date.now(), st: 'applied', what: acctFixWhat(ch, skipped), ch: ch }]);
+          return put(r).then(function () { acctFixQ(f.id, 'applied'); PIDX = null; });
+        });
+      });
+    });
+  }
+  /* «↩ Αναίρεση»: γυρίζουν ΜΟΝΟ τα πεδία της διόρθωσης, και μόνο όσα έχουν ακόμα την τιμή του λογιστή
+     (ό,τι άλλαξε ο Boss μετά, μένει). Το νέο γράμμα το λέει και στον λογιστή. */
+  function acctUndoFix(r, fx) {
+    var ch = fx.ch || { h: {}, l: [] };
+    Object.keys(ch.h || {}).forEach(function (k) { if (acctSame(acctHdrGet(r, k), ch.h[k][1])) { acctHdrSet(r, k, ch.h[k][0]); } });
+    (ch.l || []).forEach(function (x) {
+      var ln = r.lines && r.lines[x.i];
+      if (ln && acctSame(ln[x.f], x.n)) { ln[x.f] = x.o; if (ln.afix === fx.id) { delete ln.afix; } acctLnPrice(ln); }
+    });
+    fx.st = 'undone'; fx.undoneAt = Date.now();
+    acctFixQ(fx.id, 'undone');
+    PIDX = null;
+    return put(r);
+  }
+  function acctFixBox(r) {
+    var fx = (r.afix || []).slice().reverse();
+    if (!fx.length) { return null; }
+    var box = document.createElement('div');
+    box.className = 'acct-fix';
+    fx.forEach(function (x, i) {
+      var row = document.createElement('div');
+      row.className = 'acct-fix-row' + (x.st === 'undone' ? ' undone' : '');
+      row.textContent = (x.st === 'undone' ? '↩ Αναιρέθηκε η διόρθωση του λογιστή «' : '✏️ Διορθώθηκε από τον λογιστή «') + (x.by || '') + '» · ' +
+        dstr(x.at) + ' ' + new Date(x.at).toTimeString().slice(0, 5) + (x.what ? ' — ' + x.what : '');
+      box.appendChild(row);
+      if (i === 0 && x.st === 'applied' && !isReader()) {   // ΜΟΝΟ η τελευταία: αλλιώς η αναίρεση μιας παλιάς θα έσβηνε νεότερη
+        var ub = document.createElement('button');
+        ub.className = 'btn ghost acct-undo';
+        ub.textContent = '↩ Αναίρεση';
+        ub.onclick = function () {
+          if (!confirm('Να γυρίσει το τιμολόγιο όπως ήταν πριν τη διόρθωση του λογιστή;\n\nΟ λογιστής θα το δει στο FastWrite.')) { return; }
+          acctUndoFix(r, x).then(function () { acctSoon(300); freeUrls(); nav.pop(); openShot(r.id); });
+        };
+        box.appendChild(ub);
+      }
+    });
+    return box;
+  }
+  /* ── «📒 Λογιστής» μέσα στην οθόνη «👥 Ομάδα» (μόνο ο Boss) ── */
+  var ACCT_ST = { invited: '⏳ Πρόσκληση', joined: '🔔 Συνδέθηκε — πάτα «Ενεργοποίηση» για να δει τα τιμολόγια', active: '🟢 Συνδεδεμένος' };
+  function acctSection(body) {
+    var sec = document.createElement('div');
+    sec.className = 'acct-sec';
+    sec.innerHTML = '<h3>📒 Λογιστής (FastWrite)</h3><p class="fine">Ο λογιστής σου βλέπει στο <b>FastWrite</b> κάθε τιμολόγιο που αποθηκεύεις, με γραμμές και φωτογραφία — <b>μόνο ανάγνωση</b>. Αν διορθώσει κάτι, η διόρθωση έρχεται εδώ αυτόματα και μπορείς να την <b>αναιρέσεις</b>.</p><div class="acct-list"><p class="fine">Φόρτωση…</p></div>';
+    body.appendChild(sec);
+    acctJson('pro/acct').then(function (j) {
+      var ls = sec.querySelector('.acct-list');
+      ls.innerHTML = '';
+      if (!j || !j.ok) { ls.innerHTML = '<p class="err">Δεν φόρτωσε: ' + escH((j && j.error) || 'δίκτυο') + '</p>'; return; }
+      ACCT = j;
+      (j.accts || []).forEach(function (a) { ls.appendChild(acctCard(a)); });
+      if (!(j.accts || []).length) { var e0 = document.createElement('p'); e0.className = 'empty'; e0.textContent = 'Δεν έχεις συνδέσει λογιστή.'; ls.appendChild(e0); }
+      var full = (j.accts || []).length >= (j.max || 3);
+      var b = document.createElement('button');
+      b.className = 'btn primary'; b.id = 'acct-inv';
+      b.textContent = '+ Πρόσκληση λογιστή' + (full ? ' (γεμάτο)' : '');
+      b.disabled = full;
+      b.onclick = acctInvite;
+      ls.appendChild(b);
+      if (j.mail && j.mail.n) {
+        var mi = document.createElement('p'); mi.className = 'fine acct-mail';
+        mi.textContent = '📮 Στο γραμματοκιβώτιο του λογιστή: ' + j.mail.n + ' γράμματα.';
+        ls.appendChild(mi);
+      }
+      acctSoon(500);
+    });
+  }
+  function acctCard(a) {
+    var c = document.createElement('div');
+    c.className = 'card team-card acct-card';
+    c.setAttribute('data-acct', a.acct_id);
+    c.innerHTML = '<div class="card-sup"></div><div class="team-st"></div>';
+    c.querySelector('.card-sup').textContent = a.name + (a.office ? ' · ' + a.office : '');
+    var st = ACCT_ST[a.status] || a.status;
+    if (a.status === 'joined' && acctOk(a.acct_id)) { st = '⏳ Ενεργοποιείται…'; }
+    if (a.status === 'invited' && a.invite_exp) { st += ' — ισχύει ως ' + dstr(Date.parse(a.invite_exp)) + ' ' + new Date(Date.parse(a.invite_exp)).toTimeString().slice(0, 5); }
+    if (a.status === 'active' && a.last_pull) { st += ' · τελευταία λήψη ' + dstr(Date.parse(a.last_pull)) + ' ' + new Date(Date.parse(a.last_pull)).toTimeString().slice(0, 5); }
+    c.querySelector('.team-st').textContent = st;
+    if (a.status === 'joined' && a.pub && !acctOk(a.acct_id)) {
+      /* 🔴 ο Boss ΒΛΕΠΕΙ ποιος μπήκε πριν του δώσει το ιστορικό: γραφείο, συσκευή, κωδικός (ίδιος στο FastWrite) */
+      var info = document.createElement('p');
+      info.className = 'fine acct-who';
+      info.textContent = 'Συσκευή: ' + (a.device || '—') + ' · Κωδικός επιβεβαίωσης: …';
+      c.appendChild(info);
+      acctCode(a.pub).then(function (code) { info.textContent = 'Συσκευή: ' + (a.device || '—') + ' · Κωδικός επιβεβαίωσης: ' + code + ' (ίδιος με αυτόν που βλέπει ο λογιστής στο FastWrite)'; });
+      var go = document.createElement('button');
+      go.className = 'btn primary acct-ok';
+      go.textContent = '✓ Ενεργοποίηση';
+      go.onclick = function () {
+        go.disabled = true;
+        acctConfirm(a).then(function () { acctSoon(300); renderTeam(); }, function (e) { go.disabled = false; alert('Δεν έγινε: ' + (e && e.message || 'δίκτυο')); });
+      };
+      c.appendChild(go);
+    }
+    var rv = document.createElement('button');
+    rv.className = 'btn ghost del acct-revoke';
+    rv.textContent = a.status === 'invited' ? 'Ακύρωση πρόσκλησης' : 'Ανάκληση πρόσβασης';
+    rv.onclick = function () {
+      if (!confirm((a.status === 'invited' ? 'Ακύρωση της πρόσκλησης για «' : 'Ανάκληση της πρόσβασης του λογιστή «') + a.name + '»;\n\n' +
+                   'Από τώρα δεν παίρνει τίποτα καινούριο. Ό,τι έχει ήδη στο FastWrite του μένει εκεί (είναι τα βιβλία σου).')) { return; }
+      acctJson('pro/acct/revoke', { method: 'POST', body: JSON.stringify({ acct_id: a.acct_id }) }).then(function (j) {
+        if (!j || !j.ok) { alert('Δεν έγινε: ' + ((j && j.error) || 'δίκτυο')); return; }
+        if (a.status === 'active') { acctRotate(); }
+        acctSoon(300);
+        renderTeam();
+      });
+    };
+    c.appendChild(rv);
+    return c;
+  }
+  function acctInvite() {
+    var name = prompt('Όνομα λογιστή ή λογιστικού γραφείου (π.χ. Λογιστήριο Χριστοφή)', '');
+    if (name === null || !name.trim()) { return; }
+    var t = teamRead();
+    if (t && !t.biz) {
+      var biz = prompt('Πώς θα βλέπει ο λογιστής την επιχείρησή σου; (π.χ. Ταβέρνα Ακτή)', '');
+      if (biz && biz.trim()) { t = JSON.parse(JSON.stringify(t)); t.biz = biz.trim().slice(0, 80); teamSave(t); }
+    }
+    acctEnsureKey();
+    acctJson('pro/acct/invite', { method: 'POST', body: JSON.stringify({ name: name.trim() }) }).then(function (j) {
+      if (!j || !j.ok) { alert(j && j.error === 'acct_full' ? 'Έως ' + j.max + ' υπολογιστές λογιστηρίου.' : 'Δεν έγινε: ' + ((j && j.error) || 'δίκτυο')); return; }
+      var url = location.origin + '/kostometro/#km_acct=' + j.code;
+      var w = sheet('<h3>Πρόσκληση λογιστή «' + escH(name.trim()) + '»</h3>' +
+        '<p class="fine">Στείλε αυτόν τον σύνδεσμο στον λογιστή σου (email, Viber, WhatsApp). Τον επικολλά στο <b>FastWrite → Kostometro → Σύνδεση</b>. <b>Ανοίγει μία φορά</b> και ισχύει <b>48 ώρες</b>.</p>' +
+        '<p class="team-link" id="acct-link"></p>' +
+        '<button class="btn primary" data-a="copy">Αντιγραφή συνδέσμου</button>' +
+        (navigator.share ? '<button class="btn ghost" data-a="share">Κοινοποίηση…</button>' : ''));
+      w.querySelector('#acct-link').textContent = url;
+      w.querySelector('[data-a="copy"]').onclick = function () {
+        try { navigator.clipboard.writeText(url).then(function () { alert('Αντιγράφηκε.'); }, function () { prompt('Αντέγραψε τον σύνδεσμο:', url); }); } catch (e) { prompt('Αντέγραψε τον σύνδεσμο:', url); }
+      };
+      var sh = w.querySelector('[data-a="share"]');
+      if (sh) { sh.onclick = function () { navigator.share({ title: 'Kostometro → FastWrite', text: 'Σύνδεση FastWrite με το Kostometro', url: url }).catch(function () {}); }; }
+      renderTeam();
+    });
+  }
+
   /* ── «👥 Ομάδα»: Boss (όλα) · manager με «διαχείριση» (μόνο υπάλληλοι: πρόσκληση, βάρδια, λήξη) ── */
   function teamStatusTxt(m) {
     if (m.status === 'invited') { return '⏳ Πρόσκληση — ισχύει ως ' + dstr(Date.parse(m.invite_exp)) + ' ' + new Date(Date.parse(m.invite_exp)).toTimeString().slice(0, 5); }
@@ -1802,7 +2305,9 @@
     return '⚪ Εκτός βάρδιας';
   }
   var TEAM_LOG_TXT = { setup: 'η ομάδα στήθηκε', invite: 'πρόσκληση', join: 'μπήκε', activate: 'ενεργοποιήθηκε', member: 'αλλαγή', revoke: 'ανάκληση',
-                       propose: 'έστειλε τιμολόγιο', approve: 'εγκρίθηκε τιμολόγιο', reject: 'απορρίφθηκε τιμολόγιο' };
+                       propose: 'έστειλε τιμολόγιο', approve: 'εγκρίθηκε τιμολόγιο', reject: 'απορρίφθηκε τιμολόγιο',
+                       acct_invite: 'πρόσκληση λογιστή', acct_join: 'ο λογιστής συνδέθηκε', acct_activate: 'ο λογιστής ενεργοποιήθηκε', acct_revoke: 'ανάκληση λογιστή',
+                       fix: 'διόρθωση λογιστή', fix_applied: 'η διόρθωση πέρασε', fix_undone: 'η διόρθωση αναιρέθηκε' };   /* KM-PRO-F4 */
   function teamLogLine(x, names) {
     var who = x.actor === 'boss' ? 'Εσύ' : (names[x.actor.slice(2)] || 'μέλος');
     var d = {}; try { d = JSON.parse(x.detail || '{}') || {}; } catch (e) {}
@@ -1865,6 +2370,7 @@
       b.onclick = function () { teamInvite(x[0], mgr); };
       body.appendChild(b);
     });
+    if (!mgr) { acctSection(body); }   /* KM-PRO-F4 — ο λογιστής */
     if (!mgr && j.log && j.log.length) {
       var lg = document.createElement('div');
       lg.className = 'pro-log team-log';
@@ -3031,6 +3537,8 @@
       }
 
       drawKv();
+      var afb = acctFixBox(r);   /* KM-PRO-F4 — διόρθωση λογιστή + «↩ Αναίρεση» */
+      if (afb) { body.appendChild(afb); }
       var dl = document.createElement('button');
       dl.className = 'btn ghost del wide';
       dl.hidden = isReader();
@@ -3324,7 +3832,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v197';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
+  var APP_VER = 'φέτα 3 · v198';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */

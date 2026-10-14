@@ -176,6 +176,8 @@ async function teamGet(request, env, h, pro) {
   const team = await env.DB.prepare("SELECT * FROM km_team WHERE folder_id = ?").bind(w.folder).first();
   const everyone = await members(env, w.folder), names = {};
   everyone.forEach((m) => { names[m.member_id] = m.name; });   // και των ανακλημένων: το ίχνος μένει ευανάγνωστο
+  // KM-PRO-F4 · και οι λογιστές (ίχνος «a:<id>») — πριν τη μετάβαση της βάσης ο πίνακας δεν υπάρχει
+  try { ((await env.DB.prepare("SELECT acct_id, name FROM km_acct WHERE folder_id = ?").bind(w.folder).all()).results || []).forEach((a) => { names[a.acct_id] = a.name; }); } catch (e) {}
   const ms = everyone.filter((m) => m.status !== "revoked").map((m) => memberView(m, t));
   const pend = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_proposals WHERE folder_id = ? AND status = 'pending'").bind(w.folder).first();
   const lg = await env.DB.prepare("SELECT at, actor, kind, member_id, detail FROM km_team_log WHERE folder_id = ? ORDER BY id DESC LIMIT 60").bind(w.folder).all();

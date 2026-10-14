@@ -4475,6 +4475,18 @@ def xero_push_doc_endpoint(doc_id):
     return jsonify(result), 200
 
 
+# ── KM-PRO-F4 · Kostometro PRO → FastWrite «γραμματοκιβώτιο» (μόνο desktop) ──────────
+# Ο λογιστής διαβάζει τα τιμολόγια του πελάτη του (γραμμές + φωτογραφία) με κλειδί ΜΟΝΟ ανάγνωσης.
+# Όλα στο km_mailbox.py· εδώ μόνο η σύνδεση. Στον server (web mode) ΔΕΝ φορτώνεται.
+if _is_desktop_mode() or os.environ.get("FASTWRITE_KM_MAILBOX") == "1":
+    try:
+        import km_mailbox
+        km_mailbox.register(app, db, BASE_DIR, require_auth,
+                            start_thread=os.environ.get("FASTWRITE_KM_NOTHREAD") != "1")
+    except Exception:
+        logger.exception("[km] mailbox init failed")
+
+
 # ── App Start ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
