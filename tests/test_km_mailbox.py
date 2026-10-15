@@ -75,6 +75,12 @@ MUT = [
     ("        self._retry_photos(l, ring)\n", ""),
     # Μ23 · 🔴 έγγραφο που άλλαξε στα «Έγγραφα» πατιέται σιωπηλά
     ('                if old.get("_km_fp") and old["_km_fp"] != self.fp(old):', '                if False:'),
+    # Μ24 · 🔴 F5 · άδειο Σύνολο γίνεται δεκτό
+    ('            if k == "total" and nv is None:\n                return {"ok": False, "error": "total_required"}', '            if False:\n                return {"ok": False, "error": "total_required"}'),
+    # Μ25 · 🔴 F5 · NaN/Infinity στην κεφαλίδα
+    ('            if isinstance(nv, float) and not (math.isfinite(nv) and abs(nv) < 1e9):\n                return {"ok": False, "error": "bad_number"}   # NaN', '            if False:\n                return {"ok": False, "error": "bad_number"}   # NaN'),
+    # Μ26 · F5 · κείμενο γραμμής χωρίς όριο
+    ('                return {"ok": False, "error": "too_long"}   # KM-PRO-F5 · ίδιο όριο με το κινητό (acctValOk)', '                pass'),
 ]
 
 SRC = (ROOT / "km_mailbox.py").read_text(encoding="utf8")
@@ -346,6 +352,12 @@ def main():
     data = json.loads(db.get_document(i1["doc_id"])["result_json"])
     ok(data["total"] == 65.7 and data["line_items"][0]["unit_price"] == 1.55, "🔴 ισχύει ΑΜΕΣΩΣ και στο έγγραφο (εξαγωγές / Xero)")
     ok(not mb.fix(i1["id"], h={"total": "65,70"})["ok"], "ίδια τιμή → «δεν άλλαξε τίποτα»")
+    # KM-PRO-F5 · ό,τι δεν θα δεχόταν το κινητό (acctValOk) ΔΕΝ γράφεται ούτε εδώ — αλλιώς οι δύο πλευρές χωρίζουν
+    ok(mb.fix(i1["id"], h={"total": ""}).get("error") == "total_required", "🔴 F5 · το Σύνολο δεν αδειάζει (θα έβγαζε το τιμολόγιο από το λογιστήριο)")
+    ok(mb.fix(i1["id"], h={"total": "nan"}).get("error") == "bad_number" and mb.fix(i1["id"], h={"net": "1e400"}).get("error") == "bad_number", "🔴 F5 · NaN / Infinity → bad_number")
+    ok(mb.fix(i1["id"], l=[{"i": 0, "f": "qty", "n": "1e12"}]).get("error") == "bad_number", "F5 · τεράστιος αριθμός γραμμής → bad_number")
+    ok(mb.fix(i1["id"], l=[{"i": 0, "f": "desc", "n": "x" * 201}]).get("error") == "too_long" and mb.fix(i1["id"], h={"number": "y" * 201}).get("error") == "too_long", "F5 · κείμενο > 200 → too_long")
+    ok(abs(st.one("SELECT total FROM km_invoices WHERE rid = 'r1'")["total"] - 65.7) < 1e-9, "F5 · οι απορριφθείσες διορθώσεις δεν άγγιξαν τίποτα")
     # ο Boss στέλνει ΠΑΛΙΑ έκδοση (δεν έχει περάσει ακόμα τη διόρθωση) → η διόρθωση ΜΕΝΕΙ
     srv.post("r1", "inv", inv("r1", "ΟΡΙΖΩΝ", "ΤΔΑ 4411", "2026-10-02", [["K100", "ΓΑΛΑ ΦΡΕΣΚΟ 1LT", "ΛΤ", 10, 1.5, key("ΟΡΙΖΩΝ", "K100"), {"per": 1, "base": "L"}],
                                                                        ["K200", "ΑΛΕΥΡΙ ΣΑΚΙ 25KG", "ΤΕΜ", 2, 20.0, key("ΟΡΙΖΩΝ", "K200"), {"per": 25, "base": "kg"}]]))

@@ -166,7 +166,8 @@
     document.querySelectorAll('#km-detail .km-h').forEach(function (x) { h[x.getAttribute('data-f')] = x.value; });
     document.querySelectorAll('#km-detail .km-l').forEach(function (x) { l.push({ i: +x.getAttribute('data-i'), f: x.getAttribute('data-f'), n: x.value }); });
     call('POST', '/api/km/invoices/' + v.id + '/fix', { h: h, l: l }).then(function (j) {
-      if (!j || !j.ok) { toast(j && j.error === 'nothing' ? 'Δεν άλλαξε τίποτα.' : 'Δεν αποθηκεύτηκε: ' + ((j && j.error) || ''), j && j.error === 'nothing' ? 'info' : 'error'); return; }
+      if (!j || !j.ok) { toast(j && j.error === 'nothing' ? 'Δεν άλλαξε τίποτα.' : j && j.error === 'total_required' ? 'Το Σύνολο δεν μπορεί να μείνει κενό.' :
+            j && j.error === 'too_long' ? 'Πολύ μεγάλο κείμενο (έως 200 χαρακτήρες).' : j && j.error === 'bad_number' ? 'Μη έγκυρος αριθμός.' : 'Δεν αποθηκεύτηκε: ' + ((j && j.error) || ''),   /* KM-PRO-F5 */ j && j.error === 'nothing' ? 'info' : 'error'); return; }
       toast('Η διόρθωση ισχύει. Φεύγει για το κινητό του πελάτη.', 'success');
       kmOpen(v.id); kmSearch();
     });

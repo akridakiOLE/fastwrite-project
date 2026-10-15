@@ -20,6 +20,7 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import os
 import re
 import secrets
@@ -788,6 +789,13 @@ class Mailbox:
             nv = _num(v) if k in NUM_FIELDS else ((str(v).strip() or None) if v is not None else None)
             if k == "date" and nv and not re.match(r"^\d{4}-\d{2}-\d{2}$", nv):
                 return {"ok": False, "error": "bad_date"}
+            # KM-PRO-F5 · το Σύνολο δεν αδειάζει (άδειο = «Εκκρεμές» στο κινητό = το τιμολόγιο φεύγει από το λογιστήριο)
+            if k == "total" and nv is None:
+                return {"ok": False, "error": "total_required"}
+            if isinstance(nv, float) and not (math.isfinite(nv) and abs(nv) < 1e9):
+                return {"ok": False, "error": "bad_number"}   # NaN/Infinity/1e400 → το κινητό δεν θα τα δεχόταν (acctValOk)
+            if isinstance(nv, str) and len(nv) > 200:
+                return {"ok": False, "error": "too_long"}
             if nv != cur[k]:
                 ph[k] = [cur[k], nv]
         for x in (l or []):
@@ -796,6 +804,10 @@ class Mailbox:
                 continue
             o = lines[i][f]
             nv = _num(x.get("n")) if f in NUM_FIELDS else ((str(x.get("n")).strip() or None) if x.get("n") is not None else None)
+            if isinstance(nv, str) and len(nv) > 200:
+                return {"ok": False, "error": "too_long"}   # KM-PRO-F5 · ίδιο όριο με το κινητό (acctValOk)
+            if isinstance(nv, float) and not (math.isfinite(nv) and abs(nv) < 1e9):
+                return {"ok": False, "error": "bad_number"}
             if nv != o:
                 pl.append({"i": i, "f": f, "o": o, "n": nv})
         if not ph and not pl:

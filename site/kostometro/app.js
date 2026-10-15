@@ -11,6 +11,8 @@
   var LS = {
     /* KM-PRO-F1 · η τελευταία γνωστή κατάσταση PRO {pro, at} — από τον server, ποτέ από τη συσκευή */
     pro: 'km_pro',
+    /* KM-PRO-F5 · το όριο αναγνώσεων του μήνα {kind:'reads'|'cost'|'unset', used, limit, renews, at} — ΜΟΝΟ από τον server */
+    proLim: 'km_pro_lim',
     /* KM-PRO-F2 · το βιβλίο τιμών: κεντρικά προϊόντα, αντιστοιχίσεις, συσκευασίες, ίχνος — ταξιδεύει στον φάκελο */
     book: 'km_book',
     /* KM-PRO-F3 · η ομάδα: team = κλειδιά Boss + S/H (ταξιδεύουν στον φάκελο) · member = αυτή η συσκευή είναι ΜΕΛΟΣ (όχι λογαριασμός) */
@@ -625,6 +627,8 @@
     body.innerHTML = '';
     all().then(function (rows) {
       var list = rows.filter(isPending);
+      var lb = proPendBanner();   /* KM-PRO-F5 — το όριο του μήνα φαίνεται ΕΚΕΙ που περιμένουν οι φωτογραφίες */
+      if (lb && list.length) { body.appendChild(lb); }
       if (!list.length) {
         body.innerHTML = memberMode() ? '<p class="empty">Τίποτα για αποστολή.</p>' : '<p class="empty">Δεν έχεις εκκρεμή.<br>Ό,τι φωτογράφισες έχει ποσά.</p>';
         if (memberMode()) { body.appendChild(memberSentBlock()); }   /* KM-PRO-F3 */
@@ -1103,12 +1107,92 @@
     });
   }
   function proRefresh() {
-    if (!localStorage.getItem(LS.reg) || !navigator.onLine) { return Promise.resolve(proOn()); }
+    /* KM-PRO-F5 · ΒΡΕΘΗΚΕ ΣΤΗ ΔΟΚΙΜΗ f5check (15/10): η νέα εγγραφή ΔΕΝ περιμένει το δίκτυο, άρα το «είναι PRO;»
+       ρωτιόταν ΠΡΙΝ υπάρξει λογαριασμός → ο νέος πελάτης PRO έβλεπε την οθόνη κλειδιού. Τώρα περιμένει την εγγραφή. */
+    if (!localStorage.getItem(LS.reg) && kmRegP && navigator.onLine && !memberMode()) {
+      var rp = kmRegP; kmRegP = null;
+      return rp.then(function () { return localStorage.getItem(LS.reg) ? proRefresh() : proOn(); });
+    }
+    if (!localStorage.getItem(LS.reg) || !navigator.onLine || memberMode()) { return Promise.resolve(proOn()); }
+    var was = localStorage.getItem(LS.pro) === null ? null : proOn();
+    proChecked = Date.now();
     return kmFetch('pro/status', { headers: kmHead() }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      if (j && j.ok) { localStorage.setItem(LS.pro, JSON.stringify({ pro: !!j.pro, at: Date.now() })); }
+      if (j && j.ok) {
+        localStorage.setItem(LS.pro, JSON.stringify({ pro: !!j.pro, at: Date.now(), month: j.month || null, sub: !!j.sub }));
+        proMonth(j.month);
+        /* KM-PRO-F5 · ΑΝΑΒΑΘΜΙΣΗ Free → PRO ΑΠΕΥΘΕΙΑΣ ΣΤΟ ΜΕΝΟΥ (Stavros 12/10): καμία οθόνη εισαγωγής —
+           μία γραμμή ενημέρωσης και οι γραμμές PRO εμφανίζονται στο Μενού. Και το ανάποδο (λήξη) λέγεται. */
+        if (was !== null && was !== !!j.pro) { proNote(j.pro ? 'on' : 'off'); if (j.pro) { teamStart(); schedule(1500); } }
+        giftRender();
+      }
+      document.body.classList.toggle('is-pro', proOn());
       return proOn();
     }).catch(function () { return proOn(); });
   }
+  /* ══ KM-PRO-F5 · ΟΡΙΟ ΑΝΑΓΝΩΣΕΩΝ ΤΟΥ ΜΗΝΑ — ΠΟΤΕ ΣΙΩΠΗΛΗ ΑΠΟΤΥΧΙΑ ══
+     Ως τη v198 το παλιό «ταβάνι μήνα» γραφόταν μόνο στο διαγνωστικό και η φωτογραφία έμενε στα «Εκκρεμή»
+     χωρίς εξήγηση. Τώρα: κουτί στην κάμερα + λωρίδα στα «Εκκρεμή» με το πόσες, ως πότε, τι κάνει ο χρήστης.
+     Τα νούμερα έρχονται ΜΟΝΟ από τον server (ρύθμιση, όχι σταθερά της εφαρμογής). */
+  var proChecked = 0;
+  function proLimGet() { try { return JSON.parse(localStorage.getItem(LS.proLim) || 'null'); } catch (e) { return null; } }
+  function proLimSet(x) { try { if (x) { localStorage.setItem(LS.proLim, JSON.stringify(x)); } else { localStorage.removeItem(LS.proLim); } } catch (e) {} }
+  /* Η αλήθεια για το «μπλοκαρισμένο» έρχεται από τον server (month.blocked: unset | cost | reads | null) —
+     η εφαρμογή δεν μαντεύει (αναθεώρηση #3/#7: μισή ρύθμιση έσβηνε το μήνυμα · αύξηση ταβανιού δεν το έσβηνε). */
+  function proMonth(m) {
+    if (!m) { return; }
+    if (m.blocked === 'unset') { proLimSet({ kind: 'unset', at: Date.now() }); }
+    else if (m.blocked === 'cost') { proLimSet({ kind: 'cost', renews: m.renews, at: Date.now() }); }
+    else if (m.blocked === 'reads' || m.left === 0) { proLimSet({ kind: 'reads', used: m.reads, limit: m.limit, renews: m.renews, at: Date.now() }); }
+    else if (typeof m.limit === 'number' && m.left > 0) { proLimSet(null); }
+    proNoteRender();
+  }
+  /* μετά από ανάγνωση: ο μήνας της απάντησης γράφεται και στο LS.pro (για το «απομένουν Ν») */
+  function proMonthSeen(m) {
+    try { var s0 = JSON.parse(localStorage.getItem(LS.pro) || 'null') || {}; s0.month = m; localStorage.setItem(LS.pro, JSON.stringify(s0)); } catch (e) {}
+    proMonth(m);
+  }
+  function proDay(ymd) { var p = String(ymd || '').split('-'); return p.length === 3 ? (+p[2]) + '/' + (+p[1]) : ''; }
+  function proLimText(x) {
+    if (!x) { return null; }
+    if (x.kind === 'unset') { return { t: '⏸ Η αυτόματη ανάγνωση PRO σταμάτησε προσωρινά', p: 'Δεν χάθηκε τίποτα: οι φωτογραφίες σου μένουν στα «Εκκρεμή». Συμπλήρωσε τα ποσά με το χέρι ή περίμενε — ξαναδοκιμάζουμε μόνοι μας. Πληροφορίες: support@fastwrite.tech' }; }
+    return { t: x.kind === 'cost' ? '⛔ Συμπληρώθηκε το μηνιαίο όριο αναγνώσεων PRO'
+                                   : '⛔ Συμπληρώθηκαν οι αναγνώσεις PRO του μήνα' + (x.limit ? ' (' + x.used + '/' + x.limit + ')' : ''),
+             p: 'Δεν χάθηκε τίποτα: οι φωτογραφίες σου μένουν στα «Εκκρεμή». Συμπλήρωσε τα ποσά με το χέρι ή περίμενε έως ' + proDay(x.renews) +
+                ', οπότε ο Κώστας τα διαβάζει μόνος του. Πληροφορίες: support@fastwrite.tech' };
+  }
+  var proNoteKind = null;
+  function proNote(kind) { proNoteKind = kind; proNoteRender(); }
+  function proNoteRender() {
+    var box = el('pro-note');
+    if (!box) { return; }
+    var lim = proOn() ? proLimText(proLimGet()) : null, x = null, warn = false;
+    var m = (function () { try { return (JSON.parse(localStorage.getItem(LS.pro) || 'null') || {}).month || null; } catch (e) { return null; } })();
+    if (lim) { x = lim; warn = true; }
+    else if (proNoteKind === 'on') { x = { t: '✓ Το Kostometro PRO είναι ενεργό', p: 'Στο Μενού: 📊 Τιμές και 👥 Ομάδα. Ο Κώστας διαβάζει κάθε τιμολόγιο γραμμή-γραμμή.' }; }
+    else if (proNoteKind === 'off') { x = { t: 'Η συνδρομή PRO έληξε', p: 'Συνεχίζεις στο Kostometro Free. Τα τιμολόγια και οι τιμές σου μένουν όπως είναι.' }; }
+    else if (proOn() && m && m.limit && m.left > 0 && m.left <= Math.max(3, Math.ceil(m.limit / 10))) {
+      x = { t: 'Απομένουν ' + m.left + ' αναγνώσεις PRO αυτόν τον μήνα', p: 'Ανανεώνονται ' + proDay(m.renews) + '.' };
+    }
+    if (!x) { box.hidden = true; return; }
+    el('pro-note-t').textContent = x.t; el('pro-note-p').textContent = x.p;
+    box.className = 'gift pro-note' + (warn ? ' warn' : '');
+    box.hidden = !!box.dataset.shut && box.dataset.shut === x.t;
+  }
+  function proPendBanner() {
+    var x = proOn() ? proLimText(proLimGet()) : null;
+    if (!x) { return null; }
+    var d = document.createElement('div');
+    d.className = 'pro-lim-bar';
+    d.setAttribute('role', 'status');
+    var b = document.createElement('b'); b.textContent = x.t;
+    var p = document.createElement('span'); p.textContent = x.p;
+    d.appendChild(b); d.appendChild(p);
+    return d;
+  }
+  /* επιστροφή στην εφαρμογή: η αναβάθμιση που πληρώθηκε στο web εμφανίζεται χωρίς να ξανανοίξει η εφαρμογή */
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && Date.now() - proChecked > 300000) { proRefresh(); }
+  });
   var proBusy = false, proWait = 0;
   function proSweep() {
     if (!proOn() || proBusy || !navigator.onLine) { return false; }
@@ -1127,9 +1211,10 @@
         return r.json().catch(function () { return {}; }).then(function (j) {
           if (r.ok && j && j.ok) { return j; }
           var e = new Error('http'); e.status = r.status; e.msg = (j && j.error) || ('σφάλμα ' + r.status);
-          e.retryAfter = ((j && j.retry_after) || 30) * 1000; throw e;
+          e.retryAfter = ((j && j.retry_after) || 30) * 1000; e.body = j || {}; throw e;
         });
       }).then(function (j) {
+        if (j.month) { proMonthSeen(j.month); }   /* KM-PRO-F5 */
         if (!j.lines || !j.lines.length) {
           rec.proTry = (rec.proTry || 0) + 1;
           diag('PRO · δεν διάβασε γραμμές (' + rec.proTry + '/3)');
@@ -1146,8 +1231,19 @@
       }).catch(function (err) {
         proBusy = false; aiBusy = false;
         aiErrLog('PRO · ' + (err.msg || err.message || 'δίκτυο'));
-        if (err.msg === 'not_pro') { localStorage.setItem(LS.pro, JSON.stringify({ pro: false, at: Date.now() })); schedule(AI_NEXT); return; }
-        proWait = Date.now() + (err.msg === 'month_cap' ? 3600000 : (err.retryAfter || 30000));
+        if (err.msg === 'not_pro') { var o0 = {}; try { o0 = JSON.parse(localStorage.getItem(LS.pro) || 'null') || {}; } catch (x) {} o0.pro = false; o0.at = Date.now(); localStorage.setItem(LS.pro, JSON.stringify(o0)); schedule(AI_NEXT); return; }   /* F5: κρατά το sub */
+        /* KM-PRO-F5 · όριο μήνα / όριο που δεν ρυθμίστηκε: ΦΑΙΝΕΤΑΙ (κάμερα + Εκκρεμή), ποτέ μόνο στο διαγνωστικό.
+           Ξαναρωτάμε κάθε 3 ώρες (ο admin μπορεί να ανεβάσει το όριο) ή στην ανανέωση, ό,τι έρθει πρώτο. */
+        if (err.msg === 'read_limit' || err.msg === 'limit_unset') {
+          var b0 = err.body || {}, ren = Date.parse((b0.renews || '') + 'T00:00:00Z');
+          proLimSet(err.msg === 'limit_unset' ? { kind: 'unset', at: Date.now() }
+                    : { kind: b0.reason === 'cost' ? 'cost' : 'reads', used: b0.used, limit: b0.limit, renews: b0.renews, at: Date.now() });
+          proNoteRender();
+          if (!el('s-pend').hidden) { renderPending(); }
+          proWait = Date.now() + (err.msg === 'read_limit' && ren > Date.now() ? Math.min(ren - Date.now() + 60000, 3 * 3600000) : 3600000);
+        } else {
+          proWait = Date.now() + (err.retryAfter || 30000);
+        }
         diag('PRO · αναμονή — ' + (err.msg || 'δίκτυο'));
         schedule(proWait - Date.now() + 500);
       });
@@ -1947,8 +2043,11 @@
     return out;
   }
   function acctPhotoIds(r) {
-    var n = Math.max(pageCount(r), r.srvPages || 1), out = [];
-    for (var i = 0; i < n; i++) { out.push(pidOf(r.id, i)); }
+    if (!r.blob && !(r.pages && r.pages.length) && !r.srvPages) { return []; }   /* F5 · τιμολόγιο χωρίς φωτογραφία: καμία «αναμονή» στο FastWrite */
+    var n = r.pgv ? pageCount(r) : Math.max(pageCount(r), r.srvPages || 1), out = [];   /* F5: μετά από αλλαγή σελίδων μετράνε ΜΟΝΟ οι τοπικές */
+    /* KM-PRO-F5 · Α10 «ο λογιστής βλέπει ΠΑΝΤΑ τη φωτογραφία» — μετά από «Διαγραφή σελίδας» οι σελίδες
+       μετακινούνται (θέση = id): νέα έκδοση σελίδων (pgv) = νέα ids, αλλιώς ο λογιστής κρατούσε τη ΣΒΗΣΜΕΝΗ. */
+    for (var i = 0; i < n; i++) { out.push(pidOf(r.id, i) + (r.pgv ? '-v' + r.pgv : '')); }
     return out;
   }
   function acctRecBody(r) {
@@ -1988,7 +2087,10 @@
   function acctPhotoBytes(r, slot) {
     var have = slot === 0 ? r.blob : (r.pages && r.pages[slot - 1]);
     if (have) { return blobBytes(have); }
-    if (!r.srvPages) { return Promise.resolve(null); }
+    /* KM-PRO-F5 · ούτε στο κινητό ούτε στον server = το τιμολόγιο ΔΕΝ έχει φωτογραφία (π.χ. χειροκίνητο):
+       δεν «περιμένει» για πάντα — φεύγει χωρίς. (Το κινητό πετάει ΜΟΝΟ ό,τι υπάρχει ήδη στον server.) */
+    if (!r.srvPages) { return Promise.resolve('none'); }
+    if (r.pgv) { return Promise.resolve(null); }   // άλλαξαν οι σελίδες και λείπουν από το κινητό: ο server έχει τις ΠΑΛΙΕΣ θέσεις
     return kmKeyReady().then(function (key) {
       return kmFetch('photo?id=' + encodeURIComponent(pidOf(r.id, slot)), { headers: kmHead() }).then(function (res) {
         if (!res.ok) { return null; }
@@ -2002,6 +2104,7 @@
       return acctPhHas(id).then(function (has) {
         if (has) { return; }
         return acctPhotoBytes(r, slot).then(function (bytes) {
+          if (bytes === 'none') { return; }
           if (!bytes) { ok = false; return; }   // δεν έχει ανέβει ακόμα ούτε στον φάκελο — ξανά στον επόμενο κύκλο
           return kmImportK(kmHexToBytes(acctKeyNow().k)).then(function (key) { return kmSeal(key, bytes); }).then(function (sealed) {
             var h = kmHead(); h['Content-Type'] = 'application/octet-stream';
@@ -2009,8 +2112,20 @@
           }).then(function (res) { if (!res.ok) { ok = false; return; } return acctPhPut(id, true); });
         });
       });
-    }; })).then(function () { return ok; });
+    }; })).then(function () {
+      if (!ok) { return ok; }
+      /* παλιές εκδόσεις σελίδων αυτού του τιμολογίου φεύγουν από το γραμματοκιβώτιο */
+      return acctPhKeys().then(function (keys) {
+        return chain((keys || []).filter(function (id) { return (id === r.id || id.indexOf(r.id + '-') === 0) && ids.indexOf(id) < 0; }).map(function (id) { return function () {
+          return kmFetch('pro/acct/photo?id=' + encodeURIComponent(id), { method: 'DELETE', headers: kmHead() }).then(function () { return acctPhPut(id, false); });
+        }; }));
+      }).then(function () { return ok; }, function () { return ok; });
+    });
   }
+  /* KM-PRO-F5 · τιμολόγιο που η φωτογραφία του δεν φεύγει ακόμα: αναμονή που μεγαλώνει (1′ → 30′), ώστε
+     40 «κολλημένα» να μη τρώνε κάθε κύκλο και τα επόμενα να μη φεύγουν ποτέ. */
+  var acctPhWait = {};
+  function acctPhLater(rid) { var w = acctPhWait[rid] || { n: 0 }; w.n++; w.until = Date.now() + Math.min(60000 * Math.pow(2, w.n - 1), 1800000); acctPhWait[rid] = w; }
   function acctPublish() {
     if (!acctKeyNow()) { return Promise.resolve(); }
     var full = acctFull, ids = Object.keys(acctDirtyIds), book = acctBookDirty || full;
@@ -2025,7 +2140,10 @@
           if (n >= ACCT_TICK_MAX) { again(); return; }   // όριο γύρου — τα υπόλοιπα στον επόμενο
           n++;
           return (after ? after() : Promise.resolve(true)).then(function (okPh) {
-            return acctSealMail(body, fp).then(function () { if (okPh !== false) { sent[rid] = fp; return acctSentPut(rid, fp); } again(); });
+            /* 🔴 KM-PRO-F5 · Α10: το γράμμα φεύγει ΜΑΖΙ με τη φωτογραφία — ποτέ τιμολόγιο χωρίς φωτογραφία στον λογιστή */
+            if (okPh === false) { acctPhLater(rid); again(); return; }
+            delete acctPhWait[rid];
+            return acctSealMail(body, fp).then(function () { sent[rid] = fp; return acctSentPut(rid, fp); });
           });
         };
       }
@@ -2036,6 +2154,7 @@
       }
       function rec(r, rid) {
         if (r && !isPending(r)) {   // 🔴 μόνο ΕΓΚΕΚΡΙΜΕΝΑ (με Σύνολο) — τα Εκκρεμή δεν φεύγουν στον λογιστή
+          if (acctPhWait[r.id] && acctPhWait[r.id].until > Date.now()) { again(); return; }   /* KM-PRO-F5 */
           var j = one(r.id, acctRecBody(r), function () { return acctSendPhotos(r); });
           if (j) { work.push(j); }
           return;
@@ -2046,7 +2165,7 @@
           if (n >= ACCT_TICK_MAX) { again(); return; }
           n++;
           return acctSealMail({ v: 1, kind: 'del', rid: rid }).then(acctPhKeys).then(function (keys) {
-            return chain((keys || []).filter(function (id) { return id === rid || id.indexOf(rid + '-p') === 0; }).map(function (id) { return function () {
+            return chain((keys || []).filter(function (id) { return id === rid || id.indexOf(rid + '-') === 0; }).map(function (id) { return function () {   /* F5: και οι εκδόσεις -vN */
               return kmFetch('pro/acct/photo?id=' + encodeURIComponent(id), { method: 'DELETE', headers: kmHead() }).then(function () { return acctPhPut(id, false); });
             }; }));
           }).then(function () { delete sent[rid]; return acctSentPut(rid, null); });
@@ -2117,6 +2236,16 @@
       ln.base_price = Math.round((ln.unit_price * (1 - (ln.disc_pct || 0) / 100) / ln.pack.per) * 10000) / 10000;
     }
   }
+  /* KM-PRO-F5 · τι δέχεται μια διόρθωση: αριθμός ή κενό στα ποσά, κείμενο ≤200 στα κείμενα, ημερομηνία σε ms.
+     🔴 Το Σύνολο ΔΕΝ αδειάζει: άδειο Σύνολο = «Εκκρεμές» = το τιμολόγιο θα έφευγε από τον λογιστή (με τις
+     φωτογραφίες του) — ο λογιστής διορθώνει, δεν αποσύρει τιμολόγια. */
+  var ACCT_NUM = { net: 1, vat: 1, total: 1, qty: 1, unit_price: 1, disc_pct: 1, line_net: 1, vat_pct: 1 };
+  function acctValOk(k, v) {
+    if (k === 'total') { return typeof v === 'number' && isFinite(v) && Math.abs(v) < 1e9; }
+    if (k === 'invDate') { return v === null || (typeof v === 'number' && isFinite(v)); }
+    if (ACCT_NUM[k]) { return v === null || (typeof v === 'number' && isFinite(v) && Math.abs(v) < 1e9); }
+    return v === null || (typeof v === 'string' && v.length <= 200);
+  }
   function acctHmac(keyHex, txt) {
     return crypto.subtle.importKey('raw', kmHexToBytes(keyHex), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
       .then(function (k) { return crypto.subtle.sign('HMAC', k, new TextEncoder().encode(txt)); }).then(hexOf);
@@ -2143,12 +2272,14 @@
             var cur = acctHdrGet(r, k), old = k === 'invDate' ? acctDay(m.h[k][0]) : m.h[k][0], nv = k === 'invDate' ? acctDay(m.h[k][1]) : m.h[k][1];
             if (k === 'invDate' ? (acctYmd(dateOf(r)) !== String(m.h[k][0])) : !acctSame(cur, old)) { skipped++; return; }
             if (k !== 'invDate' && nv !== null && typeof cur === 'number') { nv = typeof nv === 'number' ? nv : parseNum(String(nv)); }
+            if (!acctValOk(k, nv)) { skipped++; return; }   /* KM-PRO-F5 */
             ch.h[k] = [cur, nv]; acctHdrSet(r, k, nv);
           });
           (m.l || []).forEach(function (x) {
             if (!x || !Number.isInteger(x.i) || x.i < 0 || !r.lines || x.i >= r.lines.length || !ACCT_LN[x.f]) { skipped++; return; }
             var ln = r.lines[x.i];
             if (!acctSame(ln[x.f], x.o)) { skipped++; return; }
+            if (!acctValOk(x.f, x.n)) { skipped++; return; }   /* KM-PRO-F5 */
             ch.l.push({ i: x.i, f: x.f, o: ln[x.f] === undefined ? null : ln[x.f], n: x.n });
             ln[x.f] = x.n; ln.afix = f.id; acctLnPrice(ln);
           });
@@ -2163,10 +2294,14 @@
      (ό,τι άλλαξε ο Boss μετά, μένει). Το νέο γράμμα το λέει και στον λογιστή. */
   function acctUndoFix(r, fx) {
     var ch = fx.ch || { h: {}, l: [] };
-    Object.keys(ch.h || {}).forEach(function (k) { if (acctSame(acctHdrGet(r, k), ch.h[k][1])) { acctHdrSet(r, k, ch.h[k][0]); } });
+    /* F5 (αναθεώρηση #10) · πεδίο που άγγιξε ΝΕΟΤΕΡΗ εφαρμοσμένη διόρθωση δεν γυρίζει (Α→Β→Α: ίδια τιμή, άλλη διόρθωση) */
+    var later = (r.afix || []).slice((r.afix || []).indexOf(fx) + 1).filter(function (y) { return y.st === 'applied' && y.ch; });
+    var hTouched = function (k) { return later.some(function (y) { return y.ch.h && y.ch.h[k]; }); };
+    var lTouched = function (i, f) { return later.some(function (y) { return (y.ch.l || []).some(function (z) { return z.i === i && z.f === f; }); }); };
+    Object.keys(ch.h || {}).forEach(function (k) { if (!hTouched(k) && acctSame(acctHdrGet(r, k), ch.h[k][1])) { acctHdrSet(r, k, ch.h[k][0]); } });
     (ch.l || []).forEach(function (x) {
       var ln = r.lines && r.lines[x.i];
-      if (ln && acctSame(ln[x.f], x.n)) { ln[x.f] = x.o; if (ln.afix === fx.id) { delete ln.afix; } acctLnPrice(ln); }
+      if (ln && !lTouched(x.i, x.f) && acctSame(ln[x.f], x.n)) { ln[x.f] = x.o; if (ln.afix === fx.id) { delete ln.afix; } acctLnPrice(ln); }
     });
     fx.st = 'undone'; fx.undoneAt = Date.now();
     acctFixQ(fx.id, 'undone');
@@ -2184,7 +2319,9 @@
       row.textContent = (x.st === 'undone' ? '↩ Αναιρέθηκε η διόρθωση του λογιστή «' : '✏️ Διορθώθηκε από τον λογιστή «') + (x.by || '') + '» · ' +
         dstr(x.at) + ' ' + new Date(x.at).toTimeString().slice(0, 5) + (x.what ? ' — ' + x.what : '');
       box.appendChild(row);
-      if (i === 0 && x.st === 'applied' && !isReader()) {   // ΜΟΝΟ η τελευταία: αλλιώς η αναίρεση μιας παλιάς θα έσβηνε νεότερη
+      /* KM-PRO-F5 · αναίρεση σε ΚΑΘΕ εφαρμοσμένη διόρθωση: το acctUndoFix γυρίζει μόνο πεδία που έχουν ακόμα
+         την τιμή του λογιστή — νεότερη αλλαγή στο ίδιο πεδίο ΔΕΝ πατιέται (ως τη v198: μόνο η τελευταία). */
+      if (x.st === 'applied' && !isReader()) {
         var ub = document.createElement('button');
         ub.className = 'btn ghost acct-undo';
         ub.textContent = '↩ Αναίρεση';
@@ -3408,10 +3545,14 @@
           dp.hidden = isReader();
           dp.textContent = 'Διαγραφή σελίδας ' + (i + 1);
           dp.onclick = function () {
+            /* F5 (2η αναθεώρηση): σελίδα που δεν έχει κατέβει στο κινητό θα χανόταν/μπερδευόταν με τις θέσεις του server */
+            if (pgs.some(function (x) { return !x; })) { alert('Άνοιξε πρώτα όλες τις σελίδες («Δείξε τη φωτογραφία») και μετά σβήσε αυτή που δεν θέλεις.'); return; }
             if (!confirm('Διαγραφή της σελίδας ' + (i + 1) + ' από ' + pgs.length + ';\n\nΤο τιμολόγιο και οι υπόλοιπες σελίδες μένουν.')) { return; }
             var left = pgs.slice(0, i).concat(pgs.slice(i + 1));
             r.blob = left[0];
             r.pages = left.slice(1);
+            r.pgv = (r.pgv || 0) + 1;   /* KM-PRO-F5 · ο λογιστής παίρνει τις σελίδες με νέα ids (όχι τη σβησμένη) */
+            if (r.srvPages) { r.srvPages = left.length; }   /* F5 (αναθεώρηση #1): αλλιώς ζητούσε σελίδα που δεν υπάρχει → γράμμα που δεν φεύγει ποτέ */
             put(r).then(function () { freeUrls(); nav.pop(); openShot(r.id); });
           };
           block.appendChild(dp);
@@ -3832,7 +3973,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v198';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
+  var APP_VER = 'φέτα 3 · v199';   // KM-PRO: ο κλάδος pro αριθμεί από v190 (το Free συνεχίζει v127…)
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -4192,6 +4333,9 @@
     if (!box || !btn) { return; }
     var g = giftGet();
     if (!hasAccount() || isReader()) { box.hidden = true; btn.hidden = true; return; }
+    /* KM-PRO-F5 · στο PRO ο Κώστας διαβάζει ήδη κάθε τιμολόγιο — το δώρο 20 του Free («Ενεργοποίηση Κώστα AI»)
+       δεν έχει θέση (βρέθηκε στα στιγμιότυπα του f5check 15/10) */
+    if (proOn()) { box.hidden = true; btn.hidden = true; return; }
     if (!g || !g.active) {
       // ΠΡΙΝ: το κουτί σε κάθε άνοιγμα της κάμερας (✕ = ως το επόμενο), το κουμπί πάντα.
       el('gift-t').textContent = '🎁 Έκπληξη bonus';
@@ -4593,7 +4737,7 @@
     if (!document.hidden && !el('s-cam').hidden) { startCam(); }
   });
 
-  function toCam() { nav = []; supView = null; clearPending(); show('s-cam'); startCam(); refreshCount(); }
+  function toCam() { nav = []; supView = null; clearPending(); show('s-cam'); startCam(); refreshCount(); proNoteRender(); }
 
   function capture() {
     /* Δεύτερο φρένο, επίτηδες: το πρώτο είναι η οθόνη. Αν ποτέ μια διαδρομή
@@ -5120,6 +5264,8 @@
   /* Εγγραφή στο μητρώο. ΠΟΤΕ δεν μπλοκάρει τον χρήστη: χωρίς δίκτυο
      μένει εκκρεμής και ξαναδοκιμάζεται στο επόμενο άνοιγμα (Α400 §Γ —
      η φωτογραφία στην πόρτα δεν περιμένει ποτέ το δίκτυο). */
+  /* KM-PRO-F5 · η εγγραφή που τρέχει (για να ρωτήσει το PRO ΑΦΟΥ υπάρξει λογαριασμός — νέος πελάτης απευθείας PRO) */
+  var kmRegP = null;
   function kmRegister() {
     var email = localStorage.getItem(LS.email);
     if (!email || !localStorage.getItem(LS.folder)) { return Promise.resolve(false); }
@@ -5164,6 +5310,8 @@
       }).catch(function () { setActiveState(true); return true; });
     }).catch(function () { return false; });
   }
+  /* KM-PRO-F5 · κάθε εγγραφή κρατιέται στο kmRegP (το proRefresh την περιμένει) — ίδια συνάρτηση, απλώς «καταγράφεται» */
+  kmRegister = (function (orig) { return function () { var p = orig(); kmRegP = p.then(function (x) { return x; }, function () { return false; }); return p; }; })(kmRegister);
 
   /* ══ v47 · Η.13 — ΑΠΟ ΤΗ v46 ΣΤΗ ΝΕΑ ΒΑΣΗ Κ ════════════════════════
      Τρεις καταστάσεις, και η συσκευή μπαίνει μόνη της στη σωστή:
@@ -6627,7 +6775,7 @@
   /* Πού πάει ο χρήστης μόλις αποκτήσει λογαριασμό — η παλιά ροή, ίδια. */
   function afterAccount() {
     setTimeout(maybeInstall, 600);   // v120 · (1) — η προτροπή ΜΕΤΑ τον λογαριασμό
-    proReady(2500).then(function () {   /* KM-PRO-NOKEY */
+    proReady(4000).then(function () {   /* KM-PRO-NOKEY · F5: 4″ — μέσα χωράει η εγγραφή ΚΑΙ η ερώτηση PRO */
       if (needKeyScreen()) { return show('s-key'); }
       if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
       toCam();
@@ -7371,6 +7519,7 @@
   /* v113 · KM-READ-GIFT */
   el('gift-b').onclick = giftAsk;
   el('gift-x').onclick = function (e) { e.stopPropagation(); giftClose(); };
+  el('pro-note-x').onclick = function (e) { e.stopPropagation(); var b = el('pro-note'); b.dataset.shut = el('pro-note-t').textContent; b.hidden = true; proNoteKind = null; };   /* KM-PRO-F5 */
   el('gift').onclick = function (e) { if (e.target && e.target.id === 'gift-k') { return; } if (giftFold) { return; } var g = giftGet(); if (!g || !g.active) { giftAsk(); } };
   el('gift-ok-go').onclick = giftActivate;
   el('gift-ok-no').onclick = function () { el('gift-ok').hidden = true; };
@@ -7790,6 +7939,8 @@
         done();
         el('dl-word').value = '';
         el('dl-err').hidden = true;
+        /* KM-PRO-F5 (αναθεώρηση #4) · η διαγραφή ΔΕΝ ακυρώνει τη συνδρομή στον πάροχο πληρωμών — το λέμε ΠΡΙΝ */
+        try { el('dl-sub').hidden = !(JSON.parse(localStorage.getItem(LS.pro) || 'null') || {}).sub; } catch (x) { el('dl-sub').hidden = true; }
         goto('s-del');
       }).catch(function () {
         stop('Δεν επιβεβαιώθηκε το κλείδωμα της συσκευής. Δοκίμασε ξανά.');

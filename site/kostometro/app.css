@@ -843,3 +843,12 @@ body.is-member #ag-fab, body.is-member #ag { display: none !important; }
 .acct-fix-row { font-size: .9rem; line-height: 1.35; }
 .acct-fix-row.undone { opacity: .7; }
 .acct-undo { align-self: flex-start; }
+
+/* KM-PRO-F5 · μήνυμα PRO στην κάμερα (όριο μήνα / ενεργοποίηση / λήξη) — ίδια θέση με το δώρο, που στο PRO δεν χρειάζεται */
+.pro-note{z-index:3}
+.pro-note.warn{background:rgba(48,24,14,.94);border-color:rgba(255,160,80,.6)}
+.pro-note.warn .gift-t{color:#ffb070}
+.pro-lim-bar{display:flex;flex-direction:column;gap:4px;margin:0 0 12px;padding:12px 14px;border-radius:12px;
+  background:rgba(255,160,80,.10);border:1px solid rgba(255,160,80,.55);font-size:13px;line-height:1.45}
+.pro-lim-bar b{color:#ffb070;font-size:14px}
+#s-cam:has(#pro-note:not([hidden])) #gift{display:none}

@@ -1,0 +1,18 @@
+KM-PRO-V199 · Φ5 (χωρίς λογαριασμό Paddle): όριο αναγνώσεων Κώστα · συνδρομή Paddle (mock) · ροές Free→PRO / νέος PRO · Α10
+
+- όριο μήνα ανά λογαριασμό: km_pro_quota (folder_id, month) + ευρετήρια · ΡΥΘΜΙΣΗ PRO_MONTHLY_READS / PRO_MONTHLY_USD
+  (ή km_pro_limits ανά λογαριασμό), ΠΟΤΕ σταθερά · χωρίς ρύθμιση → 503 limit_unset · ατομική κράτηση (UPSERT … WHERE)
+  · μετράνε μόνο πετυχημένες · read_limit {used, limit, renews} · status: reads/limit/left/blocked/renews
+- κινητό: μήνυμα στην κάμερα + λωρίδα στα «Εκκρεμή» (ποτέ σιωπηλή αποτυχία) · «απομένουν Ν» · αναβάθμιση/λήξη = μία
+  γραμμή, PRO στο Μενού χωρίς οθόνες εισαγωγής · επιστροφή στην εφαρμογή ξαναρωτά το PRO · νέος PRO: το «είναι PRO;»
+  περιμένει την εγγραφή (χωρίς οθόνη κλειδιού) · χωρίς «δώρο 20» στο PRO · προειδοποίηση συνδρομής στη διαγραφή
+- src/km_paddle.js: webhook Paddle Billing (υπογραφή ts:σώμα HMAC-SHA256, ανοχή 5″, πολλά h1, event_id μία φορά,
+  occurred_at χωρίς πισωγύρισμα, trialing/active/past_due = πρόσβαση, plan μόνο όταν πλήρωσε) · km_email ή email πελάτη
+  · συνδρομή «σε αναμονή» δένεται στην εγγραφή · λήξη χωρίς γεγονός (cron) · admin link · σελίδα αγοράς site/pro/
+- Α10: γράμμα στον λογιστή ΜΟΝΟ μαζί με τη φωτογραφία · «Διαγραφή σελίδας» → νέα ids (pgv) · διόρθωση: Σύνολο ποτέ
+  κενό, μόνο αριθμοί/κείμενα ≤200 (κινητό + FastWrite) · «↩ Αναίρεση» σε κάθε εφαρμοσμένη διόρθωση
+- τεστ: pro_f5 (47 μεταλλάξεις) · test_km_mailbox.py +3 · f5check άκρη-σε-άκρη (Boss + όριο + Paddle mock + νέος PRO)
+  · ανεξάρτητη αναθεώρηση: 10 + 2 ευρήματα, όλα με τεστ
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019M5tgYTaq7A2u1u4HSKM59

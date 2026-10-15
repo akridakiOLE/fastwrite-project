@@ -60,7 +60,7 @@ ok(badLine.check.approve === "manual" && badLine.lines[0].ok === false, "🔴 π
 ok(P.PRO_MODEL_DEFAULT === "claude-sonnet-5-5", "🔴 μοντέλο PRO = Sonnet (μέτρηση 12/10)");
 ok(/if \(String\(env\.PRO_LIVE \|\| ""\) !== "1"\) return h\.json\(\{ ok: false, error: "pro_not_live" \}/.test(pro), "🔴 grant ΜΟΝΟ όπου PRO_LIVE=1");
 ok(/proActive\(env, await proRow\(env, folder\), t\)\) return h\.json\(\{ ok: false, error: "not_pro" \}, 403\)/.test(pro), "read: μόνο λογαριασμός PRO");
-ok(pro.includes('error: "month_cap"'), "ταβάνι μήνα ανά λογαριασμό");
+ok(pro.includes('error: "read_limit"') && pro.includes("quotaTake(env, folder, month, lim.reads, t)"), "όριο μήνα ανά λογαριασμό (F5: αναγνώσεις + κόστος)");
 ok(km.includes('const { handlePro } = await import("./km_pro.js");') && km.includes('path.startsWith("/api/km/pro/")'), "km.js → km_pro.js (δυναμικά)");
 
 // κινητό

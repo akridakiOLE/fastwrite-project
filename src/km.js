@@ -2437,9 +2437,13 @@ async function wipeFolder(env, folderId) {
   // KM-PRO-F3 · η ομάδα φεύγει με τον λογαριασμό: μέλη (ονόματα, κλειδιά), προτάσεις, ίχνος (ίδιο μοτίβο:
   // KM-PRO-F4 · και ο λογιστής: σύνδεση, γραμματοκιβώτιο, διορθώσεις — το R2 (acct/) φεύγει με το wipeR2.
   // στην παραγωγή οι πίνακες δεν υπάρχουν ακόμα — η διαγραφή του Free ΔΕΝ πέφτει γι' αυτό). Το R2 (team/) έφυγε με το wipeR2.
-  for (const t of ["km_proposals", "km_team_log", "km_members", "km_team", "km_acct_fix", "km_acct_mail", "km_acct"]) {
+  // KM-PRO-F5 · και η κατάσταση PRO, ο μετρητής αναγνώσεων, η χρήση και το ειδικό όριο. Η συνδρομή του παρόχου
+  // ΔΕΝ σβήνεται (φορολογικά αρχεία, Α10) — μόνο ξεδένεται από τον φάκελο που έφυγε (folder_id = NULL).
+  for (const t of ["km_proposals", "km_team_log", "km_members", "km_team", "km_acct_fix", "km_acct_mail", "km_acct",
+                   "km_pro_quota", "km_pro_limits", "km_pro_usage", "km_pro"]) {
     try { await env.DB.prepare("DELETE FROM " + t + " WHERE folder_id = ?").bind(folderId).run(); } catch (e) {}
   }
+  try { await env.DB.prepare("UPDATE km_pro_sub SET folder_id = NULL, updated_at = ? WHERE folder_id = ?").bind(ts, folderId).run(); } catch (e) {}
 
   return {
     folder_id: folderId,
@@ -2995,6 +2999,11 @@ export async function kmCleanup(env, nowIso) {
     // v97 · KM-FUNNEL — 24 μήνες
     funnel: await wipe("km_funnel", "at < ?", monthsAgo(RETENTION.feedback_months, nowIso)),
   };
+  // KM-PRO-F5 · γεγονότα παρόχου πληρωμών: μόνο για να μη διπλοεφαρμοστούν (η Paddle ξαναστέλνει έως 3 ημέρες) → 3 μήνες.
+  // try: στην παραγωγή ο πίνακας δεν υπάρχει πριν το PRO — ο καθαρισμός του Free ΔΕΝ πέφτει γι' αυτό.
+  try { done.pro_events = await wipe("km_pro_events", "received_at < ?", monthsAgo(3, nowIso)); } catch (e) { done.pro_events = null; }
+  // KM-PRO-F5 · συνδρομή που έληξε χωρίς γεγονός (χαμένο webhook): PRO κλείνει, το «πλήρωσε» (συστάσεις) σβήνει
+  try { const { proExpire } = await import("./km_paddle.js"); done.pro_expired = await proExpire(env, nowIso); } catch (e) { done.pro_expired = null; }
   done.batch_limit = CLEANUP_BATCH;
   done.more = Object.keys(done).some((k) => k !== "batch_limit" && done[k] === CLEANUP_BATCH);
   return done;

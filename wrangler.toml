@@ -132,6 +132,12 @@ STAGING_LOGIN = "1"
 KM_PUBLIC_ORIGIN = "https://fastwrite-staging.stavrosfkallenos.workers.dev"
 AGENT_DAILY_USD = "2"
 READ_DAILY_USD = "2"
+# KM-PRO-F5 (15/10/2026) · όριο μήνα ανά λογαριασμό PRO — ΔΟΚΙΜΑΣΤΙΚΕΣ τιμές ΜΟΝΟ για το staging.
+# ⚠ ΔΕΝ είναι απόφαση: το όριο της παραγωγής το ορίζει ο Stavros (Α320 30/9: «~3 €»· εκκρεμεί).
+# Στην παραγωγή μπαίνουν ως [vars] την ημέρα του PRO· χωρίς αυτά η ανάγνωση PRO ΔΕΝ γίνεται (503 limit_unset).
+# Το PADDLE_WEBHOOK_SECRET είναι secret (wrangler secret put), ΠΟΤΕ εδώ.
+PRO_MONTHLY_READS = "300"
+PRO_MONTHLY_USD = "15"
 
 [[env.staging.d1_databases]]
 binding = "DB"

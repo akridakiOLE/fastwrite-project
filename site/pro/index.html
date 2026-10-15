@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kostometro PRO — ενεργοποίηση</title>
+<meta name="robots" content="noindex">
+<!-- KM-PRO-F5 (15/10/2026) · Η ΣΕΛΙΔΑ ΑΓΟΡΑΣ ΤΟΥ PRO (Α320 13/10: το PRO αγοράζεται ΕΔΩ, ποτέ μέσα στην εφαρμογή).
+     Paddle Billing, Paddle.js v2 overlay checkout. Οι ρυθμίσεις (client token, price id, sandbox/live) έρχονται από
+     /api/km/pro/checkout-config — όσο ΔΕΝ υπάρχουν (λογαριασμός Paddle: Νοέμβριος), η σελίδα λέει «ανοίγει σύντομα».
+     customData.km_email = το email ΛΟΓΑΡΙΑΣΜΟΥ Kostometro → το webhook (src/km_paddle.js) βρίσκει τον λογαριασμό·
+     αν δεν υπάρχει ακόμα, η συνδρομή περιμένει την εγγραφή με αυτό το email (νέος πελάτης απευθείας PRO).
+     ⚠ Η κλήση Paddle.Checkout.open επαληθεύεται στο sandbox την ημέρα που ανοίγει ο λογαριασμός. -->
+<style>
+  :root { --bg:#0a0e14; --card:#121a24; --fg:#e8eef5; --mut:#9fb0c2; --acc:#00e5a0; --warn:#ffb070; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:520px; margin:0 auto; padding:32px 16px 48px; }
+  h1 { font-size:26px; margin:0 0 8px; } h1 b { color:var(--acc); }
+  p { color:var(--mut); margin:0 0 14px; }
+  .card { background:var(--card); border:1px solid #1f2b38; border-radius:16px; padding:20px; margin-top:18px; }
+  label { display:block; font-weight:600; margin:0 0 6px; }
+  input { width:100%; padding:14px; border-radius:12px; border:1px solid #2a3a4c; background:#0d141c; color:var(--fg); font-size:17px; }
+  button { width:100%; margin-top:14px; padding:15px; border:0; border-radius:12px; background:var(--acc); color:#04120d; font-weight:700; font-size:17px; cursor:pointer; }
+  button:disabled { opacity:.45; cursor:default; }
+  .msg { margin-top:12px; font-size:14px; min-height:20px; } .msg.warn { color:var(--warn); } .msg.ok { color:var(--acc); }
+  ul { color:var(--mut); padding-left:20px; margin:0; } li { margin:4px 0; }
+  .fine { font-size:13px; color:#7f91a5; margin-top:18px; } a { color:var(--acc); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Kostometro <b>PRO</b></h1>
+  <p>Για επιχειρήσεις: ο Κώστας διαβάζει κάθε τιμολόγιο γραμμή-γραμμή και σου δείχνει την προηγούμενη τιμή πάνω στην παραλαβή. Μαζί η ομάδα σου και το FastWrite για τον λογιστή σου.</p>
+  <div class="card">
+    <label for="em">Το email του λογαριασμού σου στο Kostometro</label>
+    <input id="em" type="email" autocomplete="email" inputmode="email" placeholder="όνομα@επιχείρηση.com">
+    <label for="em2" style="margin-top:12px">Ξανά το email (για να μη γίνει λάθος)</label>
+    <input id="em2" type="email" autocomplete="off" inputmode="email" placeholder="όνομα@επιχείρηση.com">
+    <p class="fine" style="margin-top:8px">Αν δεν έχεις ακόμα λογαριασμό, γράψε το email με το οποίο θα εγγραφείς στην εφαρμογή. Το PRO ενεργοποιείται στον λογαριασμό με αυτό το email.</p>
+    <button id="go" type="button" disabled>Συνέχεια στην πληρωμή</button>
+    <div class="msg" id="msg" role="status"></div>
+  </div>
+  <ul class="card" style="padding-left:36px">
+    <li>Η πληρωμή γίνεται μέσω της Paddle (merchant of record), που υπολογίζει και αποδίδει τον ΦΠΑ.</li>
+    <li>Μετά την πληρωμή, άνοιξε το Kostometro: το PRO εμφανίζεται μόνο του στο Μενού.</li>
+  </ul>
+  <p class="fine"><a href="/legal/privacy">Πολιτική απορρήτου</a> · <a href="/legal/terms">Όροι</a> · Πληροφορίες: support@fastwrite.tech</p>
+</main>
+<script>
+(function () {
+  'use strict';
+  var em = document.getElementById('em'), em2 = document.getElementById('em2'), go = document.getElementById('go'), msg = document.getElementById('msg'), cfg = null;
+  function say(t, cls) { msg.textContent = t; msg.className = 'msg' + (cls ? ' ' + cls : ''); }
+  function valid(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+  /* F5 (αναθεώρηση #5): ένα λάθος γράμμα = PRO σε ξένο λογαριασμό → το email γράφεται ΔΥΟ φορές */
+  function same() { var a = em.value.trim().toLowerCase(); return valid(a) && a === em2.value.trim().toLowerCase(); }
+  function upd() { go.disabled = !(cfg && cfg.ready && window.Paddle && same()); }
+  em.addEventListener('input', upd); em2.addEventListener('input', upd);
+  fetch('/api/km/pro/checkout-config', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+    cfg = j;
+    if (!j || !j.ready) { say('Η αγορά του PRO ανοίγει σύντομα. Για να ενημερωθείς: support@fastwrite.tech', 'warn'); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
+    s.onload = function () {
+      try {
+        if (j.env === 'sandbox') { window.Paddle.Environment.set('sandbox'); }
+        window.Paddle.Initialize({ token: j.token, eventCallback: function (e) {
+          if (e && e.name === 'checkout.completed') { say('✓ Η πληρωμή ολοκληρώθηκε. Άνοιξε το Kostometro — το PRO θα είναι στο Μενού σε λίγα δευτερόλεπτα.', 'ok'); }
+        } });
+        upd();
+      } catch (e) { say('Η σελίδα πληρωμής δεν φόρτωσε. Δοκίμασε ξανά σε λίγο.', 'warn'); }
+    };
+    s.onerror = function () { say('Η σελίδα πληρωμής δεν φόρτωσε. Δοκίμασε ξανά σε λίγο.', 'warn'); };
+    document.head.appendChild(s);
+  }).catch(function () { say('Δεν υπάρχει σύνδεση. Δοκίμασε ξανά σε λίγο.', 'warn'); });
+  go.addEventListener('click', function () {
+    var v = em.value.trim().toLowerCase();
+    if (!same() || !cfg || !cfg.ready || !window.Paddle) { return; }
+    window.Paddle.Checkout.open({ items: [{ priceId: cfg.price, quantity: 1 }], customer: { email: v }, customData: { km_email: v } });
+  });
+})();
+</script>
+</body>
+</html>

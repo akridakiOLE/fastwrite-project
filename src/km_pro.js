@@ -5,6 +5,9 @@
 //   POST /api/km/pro/read            -> { pages:[b64 jpeg] } → κεφαλίδα + γραμμές + έλεγχοι
 //   POST /api/km/admin/pro/grant     -> (KM_ADMIN_KEY) { folder_id, status } — ΜΟΝΟ για δοκιμές
 //   POST /api/km/admin/pro/read-test -> (KM_ADMIN_KEY) { pages, model? } — μέτρηση χωρίς λογαριασμό
+//   POST /api/km/admin/pro/limit     -> (KM_ADMIN_KEY) { folder_id, reads_limit|null, usd_limit|null } — όριο ΑΝΑ λογαριασμό
+//   POST /api/km/pro/paddle/webhook  -> γεγονότα του παρόχου πληρωμών (src/km_paddle.js, F5)
+//   POST /api/km/admin/pro/link      -> (KM_ADMIN_KEY) { sub_id, folder_id } — συνδρομή σε άλλο email (υποστήριξη)
 //
 // Αρχές:
 //   · Η φωτογραφία περνά από τον server ΧΩΡΙΣ αποθήκευση (Πολιτική §Α9, ίδιο με το δώρο 20).
@@ -20,7 +23,10 @@ const PRO_PRICES = {                                   // micro-$ ανά token
   "claude-haiku-4-5-20251001": { in: 1, out: 5 },
   "claude-sonnet-5-5": { in: 2, out: 10 },
 };
-const PRO_MONTHLY_USD_DEFAULT = 15;     // ανά λογαριασμό · ~2-3 φορές η μετρημένη χρήση (βλ. μέτρηση Φ1)
+// KM-PRO-F5 · ΤΑ ΟΡΙΑ ΤΟΥ ΜΗΝΑ ΕΙΝΑΙ ΡΥΘΜΙΣΗ, ΠΟΤΕ ΣΤΑΘΕΡΑ ΣΤΟΝ ΚΩΔΙΚΑ (Stavros 15/10: «το ΤΙ όριο δεν είναι
+// απόφαση του Claude»). PRO_MONTHLY_READS = αναγνώσεις ανά λογαριασμό/μήνα · PRO_MONTHLY_USD = ταβάνι κόστους.
+// Ανά λογαριασμό υπερισχύει το km_pro_limits. Λείπει ρύθμιση → η ανάγνωση PRO ΔΕΝ γίνεται (503 limit_unset,
+// με μήνυμα στον χρήστη και στα logs) — ποτέ ανάγνωση χωρίς όριο, ποτέ σιωπηλή αποτυχία.
 const PRO_RATE_PER_MIN = 10;
 const PRO_MAX_PAGES = 6;
 const PRO_MAX_B64 = 10 * 1024 * 1024;
@@ -159,6 +165,45 @@ export function proActive(env, row, nowIso) {
   return !row.until || row.until > nowIso;
 }
 
+// ── KM-PRO-F5 · ΟΡΙΑ ΜΗΝΑ ───────────────────────────────────────────────────
+const posNum = (v) => { if (v === null || v === undefined || v === "") return null; const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
+export function proLimits(env, over) {
+  const r = (over && posNum(over.reads_limit)) || posNum(env && env.PRO_MONTHLY_READS);
+  const u = (over && posNum(over.usd_limit)) || posNum(env && env.PRO_MONTHLY_USD);
+  return { reads: r ? Math.floor(r) : null, usd: u };          // null = ΔΕΝ ΡΥΘΜΙΣΤΗΚΕ
+}
+async function limitsRow(env, folder) {
+  try { return await env.DB.prepare("SELECT reads_limit, usd_limit FROM km_pro_limits WHERE folder_id = ?").bind(folder).first(); }
+  catch (e) { return null; }
+}
+// 1η του επόμενου μήνα (UTC) — εκεί μηδενίζει ο μετρητής
+export function proRenews(month) {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(m === 12 ? y + 1 : y, m === 12 ? 0 : m, 1)).toISOString().slice(0, 10);
+}
+async function quotaUsed(env, folder, month) {
+  const q = await env.DB.prepare("SELECT reads FROM km_pro_quota WHERE folder_id = ? AND month = ?").bind(folder, month).first();
+  return q ? q.reads : 0;
+}
+// ΑΤΟΜΙΚΗ κράτηση μίας θέσης: true = πήρε θέση · false = το όριο γέμισε (δύο ταυτόχρονες δεν το περνούν)
+async function quotaTake(env, folder, month, limit, t) {
+  // ⚠ ΔΕΝ πιάνει σφάλμα εδώ: πίνακας που λείπει = εξαίρεση → ο καλών απαντά 503 limit_unset (ορατό, όχι βρόχος 500)
+  const r = await env.DB.prepare(
+    `INSERT INTO km_pro_quota (folder_id, month, reads, updated_at) VALUES (?, ?, 1, ?)
+     ON CONFLICT(folder_id, month) DO UPDATE SET reads = km_pro_quota.reads + 1, updated_at = excluded.updated_at
+     WHERE km_pro_quota.reads < ?`
+  ).bind(folder, month, t, limit).run();
+  return !!(r && r.meta && r.meta.changes);
+}
+// η ανάγνωση απέτυχε / δεν έβγαλε γραμμές → η θέση ΕΠΙΣΤΡΕΦΕΙ (μετράνε μόνο οι πετυχημένες)
+async function quotaGive(env, folder, month) {
+  try { await env.DB.prepare("UPDATE km_pro_quota SET reads = MAX(reads - 1, 0) WHERE folder_id = ? AND month = ?").bind(folder, month).run(); }
+  catch (e) { console.error("pro quota give:", e && e.message); }
+}
+function limitHit(h, used, limit, month, reason) {
+  return h.json({ ok: false, error: "read_limit", reason, used, limit, renews: proRenews(month) }, 429);
+}
+
 async function proUsage(env, folder, month, f) {
   try {
     await env.DB.prepare(
@@ -198,6 +243,16 @@ export async function handlePro(request, env, path, h) {
   if (path === "/api/km/pro/read" && method === "POST") return proRead(request, env, h);
   if (path === "/api/km/admin/pro/grant" && method === "POST") return proGrant(request, env, h);
   if (path === "/api/km/admin/pro/read-test" && method === "POST") return proReadTest(request, env, h);
+  if (path === "/api/km/admin/pro/limit" && method === "POST") return proLimitSet(request, env, h);
+  // KM-PRO-F5 · σελίδα αγοράς (site/pro/): ΜΟΝΟ δημόσια στοιχεία (client token + price id είναι δημόσια κατά την Paddle)
+  if (path === "/api/km/pro/checkout-config" && method === "GET") {
+    const tok = typeof env.PADDLE_CLIENT_TOKEN === "string" ? env.PADDLE_CLIENT_TOKEN : "", price = typeof env.PADDLE_PRICE_ID === "string" ? env.PADDLE_PRICE_ID : "";
+    const ready = String(env.PRO_LIVE || "") === "1" && /^(test|live)_[A-Za-z0-9]+$/.test(tok) && /^pri_[A-Za-z0-9]+$/.test(price);
+    return h.json(ready ? { ok: true, ready: true, env: tok.startsWith("test_") ? "sandbox" : "live", token: tok, price } : { ok: true, ready: false });
+  }
+  // KM-PRO-F5 · ο πάροχος πληρωμών (Paddle) — χωρίς ταυτότητα λογαριασμού, με ΥΠΟΓΡΑΦΗ
+  if (path === "/api/km/pro/paddle/webhook" && method === "POST") { const { paddleWebhook } = await import("./km_paddle.js"); return paddleWebhook(request, env, h); }
+  if (path === "/api/km/admin/pro/link" && method === "POST") { const { paddleAdminLink } = await import("./km_paddle.js"); return paddleAdminLink(request, env, h); }
   // KM-PRO-F3 · η ομάδα (Boss / admin / user) — src/km_team.js
   if (path === "/api/km/pro/team" || path.startsWith("/api/km/pro/team/") || path.startsWith("/api/km/pro/m/")) {
     const { handleTeam } = await import("./km_team.js");
@@ -216,11 +271,24 @@ export async function handlePro(request, env, path, h) {
 async function proStatus(request, env, h) {
   const a = await h.authed(request, env);
   if (a.err) return a.err;
-  const t = h.now(), row = await proRow(env, a.id.folder);
+  const t = h.now(), month = t.slice(0, 7);
+  // KM-PRO-F5 · νέος πελάτης απευθείας PRO: πλήρωσε στο web ΠΡΙΝ φτιάξει λογαριασμό → η συνδρομή δένεται εδώ
+  try { const { proClaim } = await import("./km_paddle.js"); await proClaim(env, a.id.folder, a.acc.email, t); }
+  catch (e) { console.error("pro claim:", e && e.message); }
+  const row = await proRow(env, a.id.folder);
   const u = await env.DB.prepare("SELECT calls, usd_micro FROM km_pro_usage WHERE folder_id = ? AND month = ?")
-    .bind(a.id.folder, t.slice(0, 7)).first();
+    .bind(a.id.folder, month).first();
+  const lim = proLimits(env, await limitsRow(env, a.id.folder));
+  const used = await quotaUsed(env, a.id.folder, month).catch(() => 0);
+  // όριο «ρυθμισμένο» = ΚΑΙ αναγνώσεις ΚΑΙ κόστος (ίδιος κανόνας με την ανάγνωση) — αλλιώς unset, ποτέ μισή εικόνα
+  const set = !!(lim.reads && lim.usd);
+  const blocked = !set ? "unset" : (u && u.usd_micro >= Math.round(lim.usd * 1e6)) ? "cost" : used >= lim.reads ? "reads" : null;
+  let sub = false;
+  try { sub = !!(await env.DB.prepare("SELECT 1 AS x FROM km_pro_sub WHERE folder_id = ? AND status IN ('active','trialing','past_due','paused') LIMIT 1").bind(a.id.folder).first()); } catch (e) {}
   return h.json({ ok: true, pro: proActive(env, row, t), plan: row ? row.plan : null, status: row ? row.status : null,
-                  until: row ? row.until : null, month: { calls: u ? u.calls : 0, usd: u ? u.usd_micro / 1e6 : 0 } });
+                  until: row ? row.until : null, sub,
+                  month: { calls: u ? u.calls : 0, usd: u ? u.usd_micro / 1e6 : 0, reads: used, limit: set ? lim.reads : null,
+                           left: set ? Math.max(0, lim.reads - used) : null, blocked, renews: proRenews(month) } });
 }
 
 async function proRead(request, env, h) {
@@ -236,23 +304,34 @@ export async function proReadFor(request, env, h, folder) {
   const b = await h.safeJson(request);
   const bad = pagesOk(b && b.pages);
   if (bad) return h.json({ ok: false, error: bad }, bad === "too_big" ? 413 : 400);
-  // ταβάνι μήνα ανά λογαριασμό — η ανάγνωση ΠΕΡΙΜΕΝΕΙ τον επόμενο μήνα ή χειροκίνητα
+  // KM-PRO-F5 · ΟΡΙΑ ΜΗΝΑ ανά λογαριασμό — ρύθμιση (env / km_pro_limits), ΠΟΤΕ σταθερά. Η ανάγνωση ΠΕΡΙΜΕΝΕΙ
+  // την 1η του επόμενου μήνα· ο χρήστης το ΒΛΕΠΕΙ (read_limit + used/limit/renews) και συνεχίζει χειροκίνητα.
+  const lim = proLimits(env, await limitsRow(env, folder));
+  if (!lim.reads || !lim.usd) {
+    console.error("pro read: ΔΕΝ έχει ρυθμιστεί όριο μήνα (PRO_MONTHLY_READS / PRO_MONTHLY_USD) — η ανάγνωση PRO σταμάτησε");
+    return h.json({ ok: false, error: "limit_unset" }, 503);
+  }
   const u = await env.DB.prepare("SELECT calls, usd_micro FROM km_pro_usage WHERE folder_id = ? AND month = ?").bind(folder, month).first();
-  const cap = Math.round(Number(env.PRO_MONTHLY_USD || PRO_MONTHLY_USD_DEFAULT) * 1e6);
-  if (u && u.usd_micro >= cap) return h.json({ ok: false, error: "month_cap" }, 429);
-  // ρυθμός: ≤ PRO_RATE_PER_MIN ανά λεπτό (από τα calls του λεπτού — ελαφρύ όριο, όχι ασφάλεια)
+  if (u && u.usd_micro >= Math.round(lim.usd * 1e6)) return limitHit(h, await quotaUsed(env, folder, month), lim.reads, month, "cost");
+  let took;
+  try { took = await quotaTake(env, folder, month, lim.reads, t); }
+  catch (e) { console.error("pro quota:", e && e.message); return h.json({ ok: false, error: "limit_unset" }, 503); }
+  if (!took) return limitHit(h, await quotaUsed(env, folder, month), lim.reads, month, "reads");
   const model = env.PRO_READ_MODEL || PRO_MODEL_DEFAULT;
   let r;
   try { r = await proExtract(env, h, b.pages, model); }
   catch (e) {
+    await quotaGive(env, folder, month);
     await proUsage(env, folder, month, { calls: 1, fail: 1 });
     console.error("pro read:", e && e.message);   // 🔴 ΜΟΝΟ το μήνυμα — ποτέ η εικόνα
     const st = /anthropic_(429|529)/.test(String(e && e.message)) ? 429 : 503;
     return h.json({ ok: false, error: "provider", retry_after: 30 }, st);
   }
   const good = r.data.lines.length > 0;
+  if (!good) await quotaGive(env, folder, month);
   await proUsage(env, folder, month, { calls: 1, ok: good ? 1 : 0, fail: good ? 0 : 1, lines: r.data.lines.length, in: r.usage.in, out: r.usage.out, micro: r.usage.micro });
-  return h.json(Object.assign({ ok: true }, r.data));
+  const used = await quotaUsed(env, folder, month);
+  return h.json(Object.assign({ ok: true }, r.data, { month: { reads: used, limit: lim.reads, left: Math.max(0, lim.reads - used), renews: proRenews(month) } }));
 }
 
 async function proGrant(request, env, h) {
@@ -266,8 +345,8 @@ async function proGrant(request, env, h) {
   const t = h.now();
   await env.DB.prepare(
     `INSERT INTO km_pro (folder_id, plan, status, started_at, until, source, updated_at) VALUES (?, 'pro', ?, ?, NULL, 'admin', ?)
-     ON CONFLICT(folder_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`
-  ).bind(folder, status, t, t).run();
+     ON CONFLICT(folder_id) DO UPDATE SET status = excluded.status, source = 'admin', until = NULL, updated_at = excluded.updated_at`
+  ).bind(folder, status, t, t).run();   // F5: η δοκιμή admin ξαναγίνεται ΚΑΘΑΡΗ (όχι παλιό until/source του παρόχου)
   return h.json({ ok: true, folder_id: folder, status });
 }
 
@@ -283,4 +362,20 @@ async function proReadTest(request, env, h) {
   } catch (e) {
     return h.json({ ok: false, error: String(e && e.message).slice(0, 120) }, 502);
   }
+}
+
+// KM-PRO-F5 · όριο ΑΝΑ λογαριασμό (admin). null = ισχύει η γενική ρύθμιση.
+async function proLimitSet(request, env, h) {
+  if (!h.adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await h.safeJson(request)) || {};
+  const folder = (h.clean(b.folder_id, 64) || "").toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(folder)) return h.json({ ok: false, error: "bad_folder_id" }, 400);
+  const rl = b.reads_limit === null ? null : posNum(b.reads_limit), ul = b.usd_limit === null ? null : posNum(b.usd_limit);
+  if ((b.reads_limit !== null && b.reads_limit !== undefined && !rl) || (b.usd_limit !== null && b.usd_limit !== undefined && !ul)) return h.json({ ok: false, error: "bad_limit" }, 400);
+  const t = h.now();
+  await env.DB.prepare(
+    `INSERT INTO km_pro_limits (folder_id, reads_limit, usd_limit, note, updated_at) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(folder_id) DO UPDATE SET reads_limit = excluded.reads_limit, usd_limit = excluded.usd_limit, note = excluded.note, updated_at = excluded.updated_at`
+  ).bind(folder, rl ? Math.floor(rl) : null, ul, h.clean(b.note, 120), t).run();
+  return h.json({ ok: true, folder_id: folder, limits: proLimits(env, { reads_limit: rl, usd_limit: ul }) });
 }

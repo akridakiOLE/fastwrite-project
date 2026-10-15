@@ -40,7 +40,7 @@ const MUT = [
   // Μ13 · 🔴 χωρίς PRO ο λογιστής συνεχίζει να κατεβάζει
   ["acct", "const readErr = (h, w) => (!w.proOn ? h.json({ ok: false, error: \"not_pro\" }, 403) :", "const readErr = (h, w) => (false ? h.json({ ok: false, error: \"not_pro\" }, 403) :"],
   // Μ14 · 🔴 διαγραφή λογαριασμού αφήνει τον λογιστή / τα γράμματα
-  ["km", "\"km_team\", \"km_acct_fix\", \"km_acct_mail\", \"km_acct\"]", "\"km_team\"]"],
+  ["km", "\"km_team\", \"km_acct_fix\", \"km_acct_mail\", \"km_acct\",", "\"km_team\","],
   // Μ15 · 🔴 το κινητό σφραγίζει το γράμμα με το Κ (ο λογιστής θα χρειαζόταν το Κ)
   ["js", "    return kmImportK(kmHexToBytes(acctKeyNow().k)).then(function (key) { return kmSeal(key, bytes); })", "    return kmKeyReady().then(function (key) { return kmSeal(key, bytes); })"],
   // Μ16 · 🔴 ανάκληση λογιστή χωρίς νέο A
@@ -315,7 +315,7 @@ const kinds = db.prepare("SELECT kind FROM km_team_log WHERE folder_id = ?").all
 ok(["acct_invite", "acct_join", "acct_activate", "fix", "fix_applied", "fix_undone", "acct_revoke"].every((k) => kinds.includes(k)), "🧾 ίχνος: πρόσκληση · μπήκε · ενεργοποίηση · διόρθωση · εφαρμόστηκε · αναιρέθηκε · ανάκληση");
 
 // ── κείμενο κώδικα: server ──
-ok(km.includes('"km_team", "km_acct_fix", "km_acct_mail", "km_acct"]'), "🔴 διαγραφή λογαριασμού → φεύγει και ο λογιστής (σύνδεση, γράμματα, διορθώσεις)");
+ok(km.includes('"km_team", "km_acct_fix", "km_acct_mail", "km_acct",'), "🔴 διαγραφή λογαριασμού → φεύγει και ο λογιστής (σύνδεση, γράμματα, διορθώσεις)");
 ok(readFileSync("src/km_pro.js", "utf8").includes('const { handleAcct } = await import("./km_acct.js");'), "km_pro → km_acct");
 ok(readFileSync("src/km_team.js", "utf8").includes("SELECT acct_id, name FROM km_acct WHERE folder_id = ?"), "το ίχνος της ομάδας γράφει και τα ονόματα των λογιστών");
 
@@ -329,7 +329,7 @@ ok(js.includes("a.pub && (a.status === 'active' || (a.status === 'joined' && acc
 ok(js.includes("            if (!acctSame(ln[x.f], x.o)) { skipped++; return; }") && js.includes("!Number.isInteger(x.i)"), "🔴 διόρθωση ΜΟΝΟ όπου η τιμή είναι ακόμα αυτή που είδε ο λογιστής (και αριθμός γραμμής)");
 ok(js.includes("            if (goneMap()[m.rid]) { acctFixQ(f.id, 'rejected'); }"), "🔴 διόρθωση για τιμολόγιο που δεν ήρθε ακόμα → περιμένει (δεν χάνεται)");
 ok(js.includes("          return acctApplyFix(priv, f).catch("), "🔴 η διόρθωση του λογιστή περνά ΧΩΡΙΣ πάτημα (Α320 9/10)");
-ok(js.includes("          acctUndoFix(r, x).then(function () { acctSoon(300);") && js.includes("if (acctSame(acctHdrGet(r, k), ch.h[k][1]))"), "🔴 «↩ Αναίρεση» → το τιμολόγιο ξαναφεύγει στον λογιστή");
+ok(js.includes("          acctUndoFix(r, x).then(function () { acctSoon(300);") && js.includes("if (!hTouched(k) && acctSame(acctHdrGet(r, k), ch.h[k][1]))"), "🔴 «↩ Αναίρεση» → το τιμολόγιο ξαναφεύγει στον λογιστή");
 ok(js.includes("        if (r && !isPending(r)) {   // 🔴 μόνο ΕΓΚΕΚΡΙΜΕΝΑ"), "🔴 μόνο εγκεκριμένα τιμολόγια φεύγουν στον λογιστή");
 ok(js.includes("        acctItemBodies().forEach(function (it) {"), "η αντιστοίχιση ταξιδεύει ανά κωδικό (μικρά γράμματα «item»)");
 ok(js.includes("        if (sent[rid] === fp) { return null; }") && js.includes("    if (!full && !ids.length && !book) { return Promise.resolve(); }") && js.includes("indexedDB.open('km_acct', 1)"), "🔴 ΚΛΙΜΑΚΑ: στέλνεται ΜΟΝΟ ό,τι άλλαξε, και σάρωση μόνο όταν κάτι γράφτηκε");

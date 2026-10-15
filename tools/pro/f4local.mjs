@@ -63,7 +63,22 @@ const ASSETS = { async fetch(req) {
   if (!existsSync(f)) return new Response("not found", { status: 404 });
   return new Response(readFileSync(f), { headers: { "Content-Type": MIME[extname(f)] || "application/octet-stream" } });
 } };
-const env = { DB, FOLDERS, ASSETS, STAGING_LOGIN: "1", PRO_LIVE: "1", KM_ADMIN_KEY: "local-admin", KM_PUBLIC_ORIGIN: "http://127.0.0.1:" + PORT, AG_PUBLIC: "false" };
+const env = { DB, FOLDERS, ASSETS, STAGING_LOGIN: "1", PRO_LIVE: "1", KM_ADMIN_KEY: "local-admin", KM_PUBLIC_ORIGIN: "http://127.0.0.1:" + PORT, AG_PUBLIC: "false",
+  // KM-PRO-F5 · ίδιες ρυθμίσεις με το staging (wrangler.toml) + μυστικό Paddle ΜΟΝΟ για τα ψεύτικα γεγονότα της δοκιμής
+  PRO_MONTHLY_READS: process.env.KM_LOCAL_READS || "300", PRO_MONTHLY_USD: "15", PADDLE_WEBHOOK_SECRET: process.env.KM_LOCAL_PADDLE || "pdl_ntfset_local_test" };
+// KM-PRO-F5 · --fake-ai: η κλήση στην Anthropic απαντιέται ΕΔΩ (έτοιμη ανάγνωση γραμμών) — ώστε ο server (όριο, μετρητής)
+// να δουλεύει ΑΛΗΘΙΝΑ χωρίς δίκτυο. Η απάντηση έρχεται από το αρχείο --fake-ai=<json> (ανανεώνεται σε κάθε κλήση).
+const FAKE = arg("fake-ai", "");
+if (FAKE) {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (u, o) => {
+    if (String(u).startsWith("https://api.anthropic.com/")) {
+      const j = existsSync(FAKE) ? JSON.parse(readFileSync(FAKE, "utf8")) : { lines: [] };
+      return new Response(JSON.stringify({ usage: { input_tokens: 3300, output_tokens: 560 }, content: [{ type: "text", text: JSON.stringify(j) }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return realFetch(u, o);
+  };
+}
 const worker = (await import(pathToFileURL(join(ROOT, "src", "worker.js")).href)).default;
 const ctx = { waitUntil(p) { Promise.resolve(p).catch(() => {}); }, passThroughOnException() {} };
 
