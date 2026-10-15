@@ -130,6 +130,7 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/read/status" && method === "GET") return readStatus(request, env);
   if (path === "/api/km/read/activate" && method === "POST") return readActivate(request, env);
   if (path === "/api/km/read" && method === "POST") return readInvoice(request, env);
+  if (path === "/api/km/admin/read-test" && method === "POST") return readTest(request, env);   // KM-PRO-F5 · μέτρηση κόστους (μόνο admin)
   // KM-OAUTH (29/9/2026) — Σύνδεση με Google / Microsoft
   // KM-PRO-STAGING-LOGIN (12/10/2026) · πόρτα ΜΟΝΟ του server δοκιμών (STAGING_LOGIN=1 μόνο στο [env.staging]).
   // Στην παραγωγή η μεταβλητή ΔΕΝ υπάρχει → η διαδρομή δεν υπάρχει (404 όπως κάθε άγνωστη).
@@ -4044,6 +4045,25 @@ const READ_PROMPT_REST =
   'Απάντησε ΜΟΝΟ με JSON: {"net": καθαρή αξία ΠΡΟ ΦΠΑ (ελληνικά: καθαρή αξία, μερικό σύνολο, υποσύνολο · αγγλικά: net, subtotal, amount before VAT), "vat": συνολικό ποσό ΦΠΑ όλων των συντελεστών μαζί (ελληνικά: ΦΠΑ · αγγλικά: VAT, tax), "total": τελικό πληρωτέο ΜΕ ΦΠΑ (ελληνικά: σύνολο, γενικό σύνολο, πληρωτέο · αγγλικά: total, grand total, amount due), "date": η ημερομηνία ΤΟΥ ΤΙΜΟΛΟΓΙΟΥ ως "YYYY-MM-DD", ή null}. ' +
   "ΠΡΟΣΟΧΗ ΣΤΟΥΣ ΑΡΙΘΜΟΥΣ: το χαρτί μπορεί να γράφει 1.234,56 (ελληνικά) ή 1,234.56 (αγγλικά) — και τα δύο σημαίνουν χίλια διακόσια τριάντα τέσσερα και 56 λεπτά. Κατάλαβε ποιο σύστημα χρησιμοποιεί το ΣΥΓΚΕΚΡΙΜΕΝΟ χαρτί και δώσε τον αριθμό ΠΑΝΤΑ με τελεία δεκαδικών και ΧΩΡΙΣ διαχωριστή χιλιάδων: 1234.56. " +
   "Χωρίς σύμβολα, χωρίς κείμενο. Αν κάτι δεν διαβάζεται ΚΑΘΑΡΑ, βάλε null — ποτέ μην μαντεύεις.";
+// KM-PRO-F5 (15/10/2026) · ΜΕΤΡΗΣΗ του φθηνού μοντέλου (σύνολα) στις ΙΔΙΕΣ εικόνες με το PRO — για την τιμή PRO.mini.
+// ΜΟΝΟ με κλειδί admin · ίδιο prompt, ίδιο μοντέλο, ίδιο max_tokens με την ανάγνωση του δώρου · τίποτα δεν γράφεται.
+async function readTest(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const pages = Array.isArray(b.pages) ? b.pages : null;
+  if (!pages || !pages.length || pages.length > 6 || pages.some((p) => typeof p !== "string" || !/^[A-Za-z0-9+/=]+$/.test(p.slice(0, 200)))) return json({ ok: false, error: "bad_pages" }, 400);
+  const content = pages.map((d) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: d } })).concat([{ type: "text", text: readPrompt(pages.length) }]);
+  const model = env.READ_MODEL || READ_MODEL_DEFAULT, t0 = Date.now();
+  let j;
+  try { j = await agentCall(env, { model, max_tokens: 300, messages: [{ role: "user", content }] }); }
+  catch (e) { return json({ ok: false, error: String(e && e.message).slice(0, 120) }, 502); }
+  const u = j.usage || {};
+  const micro = Math.round((u.input_tokens || 0) * READ_PRICE.in + (u.output_tokens || 0) * READ_PRICE.out);
+  const o = readParse((j.content || []).filter((x) => x.type === "text").map((x) => x.text).join("")) || {};
+  return json({ ok: true, model, usage: { in: u.input_tokens || 0, out: u.output_tokens || 0, micro, ms: Date.now() - t0 },
+                net: readNum(o.net), vat: readNum(o.vat), total: readNum(o.total), date: readDate(o.date) });
+}
+
 function readPrompt(n) {
   return (n > 1
     ? "Οι " + n + " φωτογραφίες είναι ΣΕΛΙΔΕΣ ΤΟΥ ΙΔΙΟΥ τιμολογίου, με τη σειρά. Δώσε ΕΝΑ σύνολο για ολόκληρο το τιμολόγιο — το τελικό πληρωτέο, που συνήθως βρίσκεται στην ΤΕΛΕΥΤΑΙΑ σελίδα. ΠΟΤΕ μην προσθέσεις μερικά σύνολα από διαφορετικές σελίδες. "

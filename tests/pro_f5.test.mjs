@@ -110,6 +110,8 @@ const MUT = [
   ["js", "    if (r.pgv) { return Promise.resolve(null); }", ""],
   // Μ47 · 🔴 διαγραφή σελίδας με σελίδες που δεν κατέβηκαν
   ["js", "            if (pgs.some(function (x) { return !x; })) { alert(", "            if (false) { alert("],
+  // Μ48 · 🔴 η μέτρηση του φθηνού μοντέλου ανοιχτή σε όλους (δωρεάν αναγνώσεις για οποιονδήποτε)
+  ["km", "async function readTest(request, env) {\n  if (!adminOk(request, env)) return new Response(\"Not found\", { status: 404 });", "async function readTest(request, env) {\n  if (false) return new Response(\"Not found\", { status: 404 });"],
 ];
 if (ONLY !== null) {
   const m = MUT[ONLY - 1]; const bag = { pro, pad, km, js, html, wt };
@@ -443,6 +445,7 @@ ok(html.includes('id="dl-sub"') && js.includes("el('dl-sub').hidden = !(JSON.par
 { const pgs = readFileSync("site/pro/index.html", "utf8");
   ok(pgs.includes('id="em2"') && pgs.includes("return valid(a) && a === em2.value.trim().toLowerCase();"), "σελίδα αγοράς: email ΔΥΟ φορές (λάθος γράμμα = PRO σε ξένο)"); }
 ok(!/(\d+[.,]?\d*\s?€\s?\/\s?μήνα|€\s?\d+|\d+\s?€)/.test(html) && !/(\d+[.,]?\d*\s?€|€\s?\d)/.test(html.slice(html.indexOf('id="pro-note"'), html.indexOf('id="pro-note"') + 600)), "🔴 Apple 3.1.1: καμία τιμή σε ευρώ στο HTML της εφαρμογής");
+ok(/async function readTest\(request, env\) \{\n  if \(!adminOk\(request, env\)\) return new Response\("Not found", \{ status: 404 \}\);/.test(km) && km.includes('if (path === "/api/km/admin/read-test" && method === "POST") return readTest(request, env);'), "🔴 μέτρηση φθηνού μοντέλου: ΜΟΝΟ με κλειδί admin");
 const py = readFileSync("km_mailbox.py", "utf8");
 ok(py.includes('if k == "total" and nv is None:') && py.includes('"error": "total_required"'), "FastWrite: το Σύνολο δεν αδειάζει (ίδιος κανόνας με το κινητό)");
 
