@@ -33,7 +33,7 @@ const MUTATIONS = [
      να ισχύει. Μετρήθηκε 19/9/2026 — το έπιασε ο φρουρός «ΔΕΝ ΒΡΗΚΕ ΣΤΟΧΟ». */
   ["sw", "var CACHE = 'km-" + VER + "';", "var CACHE = 'km-vPALIA';"],
   // Μ6 · ο σύνδεσμος γίνεται σύνδεσμος Store — το ?ref= δεν επιβιώνει του Play.
-  ["js", "location.origin + '/kostometro/?ref=' + c", "'https://play.google.com/store/apps/details?id=km'"],
+  ["js", "KM_WEB + '/kostometro/?ref=' + c", "'https://play.google.com/store/apps/details?id=km'"],
   // Μ7 · 🔴 ΤΟ ΣΦΑΛΜΑ ΤΗΣ 17/9 ΞΑΝΑΜΠΑΙΝΕΙ: το ?ref= διαβάζεται μόνο σε καθαρή συσκευή.
   ["js", "if (qRef && !registered) { return 'ref:' + qRef[1].toUpperCase(); }",
          "if (qRef && !registered && !current) { return 'ref:' + qRef[1].toUpperCase(); }"],
@@ -126,7 +126,9 @@ check("Ο-6 · 🔴 Ο ΚΩΔΙΚΟΣ ΔΕΝ ΒΓΑΙΝΕΙ ΑΠΟ ΤΗ ΣΥΣΚ
 });
 
 check("Ο-7 · ο σύνδεσμος είναι ΠΑΝΤΑ web με ?ref=, ΠΟΤΕ Store", () => {
-  has(js, "location.origin + '/kostometro/?ref=' + c");
+  /* v132 · K4: σταθερή διεύθυνση web (στο κέλυφος το location.origin = localhost) */
+  has(js, "KM_WEB + '/kostometro/?ref=' + c");
+  has(js, "var KM_WEB = 'https://fastwrite.tech';");
   const f = js.slice(js.indexOf("function refUrl()"), js.indexOf("function refProState"));
   hasnt(f, /play\.google|apps\.apple|microsoft\.com/i, "σύνδεσμος Store");
 });

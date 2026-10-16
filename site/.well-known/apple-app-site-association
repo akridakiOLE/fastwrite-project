@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "5FM8N85F5U.tech.fastwrite.kostometro",
+        "paths": [
+          "/kostometro/",
+          "/kostometro/?*"
+        ]
+      }
+    ]
+  }
+}

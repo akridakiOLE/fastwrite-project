@@ -45,7 +45,7 @@ function world(ls, verJson) {
   const timers = []; const setTimeout = (f, ms) => timers.push({ f, ms });
   const fetch = async () => ({ ok: true, json: async () => verJson });
   const LS = { seenVer: "km_seen_ver", reg: "km_registered", folder: "km_folder" };
-  const src = "var LS = arguments[0], localStorage = arguments[1], setTimeout = arguments[2], fetch = arguments[3], el = arguments[4], requestAnimationFrame = function (f) { f(); };\n" +
+  const src = "var LS = arguments[0], localStorage = arguments[1], setTimeout = arguments[2], fetch = arguments[3], el = arguments[4], requestAnimationFrame = function (f) { f(); }, KM_NATIVE = false;\n" +  /* v132 · K4: browser */
     slice("  var APP_VER =", "  function aiModels()") + "\n" +
     "  var srvVer = null, srvNote = '';\n" +
     slice("  function shortVer(", "  function checkVersion(") +

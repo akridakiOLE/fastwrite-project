@@ -148,8 +148,9 @@ await check("Ο-11 · 🔴 κουμπιά στην οθόνη email, ΠΡΙΝ τ
   const sE = html.indexOf('id="s-email"'), g = html.indexOf('id="go-google"'), m = html.indexOf('id="go-microsoft"'), e = html.indexOf('id="in-email"');
   ok(sE > 0 && g > sE && m > g && e > m && html.indexOf("</section>", sE) > e, "θέση κουμπιών");
   const go = slice("  function oauthGo(p) {", "  if (el('go-google'))");
-  ok(/localStorage\.setItem\(LS\.src, 'ref:' \+ refIn\)/.test(go) && go.indexOf("LS.src, 'ref:'") < go.indexOf("location.assign"), "σύσταση μετά το redirect");
-  ok(go.includes("location.assign(KM_API + 'auth/' + p + '/start')"), "προορισμός");
+  ok(/localStorage\.setItem\(LS\.src, 'ref:' \+ refIn\)/.test(go) && go.indexOf("LS.src, 'ref:'") < go.indexOf("oauthNav(p, false)"), "σύσταση μετά το redirect");
+  /* v132 · K4: ο προορισμός ζει στην oauthNav — στον browser ΙΔΙΟΣ με πριν */
+  ok(js.includes("    if (!KM_NATIVE) { location.assign(KM_API + 'auth/' + p + '/start' + q); return; }") && js.includes("var q = own ? '?purpose=own' : '';"), "προορισμός");
   const bootOk = slice("    var oa = oauthTake();", "    var hasEmail");
   ok(/LS\.emailTok, oa\.t/.test(bootOk) && /LS\.email, oa\.e/.test(bootOk) && /silentAccount\(\)/.test(bootOk) /* v120: εγγραφή χωρίς οθόνη 12 λέξεων (Stavros 6/10) */ && /LS\.reg/.test(bootOk), "boot");
 });

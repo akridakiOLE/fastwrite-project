@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "tech.fastwrite.kostometro",
+      "sha256_cert_fingerprints": [
+        "4B:DE:A3:74:55:87:8D:E8:BE:63:2A:35:90:F4:96:65:E2:92:E5:D3:15:83:D1:79:5B:A9:8E:51:F4:AE:39:66"
+      ]
+    }
+  }
+]

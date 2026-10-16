@@ -54,6 +54,7 @@
     emailTok: 'km_email_tok',
     /* v118 · KM-OWN-PROOF — «έφυγα για Google/Microsoft για ΑΛΛΑΓΗ λέξεων» (επιβιώνει του redirect) */
     ownPend: 'km_own_pend',
+    appV: 'km_app_v',   /* K4 · το μυστικό της εφαρμογής όσο ο πάροχος είναι ανοιχτός στον browser συστήματος */
     /* v120 · (5) λέξεις που ΔΕΝ έχει γράψει ακόμα ο χρήστης (εγγραφή χωρίς λέξεις) */
     wordsTodo: 'km_words_todo',
     /* v120 · (6) QR στη Συσκευή Β — επιβιώνει του redirect Google/Microsoft */
@@ -1732,7 +1733,7 @@
                 /* (β) — μία κατ' απαίτηση ανά προμηθευτή. Τρέχει ΜΟΝΟ στο
                    πάτημα του χρήστη· το αυτόματο σύνολο δεν το αγγίζει. */
                 return all().then(function (rows) {
-                  return pcDropSameSupplier(rows, pidOf(r.id, i), r.supplier);
+                  return pcDropSameSupplier(rows, phId(r, i), r.supplier);
                 }).catch(function () {});
               }).then(function () {
                 freeUrls(); nav.pop(); openShot(r.id);
@@ -1775,11 +1776,24 @@
           dp.className = 'btn ghost del';
           dp.hidden = isReader();
           dp.textContent = 'Διαγραφή σελίδας ' + (i + 1);
+          /* v132 · 🔴 ΜΟΝΟ ΜΕ ΟΛΕΣ ΤΙΣ ΣΕΛΙΔΕΣ ΣΤΟ ΚΙΝΗΤΟ. Η νέα έκδοση σελίδων
+             ανεβαίνει από ό,τι υπάρχει εδώ· μια σελίδα που ζει μόνο στον
+             server θα χανόταν με την παλιά έκδοση. */
+          var allHere = pgs.every(function (b) { return !!b; });
+          if (!allHere) {
+            dp.disabled = true;
+            dp.textContent = 'Διαγραφή σελίδας ' + (i + 1) + ' — πρώτα «Δείξε τη φωτογραφία» σε όσες λείπουν';
+          }
           dp.onclick = function () {
+            if (!pgs.every(function (b) { return !!b; })) { return; }
             if (!confirm('Διαγραφή της σελίδας ' + (i + 1) + ' από ' + pgs.length + ';\n\nΤο τιμολόγιο και οι υπόλοιπες σελίδες μένουν.')) { return; }
             var left = pgs.slice(0, i).concat(pgs.slice(i + 1));
             r.blob = left[0];
             r.pages = left.slice(1);
+            r.pgv = Math.max(Date.now(), (r.pgv || 0) + 1); // νέα ids για ΟΛΕΣ τις σελίδες — μοναδικά (χρόνος), όχι απλός μετρητής
+            if (r.crops) { r.crops.splice(i, 1); }          // η περικοπή φεύγει με τη σελίδα της
+            if (r.srvPages) { r.srvPages = left.length; }    // η θέση που έφυγε δεν ξαναφαίνεται
+            pcForget(r.id);
             put(r).then(function () { freeUrls(); nav.pop(); openShot(r.id); });
           };
           block.appendChild(dp);
@@ -1959,6 +1973,7 @@
      δείχνει σε εκδοχή που ΚΡΑΤΑΕΙ ref/src στο start_url. Μετά την εγγραφή
      δεν αγγίζεται τίποτα: η σύσταση γράφεται μία φορά (Α400 §Δ, 4/9). */
   function manifestFollow() {
+    if (KM_NATIVE) { return; }   /* K4: δεν υπάρχει «Add to Home Screen» στο κέλυφος */
     if (localStorage.getItem(LS.reg)) { return; }
     var r = /[?&]ref=([A-Za-z0-9]+)/.exec(location.search);
     var s = /[?&]src=([A-Za-z0-9:_-]+)/.exec(location.search);
@@ -1971,7 +1986,7 @@
     link.setAttribute('href', '/api/km/manifest?' + q.join('&'));
   }
   function refCode() { return localStorage.getItem(LS.refCode) || ''; }
-  function refUrl()  { var c = refCode(); return c ? (location.origin + '/kostometro/?ref=' + c) : ''; }
+  function refUrl()  { var c = refCode(); return c ? (KM_WEB + '/kostometro/?ref=' + c) : ''; }   /* K4: όχι location.origin (στο κέλυφος = localhost) */
 
   /* Οι δύο καταστάσεις της οθόνης. Η σημαία έρχεται ΑΠΟ ΤΟΝ SERVER: την
      ημέρα που βγαίνει το PRO αλλάζει μία ρύθμιση, ΟΧΙ το κείμενο. */
@@ -2198,7 +2213,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v127';
+  var APP_VER = 'φέτα 3 · v132';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -3327,7 +3342,19 @@
      λέξεις με υποχρεωτικό τσεκάρισμα, και εγγραφή του email στο μητρώο.
      ⛔ Τι ΔΕΝ κάνει ακόμα: ΔΕΝ ανεβάζει και ΔΕΝ κατεβάζει τιμολόγια
      (Η.2). Καμία γραμμή εδώ δεν αγγίζει το IndexedDB. */
-  var KM_API = '/api/km/';
+  /* K4 (14/10/2026) · ΕΦΑΡΜΟΓΗ ΚΑΤΑΣΤΗΜΑΤΟΣ — ο ΙΔΙΟΣ κώδικας τρέχει και μέσα στο
+     κέλυφος Capacitor, από https://localhost (Android) / capacitor://localhost (iOS).
+     Εκεί ο server ΔΕΝ είναι ίδια προέλευση: κάθε κλήση /api/km/ θέλει απόλυτη βάση
+     (KM_ORIGIN) και ο server απαντά CORS για τις δύο προελεύσεις (K3_Allagi_Server §4).
+     Στον browser η KM_ORIGIN είναι '' → KM_API = '/api/km/', ακριβώς όπως σήμερα.
+     Όλες οι 48 κλήσεις (44 kmFetch + 4 fetch χωρίς ανιχνευτή 410/423) χρησιμοποιούν ήδη την KM_API — μετρήθηκε 14/10. */
+  var KM_CAP = window.Capacitor || null;
+  var KM_NATIVE = !!(KM_CAP && KM_CAP.isNativePlatform && KM_CAP.isNativePlatform());
+  var KM_PLAT = KM_NATIVE && KM_CAP.getPlatform ? KM_CAP.getPlatform() : 'web';   // 'android' | 'ios' | 'web'
+  var KM_PLUG = (KM_CAP && KM_CAP.Plugins) || {};
+  var KM_WEB = 'https://fastwrite.tech';
+  var KM_ORIGIN = KM_NATIVE ? KM_WEB : '';
+  var KM_API = KM_ORIGIN + '/api/km/';
   var pendingWords = null;   // οι λέξεις που μόλις φτιάχτηκαν, πριν τσεκαριστούν
 
   /* ══ v56 · Η.11 — Ο ΑΝΙΧΝΕΥΤΗΣ ΤΟΥ ΝΕΚΡΟΥ ΛΟΓΑΡΙΑΣΜΟΥ ═══════════════
@@ -3852,7 +3879,7 @@
             }
             qrTid = j.tid;
             qrUntil = Date.now() + (j.ttl_s || 600) * 1000;
-            var url = location.origin + '/kostometro/?src=qr#km_qr=' + j.tid + '.' + qrB64(T);
+            var url = KM_WEB + '/kostometro/?src=qr#km_qr=' + j.tid + '.' + qrB64(T);   /* K4: σταθερή διεύθυνση */
             var q = qrcode(0, 'M'); q.addData(url); q.make();
             el('qr-box').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
             el('qr-link').textContent = url;
@@ -3896,6 +3923,7 @@
   function qrInShow(msg) {
     if (el('go-google'))    { el('qi-google').innerHTML = el('go-google').innerHTML; }
     if (el('go-microsoft')) { el('qi-microsoft').innerHTML = el('go-microsoft').innerHTML; }
+    if (el('go-apple') && el('qi-apple')) { el('qi-apple').innerHTML = el('go-apple').innerHTML; }   /* K4β */
     el('qi-busy').hidden = true;
     qiErr(msg || '');
     show('s-qrin');
@@ -3946,8 +3974,9 @@
       });
     }).catch(function () { el('qi-busy').hidden = true; qiErr('Η μεταφορά δεν ολοκληρώθηκε. Φτιάξε καινούριο QR από την παλιά συσκευή.'); });
   }
-  if (el('qi-google'))    { el('qi-google').onclick    = function () { location.assign(KM_API + 'auth/google/start?purpose=own'); }; }
-  if (el('qi-microsoft')) { el('qi-microsoft').onclick = function () { location.assign(KM_API + 'auth/microsoft/start?purpose=own'); }; }
+  if (el('qi-google'))    { el('qi-google').onclick    = function () { oauthNav('google', true); }; }      /* K4 */
+  if (el('qi-microsoft')) { el('qi-microsoft').onclick = function () { oauthNav('microsoft', true); }; }   /* K4 */
+  if (el('qi-apple'))     { el('qi-apple').onclick     = function () { oauthNav('apple', true); }; }       /* K4β */
   if (el('qi-send')) {
     el('qi-send').onclick = function () {
       var q = qrInGet(), b = el('qi-send');
@@ -4249,7 +4278,7 @@
      κάθε ΦΩΤΟΓΡΑΦΙΑ μία φορά. Όλα σφραγισμένα στη συσκευή. */
   var kmKey = null;          // κλειδί AES στη μνήμη — ποτέ στον δίσκο
   var syncBusy = false, syncAgain = false, syncTimer = null;
-  var syncInfo = { photos: 0, total: 0, want: 0, onSrv: 0, ver: null, at: null, msg: null };
+  var syncInfo = { photos: 0, total: 0, want: 0, onSrv: 0, ver: null, at: null, msg: null, hard: false, up: [] };
 
   /* v47 · Η.13 — ΤΟ ΚΛΕΙΔΙ ΤΩΝ ΔΕΔΟΜΕΝΩΝ ΕΙΝΑΙ ΤΟ Κ, ΟΧΙ ΟΙ ΛΕΞΕΙΣ.
      Αν υπάρχει Κ στη συσκευή, αυτό είναι. Αλλιώς (λογαριασμός v46 που δεν
@@ -4291,14 +4320,15 @@
   function metaOf(r) {
     return { id: r.id, ts: r.ts, supplier: r.supplier, invDate: r.invDate,
              net: r.net, vat: r.vat, total: r.total,
-             pages: 1 + ((r.pages && r.pages.length) || 0) };
+             pages: 1 + ((r.pages && r.pages.length) || 0),
+             pgv: r.pgv || 0 };
   }
   /* Τα id των φωτογραφιών ενός τιμολογίου: η πρώτη σελίδα παίρνει το id του
      τιμολογίου, οι υπόλοιπες <id>-p2, <id>-p3… Σταθερά, ώστε να μην
      ξαναστέλνεται ποτέ ό,τι έχει ήδη σταλεί. */
   function photoIds(r) {
-    var out = [{ id: r.id, blob: r.blob }];
-    (r.pages || []).forEach(function (b, i) { out.push({ id: r.id + '-p' + (i + 2), blob: b }); });
+    var out = [{ id: phId(r, 0), blob: r.blob }];
+    (r.pages || []).forEach(function (b, i) { out.push({ id: phId(r, i + 1), blob: b }); });
     return out.filter(function (x) { return !!x.blob; });
   }
 
@@ -4354,6 +4384,45 @@
     });
   }
 
+  /* v132 · KM-PGV — φωτογραφίες ΠΑΛΙΑΣ έκδοσης σελίδων ζωντανού τιμολογίου.
+     Μόνο από την ενεργή (ο server δέχεται DELETE μόνο από αυτήν) και μόνο
+     για τιμολόγια που υπάρχουν εδώ — ό,τι δεν ξέρουμε, δεν το αγγίζουμε. */
+  function staleOf(rows, have) {
+    var live = {};
+    rows.forEach(function (r) { live[r.id] = r; });
+    return have.filter(function (id) {
+      var q = pidSplit(id), r = live[q.rec];
+      return r && q.v !== (r.pgv || 0);
+    });
+  }
+  /* 🔴 ΠΛΗΡΗΣ νέα έκδοση ή τίποτα: αν λείπει έστω μία σελίδα της τρέχουσας
+     έκδοσης από τον server, οι παλιές μένουν — είναι το μόνο αντίγραφο. */
+  function completeOn(r, onSrv) {
+    var n = Math.max(pageCount(r), r.srvPages || 1);
+    for (var i = 0; i < n; i++) { if (!onSrv[phId(r, i)]) { return false; } }
+    return true;
+  }
+  function prunable(rows, have) {
+    var live = {}, onSrv = {};
+    rows.forEach(function (r) { live[r.id] = r; });
+    have.forEach(function (id) { onSrv[id] = 1; });
+    return staleOf(rows, have).filter(function (id) { return completeOn(live[pidSplit(id).rec], onSrv); });
+  }
+  function prunePending(rows, have) { return prunable(rows, have).length > 0; }
+  function prunePhotos(rows, have) {
+    var out = prunable(rows, have);
+    if (!out.length) { return Promise.resolve(0); }
+    var step = function (i) {
+      if (i >= out.length) { return Promise.resolve(out.length); }
+      return kmFetch('photo?id=' + encodeURIComponent(out[i]), { method: 'DELETE', headers: kmHead() })
+        .catch(function () {})
+        .then(function () { return step(i + 1); });
+    };
+    return step(0);
+  }
+
+  function isActiveNow() { return localStorage.getItem(LS.active) !== '0'; }
+
   function pushPhotos(rows, key, have) {
     var jobs = [], want = 0;
     rows.forEach(function (r) {
@@ -4380,10 +4449,15 @@
           return kmFetch('photo?id=' + encodeURIComponent(jobs[i].id), { method: 'PUT', headers: h, body: sealed });
         })
         .then(function (res) {
-          if (res.ok) { syncInfo.photos++; syncInfo.onSrv++; return step(i + 1); }
-          if (res.status === 409) { setActiveState(false); syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return; }
+          if (res.ok) { syncInfo.photos++; syncInfo.onSrv++; syncInfo.up.push(jobs[i].id); return step(i + 1); }
+          if (res.status === 409) { setActiveState(false); syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; syncInfo.hard = true; return; }
+          /* v132 · ΜΟΝΙΜΟ (ποτέ δεν θα περάσει): η φωτογραφία παρακάμπτεται και ο
+             γύρος ΣΥΝΕΧΙΖΕΙ — μία χαλασμένη φωτογραφία δεν παγώνει τα ποσά όλων. */
           if (res.status === 413) { syncInfo.msg = 'μία φωτογραφία είναι πολύ μεγάλη'; return step(i + 1); }
+          if (res.status === 400) { syncInfo.msg = 'μία φωτογραφία δεν γίνεται δεκτή (400)'; return step(i + 1); }
+          /* ΠΡΟΣΩΡΙΝΟ (δίκτυο, 5xx, 429): ο γύρος σταματά και ξαναδοκιμάζει ΟΛΟΚΛΗΡΟΣ. */
           syncInfo.msg = 'σφάλμα ' + res.status;
+          syncInfo.hard = true;
         });
     };
     return step(0);
@@ -4414,21 +4488,29 @@
           v: 1, from: localStorage.getItem(LS.id) || '', at: new Date().toISOString(),
           shots: rows.map(metaOf)
         }));
-        return kmSeal(key, payload).then(function (sealed) {
-          var h = kmHead();
-          h['Content-Type'] = 'application/octet-stream';
-          return kmFetch('inbox', { method: 'PUT', headers: h, body: sealed });
-        }).then(function (res) {
-          if (!res.ok) { throw new Error('inbox ' + res.status); }
-          /* Και οι φωτογραφίες: επιτρέπονται από μη ενεργή συσκευή ακριβώς
-             επειδή μια φωτογραφία δεν αλλάζει ποτέ περιεχόμενο. */
-          return kmFetch('photos', { headers: kmHead() })
-            .then(function (r) { return r.ok ? r.json() : { photos: [] }; })
-            .then(function (j) {
-              var ids = (j.photos || []).map(function (x) { return x.id; });
-              return pushPhotos(rows, key, ids);
-            });
-        }).then(function () {
+        /* v132 · ΠΡΩΤΑ οι φωτογραφίες, ΜΕΤΑ τα στοιχεία (ίδια σειρά με το syncNow):
+           ό,τι γράφει το inbox υπάρχει ΗΔΗ στον server. Οι φωτογραφίες επιτρέπονται
+           από μη ενεργή συσκευή ακριβώς επειδή μια φωτογραφία δεν αλλάζει ποτέ
+           περιεχόμενο (νέα διάταξη σελίδων = νέα ids). */
+        syncInfo.hard = false; syncInfo.up = [];
+        return kmFetch('photos', { headers: kmHead() })
+          .then(function (r) { if (!r.ok) { throw new Error('λίστα ' + r.status); } return r.json(); })
+          .then(function (j) {
+            var ids = (j.photos || []).map(function (x) { return x.id; });
+            return pushPhotos(rows, key, ids);
+          })
+          .then(function () {
+            if (syncInfo.hard) { throw new Error('φωτογραφίες: ' + (syncInfo.msg || 'σφάλμα')); }
+            return kmSeal(key, payload);
+          })
+          .then(function (sealed) {
+            var h = kmHead();
+            h['Content-Type'] = 'application/octet-stream';
+            return kmFetch('inbox', { method: 'PUT', headers: h, body: sealed });
+          })
+          .then(function (res) {
+            if (!res.ok) { throw new Error('inbox ' + res.status); }
+          }).then(function () {
           unsyncedClear();      // ό,τι χρωστούσε αυτή η συσκευή, το έδωσε
           return true;
         });
@@ -4491,7 +4573,7 @@
                   var m = news[k++];
                   return put({ id: m.id, ts: m.ts, supplier: m.supplier, invDate: m.invDate,
                                net: m.net, vat: m.vat, total: m.total,
-                               pages: [], srvPages: m.pages || 1 })
+                               pages: [], srvPages: m.pages || 1, pgv: m.pgv || 0 })
                     .then(function () { added++; return one(); });
                 };
                 return one();
@@ -4522,7 +4604,10 @@
       return pullNow();
     }
     if (syncBusy) { syncAgain = true; return Promise.resolve(); }
-    syncBusy = true; syncInfo.msg = null;
+    /* v132 · όσο τρέχει ξεφόρτωμα (inbox), ο συγχρονισμός περιμένει: μοιράζονται
+       το syncInfo.hard/up, και ένας νέος γύρος θα «καθάριζε» την αποτυχία του. */
+    if (flushBusy) { scheduleSync(1500); return Promise.resolve(); }
+    syncBusy = true; syncInfo.msg = null; syncInfo.hard = false; syncInfo.up = [];
     var key, rows;
     return kmKeyReady().then(function (k) { key = k; return all(); })
       .then(function (rs) { rows = rs; return kmStatus(); })
@@ -4541,28 +4626,60 @@
           return null;
         }
         setActiveState(true, st.state && st.state.active_since);
-        return pushMeta(rows, key, st.state ? st.state.folder_version : null).then(function (res) {
-          if (res.ok) { return res.json().then(function (j) { syncInfo.ver = j.folder_version; }); }
-          if (res.status === 409) { setActiveState(false); syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; return null; }
-          syncInfo.msg = 'σφάλμα στοιχείων ' + res.status;
-          return null;
-        }).then(function () {
-          if (syncInfo.msg) { return null; }
-          return kmFetch('photos', { headers: kmHead() })
-            .then(function (r) { return r.ok ? r.json() : { photos: [] }; })
-            .then(function (j) {
-              var ids = (j.photos || []).map(function (p) { return p.id; });
-              return killPhotos(ids).then(function () {
-                return pushPhotos(rows, key, ids.filter(function (id) { return !goneMap()[pidSplit(id).rec]; }));
-              });
-            })
+        /* 🔴 v132 · Η ΣΕΙΡΑ ΑΛΛΑΞΕ: ΠΡΩΤΑ οι φωτογραφίες, ΜΕΤΑ τα στοιχεία.
+           Ως τη v131 τα στοιχεία ανέβαιναν πρώτα. Με την έκδοση σελίδων αυτό
+           είναι επικίνδυνο: στοιχεία με «έκδοση 2» στον server ενώ οι
+           φωτογραφίες της έκδοσης 2 δεν ανέβηκαν ποτέ (κινητό χάθηκε στο
+           μεταξύ) = η επόμενη συσκευή πετά τις τοπικές της και ψάχνει
+           φωτογραφίες που δεν υπάρχουν (εύρημα ανεξάρτητης αναθεώρησης 15/10,
+           αποδεδειγμένο). Τώρα ό,τι λένε τα στοιχεία υπάρχει ΗΔΗ στον server. */
+        var ids = [];
+        return kmFetch('photos', { headers: kmHead() })
+          .then(function (r) {
+            /* v132 · λίστα που απέτυχε ΔΕΝ είναι «ο server δεν έχει τίποτα»: θα
+               ξανανέβαιναν ΟΛΕΣ οι φωτογραφίες (εκατοντάδες MB σε δεδομένα κινητής). */
+            if (!r.ok) { syncInfo.msg = 'σφάλμα λίστας ' + r.status; syncInfo.hard = true; return null; }
+            return r.json();
+          })
+          .then(function (j) {
+            if (!j) { return null; }
+            ids = (j.photos || []).map(function (p) { return p.id; });
+            return pushPhotos(rows, key, ids.filter(function (id) { return !goneMap()[pidSplit(id).rec]; }));
+          })
+          .then(function () {
+            if (!isActiveNow()) { return null; }               // 409 στο ανέβασμα: δεν είμαστε η ενεργή
+            /* προσωρινή αποτυχία φωτογραφίας (δίκτυο/server) = τα στοιχεία ΠΕΡΙΜΕΝΟΥΝ τον
+               επόμενο γύρο· μόνιμη (400/413) δεν κρατά τα ποσά κανενός. */
+            if (syncInfo.hard) { return null; }
+            return pushMeta(rows, key, st.state ? st.state.folder_version : null).then(function (res) {
+              if (res.ok) { return res.json().then(function (j) { syncInfo.ver = j.folder_version; }); }
+              if (res.status === 409) { setActiveState(false); syncInfo.msg = 'δεν είναι η ενεργή συσκευή'; syncInfo.hard = true; return null; }
+              syncInfo.msg = 'σφάλμα στοιχείων ' + res.status;
+              syncInfo.hard = true;
+              return null;
+            });
+          })
+          .then(function () {
+            if (syncInfo.hard || !isActiveNow()) { return null; }
+            return killPhotos(ids).then(function () {
+              /* v132 · οι παλιές εκδόσεις φεύγουν ΜΟΝΟ όταν η νέα είναι ΟΛΟΚΛΗΡΗ
+                 στον server — ελέγχεται με νέα λίστα, όχι με το «νομίζω ότι ανέβηκαν».
+                 Η δεύτερη λίστα ζητείται ΜΟΝΟ αν κάποιο τιμολόγιο φαίνεται ήδη ολόκληρο. */
+              if (!prunePending(rows, ids.concat(syncInfo.up))) { return null; }
+              return kmFetch('photos', { headers: kmHead() })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (j2) {
+                  if (!j2) { return null; }
+                  return prunePhotos(rows, (j2.photos || []).map(function (p) { return p.id; }));
+                });
+            });
+          })
             /* v47 · Η.13 — Ο ΜΕΤΡΗΤΗΣ ΜΗΔΕΝΙΖΕΙ ΕΔΩ ΚΑΙ ΜΟΝΟ ΕΔΩ: αφού
                πέρασαν ΚΑΙ τα στοιχεία ΚΑΙ οι φωτογραφίες, χωρίς κανένα
                μήνυμα σφάλματος. Οποιοδήποτε syncInfo.msg σημαίνει ότι κάτι
                έμεινε πίσω — και τότε ο αριθμός ΠΡΕΠΕΙ να μείνει, γιατί πάνω
                του κρίνεται αν μια νέα συσκευή θα πάρει τη σκυτάλη. */
             .then(function () { if (!syncInfo.msg) { unsyncedClear(); } });
-        });
       })
       .catch(function (e) { syncInfo.msg = 'σφάλμα: ' + (e && e.message ? e.message : e); })
       .then(function () {
@@ -4637,9 +4754,29 @@
   }
   /* `<id>` = σελίδα 1 · `<id>-pN` = σελίδα N. Σταθερό από τη v31. */
   function pidOf(recId, slot) { return slot === 0 ? recId : recId + '-p' + (slot + 1); }
+  /* 🔴 v132 · KM-PGV — Η ΕΚΔΟΣΗ ΣΕΛΙΔΩΝ (15/10/2026, εύρημα ελέγχου PRO Φ5).
+     Ως τη v131 το id μιας φωτογραφίας ήταν η ΘΕΣΗ της σελίδας. Μετά από
+     «Διαγραφή σελίδας» οι σελίδες μετακινούνταν, τα ids «υπήρχαν ήδη» στον
+     server και ΔΕΝ ξανανέβαιναν: άλλη συσκευή ή νέα εγκατάσταση κατέβαζε τη
+     ΣΒΗΣΜΕΝΗ σελίδα ή λάθος σειρά. Τώρα κάθε αλλαγή σελίδων ανεβάζει την
+     έκδοση r.pgv, και οι φωτογραφίες της παίρνουν νέα ids: `<id>_vN`,
+     `<id>-p2_vN`. Χωρίς pgv (κάθε παλιό τιμολόγιο) τα ids μένουν ίδια.
+     Κάτω παύλα, ΟΧΙ «-v»: τα ids τιμολογίων είναι `<ώρα>-<6 base36>` και ένα
+     τυχαίο «-v12345» θα διαβαζόταν ως έκδοση· η «_» δεν βγαίνει ποτέ εκεί
+     και ο server τη δέχεται (PHOTO_ID). */
+  function phId(r, slot) { return pidOf(r.id, slot) + (r.pgv ? '_v' + r.pgv : ''); }
   function pidSplit(pid) {
-    var m = /^(.*)-p(\d+)$/.exec(pid);
-    return m ? { rec: m[1], slot: (+m[2]) - 1 } : { rec: pid, slot: 0 };
+    var v = 0, mv = /^(.*)_v(\d+)$/.exec(pid);
+    if (mv) { pid = mv[1]; v = +mv[2]; }
+    var m = /^(\d+-[a-z0-9]{1,6})-p(\d+)$/.exec(pid) || (/^\d+-/.test(pid) ? null : /^(.*)-p(\d+)$/.exec(pid));
+    return m ? { rec: m[1], slot: (+m[2]) - 1, v: v } : { rec: pid, slot: 0, v: v };
+  }
+  /* Ξεχνά από το ευρετήριο του κάδου ΚΑΘΕ φωτογραφία ενός τιμολογίου. Μετά
+     από αλλαγή σελίδων οι παλιές καταχωρήσεις δείχνουν σε θέσεις που τώρα
+     κρατούν ΑΛΛΗ σελίδα — ο κάδος θα την έσβηνε νομίζοντας ότι υπάρχει στον
+     server (παγίδα 3/9: ποτέ διαγραφή φωτογραφίας που δεν έχει ανέβει). */
+  function pcForget(recId) {
+    pcWrite(pcRead().filter(function (x) { return pidSplit(x.id).rec !== recId; }));
   }
 
   /* Το τελευταίο τιμολόγιο κάθε προμηθευτή, με κριτήριο την ΗΜΕΡΟΜΗΝΙΑ ΤΟΥ
@@ -4663,7 +4800,7 @@
     var keep = {}, best = lastPerSupplier(rows);
     Object.keys(best).forEach(function (k) {
       var r = best[k], n = Math.max(pageCount(r), r.srvPages || 1);
-      for (var i = 0; i < n; i++) { keep[pidOf(r.id, i)] = 1; }
+      for (var i = 0; i < n; i++) { keep[phId(r, i)] = 1; }
     });
     return keep;
   }
@@ -4689,6 +4826,7 @@
       var q = pidSplit(drop[i].id);
       return get(q.rec).then(function (fresh) {
         if (!fresh) { return; }
+        if (q.v !== (fresh.pgv || 0)) { return; }          // v132: παλιά έκδοση — η θέση κρατά ΑΛΛΗ σελίδα
         if (q.slot === 0) { fresh.blob = null; }
         else if (fresh.pages) { fresh.pages[q.slot - 1] = null; }
         return put(fresh);
@@ -4720,7 +4858,7 @@
     rows.forEach(function (r) {
       if (String(r.supplier || '').trim().toLowerCase() !== sup) { return; }
       var n = Math.max(pageCount(r), r.srvPages || 1);
-      for (var i = 0; i < n; i++) { mine[pidOf(r.id, i)] = 1; }
+      for (var i = 0; i < n; i++) { mine[phId(r, i)] = 1; }
     });
     var out = pcRead().filter(function (x) {
       return mine[x.id] && x.id !== keepPid && !keepAuto[x.id];
@@ -4731,6 +4869,7 @@
       var q = pidSplit(out[i].id);
       return get(q.rec).then(function (fresh) {
         if (!fresh) { return; }
+        if (q.v !== (fresh.pgv || 0)) { return; }          // v132: παλιά έκδοση — η θέση κρατά ΑΛΛΗ σελίδα
         if (q.slot === 0) { fresh.blob = null; }
         else if (fresh.pages) { fresh.pages[q.slot - 1] = null; }
         return put(fresh);
@@ -4747,8 +4886,12 @@
   /* Μία φωτογραφία, τώρα. Χρησιμοποιείται ΚΑΙ από το αυτόματο κατέβασμα
      ΚΑΙ από το πάτημα του χρήστη — ένας δρόμος, ένα ευρετήριο. */
   function fetchPhoto(recId, slot) {
-    var pid = pidOf(recId, slot);
-    return kmKeyReady().then(function (key) {
+    var pid, ver;
+    return get(recId).then(function (r0) {
+      if (!r0) { throw new Error('η εγγραφή δεν υπάρχει πια'); }
+      pid = phId(r0, slot); ver = r0.pgv || 0;
+      return kmKeyReady();
+    }).then(function (key) {
       return kmFetch('photo?id=' + encodeURIComponent(pid), { headers: kmHead() })
         .then(function (res) { if (!res.ok) { throw new Error('η φωτογραφία δεν βρέθηκε στον server'); } return res.arrayBuffer(); })
         .then(function (buf) { return kmOpenAny(key, buf); })
@@ -4756,6 +4899,7 @@
           var blob = new Blob([plain], { type: 'image/jpeg' });
           return get(recId).then(function (fresh) {
             if (!fresh) { throw new Error('η εγγραφή δεν υπάρχει πια'); }
+            if ((fresh.pgv || 0) !== ver) { throw new Error('οι σελίδες άλλαξαν στο μεταξύ'); }
             if (slot === 0) { fresh.blob = blob; }
             else { fresh.pages = fresh.pages || []; fresh.pages[slot - 1] = blob; }
             return put(fresh).then(function () { pcTouch(pid, blob.size); return blob; });
@@ -4775,7 +4919,7 @@
         if (!r.srvPages) { return; }                          // ντόπιο τιμολόγιο
         var n = Math.max(pageCount(r), r.srvPages || 1);
         for (var i = 0; i < n; i++) {
-          var pid = pidOf(r.id, i);
+          var pid = phId(r, i);
           if (!keep[pid]) { continue; }                       // δεν είναι το τελευταίο του προμηθευτή
           var have = (i === 0) ? r.blob : (r.pages && r.pages[i - 1]);
           if (!have) { jobs.push({ rec: r, slot: i }); }
@@ -4864,8 +5008,30 @@
             if (!cur) {
               return put({ id: m.id, ts: m.ts, supplier: m.supplier, invDate: m.invDate,
                            net: m.net, vat: m.vat, total: m.total,
-                           pages: [], srvPages: m.pages || 1 })
+                           pages: [], srvPages: m.pages || 1, pgv: m.pgv || 0 })
                 .then(function () { pullInfo.added++; return step(i + 1); });
+            }
+            /* v132 · ΝΕΟΤΕΡΗ ΕΚΔΟΣΗ ΣΕΛΙΔΩΝ ΣΤΟΝ SERVER (σβήστηκε σελίδα σε άλλη
+               συσκευή): οι τοπικές φωτογραφίες είναι της ΠΑΛΙΑΣ διάταξης — φεύγουν
+               και κατεβαίνουν οι σωστές. Ισχύει και στην ενεργή: μόνο η ενεργή
+               γράφει, άρα νεότερη έκδοση στον server = δουλειά προηγούμενης
+               ενεργής που ήδη ανέβηκε. Τα στοιχεία (ποσά) ΔΕΝ αγγίζονται εδώ. */
+            if ((m.pgv || 0) > (cur.pgv || 0)) {
+              return get(m.id).then(function (fresh) {
+                if (!fresh) { return; }
+                if ((m.pgv || 0) <= (fresh.pgv || 0)) { return; }   // άλλαξε τοπικά στο μεταξύ — η νεότερη μένει
+                fresh.pgv = m.pgv;
+                fresh.blob = null;
+                fresh.pages = [];
+                fresh.crops = [];
+                fresh.srvPages = m.pages || 1;
+                if (reader && metaDiffers(fresh, m)) {
+                  fresh.supplier = m.supplier; fresh.invDate = m.invDate;
+                  fresh.net = m.net; fresh.vat = m.vat; fresh.total = m.total;
+                }
+                pcForget(m.id);
+                return put(fresh).then(function () { pullInfo.upd++; });
+              }).then(function () { return step(i + 1); });
             }
             /* 🔴 ΜΟΝΟ σε ΑΝΑΓΝΩΣΤΡΙΑ συσκευή ενημερώνονται τα στοιχεία
                υπάρχοντος τιμολογίου. Είναι ασφαλές ΑΚΡΙΒΩΣ επειδή η
@@ -4999,7 +5165,18 @@
      αντιγράφει και ανοίγει τα τιμολόγια για πάντα, από παντού.
      Ο κώδικας είναι αυτός που επαληθεύτηκε στο Η.0 (bio-test, 2/9) σε
      κινητό ΚΑΙ tablet — μαζί με τον «Τρόπο Β», που χρειάστηκε πραγματικά. */
+  /* K4 · ΜΕΤΡΗΘΗΚΕ: το WebAuthn (navigator.credentials, rpId = location.hostname) δεν
+     υπάρχει στο WKWebView του iOS και στο Android WebView θέλει opt-in + Digital Asset
+     Links για το rpId — που εδώ θα ήταν «localhost». Στο κέλυφος η ίδια πύλη γίνεται με
+     το κλείδωμα της συσκευής μέσω plugin (@capgo/capacitor-native-biometric 8.8.2, SPM,
+     δακτυλικό/πρόσωπο με fallback σε PIN). Η πύλη ΔΕΝ παράγει κλειδί — μόνο επιβεβαιώνει
+     τον κάτοχο — άρα η αντικατάσταση είναι 1:1. Τα 5 σημεία που τη ζητούν δεν αλλάζουν. */
   function lockAvailable() {
+    if (KM_NATIVE) {
+      var NB = KM_PLUG.NativeBiometric;
+      if (!NB) { return Promise.resolve(false); }
+      return NB.isAvailable({ useFallback: true }).then(function (r) { return !!(r && r.isAvailable); }).catch(function () { return false; });
+    }
     if (!window.PublicKeyCredential || !window.isSecureContext) { return Promise.resolve(false); }
     return PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
       .then(function (ok) { return !!ok; })
@@ -5039,6 +5216,9 @@
   }
   /* Επιστρέφει Promise<true> μόνο αν ο κάτοχος επιβεβαιώθηκε τώρα. */
   function lockVerify() {
+    if (KM_NATIVE) {
+      return KM_PLUG.NativeBiometric.verifyIdentity({ reason: 'Επιβεβαίωσε ότι είσαι εσύ', title: 'Kostometro', useFallback: true, maxAttempts: 3 }).then(function () { return true; });
+    }
     var id = localStorage.getItem(LS.lockCred);
     if (!id) { return lockEnroll(); }
     var allow;
@@ -5134,6 +5314,7 @@
      κινητού (κρυμμένη γραμμή διευθύνσεων), και η προτροπή δεν θα
      εμφανιζόταν ποτέ σε εκείνες τις συσκευές. */
   function instStandalone() {
+    if (KM_NATIVE) { return true; }   /* K4: μέσα στο κέλυφος η εφαρμογή είναι ήδη εγκατεστημένη */
     if (navigator.standalone === true) { return true; }
     try { return window.matchMedia('(display-mode: standalone)').matches; } catch (e) { return false; }
   }
@@ -5153,6 +5334,7 @@
   }
   /* v120 · (2) browser ΜΕΣΑ σε εφαρμογή — επιστρέφει το όνομα ή '' */
   function iabName() {
+    if (KM_NATIVE) { return ''; }   /* K4: το κέλυφος δεν είναι in-app browser τρίτου */
     var ua = navigator.userAgent || '';
     if (/Instagram/.test(ua)) { return 'Instagram'; }
     if (/FB_IAB\/MESSENGER|MessengerForiOS|Messenger/.test(ua)) { return 'Messenger'; }
@@ -5296,6 +5478,8 @@
     var newSrc = refCaptureSrc(location.search, !!localStorage.getItem(LS.reg),
                                localStorage.getItem(LS.src));
     if (newSrc !== null) { localStorage.setItem(LS.src, newSrc); }
+    /* K4: πρώτο άνοιγμα από κατάστημα, χωρίς σύνδεσμο → store:android / store:ios (χωνί + Πίνακας) */
+    if (KM_NATIVE && (localStorage.getItem(LS.src) || 'direct') === 'direct' && !localStorage.getItem(LS.reg)) { localStorage.setItem(LS.src, 'store:' + KM_PLAT); }
     manifestFollow();
     /* v65 — το άνοιγμα μετριέται ΑΝΕΞΑΡΤΗΤΑ από το αν θα γίνει εγγραφή.
        Μπαίνει ΕΞΩ από το «if (!LS.src)» πιο πάνω: εκείνο τρέχει μόνο στην
@@ -5613,11 +5797,63 @@
       if (refIn && ck && ck.checked) { localStorage.setItem(LS.refShare, '1'); }
       else { localStorage.removeItem(LS.refShare); }
       funnel('oauth_' + p);   // v97 · KM-FUNNEL — πάτημα Google / Microsoft
-      location.assign(KM_API + 'auth/' + p + '/start');
+      oauthNav(p, false);   /* K4 */
     }).catch(function () { emailMsg(CODE_TEXT.offline); });
   }
   if (el('go-google'))    { el('go-google').onclick    = function () { oauthGo('google'); }; }
   if (el('go-microsoft')) { el('go-microsoft').onclick = function () { oauthGo('microsoft'); }; }
+  if (el('go-apple'))     { el('go-apple').onclick     = function () { oauthGo('apple'); }; }       /* K4β · Apple 4.8 */
+  /* ══ K4 · ΕΙΣΟΔΟΣ ΜΕΣΑ ΑΠΟ ΤΟ ΚΕΛΥΦΟΣ (14/10/2026) ═══════════════════════
+     Browser: location.assign στο /start, όπως σήμερα — ΤΙΠΟΤΑ δεν αλλάζει.
+     Κέλυφος (RFC 8252): η Google μπλοκάρει την είσοδο μέσα σε WebView, άρα ο
+     πάροχος ανοίγει στον browser του συστήματος (Custom Tab / SFSafariViewController).
+     Η εφαρμογή κρατά μυστικό v, στέλνει μόνο ac = SHA-256(v)· ο server γυρίζει
+     tech.fastwrite.kostometro://oauth?h=… (κωδικός μιας χρήσης, 2′)· η εφαρμογή
+     εξαργυρώνει {h, v} και παίρνει ΑΚΡΙΒΩΣ τα πεδία του #km_oauth=…. Τα γράφει
+     στο hash και ξαναφορτώνει — ώστε η συνέχεια (boot → oauthTake) να είναι
+     byte-προς-byte ο σημερινός κώδικας του browser. Χωρίς δεύτερη διαδρομή. */
+  function oauthNav(p, own) {
+    var q = own ? '?purpose=own' : '';
+    if (!KM_NATIVE) { location.assign(KM_API + 'auth/' + p + '/start' + q); return; }
+    if (!KM_PLUG.Browser) { emailMsg(OAUTH_TEXT.unavailable); return; }
+    var v = qrB64(crypto.getRandomValues(new Uint8Array(32)));
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)).then(function (d) {
+      localStorage.setItem(LS.appV, v);
+      var url = KM_API + 'auth/' + p + '/start' + (q ? q + '&' : '?') + 'app=1&ac=' + qrB64(d);
+      return KM_PLUG.Browser.open({ url: url, presentationStyle: 'popover' });
+    }).catch(function () { emailMsg(OAUTH_TEXT.unavailable); });
+  }
+  function oauthAppReturn(url) {
+    /* K4γ · App Link / Universal Link (QR μεταφοράς, σύσταση): η ίδια σελίδα ξαναφορτώνει με το
+       query + hash του συνδέσμου — ο σημερινός boot (refCaptureSrc, km_qr) τα διαβάζει όπως στον browser. */
+    if (url && url.indexOf(KM_WEB + '/kostometro/') === 0) {
+      var lu; try { lu = new URL(url); } catch (e) { return; }
+      if (lu.search) { location.replace('/kostometro/' + lu.search + lu.hash); }   /* άλλο query = πλήρης φόρτωση */
+      else if (lu.hash) { location.replace('/kostometro/' + lu.hash); location.reload(); }   /* μόνο hash = θέλει reload */
+      return;
+    }
+    if (!url || url.indexOf('tech.fastwrite.kostometro://oauth') !== 0) { return; }
+    var u; try { u = new URL(url); } catch (e) { return; }
+    if (KM_PLUG.Browser && KM_PLUG.Browser.close) { KM_PLUG.Browser.close().catch(function () {}); }
+    var err = u.searchParams.get('err'), h = u.searchParams.get('h');
+    var v = localStorage.getItem(LS.appV);
+    localStorage.removeItem(LS.appV);
+    var done = function (frag) { location.replace(location.pathname + '#' + frag); location.reload(); };
+    if (err || !h || !v) { return done('km_oauth=err&code=' + encodeURIComponent(err || 'state')); }
+    fetch(KM_API + 'auth/app/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ h: h, v: v }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.km_oauth) { return done('km_oauth=err&code=provider'); }
+        var ps = new URLSearchParams();
+        Object.keys(j).forEach(function (k) { if (k !== 'ok') { ps.set(k, String(j[k])); } });
+        done(ps.toString());
+      })
+      .catch(function () { done('km_oauth=err&code=provider'); });
+  }
+  if (KM_NATIVE && KM_PLUG.App && KM_PLUG.App.addListener) {
+    KM_PLUG.App.addListener('appUrlOpen', function (ev) { oauthAppReturn(ev && ev.url); });
+    if (KM_PLUG.App.getLaunchUrl) { KM_PLUG.App.getLaunchUrl().then(function (r) { oauthAppReturn(r && r.url); }).catch(function () {}); }
+  }
   /* Διαβάζει ΚΑΙ ΣΒΗΝΕΙ το #km_oauth=… — το token δεν μένει ούτε στη γραμμή
      διευθύνσεων ούτε στο ιστορικό. */
   function oauthTake() {
@@ -5635,7 +5871,7 @@
   }
   var OAUTH_TEXT = {
     verify: 'Ο λογαριασμός σου δεν επιβεβαίωσε το email. Πάτα «Συνέχεια» — θα σου στείλουμε κωδικό 6 ψηφίων.',
-    unavailable: 'Η σύνδεση με Google / Microsoft δεν είναι διαθέσιμη αυτή τη στιγμή — συνέχισε με email.',
+    unavailable: 'Η σύνδεση με Google / Microsoft / Apple δεν είναι διαθέσιμη αυτή τη στιγμή — συνέχισε με email.',
     provider: 'Η σύνδεση δεν ολοκληρώθηκε — δοκίμασε ξανά ή συνέχισε με email.',
     state: 'Η σύνδεση έληξε ή άνοιξε σε άλλο παράθυρο — δοκίμασε ξανά.',
     no_email: 'Ο λογαριασμός δεν μας έδωσε email — συνέχισε με email.',
@@ -6017,6 +6253,7 @@
     el('own-code').value = '';
     if (el('go-google'))    { el('own-google').innerHTML = el('go-google').innerHTML; }
     if (el('go-microsoft')) { el('own-microsoft').innerHTML = el('go-microsoft').innerHTML; }
+    if (el('go-apple') && el('own-apple')) { el('own-apple').innerHTML = el('go-apple').innerHTML; }   /* K4β */
     show('s-own');
   }
   el('st-rotate').onclick = rotateStart;
@@ -6028,10 +6265,11 @@
   };
   function ownOauth(p) {
     localStorage.setItem(LS.ownPend, '1');
-    location.assign(KM_API + 'auth/' + p + '/start?purpose=own');
+    oauthNav(p, true);   /* K4 */
   }
   el('own-google').onclick    = function () { ownOauth('google'); };
   el('own-microsoft').onclick = function () { ownOauth('microsoft'); };
+  if (el('own-apple')) { el('own-apple').onclick = function () { ownOauth('apple'); }; }   /* K4β */
   el('own-send').onclick = function () {
     var b = el('own-send');
     b.disabled = true; ownErr('');
@@ -6912,6 +7150,21 @@
   try { agReopenFromUrl(0); } catch (e) {}
 
   checkVersion(false);   // v30 — πρώτο πράγμα σε κάθε φόρτωση
+  /* K4 · Στο κέλυφος, κάθε σύνδεσμος που δεν είναι μέσα στο πακέτο (Πολιτική, Όροι,
+     οδηγός κλειδιού, χρέωση Google) ανοίγει στον browser του συστήματος — το WebView
+     θα έβρισκε 404 στο https://localhost/legal/privacy. Μία πύλη για όλους. */
+  if (KM_NATIVE) {
+    document.addEventListener('click', function (ev) {
+      var a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
+      if (!a) { return; }
+      var href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#' || /^(mailto|tel):/.test(href)) { return; }
+      var abs = /^https?:\/\//.test(href) ? href : (href.charAt(0) === '/' ? KM_WEB + href : '');
+      if (!abs) { return; }
+      ev.preventDefault();
+      if (KM_PLUG.Browser) { KM_PLUG.Browser.open({ url: abs }).catch(function () {}); }
+    }, true);
+  }
   openDB().then(boot).then(function () { schedule(800); maybeInstall(); }).catch(function (e) {
     document.body.innerHTML = '<div style="padding:40px;color:#e6e8ec">Δεν άνοιξε η τοπική βάση: ' + e + '</div>';
   });
@@ -6930,6 +7183,7 @@
   var srvVer = null, srvNote = '';
   function shortVer(v) { var m = /v\d+/.exec(v || ''); return m ? m[0] : (v || '—'); }
   function serverVersion() {
+    if (KM_NATIVE) { return Promise.resolve(null); }   /* K4: η έκδοση είναι αυτή του πακέτου, ενημέρωση από το κατάστημα */
     return fetch('/kostometro/version.json?nc=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
@@ -7005,7 +7259,7 @@
     });
   }
 
-  if ('serviceWorker' in navigator) {
+  if (!KM_NATIVE && 'serviceWorker' in navigator) {   /* K4: κανένας worker στο κέλυφος — τα αρχεία είναι μέσα στο πακέτο */
     /* v28 — ΓΙΑΤΙ ΔΕΝ ΑΡΚΕΙ ΤΟ register(). Το register ελέγχει για νέα έκδοση
        μόνο πάνω σε ΠΛΟΗΓΗΣΗ. Ένα εγκατεστημένο PWA που ξυπνάει από το
        παρασκήνιο δεν κάνει πλοήγηση — άρα δεν ελέγχει ποτέ, και μένει στην

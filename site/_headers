@@ -29,3 +29,13 @@
 
 /kostometrisi/*
   Cache-Control: no-store
+
+# ── v132 · App Links (Android) + Universal Links (iOS) για την εφαρμογή καταστημάτων ──
+# Το AASA δεν έχει κατάληξη: χωρίς ρητό Content-Type η Apple δεν το δέχεται.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600
+
+/.well-known/assetlinks.json
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600

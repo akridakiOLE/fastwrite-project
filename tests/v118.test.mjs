@@ -185,7 +185,8 @@ await check("R-11 · εφαρμογή: s-own · «Πάρε πίσω» στη σ�
   const ra = js.slice(js.indexOf("function rotateAccepted()"), js.indexOf("v29 · Ο ΦΡΟΥΡΟΣ ΤΗΣ ΑΛΛΑΓΗΣ ΛΕΞΕΩΝ"));
   ok(ra.includes("kmFetch('words/reclaim'") && ra.includes("email_token: ownTok"), "reclaim + email_token");
   ok(!ra.includes("kmFetch('lock'"), "όχι πια /lock");
-  ok(js.includes("location.assign(KM_API + 'auth/' + p + '/start?purpose=own');"), "Google/MS με purpose=own");
+  /* v132 · K4: oauthNav(p, true) → στον browser location.assign(… '/start' + '?purpose=own') */
+  ok(js.includes("oauthNav(p, true)") && js.includes("var q = own ? '?purpose=own' : '';") && js.includes("    if (!KM_NATIVE) { location.assign(KM_API + 'auth/' + p + '/start' + q); return; }"), "Google/MS με purpose=own");
 });
 
 console.log(failed ? "\n✘ " + failed + " ΑΠΕΤΥΧΑΝ" : "\n✔ ΟΛΑ ΠΕΡΑΣΑΝ");

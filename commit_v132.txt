@@ -1,0 +1,18 @@
+v132 · KM-PGV: «Διαγραφή σελίδας» χωρίς φαντάσματα στον server + K4 (αδρανές στον browser) + App/Universal Links
+
+- Έκδοση σελίδων r.pgv (Math.max(Date.now(), pgv+1)): μετά από διαγραφή σελίδας οι φωτογραφίες
+  ανεβαίνουν με νέα ids <id>_vN / <id>-pK_vN· χωρίς pgv τα ids μένουν ίδια (κανένα ξανανέβασμα).
+- syncNow: φωτογραφίες ΠΡΙΝ από τα στοιχεία· στοιχεία μόνο χωρίς προσωρινό σφάλμα· 400/413 =
+  παράκαμψη φωτογραφίας· αποτυχημένη λίστα σταματά τον γύρο· οι παλιές εκδόσεις σβήνονται ΜΟΝΟ
+  όταν η νέα είναι ολόκληρη στον server (νέα λίστα). flushToInbox: φωτογραφίες πρώτα.
+- Κατέβασμα: νεότερη έκδοση στον server αντικαθιστά τις τοπικές σελίδες (ποτέ παλιότερη)·
+  ξανά-έλεγχος στη φρέσκια εγγραφή· κάδος και fetchPhoto σέβονται την έκδοση· περικοπές ακολουθούν.
+- pidSplit: ids «<ψηφία>-<έως 6 base36>» — τυχαίο «-p12345»/«-v12345» δεν διαβάζεται ως σελίδα/έκδοση.
+- K4 (app_k4.diff από kostometro-app\docs): KM_NATIVE/KM_ORIGIN/KM_WEB, oauthNav — στον browser ίδια
+  συμπεριφορά. Τα κουμπιά Apple (index_k4.diff) ΔΕΝ μπήκαν: μπαίνουν με το K3α.
+- site/.well-known/apple-app-site-association + assetlinks.json (upload cert #2) + _headers JSON.
+- Τεστ: v132.test.mjs (11 έλεγχοι, 25 μεταλλάξεις) · v132_pages.spec.js (άκρη-σε-άκρη, κόκκινο στη v131)
+  · ref_ui / v89 / v98 / v118 ενημερωμένα για το K4. Τρεις γύροι ανεξάρτητης αναθεώρησης.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FLM6BgMagLNdSrzRQyL7ff
