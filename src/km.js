@@ -7,6 +7,7 @@
 // KM-SERVER-V100-AGENT  ← σημάδι: θέμα email πελάτη ουδέτερο + καθάρισμα μοναχικού χαρακτήρα (30/9/2026)
 // KM-SERVER-V99-AGENT  ← σημάδι: Βοηθός Kostometro, Φάση 1 (29/9/2026)
 // KM-SERVER-V98-OAUTH  ← σημάδι: σύνδεση Google/Microsoft (29/9/2026)
+// KM-SERVER-K3A-APPLE  ← σημάδι: Sign in with Apple, τρίτος πάροχος (14/10/2026)
 // KM-SERVER-V84-VERIFY ← Brief ΣΤ (24/9/2026): ένα email = ένας λογαριασμός · κωδικός 6 ψηφίων
 // Kostometro — μητρώο + σφραγισμένος φάκελος (Brief Α, Α350 §9.8 Η.1)
 // ---------------------------------------------------------------------------
@@ -126,8 +127,11 @@ export async function handleKm(request, env, ctx, path) {
   // KM-OAUTH (29/9/2026) — Σύνδεση με Google / Microsoft
   // K3 (13/10/2026) · εφαρμογή καταστήματος: εξαργύρωση του κωδικού επιστροφής
   if (path === "/api/km/auth/app/redeem" && method === "POST") return oauthAppRedeem(request, env);
-  { const m = /^\/api\/km\/auth\/(google|microsoft)\/(start|callback)$/.exec(path);
-    if (m && method === "GET") return m[2] === "start" ? oauthStart(request, env, m[1]) : oauthCallback(request, env, m[1]); }
+  // K3α (14/10/2026) · Sign in with Apple = τρίτος πάροχος στην ίδια ροή. Η Apple
+  // γυρίζει το callback με POST (response_mode=form_post), οι άλλοι δύο με GET.
+  { const m = /^\/api\/km\/auth\/(google|microsoft|apple)\/(start|callback)$/.exec(path);
+    if (m && m[2] === "start" && method === "GET") return oauthStart(request, env, m[1]);
+    if (m && m[2] === "callback" && (method === "GET" || (method === "POST" && m[1] === "apple"))) return oauthCallback(request, env, m[1]); }
   if (path === "/api/km/ref/check" && method === "GET") return refCheck(request, env);
   if (path === "/api/km/manifest" && method === "GET") return manifestFor(request);
   if (path === "/api/km/status" && method === "GET") return status(request, env);
@@ -594,7 +598,7 @@ export async function kmSupportAutoClose(env, nowIso) {
 // ═══ v97 · KM-FUNNEL — ΧΩΝΙ ΕΓΓΡΑΦΗΣ (27/9/2026) ═══
 // Η εφαρμογή λέει «έφτασα στο βήμα Χ» ΜΙΑ φορά ανά βήμα, μόνο πριν ολοκληρωθεί η εγγραφή.
 // Ο server κρατάει ΜΟΝΟ: συσκευή (hash), βήμα, προέλευση, ώρα. Όχι email, όχι IP.
-const FUNNEL_STEPS = { open: 1, email: 1, code: 1, account: 1, key: 1, key_skip: 1, oauth_google: 1, oauth_microsoft: 1, login: 1 };  // KM-OAUTH: +2 · v116 KM-PK-V116: login = είσοδος με 12 λέξεις σε υπάρχοντα (ΟΧΙ νέος λογαριασμός)
+const FUNNEL_STEPS = { open: 1, email: 1, code: 1, account: 1, key: 1, key_skip: 1, oauth_google: 1, oauth_microsoft: 1, oauth_apple: 1, login: 1 };  // KM-OAUTH: +2 · K3α: +oauth_apple · v116 KM-PK-V116: login = είσοδος με 12 λέξεις σε υπάρχοντα (ΟΧΙ νέος λογαριασμός)
 function funnelSrc(v) {
   let s = String(v || "direct").toLowerCase();
   if (/^ref:/.test(s)) s = "ref";
@@ -1116,7 +1120,44 @@ const OAUTH = {
     // κατάλογος δηλώνει επιβεβαιωμένο domain (xms_edov). Αλλιώς → κωδικός 6 ψηφίων.
     verified: (c) => c.tid === MS_CONSUMER_TID || c.xms_edov === true || c.xms_edov === "true" || c.xms_edov === 1,
   },
+  // K3α · Sign in with Apple (14/10/2026) — κανόνας App Store 4.8. Ίδια ροή
+  // (Authorization Code, state, nonce, JWKS RS256), με τρεις διαφορές της Apple:
+  //  (α) το client_secret ΔΕΝ είναι σταθερό: είναι JWT ES256 που υπογράφεται με
+  //      το ιδιωτικό κλειδί .p8 (APPLE_PRIVATE_KEY) — φτιάχνεται σε κάθε κλήση
+  //  (β) με scope το callback έρχεται με POST (form_post) από appleid.apple.com,
+  //      άρα το cookie state θέλει SameSite=None (το Lax δεν ταξιδεύει σε
+  //      cross-site POST)
+  //  (γ) χωρίς PKCE (η Apple δεν το υποστηρίζει) · χωρίς prompt
+  // Το email είναι είτε το πραγματικό είτε relay @privaterelay.appleid.com —
+  // και τα δύο επιβεβαιωμένα από την Apple (email_verified).
+  apple: {
+    auth: "https://appleid.apple.com/auth/authorize",
+    token: "https://appleid.apple.com/auth/token",
+    jwks: "https://appleid.apple.com/auth/keys",
+    idVar: "APPLE_CLIENT_ID", secVar: "APPLE_PRIVATE_KEY",   // Services ID · κλειδί .p8 (PEM)
+    // ΜΟΝΟ "email" (όχι "name"): παίρνουμε μόνο ό,τι κρατάμε — Πολιτική «Κρατάμε μόνο το email».
+    formPost: true, pkce: false, scope: "email",
+    issOk: (c) => c.iss === "https://appleid.apple.com",
+    verified: (c) => c.email_verified === true || c.email_verified === "true",
+  },
 };
+// K3α · client_secret της Apple: JWT ES256, iss=Team ID, sub=Services ID,
+// aud=appleid.apple.com, ζωή 10 λεπτά (η Apple δέχεται έως 6 μήνες — όσο
+// μικρότερη, τόσο λιγότερο αξίζει αν διαρρεύσει). Το κλειδί .p8 μένει ΜΟΝΟ
+// ως Worker secret. Λείπει κάτι → null → «unavailable», όπως χωρίς client secret.
+async function appleClientSecret(env) {
+  const team = String(env.APPLE_TEAM_ID || ""), kid = String(env.APPLE_KEY_ID || "");
+  const cid = String(env.APPLE_CLIENT_ID || ""), pem = String(env.APPLE_PRIVATE_KEY || "");
+  if (!/^[A-Z0-9]{10}$/.test(team) || !/^[A-Z0-9]{10}$/.test(kid) || !cid || !pem) return null;
+  const der = b64urlDecode(pem.replace(/-----[^-]+-----/g, "").replace(/[\s]/g, "").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
+  const key = await crypto.subtle.importKey("pkcs8", der, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const now = Math.floor(Date.now() / 1000);
+  const enc = (o) => b64url(new TextEncoder().encode(JSON.stringify(o)));
+  const head = enc({ alg: "ES256", kid, typ: "JWT" });
+  const body = enc({ iss: team, iat: now, exp: now + 600, aud: "https://appleid.apple.com", sub: cid });
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(head + "." + body));
+  return head + "." + body + "." + b64url(new Uint8Array(sig));   // WebCrypto ECDSA = raw r||s, ακριβώς ό,τι θέλει το JWS
+}
 const oauthJwks = {};   // cache ανά isolate: { url: { at, keys } }
 
 function b64url(bytes) {
@@ -1207,7 +1248,7 @@ async function oauthStart(request, env, prov) {
   const sp = new URL(request.url).searchParams;
   const appCh = sp.get("app") === "1" ? String(sp.get("ac") || "") : "";
   if (sp.get("app") === "1" && !B64URL43.test(appCh)) return appErr("bad_request");
-  const cid = env[P.idVar], sec = env[P.secVar];
+  const cid = env[P.idVar], sec = prov === "apple" ? (await appleClientSecret(env).catch(() => null)) : env[P.secVar];
   if (!cid || !sec) return appCh ? appErr("unavailable") : oauthBack(env, oauthFrag("err", { code: "unavailable" }));
   const t = Date.now();
   await env.DB.prepare("DELETE FROM km_oauth_states WHERE created < ?").bind(new Date(t - 3600 * 1000).toISOString()).run();
@@ -1224,13 +1265,18 @@ async function oauthStart(request, env, prov) {
   await env.DB.prepare("INSERT INTO km_oauth_states (state_hash, provider, verifier, nonce, ip_h, created, app_ch) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .bind(await sha256hex(state), own ? prov + ":own" : prov, verifier, nonce, ipH, new Date(t).toISOString(), appCh || null).run();
   const q = new URLSearchParams({
-    client_id: cid, response_type: "code", scope: "openid email profile",
+    client_id: cid, response_type: "code", scope: P.scope || "openid email profile",
     redirect_uri: oauthOrigin(env) + "/api/km/auth/" + prov + "/callback",
-    state, nonce, code_challenge: challenge, code_challenge_method: "S256", prompt: "select_account",
+    state, nonce,
   });
+  // K3α: PKCE και prompt=select_account μόνο όπου υποστηρίζονται (Google/Microsoft).
+  if (P.pkce !== false) { q.set("code_challenge", challenge); q.set("code_challenge_method", "S256"); q.set("prompt", "select_account"); }
+  if (P.formPost) q.set("response_mode", "form_post");   // Apple: υποχρεωτικό όταν ζητείται scope
+  // K3α: Apple = cross-site POST στο callback → SameSite=None (αλλιώς το cookie δεν φτάνει).
+  const sameSite = P.formPost ? "None" : "Lax";
   return new Response(null, { status: 302, headers: {
     Location: P.auth + "?" + q.toString(), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
-    "Set-Cookie": "km_oauth=" + state + "; Path=/api/km/auth/; HttpOnly; Secure; SameSite=Lax; Max-Age=" + OAUTH_TTL_MS / 1000,
+    "Set-Cookie": "km_oauth=" + state + "; Path=/api/km/auth/; HttpOnly; Secure; SameSite=" + sameSite + "; Max-Age=" + OAUTH_TTL_MS / 1000,
   } });
 }
 
@@ -1269,8 +1315,12 @@ export async function oauthVerifyIdToken(idToken, P, clientId, nonce) {
 async function oauthCallback(request, env, prov) {
   const P = OAUTH[prov];
   const u = new URL(request.url);
-  const code = u.searchParams.get("code") || "";
-  const state = u.searchParams.get("state") || "";
+  // K3α: η Apple στέλνει code/state/error με POST (form_post)· οι άλλοι με GET.
+  // Όριο σώματος 16 KB (η Apple στέλνει ~2 KB: code, state, id_token, user).
+  if (request.method === "POST" && Number(request.headers.get("content-length") || 0) > 16384) return oauthBack(env, oauthFrag("err", { code: "state" }), true);
+  const sp = request.method === "POST" ? new URLSearchParams((await request.text().catch(() => "")).slice(0, 16384)) : u.searchParams;
+  const code = sp.get("code") || "";
+  const state = sp.get("state") || "";
   // K3: η γραμμή state διαβάζεται ΠΡΩΤΑ (αν το state είναι έγκυρο και ταιριάζει
   // με το cookie), ώστε και η ακύρωση στη Google να γυρίζει στην εφαρμογή.
   // Μία χρήση: η γραμμή σβήνεται ΤΗ ΣΤΙΓΜΗ που διαβάζεται — όπως πριν.
@@ -1279,7 +1329,7 @@ async function oauthCallback(request, env, prov) {
     .bind(await sha256hex(state)).first() : null;
   const appCh = row && row.app_ch ? String(row.app_ch) : "";
   const back = (frag) => appCh ? appBack(env, appCh, frag) : oauthBack(env, frag, true);
-  if (u.searchParams.get("error")) return back(oauthFrag("err", { code: "cancelled" }));
+  if (sp.get("error")) return back(oauthFrag("err", { code: "cancelled" }));   // Apple: user_cancelled_authorize
   if (!code || !stateOk) return back(oauthFrag("err", { code: "state" }));
   const own = !!row && row.provider === prov + ":own";   // v118 · KM-OWN-PROOF
   if (!row || (row.provider !== prov && !own) || Date.parse(row.created) < Date.now() - OAUTH_TTL_MS) {
@@ -1287,9 +1337,14 @@ async function oauthCallback(request, env, prov) {
   }
   let claims;
   try {
+    // K3α: το client_secret της Apple είναι υπογεγραμμένο JWT, όχι σταθερό μυστικό.
+    const secret = prov === "apple" ? await appleClientSecret(env) : env[P.secVar];
+    if (!secret) throw new Error("no_secret");
+    const form = { client_id: env[P.idVar], client_secret: secret, code,
+      grant_type: "authorization_code", redirect_uri: oauthOrigin(env) + "/api/km/auth/" + prov + "/callback" };
+    if (P.pkce !== false) form.code_verifier = row.verifier;
     const r = await fetch(P.token, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: env[P.idVar], client_secret: env[P.secVar], code, code_verifier: row.verifier,
-        grant_type: "authorization_code", redirect_uri: oauthOrigin(env) + "/api/km/auth/" + prov + "/callback" }).toString() });
+      body: new URLSearchParams(form).toString() });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.id_token) throw new Error("token_" + r.status + "_" + (j && j.error));
     claims = await oauthVerifyIdToken(j.id_token, P, env[P.idVar], row.nonce);
@@ -1628,7 +1683,7 @@ async function agentChat(request, env) {
     " · ραντεβού: " + (fup ? "κλεισμένο για " + fup.due_at.slice(0, 10) : "κανένα") +
     // v107 · has_key = έβαλε ποτέ κλειδί (MAX)· δωρεάν ή πληρωμένο δεν το ξέρουμε — το ρωτάει ο Κώστας.
     " · κλειδί Gemini (από τον λογαριασμό): " + (hasKey === null ? "άγνωστο" : hasKey ? "έχει βάλει — δωρεάν ή πληρωμένο: άγνωστο" : "κανένα, γράφει μόνος τα ποσά") +
-    ". Βήματα: open=άνοιξε · email=ζήτησε κωδικό · oauth_google/oauth_microsoft=πάτησε σύνδεση · code=email επιβεβαιώθηκε · account=λογαριασμός · key=έβαλε κλειδί Gemini · key_skip=το παρέλειψε.";
+    ". Βήματα: open=άνοιξε · email=ζήτησε κωδικό · oauth_google/oauth_microsoft/oauth_apple=πάτησε σύνδεση · code=email επιβεβαιώθηκε · account=λογαριασμός · key=έβαλε κλειδί Gemini · key_skip=το παρέλειψε.";
   const know = await agentKnowledge(env);
   const system = [
     { type: "text", text: AGENT_RULES + "\n\n# ΓΝΩΣΗ\n" + (know || "(η γνώση δεν φορτώθηκε — για κάθε ερώτηση πρότεινε άνθρωπο)"), cache_control: { type: "ephemeral" } },

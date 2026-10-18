@@ -47,6 +47,12 @@ run_worker_first = ["/api/*"]
 [vars]
 GOOGLE_CLIENT_ID = "258878753859-cbltmevo6kfg3d77plktomi0u3af2i5a.apps.googleusercontent.com"
 MS_CLIENT_ID = "c7f5b154-1fe6-476b-9c4c-8378bf0bfaa1"
+# K3α (17/10/2026) · Sign in with Apple — ΔΗΜΟΣΙΑ αναγνωριστικά (Services ID, Team ID, Key ID).
+# Το ιδιωτικό κλειδί APPLE_PRIVATE_KEY (.p8) ΠΟΤΕ εδώ: wrangler secret put από το deploy_k3a.bat,
+# διαβάζοντας το C:\Users\User\kostometro-app\secrets\AuthKey_N8QC6LYTLC.p8.
+APPLE_CLIENT_ID = "tech.fastwrite.kostometro.web"
+APPLE_TEAM_ID = "5FM8N85F5U"
+APPLE_KEY_ID = "N8QC6LYTLC"
 
 [[d1_databases]]
 binding = "DB"

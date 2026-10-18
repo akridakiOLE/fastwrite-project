@@ -50,7 +50,7 @@ check("Π-3 · 🔴 οι χρόνοι τήρησης της σελίδας = ο�
 });
 check("Π-4 · 🔴 λέει την αλήθεια για: προώθηση στο προσωπικό Gmail · σύνδεση Google/MS κρατά μόνο email · κανένα IP · χωνί ως αποτύπωμα", () => {
   ok(html.includes("προσωπικό γραμματοκιβώτιο Gmail"), "προώθηση Gmail");
-  ok(html.includes("Κρατάμε μόνο το email") && /scope: "openid email profile"/.test(src), "σύνδεση: τι ζητάμε/κρατάμε");
+  ok(html.includes("Κρατάμε μόνο το email") && /scope: (P\.scope \|\| )?"openid email profile"/.test(src) && /scope: "email",/.test(src), "σύνδεση: τι ζητάμε/κρατάμε");
   ok(/<strong>Δεν<\/strong> κρατάμε διεύθυνση IP/.test(html), "IP");
   ok(/μη αναστρέψιμο αποτύπωμα, χωρίς email/.test(html) && /sha256hex\(inst \+ ":" \+ \(env\.KM_ADMIN_KEY/.test(src), "χωνί");
 });

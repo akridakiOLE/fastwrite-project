@@ -1,0 +1,14 @@
+K3α: Sign in with Apple στον server (τρίτος πάροχος) · κουμπιά ΟΧΙ ακόμα (μπαίνουν με την Πολιτική v2.6)
+
+- OAUTH.apple: authorize/token/keys της Apple · response_mode=form_post · scope ΜΟΝΟ "email"
+  (κρατάμε μόνο το email) · χωρίς PKCE/prompt · iss/aud/nonce/email_verified ("true" ή true).
+- client_secret = JWT ES256 (iss Team ID, sub Services ID, aud appleid.apple.com, ζωή 10′),
+  υπογραφή σε κάθε κλήση με το .p8 (Worker secret APPLE_PRIVATE_KEY· ποτέ στο git).
+- Callback Apple με POST (μόνο για Apple)· cookie state SameSite=None μόνο για Apple· όριο σώματος 16 KB.
+- wrangler.toml [vars]: APPLE_CLIENT_ID tech.fastwrite.kostometro.web · APPLE_TEAM_ID 5FM8N85F5U · APPLE_KEY_ID N8QC6LYTLC (δημόσια).
+- Χωρίς .p8 → «unavailable», όπως πριν. Google/Microsoft αμετάβλητα (F1–F5).
+- tests/k3a.test.mjs 35/35 + 9 μεταλλάξεις · legal_v21 Π-4 δέχεται το P.scope και ελέγχει scope "email".
+- Ανεξάρτητη αναθεώρηση: 0 HIGH. Ανοιχτό πριν το App Store: ανάκληση token Apple στη διαγραφή λογαριασμού.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FLM6BgMagLNdSrzRQyL7ff
