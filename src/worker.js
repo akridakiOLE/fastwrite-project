@@ -69,6 +69,17 @@ export default {
       (r) => console.log("km agent-followups:", JSON.stringify(r)),
       (e) => console.error("km agent-followups failed:", e)
     ));
+    // KM-PRO-V201 · κρατήσεις υπολοίπου που έμειναν ανοιχτές >15′ (κομμένο Worker / σφάλμα βάσης) → ΕΠΙΣΤΡΟΦΗ
+    ctx.waitUntil(import("./km_bal.js").then((m) => m.balHoldSweep(env)).then(
+      (r) => console.log("km bal hold-sweep:", JSON.stringify(r)),
+      (e) => console.error("km bal hold-sweep failed:", e)
+    ));
+    // KM-PRO-V201 · Π2 · ακυρωμένες αγορές Google Play (επιστροφή χρημάτων) → αφαιρούνται από το υπόλοιπο.
+    // Χωρίς λογαριασμό υπηρεσίας (GOOGLE_PLAY_SA) δεν κάνει τίποτα. Η Apple ειδοποιεί μόνη της (/api/km/bal/apple/notify).
+    ctx.waitUntil(import("./km_iap.js").then((m) => m.googleVoidedSweep(env)).then(
+      (r) => console.log("km iap google-voided:", JSON.stringify(r)),
+      (e) => console.error("km iap google-voided failed:", e)
+    ));
   },
 
   async fetch(request, env, ctx) {

@@ -41,7 +41,7 @@ let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log("  ✔ " + m); } else { fail++; console.log("  ✘ " + m); } };
 const body = (name) => { const i = js.indexOf("  function " + name + "("); return js.slice(i, js.indexOf("\n  }\n", i) + 4); };
 
-ok(/APP_VER = 'φέτα 3 · v1(2[4-9]|[3-9]\d)'/.test(js), "έκδοση v124 ή νεότερη");
+ok(/APP_VER = 'φέτα 3 · v(?:1(?:2[4-9]|[3-9]\d)|[2-9]\d\d)'/.test(js)   /* V201: και ο κλάδος pro (v2xx) */, "έκδοση v124 ή νεότερη");
 ok(js.includes("KM-V124-ORDER") && html.includes("KM-V124-ORDER") && css.includes("KM-V124-ORDER"), "ο δείκτης v124 σε js/html/css");
 
 // ΣΥΜΠΕΡΙΦΟΡΑ: προσομοίωση του boot για νέο χρήστη σε 6 περιβάλλοντα

@@ -15,7 +15,7 @@ const MUT = [
   // 3 · δεν φεύγει ποτέ μόνο του
   ["js", "      setTimeout(hide, UPD_MS);", ""],
   // 4 · δεν δένεται στην κάμερα
-  ["js", "    if (id === 's-cam')   { updToast(); }\n", ""],
+  ["js", "    if (id === 's-cam')   { updToast(); giftShow(); kwRender(); }\n", ""],
   // 5 · 🔴 το σημάδι πρώτης εγκατάστασης φεύγει → ο νέος χρήστης το βλέπει στην πρώτη φωτογραφία
   ["js", "      localStorage.setItem(LS.seenVer, shortVer(APP_VER));\n    }\n  } catch (e) {}", "    }\n  } catch (e) {}"],
   // 6 · η γραμμή «τι νέο» δεν διαβάζεται

@@ -29,7 +29,7 @@ if (ONLY !== null) {
 }
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log("  ✔ " + m); } else { fail++; console.log("  ✘ " + m); } };
-ok(/APP_VER = 'φέτα 3 · v1(2[6-9]|[3-9]\d)'/.test(js), "έκδοση v126 ή νεότερη");
+ok(/APP_VER = 'φέτα 3 · v(?:1(?:2[6-9]|[3-9]\d)|[2-9]\d\d)'/.test(js)   /* V201: και ο κλάδος pro (v2xx) */, "έκδοση v126 ή νεότερη");
 
 // γνώση του Κώστα = η ροή της v124–v126
 const flow = kn.slice(kn.indexOf("## Η ΡΟΗ ΤΗΣ ΕΓΚΑΤΑΣΤΑΣΗΣ"), kn.indexOf("## ΣΥΧΝΑ ΠΡΟΒΛΗΜΑΤΑ"));

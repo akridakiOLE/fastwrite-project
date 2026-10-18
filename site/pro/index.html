@@ -37,6 +37,10 @@
     <input id="em" type="email" autocomplete="email" inputmode="email" placeholder="όνομα@επιχείρηση.com">
     <label for="em2" style="margin-top:12px">Ξανά το email (για να μη γίνει λάθος)</label>
     <input id="em2" type="email" autocomplete="off" inputmode="email" placeholder="όνομα@επιχείρηση.com">
+    <!-- KM-PRO-V201 · δοκιμή 14 ημερών με κάρτα (απόφαση 18/10) + προαιρετική προπληρωμή στο ΙΔΙΟ checkout:
+         οι αναγνώσεις στη δοκιμή πληρώνονται από το υπόλοιπο — χωρίς αυτό η πρώτη φωτογραφία δεν θα διαβαζόταν. -->
+    <p class="fine" id="trial" hidden style="margin-top:8px"></p>
+    <label id="topl" hidden style="margin-top:12px;font-weight:400"><input id="top" type="checkbox" checked style="width:auto;margin-right:8px"> Μαζί και προπληρωμή υπολοίπου ανάγνωσης (χρεώνεται σήμερα)</label>
     <p class="fine" style="margin-top:8px">Αν δεν έχεις ακόμα λογαριασμό, γράψε το email με το οποίο θα εγγραφείς στην εφαρμογή. Το PRO ενεργοποιείται στον λογαριασμό με αυτό το email.</p>
     <button id="go" type="button" disabled>Συνέχεια στην πληρωμή</button>
     <div class="msg" id="msg" role="status"></div>
@@ -56,7 +60,7 @@
   /* F5 (αναθεώρηση #5): ένα λάθος γράμμα = PRO σε ξένο λογαριασμό → το email γράφεται ΔΥΟ φορές */
   function same() { var a = em.value.trim().toLowerCase(); return valid(a) && a === em2.value.trim().toLowerCase(); }
   function upd() { go.disabled = !(cfg && cfg.ready && window.Paddle && same()); }
-  em.addEventListener('input', upd); em2.addEventListener('input', upd);
+  em.addEventListener('input', function () { upd(); var t = document.getElementById('topl'); if (t) { delete t.dataset.seen; document.getElementById('top').disabled = false; } }); em2.addEventListener('input', upd);
   fetch('/api/km/pro/checkout-config', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
     cfg = j;
     if (!j || !j.ready) { say('Η αγορά του PRO ανοίγει σύντομα. Για να ενημερωθείς: support@fastwrite.tech', 'warn'); return; }
@@ -69,6 +73,8 @@
           if (e && e.name === 'checkout.completed') { say('✓ Η πληρωμή ολοκληρώθηκε. Άνοιξε το Kostometro — το PRO θα είναι στο Μενού σε λίγα δευτερόλεπτα.', 'ok'); }
         } });
         upd();
+        if (j.trial) { var tp = document.getElementById('trial'); tp.textContent = (j.trial_days || 14) + ' ημέρες δοκιμή χωρίς χρέωση: η κάρτα σου χρεώνεται μόνο αν δεν ακυρώσεις πριν τη λήξη. Στη δοκιμή, οι αναγνώσεις και ο Κώστας πληρώνονται από το υπόλοιπο ανάγνωσης.'; tp.hidden = false; }
+        if (j.topup) { document.getElementById('topl').hidden = false; }
       } catch (e) { say('Η σελίδα πληρωμής δεν φόρτωσε. Δοκίμασε ξανά σε λίγο.', 'warn'); }
     };
     s.onerror = function () { say('Η σελίδα πληρωμής δεν φόρτωσε. Δοκίμασε ξανά σε λίγο.', 'warn'); };
@@ -77,7 +83,25 @@
   go.addEventListener('click', function () {
     var v = em.value.trim().toLowerCase();
     if (!same() || !cfg || !cfg.ready || !window.Paddle) { return; }
-    window.Paddle.Checkout.open({ items: [{ priceId: cfg.price, quantity: 1 }], customer: { email: v }, customData: { km_email: v } });
+    go.disabled = true;
+    /* V201 · η τιμή εξαρτάται από το email: όποιος έκανε ήδη δοκιμή παίρνει την τιμή χωρίς δοκιμή (μία ανά email) */
+    fetch('/api/km/pro/checkout-config?email=' + encodeURIComponent(v), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (c) {
+      upd();
+      if (!c || !c.ready) { say(c && c.reason === 'topup_unavailable' ? 'Η προπληρωμή υπολοίπου δεν είναι διαθέσιμη αυτή τη στιγμή — δοκίμασε ξανά σε λίγο.' : c && c.reason === 'trial_used' ? 'Η δοκιμή PRO έχει ήδη χρησιμοποιηθεί με αυτό το email. Πληροφορίες: support@fastwrite.tech' : 'Η αγορά του PRO δεν είναι διαθέσιμη αυτή τη στιγμή.', 'warn'); return; }
+      /* V201 · υπόλοιπο ως ΕΠΙΠΕΔΟ (none/low/ok), ποτέ ποσό — η σελίδα είναι δημόσια. Μηδέν → προπληρωμή υποχρεωτική. */
+      var tb = document.getElementById('top'), tl = document.getElementById('topl');
+      if (c.topup) { tl.hidden = false; }
+      if (!tl.dataset.seen) {
+        tl.dataset.seen = '1';
+        if (c.topup_required) { tb.checked = true; tb.disabled = true; say('Χρειάζεται προπληρωμή υπολοίπου: στο PRO οι αναγνώσεις πληρώνονται από αυτό (και στη δοκιμή). Πάτα ξανά «Συνέχεια».', 'warn'); return; }
+        if (c.bal === 'low') { tb.checked = true; say('Το υπόλοιπό σου είναι χαμηλό — προτείνουμε προπληρωμή μαζί. Πάτα ξανά «Συνέχεια».', 'warn'); return; }
+        if (c.bal === 'ok') { tb.checked = false; say('Έχεις ήδη υπόλοιπο — το κρατάς στο PRO. Πάτα ξανά «Συνέχεια».', 'ok'); return; }
+      }
+      if (c.topup_required && !tb.checked) { tb.checked = true; }
+      var items = [{ priceId: c.price, quantity: 1 }];
+      if (c.topup && tb.checked) { items.push({ priceId: c.topup, quantity: 1 }); }
+      window.Paddle.Checkout.open({ items: items, customer: { email: v }, customData: { km_email: v } });
+    }).catch(function () { upd(); say('Δεν υπάρχει σύνδεση. Δοκίμασε ξανά σε λίγο.', 'warn'); });
   });
 })();
 </script>

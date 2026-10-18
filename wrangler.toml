@@ -132,12 +132,25 @@ STAGING_LOGIN = "1"
 KM_PUBLIC_ORIGIN = "https://fastwrite-staging.stavrosfkallenos.workers.dev"
 AGENT_DAILY_USD = "2"
 READ_DAILY_USD = "2"
-# KM-PRO-F5 (15/10/2026) · όριο μήνα ανά λογαριασμό PRO — ΔΟΚΙΜΑΣΤΙΚΕΣ τιμές ΜΟΝΟ για το staging.
-# ⚠ ΔΕΝ είναι απόφαση: το όριο της παραγωγής το ορίζει ο Stavros (Α320 30/9: «~3 €»· εκκρεμεί).
-# Στην παραγωγή μπαίνουν ως [vars] την ημέρα του PRO· χωρίς αυτά η ανάγνωση PRO ΔΕΝ γίνεται (503 limit_unset).
-# Το PADDLE_WEBHOOK_SECRET είναι secret (wrangler secret put), ΠΟΤΕ εδώ.
-PRO_MONTHLY_READS = "300"
-PRO_MONTHLY_USD = "15"
+# KM-PRO-V201 (18/10/2026) · ΠΡΟΠΛΗΡΩΜΕΝΟ ΥΠΟΛΟΙΠΟ (Brief «Τρία σκαλιά», εγκρίθηκε 18/10) — τιμές ΜΟΝΟ για το staging.
+# Ο μετρητής μήνα της F5 (PRO_MONTHLY_READS / _USD) καταργήθηκε: «PRO χωρίς όριο, η χρήση πληρώνεται χωριστά» (15/10).
+#   KM_COST_*_USD = μετρημένο κόστος ανά ανάγνωση (15/10: Haiku σύνολα 0,00243 $ · Sonnet γραμμές 0,0121 $, 20 τιμολόγια)
+#   KM_MARKUP_PCT = 15 (απόφαση 15/10) · KM_FX_USD_EUR = ισοτιμία του Brief 15/10 (η παραγωγή ορίζει τη δική της την ημέρα του PRO)
+#   PRO_AGENT_MONTHLY_EUR = ταβάνι Κώστα συνδρομητών (Α320 30/9 «~3 €», επιβεβαιώθηκε 18/10)
+#   KM_*_FEE_PCT = προμήθεια καταστήματος (15 % με Small Business Program / βαθμίδα 15 % — ⬜ ένταξη Stavros)
+#   KM_IAP_SANDBOX = 1 → δοκιμαστικές αγορές πιστώνονται (ΜΟΝΟ staging· στην παραγωγή μόνο KM_IAP_SANDBOX_EMAILS)
+# Στην παραγωγή όλα μπαίνουν ως [vars] την ημέρα του PRO· χωρίς αυτά καμία αγορά δεν τιμολογείται (503, ξαναστέλνεται).
+# Κλειδιά (APPLE_IAP_PRIVATE_KEY, GOOGLE_PLAY_SA, PADDLE_WEBHOOK_SECRET) = Worker secrets (wrangler secret put), ΠΟΤΕ εδώ.
+KM_COST_MINI_USD = "0.00243"
+KM_COST_PRO_USD = "0.0121"
+KM_FX_USD_EUR = "0.864"
+KM_MARKUP_PCT = "15"
+PRO_AGENT_MONTHLY_EUR = "3"
+KM_APPLE_FEE_PCT = "15"
+KM_GOOGLE_FEE_PCT = "15"
+KM_IAP_SANDBOX = "1"
+# ΨΕΥΤΙΚΟ price id ΜΟΝΟ για το tools/pro/v201check.mjs (ψεύτικα υπογεγραμμένα γεγονότα) — κανένας λογαριασμός Paddle ακόμα
+PADDLE_TOPUP_PRICE_ID = "pri_01stagingtopup"
 
 [[env.staging.d1_databases]]
 binding = "DB"

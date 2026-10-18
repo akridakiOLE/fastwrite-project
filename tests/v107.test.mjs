@@ -30,7 +30,8 @@ for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_suppor
 }
 const stmt = (sql, a) => { const p = db.prepare(sql); return { async first() { return p.get(...a) ?? null; }, async run() { const r = p.run(...a); return { meta: { changes: Number(r.changes) } }; }, async all() { return { results: p.all(...a) }; } }; };
 const DB = { prepare: (sql) => ({ bind: (...a) => stmt(sql, a), ...stmt(sql, []) }), async batch(l) { for (const s of l) await s.run(); return []; } };
-const env = { DB, KM_ADMIN_KEY: "adm1n", ANTHROPIC_API_KEY: "k", ASSETS: { async fetch() { return new Response(know); } }, EMAIL: { async send() { return {}; } } };
+// KM-PRO-V201 · ο βοηθός του Free κλείνει εξ ορισμού (Π4) — τα τεστ του ελέγχουν τον κώδικα με FREE_AGENT=1
+const env = { DB, FREE_AGENT: "1", KM_ADMIN_KEY: "adm1n", ANTHROPIC_API_KEY: "k", ASSETS: { async fetch() { return new Response(know); } }, EMAIL: { async send() { return {}; } } };
 const calls = [];
 globalThis.fetch = async (u, o) => { calls.push(JSON.parse(o.body)); return new Response(JSON.stringify({ content: [{ type: "text", text: "Πώς σου φαίνεται;" }], stop_reason: "end_turn", usage: {} })); };
 const devOf = async (i) => { const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(i + ":adm1n")); return [...new Uint8Array(h)].map((x) => x.toString(16).padStart(2, "0")).join(""); };

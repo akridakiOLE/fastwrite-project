@@ -36,6 +36,7 @@ const ok = (c, m) => { if (c) { pass++; console.log("  ✔ " + m); } else { fail
 // φόρτωσε το (πιθανώς μεταλλαγμένο) km_pro.js
 const dir = mkdtempSync(join(tmpdir(), "kmpro-"));
 writeFileSync(join(dir, "km_pro.mjs"), pro);
+writeFileSync(join(dir, "km_bal.js"), readFileSync("src/km_bal.js", "utf8"));   // KM-PRO-V201 · το km_pro εισάγει το υπόλοιπο
 const P = await import("file://" + join(dir, "km_pro.mjs").replace(/\\/g, "/"));
 
 // συσκευασία
@@ -58,9 +59,9 @@ ok(badSum.check.approve === "manual" && !badSum.check.net_ok, "🔴 Σ γραμ�
 const badLine = P.proNormalize({ net: 20, vat: 1, total: 21, lines: [{ desc: "Χ", unit: "κιλ.", qty: 2, unit_price: 5, line_net: 20 }] });
 ok(badLine.check.approve === "manual" && badLine.lines[0].ok === false, "🔴 ποσότητα × τιμή ≠ αξία → «manual»");
 ok(P.PRO_MODEL_DEFAULT === "claude-sonnet-5-5", "🔴 μοντέλο PRO = Sonnet (μέτρηση 12/10)");
-ok(/if \(String\(env\.PRO_LIVE \|\| ""\) !== "1"\) return h\.json\(\{ ok: false, error: "pro_not_live" \}/.test(pro), "🔴 grant ΜΟΝΟ όπου PRO_LIVE=1");
+ok(/if \(String\(env\.PRO_LIVE \|\| ""\) !== "1"\) return h\.json\(\{ ok: false, error: "pro_not_live" \}/.test(pro.slice(pro.indexOf("async function proGrant("))), "🔴 grant ΜΟΝΟ όπου PRO_LIVE=1");
 ok(/proActive\(env, await proRow\(env, folder\), t\)\) return h\.json\(\{ ok: false, error: "not_pro" \}, 403\)/.test(pro), "read: μόνο λογαριασμός PRO");
-ok(pro.includes('error: "read_limit"') && pro.includes("quotaTake(env, folder, month, lim.reads, t)"), "όριο μήνα ανά λογαριασμό (F5: αναγνώσεις + κόστος)");
+ok(pro.includes('const hold = await balDebit(env, folder, { kind: "pro", reads: np }, "pro", { hold: true });') && !pro.includes("quotaTake("), "V201: κάθε ανάγνωση PRO χρεώνεται από το υπόλοιπο (ο μετρητής μήνα της F5 καταργήθηκε, απόφαση 15/10)");
 ok(km.includes('const { handlePro } = await import("./km_pro.js");') && km.includes('path.startsWith("/api/km/pro/")'), "km.js → km_pro.js (δυναμικά)");
 
 // κινητό

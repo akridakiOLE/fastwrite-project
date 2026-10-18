@@ -118,6 +118,11 @@ export async function handleKm(request, env, ctx, path) {
     const { handlePro } = await import("./km_pro.js");
     return handlePro(request, env, path, { authed, json, safeJson, clean, now, adminOk, agentCall, sha256hex });
   }
+  // KM-PRO-V201 (18/10/2026) — προπληρωμένο υπόλοιπο (Π1) + αγορές καταστημάτων (Π2): src/km_bal.js · src/km_iap.js
+  if (path === "/api/km/bal" || path.startsWith("/api/km/bal/") || path === "/api/km/admin/bal" || path.startsWith("/api/km/admin/bal/")) {
+    const { handleBal } = await import("./km_bal.js");
+    return handleBal(request, env, path, { authed, json, safeJson, clean, now, adminOk, sha256hex });
+  }
 
   if (path === "/api/km/lookup" && method === "GET") return lookup(request, env);
   if (path === "/api/km/register" && method === "POST") return register(request, env, ctx);
@@ -1401,6 +1406,9 @@ async function agentFollowup(env, inst, dev, input, said) {
   return { ok: true, due: due.slice(0, 10), days };
 }
 
+// KM-PRO-V201 · Π4: ο βοηθός του Free (εγκατάσταση, άδειες επανανοίγματος, ραντεβού) — ΚΛΕΙΣΤΟΣ εκτός αν FREE_AGENT=1.
+function freeAgentOn(env) { return String((env && env.FREE_AGENT) || "") === "1"; }
+
 async function agentCall(env, body) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -1464,6 +1472,18 @@ async function agentChat(request, env) {
   if (!text && !img) return json({ ok: false, error: "empty" }, 400);
   // 🔴 ΠΡΙΝ από οποιαδήποτε εγγραφή ή κλήση: μυστικά δεν μπαίνουν ποτέ.
   if (agentHasSecret(text)) return json({ ok: false, error: "secret" }, 400);
+  // KM-PRO-V201 · Π4 (Brief «Τρία σκαλιά», εγκρίθηκε 18/10/2026): ο Κώστας-βοηθός ΦΕΥΓΕΙ από το Free (υποστήριξη = email,
+  // δωρεάν πάντα) και ΜΕΝΕΙ στο PRO για τις ρυθμίσεις. Ταυτότητα λογαριασμού ΥΠΟΧΡΕΩΤΙΚΗ: κάθε μήνυμα χρεώνεται σε
+  // φάκελο (δοκιμή → υπόλοιπο · συνδρομή → ταβάνι μήνα) — το install_id μόνο του δεν αποδεικνύει τίποτα.
+  // FREE_AGENT=1 ξανανοίγει τον βοηθό εγκατάστασης του Free ΧΩΡΙΣ νέα έκδοση (αναστρέψιμη απόφαση)· εξ ορισμού ΚΛΕΙΣΤΟΣ.
+  let kpro = null, pa = null;
+  if (request.headers.get("X-Km-Folder")) {
+    pa = await authed(request, env);
+    if (pa.err) return pa.err;
+    kpro = await import("./km_pro.js");
+    if (!kpro.proActive(env, await kpro.proRow(env, pa.id.folder), now())) return json({ ok: false, error: "pro_only" }, 403);
+  } else if (!freeAgentOn(env)) return json({ ok: false, error: "pro_only" }, 403);
+  const proMode = !!kpro;
 
   const dev = await sha256hex(inst + ":" + (env.KM_ADMIN_KEY || ""));
   const t = now();
@@ -1482,15 +1502,17 @@ async function agentChat(request, env) {
       .bind(sess.id, dev, sess.src, sess.lang, t, t, t).run();
   }
   const done = (reply, extra) => json(Object.assign({ ok: true, sid: sess.id, reply, ticket: sess.ticket || null }, extra || {}));
+  // KM-PRO-V201 · στο PRO οι «πόρτες» του βοηθού εγκατάστασης (v102 πριν την εγγραφή · v106 άδεια · όριο ζωής 30 ανά
+  // συσκευή) ΔΕΝ ισχύουν: ο Κώστας μιλά σε λογαριασμό PRO, με το ταβάνι / το υπόλοιπο του φακέλου.
   // v102 · πόρτα 1 — μόνο πριν ολοκληρωθεί η εγγραφή (ή ανοιχτή συζήτηση που δεν έχει κρυώσει).
-  const warm = sess.last_at && (Date.now() - new Date(sess.last_at).getTime()) < AGENT_GRACE_MS && sess.turns > 0;
+  const warm = proMode ? false : sess.last_at && (Date.now() - new Date(sess.last_at).getTime()) < AGENT_GRACE_MS && sess.turns > 0;
   // v106 · πόρτα 2 — άδεια επανανοίγματος (email ραντεβού ή Υποστήριξη), με δικό της όριο μηνυμάτων.
-  const g = await agentGrantOf(env, dev, now());
+  const g = proMode ? null : await agentGrantOf(env, dev, now());
   const grant = g && g.msgs_left > 0 ? g : null;
   if (g && !grant) return done("Αυτή η συζήτηση ολοκληρώθηκε — ευχαριστώ που τα είπαμε! Για οτιδήποτε άλλο: ☰ Μενού → «Υποστήριξη».", { limit: true });
-  if (!grant && !warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: "onboarded" }, 403);
+  if (!proMode && !grant && !warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: "onboarded" }, 403);
   // v102 · όριο ζωής ανά συσκευή (ισχύει για την πόρτα 1· η άδεια έχει το δικό της).
-  const life = grant ? null : await env.DB.prepare("SELECT msgs FROM km_agent_devices WHERE dev = ?").bind(dev).first();
+  const life = grant || proMode ? null : await env.DB.prepare("SELECT msgs FROM km_agent_devices WHERE dev = ?").bind(dev).first();
   if (life && life.msgs >= AGENT_DEV_MAX) return done("Έφτασες το όριο του βοηθού εγκατάστασης. Για οτιδήποτε άλλο γράψε μας από ☰ Μενού → «Υποστήριξη» ή στο support@fastwrite.tech — θα σου απαντήσει άνθρωπος.", { limit: true });
   if (sess.turns >= AGENT_MAX_TURNS) return done("Η συζήτηση έγινε πολύ μεγάλη για μένα. Γράψε μας στο support@fastwrite.tech — θα σου απαντήσει άνθρωπος.", { limit: true });
 
@@ -1498,6 +1520,10 @@ async function agentChat(request, env) {
   const spent = await env.DB.prepare("SELECT usd_micro FROM km_agent_daily WHERE day = ?").bind(day).first();
   const cap = Math.round(Number(env.AGENT_DAILY_USD || AGENT_DAILY_USD_DEFAULT) * 1e6);
   if (spent && spent.usd_micro >= cap) return done("Αυτή τη στιγμή δεν μπορώ να απαντήσω. Γράψε μας στο support@fastwrite.tech και θα σου απαντήσει άνθρωπος.", { busy: true });
+  // KM-PRO-V201 · ποιος πληρώνει αυτό το μήνυμα: δοκιμή → κράτηση από το υπόλοιπο · συνδρομή → ταβάνι μήνα (εμείς)
+  // ⚠ από εδώ ως την κλήση: αν κάτι πέσει (σφάλμα βάσης), η κράτηση μένει στο km_bal_hold και το ωριαίο cron την επιστρέφει
+  const gate = proMode ? await kpro.proAgentGate(env, pa.id.folder, t) : {};
+  if (gate.error) return json({ ok: false, error: gate.error, renews: gate.renews || null, sid: sess.id }, gate.status);
 
   await env.DB.batch([
     env.DB.prepare("INSERT INTO km_agent_messages (session_id, role, body, at) VALUES (?, 'user', ?, ?)")
@@ -1538,7 +1564,10 @@ async function agentChat(request, env) {
     " · ραντεβού: " + (fup ? "κλεισμένο για " + fup.due_at.slice(0, 10) : "κανένα") +
     // v107 · has_key = έβαλε ποτέ κλειδί (MAX)· δωρεάν ή πληρωμένο δεν το ξέρουμε — το ρωτάει ο Κώστας.
     " · κλειδί Gemini (από τον λογαριασμό): " + (hasKey === null ? "άγνωστο" : hasKey ? "έχει βάλει — δωρεάν ή πληρωμένο: άγνωστο" : "κανένα, γράφει μόνος τα ποσά") +
-    ". Βήματα: open=άνοιξε · email=ζήτησε κωδικό · oauth_google/oauth_microsoft=πάτησε σύνδεση · code=email επιβεβαιώθηκε · account=λογαριασμός · key=έβαλε κλειδί Gemini · key_skip=το παρέλειψε.";
+    ". Βήματα: open=άνοιξε · email=ζήτησε κωδικό · oauth_google/oauth_microsoft=πάτησε σύνδεση · code=email επιβεβαιώθηκε · account=λογαριασμός · key=έβαλε κλειδί Gemini · key_skip=το παρέλειψε." +
+    // KM-PRO-V201 · ο χρήστης είναι ΗΔΗ πελάτης PRO με λογαριασμό: βοήθεια στις ρυθμίσεις, όχι εγκατάσταση
+    (proMode ? " · ΛΟΓΑΡΙΑΣΜΟΣ: Kostometro PRO (" + (gate.mode === "balance" ? "δοκιμή 14 ημερών — κάθε μήνυμα χρεώνεται από το υπόλοιπό του" : "συνδρομή") +
+    "). Βοήθησέ τον με τις ρυθμίσεις και τη χρήση του PRO· η εγκατάσταση έχει γίνει." : "");
   const know = await agentKnowledge(env);
   const system = [
     { type: "text", text: AGENT_RULES + "\n\n# ΓΝΩΣΗ\n" + (know || "(η γνώση δεν φορτώθηκε — για κάθε ερώτηση πρότεινε άνθρωπο)"), cache_control: { type: "ephemeral" } },
@@ -1548,9 +1577,12 @@ async function agentChat(request, env) {
   let reply = "", micro = 0, calls = 0, inTok = 0, outTok = 0, cacheTok = 0;
   try {
     for (let i = 0; i < 3; i++) {
-      const j = await agentCall(env, { model: env.AGENT_MODEL || AGENT_MODEL_DEFAULT, max_tokens: AGENT_MAX_OUT, system, tools: AGENT_TOOLS, messages: msgs });
+      // V201 · χωρίς «ραντεβού επανασύνδεσης» (ήταν για τον Free βοηθό εγκατάστασης) — μόνο «πέρνα με σε άνθρωπο»
+      const j = await agentCall(env, { model: env.AGENT_MODEL || AGENT_MODEL_DEFAULT, max_tokens: AGENT_MAX_OUT, system, tools: proMode ? AGENT_TOOLS.filter((x) => x.name === "handoff_to_human") : AGENT_TOOLS, messages: msgs });
       calls++; micro += agentMicro(j.usage);
       const u = j.usage || {}; inTok += u.input_tokens || 0; outTok += u.output_tokens || 0; cacheTok += u.cache_read_input_tokens || 0;
+      // V201 · δοκιμή: η κράτηση είναι ΤΑΒΑΝΙ — αν το κόστος τη φτάσει, καμία νέα κλήση (αναθεώρηση #5: μηδέν κόστος για εμάς)
+      if (proMode && gate.max && micro >= gate.max) { reply = agentCut((j.content || []).filter((x) => x.type === "text").map((x) => x.text).join("\n").trim(), j.stop_reason); break; }
       const blocks = j.content || [];
       reply = agentCut(blocks.filter((x) => x.type === "text").map((x) => x.text).join("\n").trim(), j.stop_reason);
       const uses = blocks.filter((x) => x.type === "tool_use");
@@ -1576,6 +1608,8 @@ async function agentChat(request, env) {
            out_tok = out_tok + excluded.out_tok, cache_tok = cache_tok + excluded.cache_tok, usd_micro = usd_micro + excluded.usd_micro`
       ).bind(day, calls, inTok, outTok, cacheTok, micro).run();
     }
+    // V201 · ΠΑΝΤΑ (και σε σφάλμα): η κράτηση επιστρέφει και χρεώνεται ΜΟΝΟ το πραγματικό κόστος (ή γράφεται στο ταβάνι)
+    if (proMode) await kpro.proAgentSettle(env, gate, micro);
   }
   reply = agentTidy(reply);
   if (agentHasSecret(reply)) reply = "Για την ασφάλειά σου δεν μπορώ να γράψω αυτό το κείμενο. Μη στέλνεις τις 12 λέξεις ή το κλειδί σου σε κανέναν.";
@@ -1593,6 +1627,9 @@ async function agentChat(request, env) {
 //     έλαβε το email (π.χ. Safari στο iPhone, που δεν βλέπει τον λογαριασμό του εικονιδίου).
 //   χωρίς token (κουμπί στην Υποστήριξη): μόνο συσκευή με λογαριασμό, έως AGENT_REOPEN_MONTH τον μήνα.
 async function agentReopen(request, env) {
+  // KM-PRO-V201 · Π4: οι άδειες επανανοίγματος ήταν η «δεύτερη πόρτα» του Free βοηθού — ο Κώστας είναι πια μόνο PRO,
+  // όπου η συνομιλία ανοίγει κατευθείαν (με ταυτότητα λογαριασμού). Η διαδρομή μένει ως απάντηση για παλιές εκδόσεις.
+  if (!freeAgentOn(env)) return json({ ok: false, error: "pro_only" }, 403);
   if (!env.ANTHROPIC_API_KEY) return json({ ok: false, error: "unavailable" }, 503);
   const b = (await safeJson(request)) || {};
   const inst = clean(b.install_id, 64);
@@ -1650,6 +1687,8 @@ export function agentFollowupMail(token) {
 
 // v106 · ωριαίο cron: στέλνει τα ραντεβού που έφτασαν. Το email διαβάζεται από τον λογαριασμό ΤΩΡΑ.
 export async function kmAgentFollowups(env, nowIso) {
+  // KM-PRO-V201 · Π4: τα email «ραντεβού επανασύνδεσης» έστελναν σύνδεσμο προς τον Free βοηθό, που δεν υπάρχει πια.
+  if (!freeAgentOn(env)) return { skipped: "pro_only" };
   const t = nowIso || now();
   const rows = (await env.DB.prepare(
     "SELECT f.id, a.email FROM km_agent_followups f LEFT JOIN km_accounts a ON a.folder_id = f.folder_id AND a.deleted IS NULL " +
@@ -2441,9 +2480,12 @@ async function wipeFolder(env, folderId) {
   // KM-PRO-F5 · και η κατάσταση PRO, ο μετρητής αναγνώσεων, η χρήση και το ειδικό όριο. Η συνδρομή του παρόχου
   // ΔΕΝ σβήνεται (φορολογικά αρχεία, Α10) — μόνο ξεδένεται από τον φάκελο που έφυγε (folder_id = NULL).
   for (const t of ["km_proposals", "km_team_log", "km_members", "km_team", "km_acct_fix", "km_acct_mail", "km_acct",
-                   "km_pro_quota", "km_pro_limits", "km_pro_usage", "km_pro"]) {
+                   "km_pro_quota", "km_pro_limits", "km_pro_usage", "km_pro_agent", "km_pro"]) {
     try { await env.DB.prepare("DELETE FROM " + t + " WHERE folder_id = ?").bind(folderId).run(); } catch (e) {}
   }
+  // KM-PRO-V201 · υπόλοιπο και κινήσεις φεύγουν· οι ΑΓΟΡΕΣ μένουν ανώνυμες (φορολογικά αρχεία). Το km_pro_trial ΜΕΝΕΙ
+  // (hash email, όχι email): αλλιώς «διαγραφή → νέα δοκιμή».
+  try { const { balWipe } = await import("./km_bal.js"); await balWipe(env, folderId); } catch (e) {}
   try { await env.DB.prepare("UPDATE km_pro_sub SET folder_id = NULL, updated_at = ? WHERE folder_id = ?").bind(ts, folderId).run(); } catch (e) {}
 
   return {
@@ -4092,10 +4134,15 @@ function readGiftOut(row) {
            used, left: Math.max(0, READ_GIFT - used) };
 }
 
+// KM-PRO-V201 · Π1 · PRO.mini: μετά τα 20 δώρα, ο Κώστας συνεχίζει να διαβάζει ΣΥΝΟΛΑ (ίδιο μοντέλο, ίδια εντολή)
+// με χρέωση από το προπληρωμένο υπόλοιπο, στην κλειδωμένη τιμή PRO.mini κάθε αγοράς (src/km_bal.js).
+async function balFor(env, folder, email) {
+  try { const { balView } = await import("./km_bal.js"); return await balView(env, folder, email || null); } catch (e) { return null; }
+}
 async function readStatus(request, env) {
   const a = await authed(request, env);
   if (a.err) return a.err;
-  return json(readGiftOut(await readGiftRow(env, a.id.folder)));
+  return json(Object.assign(readGiftOut(await readGiftRow(env, a.id.folder)), { bal: await balFor(env, a.id.folder, a.acc.email) }));
 }
 
 async function readActivate(request, env) {
@@ -4126,8 +4173,9 @@ async function readInvoice(request, env) {
   // μόνο η ενεργή συσκευή γράφει — και η ανάγνωση είναι γράψιμο (v35)
   if (a.acc.active_device_id && a.acc.active_device_id !== a.id.device) return json({ ok: false, error: "not_active" }, 409);
   const row = await readGiftRow(env, folder);
+  // η συγκατάθεση (Πολιτική §Α9) ισχύει και για το PRO.mini: η φωτογραφία περνά από τον server με τον ίδιο τρόπο
   if (!row || !row.activated_at) return json({ ok: false, error: "not_activated" }, 403);
-  if ((Number(row.used) || 0) >= READ_GIFT) return json(Object.assign(readGiftOut(row), { ok: false, error: "gift_done" }), 403);
+  const gift = (Number(row.used) || 0) < READ_GIFT;          // V201 · πρώτα το δώρο, μετά το υπόλοιπο
 
   const b = await safeJson(request);
   const pages = b && Array.isArray(b.pages) ? b.pages : null;
@@ -4148,17 +4196,39 @@ async function readInvoice(request, env) {
   const cap = Math.round(Number(env.READ_DAILY_USD || READ_DAILY_USD_DEFAULT) * 1e6);
   if (spent && spent.usd_micro >= cap) return json({ ok: false, error: "busy", retry_after: 1800 }, 429);
 
-  // ΔΕΣΜΕΥΣΗ — ατομική: δύο συσκευές ταυτόχρονα δεν περνούν ποτέ το 20.
-  const res = await env.DB.prepare(
-    `UPDATE km_read_gift SET used = used + 1, last_at = ?,
-       win_n = CASE WHEN win_at IS NOT NULL AND win_at >= ? THEN win_n + 1 ELSE 1 END,
-       win_at = CASE WHEN win_at IS NOT NULL AND win_at >= ? THEN win_at ELSE ? END
-     WHERE folder_id = ? AND activated_at IS NOT NULL AND used < ?`
-  ).bind(t, new Date(Date.parse(t) - 60000).toISOString(), new Date(Date.parse(t) - 60000).toISOString(), t, folder, READ_GIFT).run();
-  if (!res.meta || !res.meta.changes) {
-    return json(Object.assign(readGiftOut(await readGiftRow(env, folder)), { ok: false, error: "gift_done" }), 403);
+  const winAgo = new Date(Date.parse(t) - 60000).toISOString();
+  let refund, hold = null;
+  if (gift) {
+    // ΔΕΣΜΕΥΣΗ — ατομική: δύο συσκευές ταυτόχρονα δεν περνούν ποτέ το 20.
+    const res = await env.DB.prepare(
+      `UPDATE km_read_gift SET used = used + 1, last_at = ?,
+         win_n = CASE WHEN win_at IS NOT NULL AND win_at >= ? THEN win_n + 1 ELSE 1 END,
+         win_at = CASE WHEN win_at IS NOT NULL AND win_at >= ? THEN win_at ELSE ? END
+       WHERE folder_id = ? AND activated_at IS NOT NULL AND used < ?`
+    ).bind(t, winAgo, winAgo, t, folder, READ_GIFT).run();
+    if (!res.meta || !res.meta.changes) {
+      return json(Object.assign(readGiftOut(await readGiftRow(env, folder)), { ok: false, error: "gift_done", retry: true }), 403);
+    }
+    refund = () => env.DB.prepare("UPDATE km_read_gift SET used = used - 1 WHERE folder_id = ? AND used > 0").bind(folder).run();
+  } else {
+    // V201 · PRO.mini: ΚΡΑΤΗΣΗ μίας ανάγνωσης συνόλων από το υπόλοιπο (ατομικά). Χωρίς υπόλοιπο: «gift_done» όπως ως τώρα
+    // (οι παλιές εκδόσεις σταματούν ήσυχα) + no_balance + το υπόλοιπο, για να δείξει η εφαρμογή «Αγορά».
+    let kb = null;
+    try { kb = await import("./km_bal.js"); } catch (e) { console.error("read: km_bal δεν φορτώθηκε — καμία χρέωση"); }
+    const d = kb ? await kb.balDebit(env, folder, { kind: "mini", reads: pages.length }, "mini", { hold: true }) : { ok: false, error: "no_balance" };
+    if (!d.ok) {
+      if (d.error === "busy") return json({ ok: false, error: "rate", retry_after: 5 }, 429);
+      return json(Object.assign(readGiftOut(row), { ok: false, error: "gift_done", no_balance: true, bal: await balFor(env, folder, null) }), 403);
+    }
+    hold = d;
+    await env.DB.prepare(
+      `UPDATE km_read_gift SET last_at = ?,
+         win_n = CASE WHEN win_at IS NOT NULL AND win_at >= ? THEN win_n + 1 ELSE 1 END,
+         win_at = CASE WHEN win_at IS NOT NULL AND win_at >= ? THEN win_at ELSE ? END
+       WHERE folder_id = ?`
+    ).bind(t, winAgo, winAgo, t, folder).run();
+    refund = () => kb.balRelease(env, folder, d.op_id).catch((x) => console.error("read release:", x && x.message));   // αλλιώς: ωριαίο cron
   }
-  const refund = () => env.DB.prepare("UPDATE km_read_gift SET used = used - 1 WHERE folder_id = ? AND used > 0").bind(folder).run();
 
   const content = pages.map((d) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: d } }))
     .concat([{ type: "text", text: readPrompt(pages.length) }]);
@@ -4180,8 +4250,15 @@ async function readInvoice(request, env) {
   const o = readParse(txt) || {};
   const out = { net: readNum(o.net), vat: readNum(o.vat), total: readNum(o.total), date: readDate(o.date) };
   const nothing = out.net === null && out.vat === null && out.total === null;
-  if (nothing) await refund();   // διάβασε αλλά δεν είδε ποσά → δεν μετράει
+  if (nothing) await refund();   // διάβασε αλλά δεν είδε ποσά → δεν μετράει (ούτε στο δώρο, ούτε στο υπόλοιπο)
+  let charged = 0;
+  if (!gift && !nothing) {   // V201 · πολλές σελίδες: 1 ανάγνωση + ό,τι ξεπέρασε το μετρημένο κόστος (χωρίς ζημιά)
+    const kb2 = await import("./km_bal.js");
+    const one = Number(env.KM_COST_MINI_USD); charged = await kb2.balReadSettle(env, folder, hold, "mini", pages.length, micro, Number.isFinite(one) && one > 0 ? one : 0);
+  }
   await readDaily(env, day, { calls: 1, ok: nothing ? 0 : 1, fail: nothing ? 1 : 0, in: u.input_tokens || 0, out: u.output_tokens || 0, micro });
   const st = readGiftOut(await readGiftRow(env, folder));
-  return json(Object.assign({ ok: true, counted: !nothing }, out, { used: st.used, left: st.left, gift: READ_GIFT }));
+  return json(Object.assign({ ok: true, counted: !nothing }, out, { used: st.used, left: st.left, gift: READ_GIFT,
+    paid: gift ? "gift" : "balance", charged_eur: Math.round(charged / 100) / 1e4,
+    bal: gift ? null : await balFor(env, folder, null) }));
 }

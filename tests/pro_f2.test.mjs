@@ -30,7 +30,7 @@ const MUT = [
   // Μ11 · 🔴 ο σύνδεσμος δοκιμών ξαναχρησιμοποιείται (διαβάζεται χωρίς να σβηστεί)
   ["km", "DELETE FROM km_oauth_states WHERE state_hash = ? AND provider LIKE 'test:%' RETURNING *", "SELECT * FROM km_oauth_states WHERE state_hash = ? AND provider LIKE 'test:%'"],
   // Μ12 · 🔴 PRO βλέπει ξανά «κλειδί Gemini ή Παράλειψη»
-  ["js", "!localStorage.getItem(LS.skip) && !proOn(); }", "!localStorage.getItem(LS.skip); }"],
+  ["js", "  function needKeyScreen() { return false; }", "  function needKeyScreen() { return !localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip); }"],   // V201: η οθόνη κλειδιού έφυγε για όλους
   // Μ13 · 🔴 η εκκίνηση αποφασίζει για την οθόνη κλειδιού ΠΡΙΝ μάθει αν είναι PRO
   ["js", "    proP.then(function () {   /* KM-PRO-NOKEY */\n      if (needKeyScreen())", "    (function (f) { f(); })(function () {\n      if (needKeyScreen())"],
   // Μ14 · 🔴 αβέβαιη συσκευασία → σιωπή (ούτε τιμή ούτε ερώτηση)
@@ -146,7 +146,7 @@ const stg = toml.indexOf("[env.staging]");
 ok(stg > 0 && toml.indexOf("STAGING_LOGIN") > stg && toml.lastIndexOf("STAGING_LOGIN") === toml.indexOf("STAGING_LOGIN"), "🔴 STAGING_LOGIN γραμμένο ΜΟΝΟ μέσα στο [env.staging]");
 ok(toml.indexOf("KM_PUBLIC_ORIGIN") > stg, "η επιστροφή σύνδεσης του staging μένει στο staging (όχι στο fastwrite.tech)");
 // 🔴 PRO: ποτέ οθόνη κλειδιού Gemini (Κώστας AI ενσωματωμένος — Stavros 12/10)
-ok(/function needKeyScreen\(\) \{ return !localStorage\.getItem\(LS\.key\) && !localStorage\.getItem\(LS\.skip\) && !proOn\(\); \}/.test(js), "🔴 PRO δεν βλέπει την οθόνη «κλειδί Gemini»");
+ok(/function needKeyScreen\(\) \{ return false; \}/.test(js), "🔴 PRO δεν βλέπει την οθόνη «κλειδί Gemini» (V201: ούτε το Free — Π4, Brief 18/10)");
 ok((js.match(/show\('s-key'\)/g) || []).length === (js.match(/if \(needKeyScreen\(\)\) \{ return show\('s-key'\); \}/g) || []).length, "🔴 ΚΑΘΕ δρόμος προς την οθόνη κλειδιού περνά από τον έλεγχο PRO");
 ok(js.includes("    proP.then(function () {   /* KM-PRO-NOKEY */\n      if (needKeyScreen())"), "🔴 η εκκίνηση περιμένει την απάντηση PRO (έως 2,5″) πριν δείξει την οθόνη κλειδιού");
 // v194 · γραμμή: τιμή μονάδας 3 δεκαδικά · αβέβαιη συσκευασία = ερώτηση

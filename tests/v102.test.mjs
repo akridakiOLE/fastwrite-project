@@ -8,9 +8,9 @@ const ONLY = (() => { const a = process.argv.find((x) => x.startsWith("--mutate=
 let src = readFileSync("src/km.js", "utf8");
 let js = readFileSync("site/kostometro/app.js", "utf8");
 const MUT = [
-  ["src", "  if (!grant && !warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: \"onboarded\" }, 403);\n", ""], // 1 · 🔴 απαντά σε ολοκληρωμένους
+  ["src", "  if (!proMode && !grant && !warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: \"onboarded\" }, 403);\n", ""], // 1 · 🔴 απαντά σε ολοκληρωμένους
   ["src", "  if (!st.includes(\"account\")) return true;", "  if (!st.includes(\"account\")) return false;"],   // 2 · 🔴 παλιοί χρήστες (πριν το χωνί) ξεφεύγουν
-  ["src", "  const warm = sess.last_at &&", "  const warm = false &&"],                                               // 3 · κόβει ανοιχτή συζήτηση στη μέση
+  ["src", "  const warm = proMode ? false : sess.last_at &&", "  const warm = false &&"],                                               // 3 · κόβει ανοιχτή συζήτηση στη μέση
   ["src", "  if (life && life.msgs >= AGENT_DEV_MAX)", "  if (false)"],                                                   // 4 · 🔴 χωρίς όριο ζωής
   ["src", "    env.DB.prepare(\"INSERT INTO km_agent_devices", "    null && env.DB.prepare(\"INSERT INTO km_agent_devices"], // 5 · 🔴 ο μετρητής δεν μετράει
   ["js", "    if (agDone()) { return false; }\n", ""],                                                                   // 6 · 🔴 κουμπί μένει μετά την εγγραφή
@@ -33,7 +33,8 @@ for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_feedba
 const stmt = (sql, args) => { const p = db.prepare(sql); return { async first() { return p.get(...args) ?? null; },
   async run() { const r = p.run(...args); return { meta: { changes: Number(r.changes) } }; }, async all() { return { results: p.all(...args) }; } }; };
 const DB = { prepare: (sql) => ({ bind: (...a) => stmt(sql, a), ...stmt(sql, []) }), async batch(l) { for (const s of l) if (s) await s.run(); return []; } };
-const env = { DB, KM_ADMIN_KEY: "adm1n", ANTHROPIC_API_KEY: "k-test", EMAIL: { async send() { return {}; } }, ASSETS: { async fetch() { return new Response("## Γ"); } } };
+// KM-PRO-V201 · ο βοηθός του Free κλείνει εξ ορισμού (Π4) — τα τεστ του ελέγχουν τον κώδικα με FREE_AGENT=1
+const env = { DB, FREE_AGENT: "1", KM_ADMIN_KEY: "adm1n", ANTHROPIC_API_KEY: "k-test", EMAIL: { async send() { return {}; } }, ASSETS: { async fetch() { return new Response("## Γ"); } } };
 let calls = 0;
 globalThis.fetch = async (url) => { if (!/anthropic/.test(url)) throw new Error(url); calls++;
   return new Response(JSON.stringify({ content: [{ type: "text", text: "Εντάξει." }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } })); };
@@ -87,21 +88,23 @@ await check("Ν102-6 · διαγραφή: ο μετρητής φεύγει 24 μ
 // ── εφαρμογή ──
 const slice = (a, b) => { const i = js.indexOf(a), j2 = js.indexOf(b, i); if (i < 0 || j2 < 0) throw new Error("λείπει " + a); return js.slice(i, j2); };
 await check("Ν102-7 · 🔴 εφαρμογή: μετά την εγγραφή (λογαριασμός + κλειδί/Παράλειψη) το 💬 δεν ανάβει — ούτε με ?chat=1", async () => {
-  const run = (store, search) => {
+  // KM-PRO-V201 · ο βοηθός του Free ζει πια ΜΟΝΟ με AG_PUBLIC (εξ ορισμού false) — η λογική του ελέγχεται με AG_PUBLIC = true
+  const run = (store, search, pub) => {
     const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
     const LS = { reg: "km_registered", key: "km_key", skip: "km_key_skipped" };
-    const code = "var AG_PUBLIC = false;\n" + slice("  var AG = {", "  var AG_SECRET") + slice("  function agLS(k, v)", "  function agLog()") + "\nreturn agEnabled();";
+    const code = "var AG_PUBLIC = " + (pub === false ? "false" : "true") + "; function agProOn() { return false; }\n" + slice("  var AG = {", "  var AG_SECRET") + slice("  function agLS(k, v)", "  function agLog()") + "\nreturn agEnabled();";
     return new Function("localStorage", "location", "LS", code)(localStorage, { search }, LS);
   };
   ok(run({}, "?chat=1") === true, "νέα συσκευή με ?chat=1 → πρέπει να ανάβει");
   ok(run({ km_registered: "1" }, "?chat=1") === true, "λογαριασμός χωρίς κλειδί → πρέπει να ανάβει");
   ok(run({ km_registered: "1", km_key: "x" }, "?chat=1") === false, "🔴 με κλειδί ανάβει");
   ok(run({ km_registered: "1", km_key_skipped: "1" }, "?chat=1") === false, "🔴 με Παράλειψη ανάβει");
+  ok(run({}, "?chat=1", false) === false && run({ km_registered: "1" }, "", false) === false, "🔴 V201: με AG_PUBLIC = false ο Free βοηθός ΔΕΝ ανάβει ποτέ (ούτε ?chat=1)");
 });
 await check("Ν102-8 · άρνηση του server («onboarded») σβήνει το 💬 οριστικά από τη συσκευή", async () => {
   const send = slice("  function agSend(e) {", "  function agInit() {");
   ok(send.includes("if (j && j.error === 'onboarded') { agLS(AG.gone, '1'); agLS(AG.grant, null); }"), "δεν γράφει gone");   // v106: + σβήνει την άδεια
-  ok(js.includes("if (agInited || !el('ag-fab') || !agEnabled() || (agLS(AG.gone) === '1' && !agGrantOn())) { return; }"), "agInit αγνοεί gone");
+  ok(js.includes("if (agInited || !el('ag-fab') || !agEnabled() || (agLS(AG.gone) === '1' && !agGrantOn() && !agProOn())) { return; }"), "agInit αγνοεί gone");
   ok(js.includes("    el('ag-fab').hidden = agDone() || agLS(AG.gone) === '1';"), "agClose ξαναδείχνει το κουμπί");   // v123: agClose σε πολλές γραμμές (KM-V123-FOLD)
 });
 if (ONLY) { if (failed) { console.log("Μ" + ONLY + " → κοκκίνισε ✔"); process.exit(0); } console.log("Μ" + ONLY + " ΠΕΡΑΣΕ — το τεστ δεν πιάνει τίποτα"); process.exit(1); }

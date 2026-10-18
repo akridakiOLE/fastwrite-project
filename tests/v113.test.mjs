@@ -17,7 +17,7 @@ const MUT = [
   // Μ3 · το ```json του Haiku δεν καθαρίζεται → κάθε ανάγνωση «χωρίς ποσά»
   ["src", "  const a = s.indexOf(\"{\"), b = s.lastIndexOf(\"}\");\n  if (a < 0 || b <= a) return null;", "  const a = 0, b = s.length - 1;"],
   // Μ4 · temperature στην κλήση (το Sonnet 5.5 το απορρίπτει με 400 — μετρήθηκε 4/10)
-  ["src", "max_tokens: 300, messages: [{ role: \"user\", content }] });", "max_tokens: 300, temperature: 0, messages: [{ role: \"user\", content }] });"],
+  ["src", "READ_MODEL_DEFAULT, max_tokens: 300, messages: [{ role: \"user\", content }] });", "READ_MODEL_DEFAULT, max_tokens: 300, temperature: 0, messages: [{ role: \"user\", content }] });"],   // V201: μοναδικός στόχος (το readTest έχει ίδιο κομμάτι)
   // Μ5 · αναγνώστρια συσκευή διαβάζει (και καίει δώρο)
   ["src", "  if (a.acc.active_device_id && a.acc.active_device_id !== a.id.device) return json({ ok: false, error: \"not_active\" }, 409);\n", ""],
   // Μ6 · κανένα ημερήσιο ταβάνι

@@ -16,20 +16,7 @@ let js = readFileSync("site/kostometro/app.js", "utf8");
 let html = readFileSync("site/kostometro/index.html", "utf8");
 let wt = readFileSync("wrangler.toml", "utf8");
 const MUT = [
-  // Μ1 · 🔴 όριο αναγνώσεων ξανά ΣΤΑΘΕΡΑ στον κώδικα (Stavros: το όριο δεν είναι απόφαση του Claude)
-  ["pro", "  const r = (over && posNum(over.reads_limit)) || posNum(env && env.PRO_MONTHLY_READS);", "  const r = (over && posNum(over.reads_limit)) || posNum(env && env.PRO_MONTHLY_READS) || 300;"],
-  // Μ2 · 🔴 χωρίς ρύθμιση η ανάγνωση γίνεται ΧΩΡΙΣ όριο
-  ["pro", "  if (!lim.reads || !lim.usd) {", "  if (false) {"],
-  // Μ3 · 🔴 κράτηση ΧΩΡΙΣ φραγμό (δύο ταυτόχρονες περνούν το όριο)
-  ["pro", "     WHERE km_pro_quota.reads < ?`", "     WHERE ? IS NOT NULL`"],
-  // Μ4 · 🔴 αποτυχία του παρόχου ΚΑΙΕΙ αναγνώσεις του πελάτη
-  ["pro", "  catch (e) {\n    await quotaGive(env, folder, month);", "  catch (e) {\n    (0);"],
-  // Μ5 · 🔴 ανάγνωση χωρίς γραμμές μετράει ως ανάγνωση
-  ["pro", "  if (!good) await quotaGive(env, folder, month);", ""],
-  // Μ6 · 🔴 το όριο ανά λογαριασμό (km_pro_limits) αγνοείται
-  ["pro", "  const lim = proLimits(env, await limitsRow(env, folder));\n  if (!lim.reads", "  const lim = proLimits(env, null);\n  if (!lim.reads"],
-  // Μ7 · 🔴 ταβάνι κόστους δεν ελέγχεται
-  ["pro", "  if (u && u.usd_micro >= Math.round(lim.usd * 1e6)) return", "  if (false) return"],
+  // KM-PRO-V201 (18/10): οι Μ1–Μ7, Μ22, Μ40, Μ43 (μετρητής μήνα) καταργήθηκαν μαζί με τον μετρητή — νέα τεστ: tests/pro_v201.test.mjs
   // Μ8 · 🔴 webhook ΧΩΡΙΣ έλεγχο υπογραφής
   ["pad", "  if (bad) { console.error(\"paddle: απόρριψη · \" + bad); return h.json({ ok: false, error: bad }, 401); }", ""],
   // Μ9 · 🔴 παλιά υπογραφή (επανάληψη) γίνεται δεκτή
@@ -57,9 +44,7 @@ const MUT = [
   // Μ20 · 🔴 αναβάθμιση στο web δεν φαίνεται χωρίς να ξανανοίξει η εφαρμογή
   ["js", "    if (!document.hidden && Date.now() - proChecked > 300000) { proRefresh(); }", "    if (false) { proRefresh(); }"],
   // Μ21 · 🔴 διαγραφή λογαριασμού αφήνει μετρητή/όριο/κατάσταση PRO
-  ["km", "\"km_pro_quota\", \"km_pro_limits\", \"km_pro_usage\", \"km_pro\"]", "\"km_pro_quota\"]"],
-  // Μ22 · 🔴 staging χωρίς ρυθμισμένο όριο (η δοκιμή άκρη-σε-άκρη δεν θα έβλεπε ανάγνωση)
-  ["wt", "PRO_MONTHLY_READS = \"300\"", "PRO_X = \"300\""],
+  ["km", "\"km_pro_quota\", \"km_pro_limits\", \"km_pro_usage\", \"km_pro_agent\", \"km_pro\"]", "\"km_pro_quota\"]"],
   // Μ23 · 🔴 συνδρομή «μετακομίζει» σε άλλον φάκελο επειδή άλλαξε το email στην Paddle
   ["pad", "  const folder = (cur && cur.folder_id) || (await folderOfEmail(env, email));", "  const folder = (await folderOfEmail(env, email)) || (cur && cur.folder_id);"],
   // Μ24 · 🔴 συνδρομή από email σε αίτημα διαγραφής δένεται στον λογαριασμό που φεύγει
@@ -94,14 +79,10 @@ const MUT = [
   ["pad", "else if (until !== \"∞\" && (!until || u > until)) until = u;", "else if (until !== \"∞\") until = u;"],
   // Μ39 · 🔴 μεταφορά συνδρομής: ο παλιός λογαριασμός κρατά PRO
   ["pad", "  if (cur.folder_id && cur.folder_id !== folder) await proRecompute(env, cur.folder_id, t);", ""],
-  // Μ40 · 🔴 μισή ρύθμιση: το status δείχνει «απομένουν» και σβήνει το μήνυμα
-  ["pro", "  const set = !!(lim.reads && lim.usd);", "  const set = !!lim.reads;"],
   // Μ41 · 🔴 κινητό: σελίδα-φάντασμα μετά από «Διαγραφή σελίδας» (το γράμμα δεν φεύγει ποτέ)
   ["js", "    var n = r.pgv ? pageCount(r) : Math.max(pageCount(r), r.srvPages || 1), out = [];", "    var n = Math.max(pageCount(r), r.srvPages || 1), out = [];"],
   // Μ42 · 🔴 αναίρεση Α σβήνει νεότερη Γ με ίδια τιμή
   ["js", "    Object.keys(ch.h || {}).forEach(function (k) { if (!hTouched(k) && ", "    Object.keys(ch.h || {}).forEach(function (k) { if ("],
-  // Μ43 · 🔴 κινητό: το μήνυμα μένει για πάντα (δεν σβήνει όταν ξεμπλοκάρει)
-  ["js", "    else if (typeof m.limit === 'number' && m.left > 0) { proLimSet(null); }", ""],
   // Μ44 · grant δεν καθαρίζει παλιό until
   ["pro", "DO UPDATE SET status = excluded.status, source = 'admin', until = NULL, updated_at", "DO UPDATE SET status = excluded.status, updated_at"],
   // Μ45 · 🔴 Σύνολο τεράστιο από τον λογιστή
@@ -129,15 +110,19 @@ const db = new DatabaseSync(":memory:");
 db.exec("CREATE TABLE km_accounts (folder_id TEXT PRIMARY KEY, email TEXT, deleted TEXT, delete_due_at TEXT, plan TEXT, active_device_id TEXT);");
 db.exec(readFileSync("schema/km_pro.sql", "utf8"));
 db.exec(readFileSync("schema/km_pro_f5.sql", "utf8"));
+db.exec(readFileSync("schema/km_bal.sql", "utf8"));   // KM-PRO-V201 · υπόλοιπο
 const D1 = { prepare(q) { let args = []; const st = {
   bind(...a) { args = a.map((x) => (x === undefined ? null : x)); return st; },
   async first() { const r = db.prepare(q).get(...args); return r === undefined ? null : { ...r }; },
   async all() { return { results: db.prepare(q).all(...args).map((r) => ({ ...r })) }; },
-  async run() { const r = db.prepare(q).run(...args); return { meta: { changes: Number(r.changes) } }; } }; return st; } };
+  async run() { const r = db.prepare(q).run(...args); return { meta: { changes: Number(r.changes) } }; },
+  _sync() { const r = db.prepare(q).run(...args); return { meta: { changes: Number(r.changes) } }; } }; return st; },
+  async batch(list) { db.exec("BEGIN"); try { const o = list.map((x) => x._sync()); db.exec("COMMIT"); return o; } catch (e) { db.exec("ROLLBACK"); throw e; } } };
 
 const dir = mkdtempSync(join(tmpdir(), "kmf5-"));
 writeFileSync(join(dir, "km_paddle.js"), pad);
 writeFileSync(join(dir, "km_pro.js"), pro);
+writeFileSync(join(dir, "km_bal.js"), readFileSync("src/km_bal.js", "utf8"));
 writeFileSync(join(dir, "km_team.js"), "export async function handleTeam(){ return null; }");
 writeFileSync(join(dir, "km_acct.js"), "export async function handleAcct(){ return null; }");
 const P = await import("file://" + join(dir, "km_pro.js").replace(/\\/g, "/"));
@@ -183,51 +168,13 @@ const grant = (f) => db.prepare("INSERT OR REPLACE INTO km_pro VALUES (?, 'pro',
 const proRow = (f) => db.prepare("SELECT * FROM km_pro WHERE folder_id = ?").get(f);
 const plan = (f) => (db.prepare("SELECT plan FROM km_accounts WHERE folder_id = ?").get(f) || {}).plan || null;
 
-// ═══ 1 · ΟΡΙΟ ΑΝΑΓΝΩΣΕΩΝ ═══
+// ═══ 1 · ΛΟΓΑΡΙΑΣΜΟΙ ═══ (KM-PRO-V201: ο μετρητής μήνα καταργήθηκε — η χρέωση από το υπόλοιπο: tests/pro_v201.test.mjs)
 acc(F1, "boss@example.com"); grant(F1);
-envX = {};   // καμία ρύθμιση
-let r = await call("POST", "/api/km/pro/read", { folder: F1, body: PAGE });
-ok(r.st === 503 && r.j.error === "limit_unset" && reads === 0, "🔴 χωρίς ρύθμιση ορίου: ΚΑΜΙΑ ανάγνωση (503 limit_unset), καμία κλήση στον πάροχο");
-ok(PD && P.proLimits({}, null).reads === null && P.proLimits({ PRO_MONTHLY_READS: "abc" }, null).reads === null, "όριο: μόνο από ρύθμιση — άκυρη τιμή = μη ρυθμισμένο");
-envX = { PRO_MONTHLY_READS: "2", PRO_MONTHLY_USD: "5" };
-r = await call("POST", "/api/km/pro/read", { folder: F1, body: PAGE });
-ok(r.st === 200 && r.j.ok && r.j.month && r.j.month.reads === 1 && r.j.month.limit === 2 && r.j.month.left === 1, "1η ανάγνωση: μετρητής 1/2 στην απάντηση");
-nextRead = { fail: true };
-r = await call("POST", "/api/km/pro/read", { folder: F1, body: PAGE });
-ok(r.st >= 429 && r.j.error === "provider", "αποτυχία παρόχου → σφάλμα παρόχου");
-ok(db.prepare("SELECT reads FROM km_pro_quota WHERE folder_id = ?").get(F1).reads === 1, "🔴 η αποτυχία του παρόχου ΔΕΝ καίει ανάγνωση του πελάτη");
-nextRead = { lines: 0 };
-r = await call("POST", "/api/km/pro/read", { folder: F1, body: PAGE });
-ok(db.prepare("SELECT reads FROM km_pro_quota WHERE folder_id = ?").get(F1).reads === 1, "🔴 ανάγνωση χωρίς γραμμές ΔΕΝ μετράει");
-nextRead = { lines: 4 };
-r = await call("POST", "/api/km/pro/read", { folder: F1, body: PAGE });
-ok(r.j.ok && r.j.month.left === 0, "2η ανάγνωση: 2/2, απομένουν 0");
-const before = reads;
-r = await call("POST", "/api/km/pro/read", { folder: F1, body: PAGE });
-const month = new Date().toISOString().slice(0, 7);
-ok(r.st === 429 && r.j.error === "read_limit" && r.j.reason === "reads" && r.j.used === 2 && r.j.limit === 2 && r.j.renews === P.proRenews(month) && reads === before,
-   "🔴 3η: 429 read_limit {used 2, limit 2, renews} — ΧΩΡΙΣ κλήση στον πάροχο");
-ok(P.proRenews("2026-12") === "2027-01-01" && P.proRenews("2026-10") === "2026-11-01", "ανανέωση: 1η του επόμενου μήνα (και Δεκέμβριος → Ιανουάριος)");
-r = await call("GET", "/api/km/pro/status", { folder: F1 });
-ok(r.j.ok && r.j.pro && r.j.month.reads === 2 && r.j.month.limit === 2 && r.j.month.left === 0 && r.j.month.renews, "pro/status: reads / limit / left / renews");
-// όριο ανά λογαριασμό
-r = await call("POST", "/api/km/admin/pro/limit", { body: { folder_id: F1, reads_limit: 5 } });
-ok(r.st === 404, "όριο ανά λογαριασμό ΜΟΝΟ με κλειδί admin");
-r = await call("POST", "/api/km/admin/pro/limit", { admin: 1, body: { folder_id: F1, reads_limit: -3 } });
-ok(r.st === 400, "άκυρο όριο → 400");
-r = await call("POST", "/api/km/admin/pro/limit", { admin: 1, body: { folder_id: F1, reads_limit: 3 } });
-r = await call("POST", "/api/km/pro/read", { folder: F1, body: PAGE });
-ok(r.j.ok && r.j.month.limit === 3 && r.j.month.left === 0, "🔴 το όριο ΑΝΑ λογαριασμό υπερισχύει της γενικής ρύθμισης");
-// ταυτόχρονες κρατήσεις (ατομικό UPSERT)
 acc(F2, "two@example.com"); grant(F2);
-envX = { PRO_MONTHLY_READS: "3", PRO_MONTHLY_USD: "5" };
-const par = await Promise.all(Array.from({ length: 8 }, () => call("POST", "/api/km/pro/read", { folder: F2, body: PAGE })));
-ok(par.filter((x) => x.j.ok).length === 3 && par.filter((x) => x.j.error === "read_limit").length === 5, "🔴 8 ταυτόχρονες με όριο 3 → ακριβώς 3 περνούν");
-// ταβάνι κόστους
 acc(F3, "three@example.com"); grant(F3);
-db.prepare("INSERT INTO km_pro_usage (folder_id, month, calls, usd_micro) VALUES (?, ?, 10, 5000000)").run(F3, month);
-r = await call("POST", "/api/km/pro/read", { folder: F3, body: PAGE });
-ok(r.st === 429 && r.j.error === "read_limit" && r.j.reason === "cost", "🔴 ταβάνι κόστους (ρύθμιση PRO_MONTHLY_USD) → read_limit/cost");
+let r = await call("POST", "/api/km/pro/read", { folder: F1, body: PAGE });
+ok(r.st === 402 && r.j.error === "no_balance" && reads === 0, "V201: PRO χωρίς υπόλοιπο → 402 no_balance, καμία κλήση στον πάροχο");
+ok(P.proRenews("2026-12") === "2027-01-01" && P.proRenews("2026-10") === "2026-11-01", "ανανέωση ταβανιού: 1η του επόμενου μήνα (και Δεκέμβριος → Ιανουάριος)");
 
 // ═══ 2 · PADDLE WEBHOOK (ψεύτικα γεγονότα, σωστή υπογραφή) ═══
 const sign = (raw, ts, sec) => createHmac("sha256", sec || SECRET).update(ts + ":" + raw).digest("hex");
@@ -313,20 +260,8 @@ ok(db.prepare("SELECT COUNT(*) AS n FROM km_pro_events").get().n > 5 && !db.prep
 // ═══ 2β · ΕΥΡΗΜΑΤΑ ΑΝΕΞΑΡΤΗΤΗΣ ΑΝΑΘΕΩΡΗΣΗΣ (15/10) ═══
 r = await hook("subscription.updated", sub("sub_01a", "active", { email: "upgrade@example.com" }), { ts: Math.floor(Date.now() / 1000) + 60 });
 ok(r.st === 401 && r.j.error === "stale", "🔴 υπογραφή ΜΕΛΛΟΝΤΙΚΗ κατά 60″ → 401 (η ανοχή ισχύει και προς τα δύο)");
-// μισή ρύθμιση: μόνο αναγνώσεις → το status λέει unset (όχι «απομένουν»)
-envX = { PRO_MONTHLY_READS: "50" };
 r = await call("GET", "/api/km/pro/status", { folder: F2 });
-ok(r.j.month.limit === null && r.j.month.left === null && r.j.month.blocked === "unset", "🔴 μισή ρύθμιση (χωρίς ταβάνι κόστους) → status: unset — το μήνυμα ΔΕΝ σβήνει");
-envX = { PRO_MONTHLY_READS: "50", PRO_MONTHLY_USD: "5" };
-r = await call("GET", "/api/km/pro/status", { folder: F3 });
-ok(r.j.month.blocked === "cost" && r.j.month.left > 0, "status: ταβάνι κόστους → blocked = cost (ακόμα κι αν περισσεύουν αναγνώσεις)");
-r = await call("GET", "/api/km/pro/status", { folder: F2 });
-ok(r.j.month.blocked === null && r.j.month.left === 47, "status: όριο 50, 3 αναγνώσεις → απομένουν 47, τίποτα μπλοκαρισμένο");
-// πίνακας μετρητή που λείπει → 503 limit_unset (όχι 500 σε βρόχο)
-db.exec("ALTER TABLE km_pro_quota RENAME TO km_pro_quota_x");
-r = await call("POST", "/api/km/pro/read", { folder: F2, body: PAGE });
-db.exec("ALTER TABLE km_pro_quota_x RENAME TO km_pro_quota");
-ok(r.st === 503 && r.j.error === "limit_unset", "μετρητής μη διαθέσιμος → 503 limit_unset (ορατό μήνυμα), ποτέ ανάγνωση χωρίς μέτρηση");
+ok(r.j.month.blocked === "balance" && r.j.bal && r.j.bal.reads_pro === 0, "V201 · status: PRO χωρίς υπόλοιπο → blocked = balance (η εφαρμογή το δείχνει)");
 // διαφορετικός λογαριασμός με ίδιο email ΔΕΝ «κλέβει» δεμένη συνδρομή
 db.prepare("INSERT INTO km_pro_sub (sub_id, provider, email, folder_id, status, occurred_at, created_at, updated_at) VALUES ('sub_01own', 'paddle', 'same@example.com', ?, 'active', 'x', 'x', 'x')").run(F1);
 const FB = "b".repeat(64); acc(FB, "same@example.com");
@@ -376,10 +311,10 @@ ok(pg.includes("customData: { km_email: v }") && pg.includes("customer: { email:
 const sch = readFileSync("schema/km_pro_f5.sql", "utf8");
 ok(/CREATE INDEX IF NOT EXISTS idx_km_pro_quota_month/.test(sch) && /PRIMARY KEY \(folder_id, month\)/.test(sch) && /idx_km_pro_sub_email/.test(sch), "D1: μετρητής με κλειδί (λογαριασμός, μήνας) + ευρετήρια από την πρώτη έκδοση");
 ok(!/"/.test(sch.replace(/--[^\n]*/g, "")), "σχήμα χωρίς διπλά εισαγωγικά (περνά από d1apply)");
-ok(km.includes("\"km_pro_quota\", \"km_pro_limits\", \"km_pro_usage\", \"km_pro\"]") && km.includes("UPDATE km_pro_sub SET folder_id = NULL"), "🔴 διαγραφή λογαριασμού: μετρητής/όριο/χρήση/PRO φεύγουν · η συνδρομή ξεδένεται");
+ok(km.includes("\"km_pro_quota\", \"km_pro_limits\", \"km_pro_usage\", \"km_pro_agent\", \"km_pro\"]") && km.includes("UPDATE km_pro_sub SET folder_id = NULL"), "🔴 διαγραφή λογαριασμού: μετρητής/όριο/χρήση/Κώστας/PRO φεύγουν · η συνδρομή ξεδένεται");
 ok(km.includes("const { proExpire } = await import(\"./km_paddle.js\")"), "καθημερινός καθαρισμός: λήξη συνδρομών χωρίς γεγονός");
 ok(!/month_cap/.test(pro) && !/month_cap/.test(js), "το παλιό «month_cap» (σιωπηλό) δεν υπάρχει πια");
-ok(js.includes("if (err.msg === 'read_limit' || err.msg === 'limit_unset') {") && js.includes("          proNoteRender();\n          if (!el('s-pend').hidden) { renderPending(); }"), "🔴 κινητό: το όριο ΦΑΙΝΕΤΑΙ (κουτί κάμερας + Εκκρεμή)");
+ok(js.includes("if (err.msg === 'no_balance') {") && js.includes("          proNoteRender();\n          if (!el('s-pend').hidden) { renderPending(); }"), "🔴 κινητό: το τέλος υπολοίπου ΦΑΙΝΕΤΑΙ (κουτί κάμερας + Εκκρεμή) — V201");
 ok(js.includes("      if (lb && list.length) { body.appendChild(lb); }"), "🔴 κινητό: λωρίδα ορίου πάνω από τα «Εκκρεμή»");
 ok(html.includes('id="pro-note"') && html.includes('id="pro-note-t"') && html.includes('id="pro-note-x"'), "κινητό: κουτί μηνύματος PRO στην κάμερα");
 ok(js.includes("    if (!document.hidden && Date.now() - proChecked > 300000) { proRefresh(); }"), "🔴 αναβάθμιση στο web → φαίνεται στην επιστροφή στην εφαρμογή");
@@ -388,9 +323,9 @@ ok(!/paddle|checkout|59\s*€|€\s*59/i.test(js) && !/href="[^"]*fastwrite\.tec
 ok(!html.includes("σου έρχεται πρόταση διόρθωσης που την εγκρίνεις εσύ με ένα πάτημα") && html.includes("η διόρθωσή του περνά αμέσως"), "«Κάλεσε»: η διόρθωση λογιστή όπως αποφασίστηκε 9/10 (άμεση + αναίρεση)");
 ok(js.includes("      return rp.then(function () { return localStorage.getItem(LS.reg) ? proRefresh() : proOn(); });") && js.includes("proReady(4000).then(function () {   /* KM-PRO-NOKEY"), "🔴 νέος PRO: το «είναι PRO;» ρωτιέται ΑΦΟΥ γίνει η εγγραφή (αλλιώς οθόνη κλειδιού)");
 ok(js.includes("    if (proOn()) { box.hidden = true; btn.hidden = true; return; }"), "PRO: χωρίς το «δώρο 20» του Free");
-ok(js.includes("function needKeyScreen() { return !localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip) && !proOn(); }"), "νέος PRO: χωρίς οθόνη κλειδιού (needKeyScreen)");
+ok(js.includes("function needKeyScreen() { return false; }"), "νέος PRO (και V201: κάθε νέος): χωρίς οθόνη κλειδιού (needKeyScreen)");
 const stg = wt.slice(wt.indexOf("[env.staging.vars]"), wt.indexOf("[[env.staging.d1_databases]]"));
-ok(stg.includes('PRO_MONTHLY_READS = "300"') && stg.includes('PRO_MONTHLY_USD = "15"'), "staging: όριο ρυθμισμένο (ΔΟΚΙΜΑΣΤΙΚΕΣ τιμές, όχι απόφαση)");
+ok(stg.includes('KM_COST_PRO_USD = "0.0121"') && stg.includes('KM_MARKUP_PCT = "15"'), "staging: τιμές υπολοίπου ρυθμισμένες (V201 — ο μετρητής μήνα καταργήθηκε)");
 const prodVars = wt.slice(wt.indexOf("[vars]"), wt.indexOf("[[d1_databases]]"));
 ok(!/PRO_MONTHLY_READS|PRO_MONTHLY_USD|PRO_LIVE/.test(prodVars), "🔴 παραγωγή: ΚΑΝΕΝΑ όριο/PRO γραμμένο από τον Claude (απόφαση Stavros)");
 ok(!/PADDLE_WEBHOOK_SECRET\s*=/.test(wt), "🔴 το μυστικό Paddle ΠΟΤΕ στο wrangler.toml");
@@ -412,14 +347,12 @@ ok(js.includes("            if (okPh === false) { acctPhLater(rid); again(); ret
 ok(js.includes("      if (x.st === 'applied' && !isReader()) {") && !js.includes("if (i === 0 && x.st === 'applied'"), "«↩ Αναίρεση» σε ΚΑΘΕ εφαρμοσμένη διόρθωση (όχι μόνο την τελευταία)");
 ok(js.includes("        if (mac !== env.mac) { throw new Error('λάθος υπογραφή'); }") && js.includes("          return acctApplyFix(priv, f).catch("), "διόρθωση: ισχύει χωρίς πάτημα ΜΕΤΑ τον έλεγχο υπογραφής A");
 ok(js.includes("    return kmImportK(kmHexToBytes(acctKeyNow().k)).then(function (key) { return kmSeal(key, bytes); })") && !/acctGiveKey[\s\S]{0,400}kmKeyReady/.test(fnSrc("acctGiveKey") || ""), "🔴 κλειδί λογιστή = A (μόνο ανάγνωσης) — ποτέ το Κ");
-// proMonth: η εφαρμογή ακολουθεί ΜΟΝΟ τον server
+// proMonth: η εφαρμογή ακολουθεί ΜΟΝΟ τον server (V201: μόνο «υπόλοιπο» ή «τίποτα»)
 { const store = {}; const LSs = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
   const pm = new Function("localStorage", "LS", "proNoteRender", fnSrc("proLimGet") + fnSrc("proLimSet") + fnSrc("proMonth") + "\nreturn { proMonth, proLimGet };")(LSs, { proLim: "L" }, () => {});
-  pm.proMonth({ blocked: "unset", limit: null, left: null }); const a1 = pm.proLimGet();
-  pm.proMonth({ blocked: "cost", limit: 300, left: 200, renews: "2026-11-01" }); const a2 = pm.proLimGet();
-  pm.proMonth({ blocked: null, limit: 300, left: 200, renews: "2026-11-01" }); const a3 = pm.proLimGet();
-  pm.proMonth({ blocked: "reads", limit: 2, left: 0, reads: 2, renews: "2026-11-01" }); const a4 = pm.proLimGet();
-  ok(a1 && a1.kind === "unset" && a2 && a2.kind === "cost" && a3 === null && a4 && a4.kind === "reads" && a4.used === 2, "🔴 κινητό: unset / cost / καθαρό / reads — ακριβώς όπως το λέει ο server (σβήνει όταν ξεμπλοκάρει)"); }
+  pm.proMonth({ blocked: "balance" }); const a1 = pm.proLimGet();
+  pm.proMonth({ blocked: null }); const a2 = pm.proLimGet();
+  ok(a1 && a1.kind === "balance" && a2 === null, "🔴 κινητό: «τέλος υπολοίπου» / καθαρό — ακριβώς όπως το λέει ο server (σβήνει όταν ξαναμπεί υπόλοιπο)"); }
 // pgv + srvPages (εύρημα #1): μετά τη διαγραφή σελίδας ΚΑΜΙΑ σελίδα-φάντασμα
 ok(ids({ id: "R3", blob: 1, pages: [1], srvPages: 3, pgv: 1 }).join() === "R3-v1,R3-p2-v1", "🔴 «Διαγραφή σελίδας» σε τιμολόγιο από τον server: 2 σελίδες, όχι 3 (καμία που δεν υπάρχει)");
 ok(js.includes("if (pgs.some(function (x) { return !x; })) { alert("), "🔴 «Διαγραφή σελίδας» μόνο όταν ΟΛΕΣ οι σελίδες είναι στο κινητό (2η αναθεώρηση)");

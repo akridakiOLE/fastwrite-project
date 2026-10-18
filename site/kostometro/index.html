@@ -481,6 +481,7 @@
     <button class="row" data-go="s-pend"><span class="row-l"><span class="row-t">Εκκρεμή</span><span class="row-sub">περιμένουν ποσά</span></span><span class="row-b" id="m-pend">0</span></button>
     <button class="row" data-go="s-prices" id="m-prices-row" hidden><span class="row-l"><span class="row-t">📊 Τιμές</span><span class="row-sub">PRO · τελευταίες τιμές ανά προϊόν και προμηθευτή</span></span><span class="row-b">→</span></button>   <!-- KM-PRO-F2 -->
     <button class="row" data-go="s-team" id="m-team-row" hidden><span class="row-l"><span class="row-t">👥 Ομάδα</span><span class="row-sub">PRO · υπάλληλοι, βάρδιες, προσκλήσεις</span></span><span class="row-b">→</span></button>   <!-- KM-PRO-F3 -->
+    <button class="row" data-go="s-bal" id="m-bal-row" hidden><span class="row-l"><span class="row-t">💶 Υπόλοιπο</span><span class="row-sub" id="m-bal-sub">ο Κώστας διαβάζει με προπληρωμή</span></span><span class="row-b">→</span></button>   <!-- KM-PRO-V201 -->
     <button class="row" data-go="s-sup"><span class="row-l"><span class="row-t">Προμηθευτές</span><span class="row-sub">όλα τα τιμολόγια ανά προμηθευτή</span></span><span class="row-b" id="m-sup">0</span></button>
     <div class="grp">Βοήθεια</div>
     <button class="row" data-go="s-faq"><span class="row-l"><span class="row-t">Ερωτήσεις &amp; απαντήσεις</span><span class="row-sub">ό,τι ρωτάνε όλοι</span></span><span class="row-b">→</span></button>
@@ -758,6 +759,36 @@
     <p class="fine">Ο σύνδεσμος είναι δικός σου. Όποιος εγγραφεί μέσα από αυτόν, μετράει για σένα.</p>
     <p class="fine" id="ref-note"></p>
     <p class="fine" data-pro="soon">Οι δυνατότητες που περιγράφονται αφορούν την έκδοση PRO που σχεδιάζεται.</p>
+  </div>
+</section>
+
+<!-- ══ KM-PRO-V201 · ΥΠΟΛΟΙΠΟ (Brief «Τρία σκαλιά», εγκρίθηκε 18/10/2026) ══════════
+     Ό,τι δείχνει έρχεται από τον server (/api/km/bal). ΚΑΜΙΑ τιμή σε ευρώ γραμμένη εδώ (Apple 3.1.1): η τιμή
+     αγοράς έρχεται από το κατάστημα, το υπόλοιπο από τον server. -->
+<section id="s-bal" class="screen page" hidden>
+  <header class="pg-head">
+    <button class="back" data-back aria-label="Πίσω">‹<span>Επιστροφή</span></button>
+    <h2>💶 Υπόλοιπο</h2>
+  </header>
+  <div class="pg-body">
+    <div class="kv"><span>Υπόλοιπο</span><b id="bl-left">—</b></div>
+    <div class="kv"><span>Τιμολόγια PRO.mini · σύνολα</span><b id="bl-mini">—</b></div>
+    <div class="kv"><span>Τιμολόγια PRO · γραμμή-γραμμή</span><b id="bl-pro">—</b></div>
+    <p class="hint" id="bl-note"></p>
+    <div id="bl-buy" hidden>
+      <button class="btn primary" id="bl-buy-go" type="button">Αγορά υπολοίπου</button>
+      <p class="err" id="bl-buy-msg" hidden></p>
+    </div>
+    <p class="hint" id="bl-nobuy" hidden>Η αγορά υπολοίπου γίνεται μέσα από την εφαρμογή Kostometro του App Store ή του Google Play.</p>
+    <div id="bl-trial" class="bl-trial" hidden>
+      <div class="sep"></div>
+      <b id="bl-trial-t"></b>
+      <p id="bl-trial-p"></p>
+    </div>
+    <div class="grp">Αυτόν τον μήνα</div>
+    <div id="bl-month"></div>
+    <div class="grp">Τελευταίες κινήσεις</div>
+    <div id="bl-last"></div>
   </div>
 </section>
 

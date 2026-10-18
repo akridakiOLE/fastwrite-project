@@ -24,7 +24,15 @@
 //   → km_accounts.email (ένα email = ένας λογαριασμός, Brief ΣΤ). Αν δεν υπάρχει ακόμα λογαριασμός,
 //   η συνδρομή μένει «σε αναμονή» (folder_id NULL) και δένεται στην εγγραφή / στο πρώτο pro/status.
 //
-// ΤΙ ΔΕΝ ΚΑΝΕΙ: δεν αποθηκεύει το σώμα του γεγονότος, ποτέ κάρτα, ποτέ ποσά.
+// ΤΙ ΔΕΝ ΚΑΝΕΙ: δεν αποθηκεύει το σώμα του γεγονότος, ποτέ κάρτα. Ποσά ΜΟΝΟ για την προπληρωμή (V201, παρακάτω):
+// τι πλήρωσε, τι φόρο, τι κράτησε η Paddle — όσα χρειάζονται για να μπει στο υπόλοιπο ακριβώς ό,τι εισπράξαμε.
+//
+// KM-PRO-V201 · Π3 · ΠΡΟΠΛΗΡΩΜΗ ΧΡΗΣΗΣ PRO ΣΤΟ WEB (Brief «Τρία σκαλιά» §4, εγκρίθηκε 18/10/2026)
+//   · transaction.completed με τιμή PADDLE_TOPUP_PRICE_ID (μη επαναλαμβανόμενη, 10 €) → πίστωση στο υπόλοιπο
+//     (src/km_bal.js). Ποσό = σύνολο − φόρος − προμήθεια Paddle, σε € (details.payout_totals, αλλιώς details.totals —
+//     developer.paddle.com/webhooks/transactions/transaction-completed, διαβάστηκε 18/10/2026). Χωρίς ευρώ → «υπό έλεγχο».
+//   · adjustment.created / .updated με action refund|chargeback, status approved → αφαιρείται (αναλογικά στη μερική).
+//   · ίδια εύρεση λογαριασμού με τη συνδρομή (km_email → email πελάτη → «σε αναμονή» ως την εγγραφή).
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const PADDLE_TOLERANCE_S = 5;                 // τεκμηρίωση Paddle, προεπιλογή
@@ -88,6 +96,7 @@ export async function proRecompute(env, folder, nowIso) {
   // καμία συνδρομή: δεν αγγίζουμε ό,τι δεν έγραψε ο πάροχος (π.χ. δοκιμή admin)· ό,τι έγραψε ο πάροχος → λήγει
   if (!subs.length && !(row && row.source === "mor")) return row ? row.status : null;
   if (row && row.source === "admin" && row.status === "test" && !any) return row.status;   // δοκιμή admin δεν σβήνεται από ληγμένη συνδρομή
+  if (row && row.source === "trial" && row.status === "trial" && !any) return row.status;  // V201 · ούτε η δοκιμή 14 ημερών
   const status = any ? "active" : "cancelled";
   const u = any ? (until === "∞" ? null : until) : nowIso;
   await env.DB.prepare(
@@ -139,6 +148,11 @@ async function onCustomer(env, d, occ, t) {
     const f = await folderOfEmail(env, email);
     if (f) await proClaim(env, f, email, t);
   }
+  // V201 · προπληρωμές web που περίμεναν το email αυτού του πελάτη
+  if (email) {
+    const r = await env.DB.prepare("UPDATE km_bal_lot SET email = ? WHERE customer = ? AND folder_id IS NULL AND email IS NULL").bind(email, cid).run();
+    if (r && r.meta && r.meta.changes) { const f = await folderOfEmail(env, email); if (f) { const { balClaim } = await import("./km_bal.js"); await balClaim(env, f, email); } }
+  }
   return "ok";
 }
 
@@ -168,7 +182,95 @@ async function onSubscription(env, d, occ, t) {
   ).bind(subId, cid, email, folder, status, pe, sc && typeof sc.action === "string" ? sc.action.slice(0, 20) : null,
          sc ? iso(sc.effective_at) : null, pr, occ, t, t).run();
   if (folder) await proRecompute(env, folder, t);
+  // V201 · μία δοκιμή ανά email: η πρώτη «trialing» γράφει το hash του email (μένει και μετά τη διαγραφή του λογαριασμού)
+  if (status === "trialing" && email) {
+    const { trialHash } = await import("./km_bal.js");
+    const eh = await trialHash(env, email);
+    if (eh) await env.DB.prepare("INSERT INTO km_pro_trial (email_h, folder_id, started_at, until) VALUES (?, ?, ?, ?) ON CONFLICT(email_h) DO NOTHING")
+      .bind(eh, folder || "-", occ, pe || occ).run();
+  }
   return { out: folder ? "applied" : "pending", subId, folder };
+}
+
+// ── KM-PRO-V201 · Π3 · ΠΡΟΠΛΗΡΩΜΗ ──────────────────────────────────────────
+const cents = (v) => (typeof v === "string" && /^\d{1,12}$/.test(v) ? Number(v) : (Number.isInteger(v) && v >= 0 ? v : null));
+export function topupNet(details) {
+  const d = details && typeof details === "object" ? details : {};
+  const eur = (x) => (x && typeof x === "object" && x.currency_code === "EUR" ? x : null);
+  const src = eur(d.payout_totals) || eur(d.totals);
+  const tt = d.totals && typeof d.totals === "object" ? d.totals : null;
+  const gross = tt ? cents(tt.total) : null, tax = tt ? cents(tt.tax) : null;
+  if (src) {
+    const tot = cents(src.total), tx = cents(src.tax), fee = cents(src.fee);
+    if (tot !== null && tx !== null && fee !== null && tot > tx + fee) {
+      return { status: "ok", net_micro: (tot - tx - fee) * 10000, currency: tt ? tt.currency_code || null : "EUR", gross_minor: gross, tax_minor: tax };
+    }
+  }
+  return { status: "review", net_micro: 0, currency: tt ? tt.currency_code || null : null, gross_minor: gross, tax_minor: tax,
+           note: "έλεγχος: η Paddle δεν έδωσε καθαρό σε € (" + ((d.payout_totals && d.payout_totals.currency_code) || (tt && tt.currency_code) || "?") + ")" };
+}
+async function onTopup(env, d, t) {
+  const price = typeof env.PADDLE_TOPUP_PRICE_ID === "string" ? env.PADDLE_TOPUP_PRICE_ID : "";
+  const items = Array.isArray(d.items) ? d.items : [];
+  const isTop = (it) => !!(price && it && it.price && it.price.id === price);
+  if (!items.some(isTop)) return { out: "ignored" };                   // συνδρομή / ανανέωση — την πιάνει το subscription.*
+  const txn = sid(d.id, "txn_");
+  if (!txn) return { out: "bad_transaction" };
+  const { balConfig, balCredit } = await import("./km_bal.js");
+  const cfg = balConfig(env);
+  if (!cfg) throw new Error("bal_not_configured");                    // 500 → η Paddle ξαναστέλνει, τα χρήματα δεν χάνονται
+  const cd = d.custom_data && typeof d.custom_data === "object" && !Array.isArray(d.custom_data) ? d.custom_data : {};
+  const cid = sid(d.customer_id, "ctm_");
+  let email = normMail(cd.km_email);
+  if (!email && cid) { const c = await env.DB.prepare("SELECT email FROM km_pro_customer WHERE customer_id = ?").bind(cid).first(); email = c ? normMail(c.email) : null; }
+  const folder = await folderOfEmail(env, email);
+  const n = topupNet(d.details);
+  // Checkout «δοκιμή PRO + προπληρωμή» (απόφαση 18/10): η συνδρομή σε δοκιμή χρεώνεται 0 σήμερα — στο υπόλοιπο μπαίνει ΜΟΝΟ
+  // το μερίδιο της προπληρωμής (από τις γραμμές της συναλλαγής). Χωρίς γραμμές → «υπό έλεγχο», ποτέ μαντεψιά.
+  if (!items.every(isTop) && n.status === "ok") {
+    const li = d.details && Array.isArray(d.details.line_items) ? d.details.line_items : [];
+    const tot = (x) => (x && x.totals ? cents(x.totals.total) : null);
+    const all = li.reduce((s0, x) => (s0 === null || tot(x) === null ? null : s0 + tot(x)), 0);
+    const mine = li.filter((x) => x && x.price_id === price).reduce((s0, x) => (s0 === null || tot(x) === null ? null : s0 + tot(x)), 0);
+    if (li.length && all && mine !== null && mine > 0) { n.net_micro = Math.round(n.net_micro * mine / all); n.gross_minor = mine; }
+    else { n.status = "review"; n.net_micro = 0; n.note = "έλεγχος: προπληρωμή μαζί με άλλο προϊόν, χωρίς γραμμές"; }
+  }
+  const tok = typeof env.PADDLE_CLIENT_TOKEN === "string" ? env.PADDLE_CLIENT_TOKEN : "";
+  const r = await balCredit(env, Object.assign(n, { folder_id: folder, email: folder ? null : email, customer: cid, source: "paddle",
+    ext_id: "paddle:" + txn, env: tok.startsWith("test_") ? "sandbox" : "prod", product: "topup", fee_pct: null, cfg }));
+  // επιστροφές που ήρθαν ΠΡΙΝ από την πίστωση (αναθεώρηση #9)
+  if (!r.dup) {
+    const w = (await env.DB.prepare("SELECT k, v FROM km_iap_kv WHERE k LIKE ?").bind("paddle_refund_wait:" + txn + ":%").all()).results || [];
+    if (w.length) {
+      const { balRefund } = await import("./km_bal.js");
+      for (const x of w) {
+        let o = {}; try { o = JSON.parse(x.v || "{}"); } catch (e) {}
+        const frac = o.full || !n.gross_minor || o.part === null || o.part === undefined ? 1 : Math.min(1, o.part / n.gross_minor);
+        await balRefund(env, "paddle:" + txn, frac, "paddle:" + x.k.split(":").pop());
+        await env.DB.prepare("DELETE FROM km_iap_kv WHERE k = ?").bind(x.k).run();
+      }
+    }
+  }
+  return { out: r.dup ? "duplicate_topup" : folder ? (n.status === "ok" ? "credited" : "review") : "pending_topup" };
+}
+async function onAdjustment(env, d) {
+  if (!d || (d.action !== "refund" && d.action !== "chargeback") || d.status !== "approved") return { out: "ignored" };
+  const txn = sid(d.transaction_id, "txn_"), adj = sid(d.id, "adj_");
+  if (!txn || !adj) return { out: "bad_adjustment" };
+  const lot = await env.DB.prepare("SELECT gross_minor FROM km_bal_lot WHERE ext_id = ?").bind("paddle:" + txn).first();
+  if (!lot) {
+    // επιστροφή συνδρομής — ή επιστροφή προπληρωμής που ήρθε ΠΡΙΝ από την πίστωση (η Paddle δεν εγγυάται σειρά, αναθεώρηση #9):
+    // κρατιέται και εφαρμόζεται τη στιγμή που θα πιστωθεί η συναλλαγή (αν ποτέ πιστωθεί).
+    const part0 = d.totals && typeof d.totals === "object" ? cents(d.totals.total) : null;
+    await env.DB.prepare("INSERT INTO km_iap_kv (k, v, updated_at) VALUES (?, ?, ?) ON CONFLICT(k) DO NOTHING")
+      .bind("paddle_refund_wait:" + txn + ":" + adj, JSON.stringify({ full: d.type === "full" || d.action === "chargeback", part: part0 }), new Date().toISOString()).run();
+    return { out: "refund_waiting" };
+  }
+  const part = d.totals && typeof d.totals === "object" ? cents(d.totals.total) : null;
+  const frac = d.type === "full" || d.action === "chargeback" || !lot.gross_minor || part === null ? 1 : Math.min(1, part / lot.gross_minor);
+  const { balRefund } = await import("./km_bal.js");
+  const r = await balRefund(env, "paddle:" + txn, frac, "paddle:" + adj);
+  return { out: r && r.applied ? "refunded" : "refund_noop" };
 }
 
 // POST /api/km/pro/paddle/webhook
@@ -198,6 +300,8 @@ export async function paddleWebhook(request, env, h) {
   try {
     if (type === "customer.created" || type === "customer.updated" || type === "customer.imported") res = { out: await onCustomer(env, d, occ, t) };
     else if (type.startsWith("subscription.")) res = await onSubscription(env, d, occ, t);
+    else if (type === "transaction.completed") res = await onTopup(env, d, t);                          // V201 · Π3
+    else if (type === "adjustment.created" || type === "adjustment.updated") res = await onAdjustment(env, d);   // V201 · επιστροφή
     else res = { out: "ignored" };
   } catch (e) {
     await env.DB.prepare("UPDATE km_pro_events SET outcome = 'error' WHERE event_id = ?").bind(evId).run();

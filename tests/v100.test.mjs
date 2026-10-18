@@ -38,7 +38,8 @@ const stmt = (sql, args) => { const p = db.prepare(sql); return { async first() 
   async run() { const r = p.run(...args); return { meta: { changes: Number(r.changes) } }; }, async all() { return { results: p.all(...args) }; } }; };
 const DB = { prepare: (sql) => ({ bind: (...a) => stmt(sql, a), ...stmt(sql, []) }), async batch(l) { for (const s of l) await s.run(); return []; } };
 const mails = [];
-const env = { DB, KM_ADMIN_KEY: "adm1n", ANTHROPIC_API_KEY: "k-test", EMAIL: { async send(m) { mails.push(m); return { messageId: "x" }; } },
+// KM-PRO-V201 · ο βοηθός του Free κλείνει εξ ορισμού (Π4) — τα τεστ του ελέγχουν τον κώδικα με FREE_AGENT=1
+const env = { DB, FREE_AGENT: "1", KM_ADMIN_KEY: "adm1n", ANTHROPIC_API_KEY: "k-test", EMAIL: { async send(m) { mails.push(m); return { messageId: "x" }; } },
   ASSETS: { async fetch() { return new Response("## ΓΝΩΣΗ-ΤΕΣΤ"); } } };
 let calls = [], script = [];
 const anth = (content, stop) => ({ content, stop_reason: stop || "end_turn", usage: { input_tokens: 10, output_tokens: 10 } });

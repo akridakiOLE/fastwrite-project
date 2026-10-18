@@ -37,7 +37,8 @@ for (const f of ["km.sql", "km_h13.sql", "km_v54.sql", "km_mail.sql", "km_feedba
 const stmt = (sql, args) => { const p = db.prepare(sql); return { async first() { return p.get(...args) ?? null; },
   async run() { const r = p.run(...args); return { meta: { changes: Number(r.changes) } }; }, async all() { return { results: p.all(...args) }; } }; };
 const DB = { prepare: (sql) => ({ bind: (...a) => stmt(sql, a), ...stmt(sql, []) }), async batch(l) { for (const s of l) await s.run(); return []; } };
-const env = { DB, KM_ADMIN_KEY: "adm1n", ANTHROPIC_API_KEY: "k-test", EMAIL: { async send() { return { messageId: "x" }; } },
+// KM-PRO-V201 · ο βοηθός του Free κλείνει εξ ορισμού (Π4) — τα τεστ του ελέγχουν τον κώδικα με FREE_AGENT=1
+const env = { DB, FREE_AGENT: "1", KM_ADMIN_KEY: "adm1n", ANTHROPIC_API_KEY: "k-test", EMAIL: { async send() { return { messageId: "x" }; } },
   ASSETS: { async fetch() { return new Response(know); } } };
 const calls = [];
 let nextResp = null;
@@ -81,7 +82,7 @@ await check("Ν105-4 · ο builder βάζει πακέτο + «Κάλεσε» κ
   ok(build.includes("if len(s) > 60000:"), "όριο μεγέθους");
 });
 await check("Ν105-5 · το v102 μένει: μετά την εγκατάσταση (λογαριασμός + κλειδί) ο Κώστας ΔΕΝ ανοίγει νέα συζήτηση", async () => {
-  ok(src.includes("if (!grant && !warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: \"onboarded\" }, 403);"), "πόρτα v102 (+ v106 άδεια)");
+  ok(src.includes("if (!proMode && !grant && !warm && await agentOnboarded(env, inst, dev)) return json({ ok: false, error: \"onboarded\" }, 403);"), "πόρτα v102 (+ v106 άδεια) — V201: μόνο εκτός PRO");
   ok(src.includes("const AGENT_DEV_MAX = 30;"), "όριο ζωής");
 });
 await check("Ν105-6 · 🔴 απάντηση που κόπηκε στο όριο tokens: φτάνει στον πελάτη ΜΕΧΡΙ την τελευταία ολόκληρη πρόταση · όριο 1000", async () => {

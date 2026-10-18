@@ -43,7 +43,8 @@ const stmt = (sql, args) => { const p = db.prepare(sql); return { async first() 
   async run() { const r = p.run(...args); return { meta: { changes: Number(r.changes) } }; }, async all() { return { results: p.all(...args) }; } }; };
 const DB = { prepare: (sql) => ({ bind: (...a) => stmt(sql, a), ...stmt(sql, []) }), async batch(l) { for (const s of l) await s.run(); return []; } };
 const mails = [];
-const env = { DB, KM_ADMIN_KEY: "adm1n", ANTHROPIC_API_KEY: "k-test", EMAIL: { async send(m) { mails.push(m); return { messageId: "x" + mails.length }; } },
+// KM-PRO-V201 · ο βοηθός του Free κλείνει εξ ορισμού (Π4) — τα τεστ του ελέγχουν τον κώδικα με FREE_AGENT=1
+const env = { DB, FREE_AGENT: "1", KM_ADMIN_KEY: "adm1n", ANTHROPIC_API_KEY: "k-test", EMAIL: { async send(m) { mails.push(m); return { messageId: "x" + mails.length }; } },
   ASSETS: { async fetch() { return new Response("## ΓΝΩΣΗ-ΤΕΣΤ"); } } };
 const calls = []; let script = [];
 const anth = (content, stop) => ({ content, stop_reason: stop || "end_turn", usage: { input_tokens: 10, output_tokens: 10 } });
@@ -175,7 +176,7 @@ await check("Ρ-8 · εφαρμογή: ?reopen= μετά το boot · κουμπ
   ok(js.includes("try { agReopenFromUrl(0); } catch (e) {}") && js.includes("if (!id && (tries || 0) < 40) { setTimeout(") && /\[\?&\]reopen=\(\[0-9a-f\]\{32\}\)/.test(js), "url");
   ok(js.includes("if (agGrantOn()) { return true; }"), "άδεια ανάβει τον Κώστα");
   ok(html.includes('<button class="btn ghost" id="hp-kostas-go">💬 Μίλα με τον Κώστα (AI)</button>') && html.includes('id="hp-kostas" class="hp-kostas" hidden'), "κουμπί");
-  ok(js.includes("var kOn = (AG_PUBLIC || agLS(AG.on) === '1') && !!localStorage.getItem(LS.reg);"), "κρυφό όσο ο βοηθός είναι κρυφός");
+  ok(js.includes("var kOn = agProOn() && !!localStorage.getItem(LS.reg);"), "κρυφό εκτός PRO (V201 · Π4)");
   ok(wk.includes("ctx.waitUntil(kmAgentFollowups(env).then(") && wk.indexOf("kmAgentFollowups(env).then(") > wk.indexOf('if (cron === "0 3 * * *")') + 400, "ωριαίο cron");
   // v111: η έκδοση διαβάζεται από το version.json — ανεβαίνει σε κάθε deploy (απόφαση Stavros 1/10)
   const V = JSON.parse(readFileSync("site/kostometro/version.json", "utf8")).v;
