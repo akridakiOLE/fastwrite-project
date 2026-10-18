@@ -11,8 +11,8 @@ const MUT = [
   ["html", "<strong>90 ημέρες</strong> από το τελευταίο μήνυμα", "<strong>7 ημέρες</strong> από το τελευταίο μήνυμα"], // 2 · 🔴 χρόνος τήρησης συζητήσεων ≠ κώδικας
   ["html", "<strong>δεν αποθηκεύεται</strong>", "<strong>αποθηκεύεται</strong>"],           // 3 · 🔴 φωτογραφίες
   ["html", "γίνεται σε 72 ώρες", "γίνεται αμέσως"],                                        // 4 · 🔴 διαγραφή
-  ["html", '<p class="legal-lang"><strong>English:</strong> the previous policy (v1.2) for FastWrite Desktop remains available at <a href="/legal/privacy-en">', '<p class="legal-lang"><strong>English:</strong> the previous policy (v1.2) for FastWrite Desktop remains available at <a href="/legal/privacy-old">'],                        // 5 · σύνδεσμος στο αγγλικό
-  ["en", 'is in Greek at <a href="/legal/privacy">', 'is in Greek at <a href="/legal/nothing">'],                                              // 6 · το αγγλικό δεν δείχνει στο νέο
+  ["html", '<strong>English:</strong> <a href="/legal/privacy-en">', '<strong>English:</strong> <a href="/legal/privacy-old">'],                        // 5 · σύνδεσμος στο αγγλικό (v133: v2.6 EN)
+  ["en", '<strong>Ελληνικά:</strong> <a href="/legal/privacy">', '<strong>Ελληνικά:</strong> <a href="/legal/nothing">'],                                              // 6 · το αγγλικό δεν δείχνει στο ελληνικό (v133)
   ["html", "προσωπικό γραμματοκιβώτιο Gmail", "γραμματοκιβώτιο Workspace"],                 // 7 · 🔴 η προώθηση στο προσωπικό Gmail κρύβεται
   ["html", "Κρατάμε μόνο το email", "Κρατάμε email και όνομα"],                            // 8 · σύνδεση Google/MS: τι κρατάμε
   ["html", "<strong>ούτε τη φωτογραφία ούτε τα ποσά.</strong>", "<strong>τη φωτογραφία για 30 ημέρες.</strong>"],  // 9 · 🔴 v113: η Α9 λέει ότι κρατάμε τη φωτογραφία
@@ -27,7 +27,7 @@ const ok = (c, m) => { if (!c) throw new Error(m); };
 const num = (re) => { const m = re.exec(src); if (!m) throw new Error("δεν βρέθηκε στον κώδικα: " + re); return Number(m[1]); };
 
 check("Π-1 · δομή: ελληνικά, v2.1, 1/10/2026, όλες οι ενότητες και οι άγκυρες", () => {
-  ok(/<html lang="el">/.test(html) && html.includes("Έκδοση 2.5") && html.includes("7 Οκτωβρίου 2026") /* v120: Πολιτική v2.5 (Α4 — μεταφορά με QR) */, "κεφαλίδα");
+  ok(/<html lang="el">/.test(html) && html.includes("Έκδοση 2.6") && html.includes("18 Οκτωβρίου 2026") /* v133: Πολιτική v2.6 (καταστήματα, Apple, διαγραφή χωρίς εφαρμογή) */, "κεφαλίδα");
   for (const id of ["a1", "a2", "kostometro", "aa1", "aa2", "aa6", "aa7", "aa8", "fastwrite-desktop", "istotopos", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]) ok(html.includes('id="' + id + '"'), "άγκυρα " + id);
   ok(/<p class="legal-lang"><strong>English:<\/strong>[^<]*<a href="\/legal\/privacy-en">/.test(html), "σύνδεσμος στο αγγλικό");
 });
@@ -54,8 +54,8 @@ check("Π-4 · 🔴 λέει την αλήθεια για: προώθηση στ
   ok(/<strong>Δεν<\/strong> κρατάμε διεύθυνση IP/.test(html), "IP");
   ok(/μη αναστρέψιμο αποτύπωμα, χωρίς email/.test(html) && /sha256hex\(inst \+ ":" \+ \(env\.KM_ADMIN_KEY/.test(src), "χωνί");
 });
-check("Π-5 · το αγγλικό v1.2 μένει στο /legal/privacy-en με σημείωση προς το νέο", () => {
-  ok(/<html lang="en">/.test(en) && en.includes("Notice (1 October 2026)") && /is in Greek at <a href="\/legal\/privacy">/.test(en) && en.includes("v2.2"), "privacy-en");
+check("Π-5 · v133: το /legal/privacy-en είναι η μετάφραση της v2.6, δείχνει στο ελληνικό· το v1.2 στο αρχείο /legal/privacy-en-v1-2", () => {
+  ok(/<html lang="en">/.test(en) && en.includes("Version 2.6") && /<strong>Ελληνικά:<\/strong> <a href="\/legal\/privacy">/.test(en) && en.includes("/legal/privacy-en-v1-2"), "privacy-en");
 });
 check("Π-6 · 🔴 v113 · Α9 (ανάγνωση από τον Κώστα): μόνο μετά την ενεργοποίηση · ΟΥΤΕ φωτογραφία ΟΥΤΕ ποσά σε εμάς · Anthropic 30 ημέρες, χωρίς εκπαίδευση · υπεκτελών · τήρηση", () => {
   const a9 = html.slice(html.indexOf('id="aa9"'), html.indexOf('id="fastwrite-desktop"'));

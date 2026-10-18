@@ -1,0 +1,14 @@
+v133 · Πολιτική Απορρήτου v2.6 (ΕΛ+EN) + κουμπιά Apple + διαγραφή χωρίς την εφαρμογή + ειδοποίηση Πολιτικής
+
+- /legal/privacy και /legal/privacy-en = v2.6 (ισχύει 18/10/2026): App Store/Google Play, σύνδεση Apple
+  (κρυπτογραφημένο κλειδί μόνο για ακύρωση στη διαγραφή), Τ.Θ. 55518 αντί για διεύθυνση κατοικίας · v1.2 στο /legal/privacy-en-v1-2
+- όλα τα ⬜: PRO/Capgo έξω (δεν είναι ζωντανά), Apple μέσα, iPhone σαρωτής χωρίς τρίτο, Mailsuite §3 + τήρηση
+- index: 3 κουμπιά «Συνέχεια με Apple» (index_k4.diff, χειριστές K4β ήδη στο app.js)
+- ΚΩΔ-6: POST /api/km/admin/delreq (+/confirm) — κωδικός 6 ψηφίων στο email του λογαριασμού, μετά ίδιο αίτημα 72 ωρών
+- POST /api/km/admin/notice {kind:policy_v26} — dry_run εξ ορισμού, μία φορά ανά διεύθυνση (km_notice_sent)
+- κατάλογος αλληλογραφίας: «λειτουργεί από 12/10» (απόφαση Stavros 18/10, δρόμος β) · Apple 30 ημέρες επανάληψης · κωδικός διαγραφής 7 ημέρες
+- ανεξάρτητη αναθεώρηση: 1 HIGH + 6 MEDIUM διορθώθηκαν (διπλότυπα, claim-first, καθαρισμός, email «με email»)
+- tests/v133 34/34 + 12/12 μεταλλάξεις · legal_v21 ενημερώθηκε για v2.6 (6/6 + 10/10)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018FvCtKNsdhgb7jFHr9DaRc

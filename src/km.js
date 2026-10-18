@@ -8,6 +8,7 @@
 // KM-SERVER-V99-AGENT  ← σημάδι: Βοηθός Kostometro, Φάση 1 (29/9/2026)
 // KM-SERVER-V98-OAUTH  ← σημάδι: σύνδεση Google/Microsoft (29/9/2026)
 // KM-SERVER-K3A-APPLE  ← σημάδι: Sign in with Apple, τρίτος πάροχος (14/10/2026)
+// KM-SERVER-V133-DELREQ  ← σημάδι: διαγραφή χωρίς την εφαρμογή (ΚΩΔ-6, Πολιτική v2.6 Α6, 18/10/2026)
 // KM-SERVER-K3B-REVOKE  ← σημάδι: φύλαξη + ανάκληση token της Apple στη διαγραφή (TN3194, 18/10/2026)
 // KM-SERVER-V84-VERIFY ← Brief ΣΤ (24/9/2026): ένα email = ένας λογαριασμός · κωδικός 6 ψηφίων
 // Kostometro — μητρώο + σφραγισμένος φάκελος (Brief Α, Α350 §9.8 Η.1)
@@ -151,6 +152,10 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/delete" && method === "POST") return requestDelete(request, env, ctx);
   if (path === "/api/km/delete/cancel" && method === "POST") return cancelDelete(request, env, ctx);
   if (path === "/api/km/admin/delete" && method === "POST") return adminDelete(request, env);
+  // ΚΩΔ-6 (18/10/2026) · διαγραφή χωρίς την εφαρμογή — Πολιτική v2.6 Α6
+  if (path === "/api/km/admin/notice" && method === "POST") return adminNotice(request, env);   // v133 · ειδοποίηση Πολιτικής v2.6
+  if (path === "/api/km/admin/delreq" && method === "POST") return adminDelreq(request, env);
+  if (path === "/api/km/admin/delreq/confirm" && method === "POST") return adminDelreqConfirm(request, env, ctx);
   if (path === "/api/km/admin/purge" && method === "POST") return adminPurge(request, env);
   if (path === "/api/km/admin/inspect" && method === "POST") return adminInspect(request, env);
 
@@ -2989,6 +2994,122 @@ function adminOk(request, env) {
   return !!env.KM_ADMIN_KEY && k === env.KM_ADMIN_KEY;
 }
 
+// ═══ v133 · ΕΙΔΟΠΟΙΗΣΗ ΑΛΛΑΓΗΣ ΠΟΛΙΤΙΚΗΣ (Πολιτική v2.6, 18/10/2026) ═════════════
+//   POST /api/km/admin/notice {kind:"policy_v26", dry_run}  — ΜΟΝΟ KM_ADMIN_KEY, αλλιώς 404.
+// Παραλήπτες: ζωντανοί λογαριασμοί ∪ άνθρωποι του καταλόγου αλληλογραφίας (km_corr — ήδη χωρίς
+// αυτόματους/εμάς) · ΟΧΙ δικά μας / ο ελεγκτής καταστημάτων / όσοι διαγράφηκαν από τη λίστα (unsub).
+// dry_run ΕΞ ΟΡΙΣΜΟΥ. Κάθε διεύθυνση ΜΙΑ φορά, ακόμα και με δύο ταυτόχρονες εκτελέσεις: η γραμμή
+// «κλειδώνεται» ΠΡΙΝ την αποστολή (claim)· αποτυχία = attempts+1, μετά από NOTICE_TRIES δεν ξαναδοκιμάζεται.
+const NOTICE_KINDS = { policy_v26: 1 };
+const NOTICE_BATCH = 200;
+const NOTICE_TRIES = 3;
+const NOTICE_CLAIM_MS = 15 * 60 * 1000;
+async function noticeHash(env, e) { return sha256hex("notice|" + e + "|" + (env.KM_ADMIN_KEY || "km")); }
+async function adminNotice(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const kind = String(b.kind || "");
+  if (!NOTICE_KINDS[kind]) return json({ ok: false, error: "bad_kind" }, 400);
+  const dryRun = b.dry_run === false ? false : true;
+  const acc = (await env.DB.prepare("SELECT email FROM km_accounts WHERE deleted IS NULL AND email <> ''").all()).results || [];
+  let corr = [], unsub = [];
+  try { corr = (await env.DB.prepare("SELECT DISTINCT peer AS email FROM km_corr").all()).results || []; } catch (e) { corr = []; }
+  try { unsub = (await env.DB.prepare("SELECT email FROM km_leads WHERE unsub_at IS NOT NULL").all()).results || []; } catch (e) { unsub = []; }
+  const no = {}; for (const r of unsub) { const e = normEmail(r.email); if (e) no[e] = 1; }
+  const seen = {}, list = [];
+  for (const r of acc.concat(corr)) {
+    const e = normEmail(r.email);
+    if (!e || seen[e] || no[e] || MAIL_OURS_RE.test(e) || MAIL_SELF.indexOf(e) >= 0 || MAIL_AUTO_RE.test(e)) continue;   // MAIL_OURS_RE πιάνει και τον ελεγκτή καταστημάτων
+    seen[e] = 1; list.push(e);
+  }
+  const rows = (await env.DB.prepare("SELECT email_h, ok, attempts FROM km_notice_sent WHERE kind = ?").bind(kind).all()).results || [];
+  const st = {}; for (const r of rows) st[r.email_h] = r;
+  const todo = []; let done = 0, given_up = 0;
+  for (const e of list) {
+    const h = await noticeHash(env, e), r = st[h];
+    if (r && r.ok) { done++; continue; }
+    if (r && r.attempts >= NOTICE_TRIES) { given_up++; continue; }
+    todo.push({ e, h });
+  }
+  if (dryRun) return json({ ok: true, dry_run: true, kind, total: list.length, already: done, given_up, pending: todo.length, sample: todo.slice(0, 50).map((x) => maskEmail(x.e)) });
+  let sent = 0, failed = 0, busy = 0;
+  for (const x of todo.slice(0, NOTICE_BATCH)) {
+    const t = now(), stale = new Date(Date.now() - NOTICE_CLAIM_MS).toISOString();
+    await env.DB.prepare("INSERT OR IGNORE INTO km_notice_sent (kind, email_h, at, ok, attempts, claim) VALUES (?, ?, ?, 0, 0, NULL)").bind(kind, x.h, t).run();
+    const c = await env.DB.prepare(
+      "UPDATE km_notice_sent SET claim = ? WHERE kind = ? AND email_h = ? AND ok = 0 AND attempts < ? AND (claim IS NULL OR claim < ?)"
+    ).bind(t, kind, x.h, NOTICE_TRIES, stale).run();
+    if (!((c && c.meta && c.meta.changes) || 0)) { busy++; continue; }   // άλλη εκτέλεση το έχει — ΔΕΝ στέλνουμε δεύτερο
+    if (await mailSend(env, kind, x.e, {})) {
+      await env.DB.prepare("UPDATE km_notice_sent SET ok = 1, at = ?, claim = NULL WHERE kind = ? AND email_h = ?").bind(now(), kind, x.h).run();
+      sent++;
+    } else {
+      await env.DB.prepare("UPDATE km_notice_sent SET attempts = attempts + 1, claim = NULL WHERE kind = ? AND email_h = ?").bind(kind, x.h).run();
+      failed++;
+    }
+  }
+  return json({ ok: true, kind, sent, failed, busy, more: todo.length > NOTICE_BATCH });
+}
+
+// ═══ ΚΩΔ-6 · ΔΙΑΓΡΑΦΗ ΧΩΡΙΣ ΤΗΝ ΕΦΑΡΜΟΓΗ (18/10/2026) — Πολιτική v2.6 Α6 ═══════
+// Ο χρήστης γράφει στο support@· ο Stavros τρέχει δύο βήματα (μόνο με KM_ADMIN_KEY, αλλιώς 404):
+//   POST /api/km/admin/delreq          {email}        → κωδικός 6 ψηφίων στο email του λογαριασμού
+//   POST /api/km/admin/delreq/confirm  {email, code}  → ίδιο αίτημα 72 ωρών με την εφαρμογή
+// Ίδιοι κανόνες με την πόρτα Α (Η.11β): παγώνει αμέσως, ίδια email (με κείμενο «ζητήθηκε με email»),
+// ακύρωση με τις 12 λέξεις στο /akyrosi/, η πράξη από το ωριαίο cron (kmDeleteDue → wipeFolder → Apple).
+// Ο κωδικός: ΔΙΚΟΣ του πίνακας (δεν ανοίγει σύνδεση), δεμένος σε ΕΝΑΝ folder_id (ποτέ «όλοι με αυτό το
+// email»), αποτύπωμα με μυστικό (όχι σκέτο sha256 του email), ζει DELREQ_TTL_H, σβήνεται από το kmCleanup.
+// ⚠ Στον αιτούντα η απάντηση του support είναι ΙΔΙΑ είτε υπάρχει λογαριασμός είτε όχι (καμία διαρροή).
+const DELREQ_TTL_H = 7 * 24;
+async function delreqHash(env, e) { return sha256hex("delreq|" + e + "|" + (env.KM_ADMIN_KEY || "km")); }
+async function adminDelreq(request, env) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const email = normEmail(b.email);
+  if (!email) return json({ ok: false, error: "bad_email" }, 400);
+  const accs = (await env.DB.prepare("SELECT folder_id, delete_due_at FROM km_accounts WHERE email = ? AND deleted IS NULL").bind(email).all()).results || [];
+  if (!accs.length) return json({ ok: false, error: "no_account" }, 404);
+  if (accs.length > 1) return json({ ok: false, error: "duplicates", n: accs.length, hint: "παλιά διπλότυπα — καθάρισμα με /admin/purge πρώτα" }, 409);
+  const acc = accs[0];
+  if (acc.delete_due_at) return json({ ok: false, error: "already_pending", due_at: acc.delete_due_at }, 409);
+  const code = sixDigits(), t = Date.now(), emailH = await delreqHash(env, email);
+  await env.DB.prepare(
+    `INSERT INTO km_delreq_codes (email_h, folder_id, code_hash, created, expires, attempts) VALUES (?, ?, ?, ?, ?, 0)
+     ON CONFLICT(email_h) DO UPDATE SET folder_id = excluded.folder_id, code_hash = excluded.code_hash, created = excluded.created, expires = excluded.expires, attempts = 0`
+  ).bind(emailH, acc.folder_id, await sha256hex("delreq:" + email + ":" + code), new Date(t).toISOString(), new Date(t + DELREQ_TTL_H * 3600000).toISOString()).run();
+  const sent = await mailSend(env, "code_del", email, { code });
+  if (!sent) return json({ ok: false, error: "mail_failed" }, 502);
+  return json({ ok: true, sent: true, to: maskEmail(email), ttl_hours: DELREQ_TTL_H });
+}
+async function adminDelreqConfirm(request, env, ctx) {
+  if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
+  const b = (await safeJson(request)) || {};
+  const email = normEmail(b.email);
+  const code = String(b.code || "").replace(/\D/g, "");
+  if (!email || code.length !== 6) return json({ ok: false, error: "bad_code" }, 400);
+  const emailH = await delreqHash(env, email);
+  const row = await env.DB.prepare("SELECT * FROM km_delreq_codes WHERE email_h = ?").bind(emailH).first();
+  if (!row) return json({ ok: false, error: "no_code" }, 400);
+  if (row.expires < now()) return json({ ok: false, error: "code_expired" }, 400);
+  if (row.attempts >= CODE_MAX_TRIES) return json({ ok: false, error: "too_many" }, 429);
+  if ((await sha256hex("delreq:" + email + ":" + code)) !== row.code_hash) {
+    await env.DB.prepare("UPDATE km_delreq_codes SET attempts = attempts + 1 WHERE email_h = ?").bind(emailH).run();
+    return json({ ok: false, error: "bad_code", left: Math.max(0, CODE_MAX_TRIES - row.attempts - 1) }, 400);
+  }
+  await env.DB.prepare("DELETE FROM km_delreq_codes WHERE email_h = ?").bind(emailH).run();
+  const ts = now();
+  const due = new Date(Date.parse(ts) + DELETE_GRACE_HOURS * 3600 * 1000).toISOString();
+  // Ίδιος φραγμός με την πόρτα Α: «delete_requested_at IS NULL» ΜΕΣΑ στο SQL · ΕΝΑΣ folder_id, και πρέπει
+  // να έχει ΑΚΟΜΑ αυτό το email (αν άλλαξε κάτι στο μεταξύ, τίποτα δεν γίνεται).
+  const r = await env.DB.prepare(
+    `UPDATE km_accounts SET delete_requested_at = ?, delete_due_at = ?
+     WHERE folder_id = ? AND email = ? AND deleted IS NULL AND delete_requested_at IS NULL`
+  ).bind(ts, due, row.folder_id, email).run();
+  if (!((r && r.meta && r.meta.changes) || 0)) return json({ ok: false, error: "no_account_or_pending" }, 409);
+  fireMail(env, ctx, "delete_requested", email, { due: due, via: "email" });
+  return json({ ok: true, pending: { requested_at: ts, due_at: due, grace_hours: DELETE_GRACE_HOURS } });
+}
+
 async function adminDelete(request, env) {
   if (!adminOk(request, env)) return new Response("Not found", { status: 404 });
   const b = (await safeJson(request)) || {};
@@ -3393,6 +3514,10 @@ export async function kmCleanup(env, nowIso) {
     // v97 · KM-FUNNEL — 24 μήνες
     funnel: await wipe("km_funnel", "at < ?", monthsAgo(RETENTION.feedback_months, nowIso)),
   };
+  // v133 · κωδικοί διαγραφής χωρίς εφαρμογή: μόλις λήξουν (7 ημέρες) · ειδοποιήσεις Πολιτικής: 24 μήνες.
+  // Χωριστά (try): πριν τη μετάβαση της βάσης οι πίνακες δεν υπάρχουν και ο καθαρισμός ΔΕΝ πρέπει να πέσει.
+  try { done.delreq_codes = await wipe("km_delreq_codes", "expires < ?", nowIso || now()); } catch (e) { done.delreq_codes = 0; }
+  try { done.notice_sent = await wipe("km_notice_sent", "at < ?", monthsAgo(RETENTION.mail_months, nowIso)); } catch (e) { done.notice_sent = 0; }
   done.batch_limit = CLEANUP_BATCH;
   done.more = Object.keys(done).some((k) => k !== "batch_limit" && done[k] === CLEANUP_BATCH);
   return done;
@@ -3962,16 +4087,22 @@ function mailBody(kind, extra) {
   // είναι το μόνο πράγμα που ο κλέφτης δεν έχει.
   if (kind === "delete_requested") {
     const due = mailWhen(x.due);
+    // v133 · ΚΩΔ-6: ζητήθηκε με email (χωρίς την εφαρμογή) → ο κίνδυνος είναι το γραμματοκιβώτιο, όχι το κινητό
+    const viaMail = x.via === "email";
     return {
       subject: "Ζητήθηκε διαγραφή του λογαριασμού σου στο Kostometro · Kostometro account deletion requested",
       el: "Ζητήθηκε η διαγραφή του λογαριασμού σου στο Kostometro στις " + when + "." +
           " Ο λογαριασμός είναι ήδη παγωμένος και θα διαγραφεί οριστικά στις " + due + " (ώρα Κύπρου)." +
-          " ΑΝ ΔΕΝ ΗΣΟΥΝ ΕΣΥ, κάποιος έχει πρόσβαση στο κινητό σου. Μπορείς να το σταματήσεις:" +
+          (viaMail ? " Το αίτημα έγινε με email στο " + MAIL_SUPPORT + " και επιβεβαιώθηκε με τον κωδικό που στείλαμε σε αυτό το email." +
+               " ΑΝ ΔΕΝ ΗΣΟΥΝ ΕΣΥ, κάποιος έχει πρόσβαση στο email σου. Μπορείς να το σταματήσεις:"
+             : " ΑΝ ΔΕΝ ΗΣΟΥΝ ΕΣΥ, κάποιος έχει πρόσβαση στο κινητό σου. Μπορείς να το σταματήσεις:") +
           " άνοιξε τη σελίδα " + CANCEL_PAGE + " από οποιαδήποτε συσκευή και βάλε τις 12 λέξεις σου." +
           " Χρειάζεσαι βοήθεια; " + MAIL_SUPPORT,
       en: "Deletion of your Kostometro account was requested on " + when + "." +
           " The account is already frozen and will be permanently deleted on " + due + " (Cyprus time)." +
-          " IF THIS WAS NOT YOU, someone has access to your phone. You can stop it:" +
+          (viaMail ? " The request was made by email to " + MAIL_SUPPORT + " and confirmed with the code we sent to this email." +
+               " IF THIS WAS NOT YOU, someone has access to your email. You can stop it:"
+             : " IF THIS WAS NOT YOU, someone has access to your phone. You can stop it:") +
           " open " + CANCEL_PAGE + " on any device and enter your 12 words." +
           " Need help? " + MAIL_SUPPORT,
     };
@@ -3992,6 +4123,40 @@ function mailBody(kind, extra) {
           " IF YOUR PREVIOUS DEVICE IS LOST OR STOLEN, change your 12 words NOW in Settings → \"My 12 words\" —" +
           " until then that device can try again." +
           " Need help? " + MAIL_SUPPORT,
+    };
+  }
+
+  // v133 · ειδοποίηση αλλαγής Πολιτικής v2.6 (μία φορά ανά διεύθυνση)
+  if (kind === "policy_v26") {
+    return {
+      subject: "Ενημέρωση της Πολιτικής Απορρήτου (Kostometro · fastwrite.tech) · Privacy Policy update",
+      el: "Σου γράφουμε γιατί έχεις λογαριασμό στο Kostometro ή έχουμε ανταλλάξει email μαζί σου." +
+          " Ενημερώσαμε την Πολιτική Απορρήτου (έκδοση 2.6, 18 Οκτωβρίου 2026). Τι προστίθεται:" +
+          " η εφαρμογή από το App Store και το Google Play, η σύνδεση με Apple, η διαγραφή λογαριασμού χωρίς την εφαρμογή," +
+          " και ένας κατάλογος της αλληλογραφίας μας (διεύθυνση, ημερομηνία, θέμα, οι πρώτοι 200 χαρακτήρες), ώστε να μη μένει κανένα μήνυμα αναπάντητο." +
+          " Ο κατάλογος λειτουργεί από τις 12 Οκτωβρίου 2026. Μπορείς να αντιταχθείς όποτε θέλεις, γράφοντας στο " + MAIL_SUPPORT + "." +
+          " Ολόκληρο το κείμενο: https://fastwrite.tech/legal/privacy",
+      en: "We are writing because you have a Kostometro account or we have exchanged emails with you." +
+          " We have updated our Privacy Policy (version 2.6, 18 October 2026). What is added:" +
+          " the app from the App Store and Google Play, sign-in with Apple, account deletion without the app," +
+          " and a log of our correspondence (address, date, subject, the first 200 characters), so that no message is left unanswered." +
+          " The log has been running since 12 October 2026. You can object at any time by writing to " + MAIL_SUPPORT + "." +
+          " Full text: https://fastwrite.tech/legal/privacy-en",
+    };
+  }
+
+  // ΚΩΔ-6 · κωδικός επιβεβαίωσης για διαγραφή ΧΩΡΙΣ την εφαρμογή (ζητήθηκε με email στο support@)
+  if (kind === "code_del") {
+    return {
+      subject: "Κωδικός επιβεβαίωσης διαγραφής λογαριασμού Kostometro: " + x.code + " · Kostometro account deletion code",
+      el: "Ζήτησες με email τη διαγραφή του λογαριασμού σου στο Kostometro. Για να επιβεβαιώσουμε ότι είσαι εσύ," +
+          " στείλε τον κωδικό " + x.code + " στο " + MAIL_SUPPORT + ", από αυτό το email (ισχύει 7 ημέρες)." +
+          " Μετά την επιβεβαίωση ο λογαριασμός παγώνει και διαγράφεται οριστικά σε 72 ώρες· μπορείς να το σταματήσεις με τις 12 λέξεις σου." +
+          " ΑΝ ΔΕΝ ΤΟ ΖΗΤΗΣΕΣ ΕΣΥ, αγνόησε αυτό το μήνυμα — τίποτα δεν θα γίνει.",
+      en: "You asked by email to delete your Kostometro account. To confirm it is you," +
+          " send the code " + x.code + " to " + MAIL_SUPPORT + ", from this email (valid for 7 days)." +
+          " After confirmation the account is frozen and permanently deleted in 72 hours; you can stop it with your 12 words." +
+          " IF YOU DID NOT ASK FOR THIS, ignore this message — nothing will happen.",
     };
   }
 

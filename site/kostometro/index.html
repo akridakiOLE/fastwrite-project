@@ -13,6 +13,7 @@
 <link rel="apple-touch-icon" href="/kostometro/icons/icon-180.png">
 <link rel="icon" href="/kostometro/icons/icon-192.png">
 <link rel="stylesheet" href="/kostometro/app.css">
+<style>.btn.oauth-btn.oauth-apple{background:#000;color:#fff;border-color:#000}</style>
 </head>
 <body>
 
@@ -150,6 +151,7 @@
     <p class="lede">Μεταφορά του λογαριασμού σου <b>σε αυτή τη συσκευή</b>. Επιβεβαίωσε ότι είσαι εσύ, με το <b>email του λογαριασμού σου</b>:</p>
     <button class="btn oauth-btn" id="qi-google" type="button">Συνέχεια με Google</button>
     <button class="btn oauth-btn" id="qi-microsoft" type="button">Συνέχεια με Microsoft</button>
+    <button class="btn oauth-btn oauth-apple" id="qi-apple" type="button">Συνέχεια με Apple</button>
     <button class="btn ghost" id="qi-send" type="button">Στείλε μου κωδικό με email</button>
     <div id="qi-codebox" hidden>
       <p class="note" id="qi-to"></p>
@@ -205,6 +207,7 @@
       <p class="note">Τα τιμολόγιά σου δεν αγγίζονται. Οι τωρινές 12 λέξεις παύουν να ισχύουν και όποια άλλη συσκευή μπήκε με αυτές βγαίνει εκτός.</p>
       <button class="btn oauth-btn" id="own-google" type="button">Συνέχεια με Google</button>
       <button class="btn oauth-btn" id="own-microsoft" type="button">Συνέχεια με Microsoft</button>
+      <button class="btn oauth-btn oauth-apple" id="own-apple" type="button">Συνέχεια με Apple</button>
       <button class="btn ghost" id="own-send" type="button">Στείλε μου κωδικό με email</button>
       <div id="own-codebox" hidden>
         <p class="note" id="own-to"></p>
@@ -233,9 +236,10 @@
          ΙΔΙΑ ΟΘΟΝΗ ΓΙΑ ΟΛΟΥΣ, από κάθε προέλευση (όχι παράκαμψη για κάποιους —
          Α320 27/9 «ένας δρόμος για όλους»). Αντικαθιστά ΜΟΝΟ τον κωδικό 6 ψηφίων·
          οι 12 λέξεις μένουν. Ο κωδικός πρόσκλησης πιο κάτω ισχύει και εδώ. -->
-    <div class="oauth" id="oauth-box" data-oauth="google-microsoft">
+    <div class="oauth" id="oauth-box" data-oauth="google-microsoft-apple">
       <button class="btn oauth-btn" id="go-google" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Συνέχεια με Google</span></button>
       <button class="btn oauth-btn" id="go-microsoft" type="button"><svg viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg><span>Συνέχεια με Microsoft</span></button>
+      <button class="btn oauth-btn oauth-apple" id="go-apple" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.37 12.68c-.02-2.4 1.96-3.55 2.05-3.6-1.12-1.63-2.85-1.86-3.47-1.88-1.48-.15-2.88.87-3.63.87-.75 0-1.9-.85-3.13-.83-1.61.02-3.09.94-3.92 2.38-1.67 2.9-.43 7.19 1.2 9.54.8 1.15 1.74 2.44 2.98 2.4 1.2-.05 1.65-.78 3.1-.78 1.44 0 1.85.78 3.12.75 1.29-.02 2.1-1.17 2.89-2.33.91-1.33 1.28-2.62 1.3-2.69-.03-.01-2.5-.96-2.52-3.83zM13.98 5.63c.66-.8 1.11-1.91.99-3.02-.95.04-2.11.63-2.79 1.43-.61.7-1.15 1.84-1.01 2.92 1.06.08 2.15-.54 2.81-1.33z"/></svg><span>Συνέχεια με Apple</span></button>
       <p class="fine oauth-note">Παίρνουμε <b>μόνο το email σου</b> — κανέναν κωδικό, καμία επαφή, κανένα αρχείο.</p>
       <p class="or"><span>ή με email</span></p>
     </div>
@@ -285,7 +289,7 @@
          ⚠ ΔΕΝ είναι κουτάκι συγκατάθεσης: η Πολιτική είναι ΕΝΗΜΕΡΩΣΗ (πρέπει
          να φαίνεται πριν), όχι συγκατάθεση που θέλει τσιμπήμα. Το μοναδικό
          κουτάκι συγκατάθεσης της οθόνης είναι το ref-consent-ok, και μένει ασυμπλήρωτο. -->
-    <p class="fine" id="legal-line">Πατώντας <b>«Συνέχεια»</b> (ή Google / Microsoft) αποδέχεσαι τους <a href="/legal/terms" target="_blank" rel="noopener">Όρους χρήσης</a> και την <a href="/legal/privacy" target="_blank" rel="noopener">Πολιτική απορρήτου</a>.</p>
+    <p class="fine" id="legal-line">Πατώντας <b>«Συνέχεια»</b> (ή Google / Microsoft / Apple) αποδέχεσαι τους <a href="/legal/terms" target="_blank" rel="noopener">Όρους χρήσης</a> και την <a href="/legal/privacy" target="_blank" rel="noopener">Πολιτική απορρήτου</a>.</p>
     <p class="fine">Δωρεάν, χωρίς όριο χρόνου. Το email είναι για <b>ειδοποιήσεις ασφαλείας</b> (αν ζητηθεί διαγραφή ή αλλάξουν οι 12 λέξεις) και για ενημερώσεις της εφαρμογής.</p>
   </div>
 </section>
