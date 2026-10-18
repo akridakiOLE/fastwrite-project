@@ -55,6 +55,8 @@ CREATE TABLE km_email_tokens (token_hash TEXT PRIMARY KEY, email TEXT, created T
 CREATE TABLE km_accounts (folder_id TEXT, email TEXT, deleted TEXT, delete_due_at TEXT, ref_code TEXT);
 CREATE TABLE km_funnel (dev TEXT, step TEXT, src TEXT, at TEXT, PRIMARY KEY (dev, step));
 `);
+// K3β (18/10/2026): ο πίνακας των token της Apple — η Apple δεν ξεκινά χωρίς αυτόν + APPLE_TOKEN_KEY
+db.exec(readFileSync("schema/km_apple.sql", "utf8").split("\n").filter((l) => !l.trim().startsWith("--")).join("\n"));
 
 // ─── κλειδιά παρόχων (προσομοίωση) ──────────────────────────────────────
 const b64url = (buf) => Buffer.from(buf).toString("base64url");
@@ -77,6 +79,7 @@ const env = {
   GOOGLE_CLIENT_ID: "gcid.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "gsec",
   MS_CLIENT_ID: "mscid", MS_CLIENT_SECRET: "mssec",
   APPLE_CLIENT_ID: "tech.fastwrite.kostometro.web", APPLE_TEAM_ID: "ABCDE12345", APPLE_KEY_ID: "KEYID12345", APPLE_PRIVATE_KEY: P8_PEM,
+  APPLE_TOKEN_KEY: Buffer.from(webcrypto.getRandomValues(new Uint8Array(32))).toString("base64url"),   // K3β
 };
 
 // ─── fetch προσομοίωση παρόχων ──────────────────────────────────────────
@@ -88,8 +91,11 @@ globalThis.fetch = async (url, init) => {
   if (/\/token$/.test(u)) {
     const form = Object.fromEntries(new URLSearchParams(init.body));
     seen.token.push({ url: u, form });
-    return new Response(JSON.stringify({ id_token: await idToken(nextClaims) }), { status: 200 });
+    // K3β: η Apple δίνει και refresh_token (φυλάγεται για την ανάκληση)
+    const out = { id_token: await idToken(nextClaims) }; if (/appleid/.test(u)) out.refresh_token = "rt-" + form.code;
+    return new Response(JSON.stringify(out), { status: 200 });
   }
+  if (/\/auth\/revoke$/.test(u)) return new Response("", { status: 200 });   // K3β
   throw new Error("unexpected fetch " + u);
 };
 

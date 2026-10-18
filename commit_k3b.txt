@@ -1,0 +1,12 @@
+K3β: φύλαξη + ανάκληση token της Apple στη διαγραφή λογαριασμού (Apple TN3194)
+
+- km_apple_tokens: ένα κρυπτογραφημένο refresh_token ανά email (AES-GCM, APPLE_TOKEN_KEY, AAD), κανένα email/token σε καθαρό κείμενο
+- km_apple_revoke: ουρά ανάκλησης — η γραμμή μετακομίζει ατομικά πριν την ανάκληση· αναμονή 1→72 ώρες, 30 ημέρες, ρύθμιση δεν εγκαταλείπεται
+- ανάκληση ΜΟΝΟ στο wipeFolder, αμέσως μετά τη σφραγίδα (όχι στο αίτημα 72 ωρών)
+- νέα σύνδεση ίδιου email: αντικατάσταση, ΟΧΙ ανάκληση · ορφανά 7 ημερών · σύνδεση με λογαριασμό μέσα στο batch του register
+- POST /api/km/auth/apple/notify: consent-revoked / account-delete (JWT RS256, aud, event_time)
+- Apple «unavailable» χωρίς APPLE_TOKEN_KEY · Πίνακας: apple_revoke
+- tests/k3b 43/43 + 14/14 μεταλλάξεις · ανεξάρτητη αναθεώρηση δύο γύρων (2 HIGH + 3 MEDIUM διορθώθηκαν)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018FvCtKNsdhgb7jFHr9DaRc

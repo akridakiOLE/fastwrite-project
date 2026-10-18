@@ -20,7 +20,7 @@
 // GDPR: δεν αποθηκεύεται IP. Μόνο χώρα (Cloudflare) και user-agent.
 // ---------------------------------------------------------------------------
 
-import { handleKm, kmCleanup, kmDeleteDue, kmSupportPrune, kmAgentPrune, kmAgentFollowups } from "./km.js";
+import { handleKm, kmCleanup, kmDeleteDue, kmSupportPrune, kmAgentPrune, kmAgentFollowups, kmAppleTokensDue } from "./km.js";
 
 const V = 3; // έκδοση ερωτηματολογίου
 
@@ -68,6 +68,11 @@ export default {
     ctx.waitUntil(kmAgentFollowups(env).then(
       (r) => console.log("km agent-followups:", JSON.stringify(r)),
       (e) => console.error("km agent-followups failed:", e)
+    ));
+    // K3β · Apple: ξαναδοκιμή αποτυχημένων ανακλήσεων + ορφανά token (σύνδεση χωρίς λογαριασμό > 7 ημέρες)
+    ctx.waitUntil(kmAppleTokensDue(env).then(
+      (r) => console.log("km apple-tokens:", JSON.stringify(r)),
+      (e) => console.error("km apple-tokens failed:", e)
     ));
   },
 

@@ -8,6 +8,7 @@
 // KM-SERVER-V99-AGENT  ← σημάδι: Βοηθός Kostometro, Φάση 1 (29/9/2026)
 // KM-SERVER-V98-OAUTH  ← σημάδι: σύνδεση Google/Microsoft (29/9/2026)
 // KM-SERVER-K3A-APPLE  ← σημάδι: Sign in with Apple, τρίτος πάροχος (14/10/2026)
+// KM-SERVER-K3B-REVOKE  ← σημάδι: φύλαξη + ανάκληση token της Apple στη διαγραφή (TN3194, 18/10/2026)
 // KM-SERVER-V84-VERIFY ← Brief ΣΤ (24/9/2026): ένα email = ένας λογαριασμός · κωδικός 6 ψηφίων
 // Kostometro — μητρώο + σφραγισμένος φάκελος (Brief Α, Α350 §9.8 Η.1)
 // ---------------------------------------------------------------------------
@@ -129,6 +130,8 @@ export async function handleKm(request, env, ctx, path) {
   if (path === "/api/km/auth/app/redeem" && method === "POST") return oauthAppRedeem(request, env);
   // K3α (14/10/2026) · Sign in with Apple = τρίτος πάροχος στην ίδια ροή. Η Apple
   // γυρίζει το callback με POST (response_mode=form_post), οι άλλοι δύο με GET.
+  // K3β (18/10/2026) · ειδοποιήσεις server-to-server της Apple (consent-revoked / account-delete)
+  if (path === "/api/km/auth/apple/notify" && method === "POST") return appleNotify(request, env);
   { const m = /^\/api\/km\/auth\/(google|microsoft|apple)\/(start|callback)$/.exec(path);
     if (m && m[2] === "start" && method === "GET") return oauthStart(request, env, m[1]);
     if (m && m[2] === "callback" && (method === "GET" || (method === "POST" && m[1] === "apple"))) return oauthCallback(request, env, m[1]); }
@@ -1158,6 +1161,236 @@ async function appleClientSecret(env) {
   const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(head + "." + body));
   return head + "." + body + "." + b64url(new Uint8Array(sig));   // WebCrypto ECDSA = raw r||s, ακριβώς ό,τι θέλει το JWS
 }
+// ═══ K3β · ΑΝΑΚΛΗΣΗ TOKEN ΤΗΣ APPLE (18/10/2026) ═════════════════════════════
+// Apple TN3194 + κανόνας App Store 5.1.1(v): εφαρμογή με Sign in with Apple που
+// διαγράφει λογαριασμό ΠΡΕΠΕΙ να καλεί το /auth/revoke με το refresh_token του
+// χρήστη. Γι' αυτό το token ΚΡΑΤΙΕΤΑΙ από τη στιγμή της σύνδεσης.
+// Δύο πίνακες (μετά την ανεξάρτητη αναθεώρηση της 18/10):
+//   · km_apple_tokens — ΖΩΝΤΑΝΑ token, ένα ανά email (κλειδί sha256 του email,
+//     ΟΧΙ το email). AES-GCM με APPLE_TOKEN_KEY, AAD = email_h.
+//   · km_apple_revoke — ΟΥΡΑ ΑΝΑΚΛΗΣΗΣ. Στη διαγραφή η γραμμή ΜΕΤΑΚΟΜΙΖΕΙ εδώ
+//     (τυχαίο id, ξανασφραγισμένη με AAD = id) πριν γίνει οτιδήποτε άλλο. Έτσι
+//     μια νέα σύνδεση του ίδιου email δεν μπορεί ποτέ να σβήσει εκκρεμή ανάκληση.
+// Κανόνες:
+//   · Ανάκληση ΜΟΝΟ στο wipeFolder (μετά τις 72 ώρες / admin / purge) — ΟΧΙ στο
+//     αίτημα (Η.11β). Αμέσως μετά τη σφραγίδα (α), πριν από R2 — αποτυχία R2
+//     δεν αφήνει token χωρίς ανάκληση.
+//   · Νέα σύνδεση ίδιου email: το token ΑΝΤΙΚΑΘΙΣΤΑΤΑΙ, ΔΕΝ ανακαλείται — η
+//     ανάκληση της Apple ακυρώνει ΟΛΗ την εξουσιοδότηση, άρα και το νέο token.
+//   · Αποτυχία ανάκλησης δεν μπλοκάρει τη διαγραφή. Η ουρά ξαναδοκιμάζει με
+//     αυξανόμενη αναμονή (1 ώρα → 72 ώρες) για APPLE_REVOKE_DAYS. Τοπικό
+//     πρόβλημα ρύθμισης (λείπει κλειδί, invalid_client) ΔΕΝ «καίει» το
+//     περιθώριο — περιμένει να διορθωθεί.
+//   · Ορφανά: σύνδεση με Apple χωρίς λογαριασμό για APPLE_ORPHAN_DAYS → ουρά.
+//   · Χωρίς APPLE_TOKEN_KEY η Apple είναι «unavailable» (fail closed).
+//   · Αλλαγή κλειδιού: APPLE_TOKEN_KEY_OLD ανοίγει παλιά κρυπτογραφήματα.
+//   · Ειδοποιήσεις Apple: consent-revoked / account-delete → σβήνεται ΜΟΝΟ γραμμή
+//     παλαιότερη από το event_time. Ο λογαριασμός Kostometro ΔΕΝ αγγίζεται —
+//     ανοίγει με τις 12 λέξεις, όχι με την Apple.
+const APPLE_REVOKE_URL = "https://appleid.apple.com/auth/revoke";
+const APPLE_REVOKE_DAYS = 30;
+const APPLE_ORPHAN_DAYS = 7;
+const APPLE_TOK_BATCH = 100;
+const APPLE_NOTIFY_AUD = ["tech.fastwrite.kostometro"];   // + APPLE_CLIENT_ID (Services ID)
+
+async function appleKeyFrom(raw) {
+  raw = String(raw || "");
+  if (!raw) return null;
+  let bytes;
+  try { bytes = b64urlDecode(raw.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")); } catch (e) { return null; }
+  if (bytes.length !== 32) return null;
+  return crypto.subtle.importKey("raw", bytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+async function appleTokKey(env) { return appleKeyFrom(env && env.APPLE_TOKEN_KEY); }
+async function appleSeal(env, aad, rt) {
+  const key = await appleTokKey(env);
+  if (!key) throw new Error("no_token_key");
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode(aad) },
+    key, new TextEncoder().encode(String(rt))));
+  const out = new Uint8Array(12 + ct.length); out.set(iv, 0); out.set(ct, 12);
+  return b64url(out);
+}
+async function appleOpen(env, aad, sealed) {
+  const all = b64urlDecode(sealed);
+  for (const raw of [env.APPLE_TOKEN_KEY, env.APPLE_TOKEN_KEY_OLD]) {
+    const key = await appleKeyFrom(raw);
+    if (!key) continue;
+    try {
+      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: all.slice(0, 12), additionalData: new TextEncoder().encode(aad) }, key, all.slice(12));
+      return new TextDecoder().decode(pt);
+    } catch (e) { /* επόμενο κλειδί */ }
+  }
+  throw new Error("cannot_open");
+}
+// "ok" · "config" (δικό μας πρόβλημα — δεν μετράει) · "fail" (Apple/δίκτυο — μετράει)
+async function appleRevoke(env, clientId, rt) {
+  const secret = await appleClientSecret(env).catch(() => null);
+  if (!secret) return "config";
+  let r;
+  try {
+    r = await fetch(APPLE_REVOKE_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: clientId || env.APPLE_CLIENT_ID, client_secret: secret, token: rt, token_type_hint: "refresh_token" }).toString() });
+  } catch (e) { return "fail"; }
+  if (r.status === 200) return "ok";   // η Apple απαντά 200 και για token που ήδη δεν ισχύει
+  const j = await r.json().catch(() => ({}));
+  return j && j.error === "invalid_client" ? "config" : "fail";
+}
+// Στη σύνδεση: ένα ζωντανό token ανά email. ΚΑΜΙΑ ανάκληση εδώ (βλ. κανόνες).
+async function appleKeepToken(env, email, sub, rt) {
+  const emailH = await sha256hex("apple|" + email);
+  const subH = sub ? await sha256hex("apple-sub|" + sub) : null;
+  const acc = await env.DB.prepare("SELECT folder_id FROM km_accounts WHERE email = ? AND deleted IS NULL LIMIT 1").bind(email).first();
+  const ts = now();
+  await env.DB.prepare(
+    `INSERT INTO km_apple_tokens (email_h, sub_h, rt_enc, client_id, folder_id, created, updated)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(email_h) DO UPDATE SET sub_h = excluded.sub_h, rt_enc = excluded.rt_enc,
+       client_id = excluded.client_id, folder_id = excluded.folder_id, updated = excluded.updated`
+  ).bind(emailH, subH, await appleSeal(env, emailH, rt), String(env.APPLE_CLIENT_ID || ""), (acc && acc.folder_id) || null, ts, ts).run();
+}
+// Στο register: μέσα στο ΙΔΙΟ batch με τη δημιουργία του λογαριασμού (δεν αποτυγχάνει χωριστά).
+async function appleLinkStmt(env, email, folderId) {
+  return env.DB.prepare("UPDATE km_apple_tokens SET folder_id = ? WHERE email_h = ?").bind(folderId, await sha256hex("apple|" + email));
+}
+// Μετακόμιση ζωντανής γραμμής → ουρά ανάκλησης. ΑΤΟΜΙΚΗ ΚΑΙ ΥΠΟ ΟΡΟ: INSERT…SELECT
+// και DELETE στο ίδιο batch (μία συναλλαγή), με τον ίδιο όρο — αν στο μεταξύ η
+// γραμμή άλλαξε (νέα σύνδεση, ή register την έδεσε με λογαριασμό), δεν μετακομίζει.
+// cond: "orphan" → folder_id IS NULL AND updated < before · "delete" → folder_id = ? OR NULL.
+// Μετά, ξανασφράγιση με AAD = id· αν δεν ανοίγει (χαμένο κλειδί) μένει με aad = email_h.
+async function appleEnqueue(env, row, ts, mode, arg) {
+  const id = randHex(16);
+  const cond = mode === "orphan" ? "folder_id IS NULL AND updated < ?" : "(folder_id = ? OR folder_id IS NULL)";
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO km_apple_revoke (id, rt_enc, aad, client_id, sub_h, reason, created, next_at, attempts)
+       SELECT ?, rt_enc, email_h, COALESCE(client_id, ?), sub_h, ?, ?, ?, 0 FROM km_apple_tokens
+       WHERE email_h = ? AND rt_enc = ? AND ` + cond
+    ).bind(id, String(env.APPLE_CLIENT_ID || ""), mode, ts, ts, row.email_h, row.rt_enc, arg),
+    env.DB.prepare("DELETE FROM km_apple_tokens WHERE email_h = ? AND rt_enc = ? AND " + cond).bind(row.email_h, row.rt_enc, arg),
+  ]);
+  const q = await env.DB.prepare("SELECT * FROM km_apple_revoke WHERE id = ?").bind(id).first();
+  if (!q) return null;   // η γραμμή άλλαξε στο μεταξύ — δεν μετακόμισε, τίποτα δεν χάθηκε
+  try {
+    const rt = await appleOpen(env, q.aad, q.rt_enc);
+    await env.DB.prepare("UPDATE km_apple_revoke SET rt_enc = ?, aad = ? WHERE id = ?").bind(await appleSeal(env, id, rt), id, id).run();
+    return Object.assign(q, { rt_enc: await env.DB.prepare("SELECT rt_enc FROM km_apple_revoke WHERE id = ?").bind(id).first().then((r) => r.rt_enc), aad: id });
+  } catch (e) { console.error("apple enqueue reseal:", e && e.message); return q; }
+}
+// Μία γραμμή της ουράς. Επιστρέφει "revoked" | "wait" | "config" | "gave_up".
+async function appleRevokeQueued(env, q, ts) {
+  let res;
+  try { res = await appleRevoke(env, q.client_id, await appleOpen(env, q.aad, q.rt_enc)); }
+  catch (e) { res = "config"; }   // δεν ανοίγει → κλειδί λείπει/άλλαξε: δικό μας θέμα, περιμένει
+  if (res === "ok") { await env.DB.prepare("DELETE FROM km_apple_revoke WHERE id = ?").bind(q.id).run(); return "revoked"; }
+  const tries = (Number(q.attempts) || 0) + (res === "fail" ? 1 : 0);
+  // Πρόβλημα ΡΥΘΜΙΣΗΣ (δικό μας) δεν εγκαταλείπεται ποτέ — περιμένει να διορθωθεί· φαίνεται στον Πίνακα.
+  const old = res !== "config" && Date.parse(q.created) < Date.parse(ts) - APPLE_REVOKE_DAYS * 86400000;
+  if (old) {
+    await env.DB.prepare("DELETE FROM km_apple_revoke WHERE id = ?").bind(q.id).run();
+    console.error("🔴 apple revoke: ΕΓΚΑΤΑΛΕΙΨΗ μετά από " + APPLE_REVOKE_DAYS + " ημέρες (" + res + ", " + tries + " αποτυχίες) — id " + q.id);
+    return "gave_up";
+  }
+  const waitH = Math.min(72, Math.pow(2, Math.min(tries, 7)));
+  await env.DB.prepare("UPDATE km_apple_revoke SET attempts = ?, next_at = ?, last_error = ? WHERE id = ?")
+    .bind(tries, new Date(Date.parse(ts) + waitH * 3600000).toISOString(), res, q.id).run();
+  if (res === "config") console.error("🔴 apple revoke: πρόβλημα ρύθμισης (κλειδί/APPLE_* secrets) — η ουρά περιμένει");
+  return res === "config" ? "config" : "wait";
+}
+// Από το wipeFolder, ΑΜΕΣΩΣ μετά τη σφραγίδα. Ποτέ δεν πετάει σφάλμα.
+// Ταίριασμα με email ΜΟΝΟ για γραμμή χωρίς λογαριασμό — αλλιώς διαγραφή διπλότυπου
+// λογαριασμού θα ανακαλούσε το token του ζωντανού. ⚠ Ο φραγμός είναι ΕΝΑΣ: ο όρος
+// "delete" του appleEnqueue (folder_id = ? OR folder_id IS NULL), μέσα στη συναλλαγή.
+async function appleRevokeFor(env, folderId, email) {
+  const out = { queued: 0, revoked: 0, wait: 0, config: 0, gave_up: 0 };
+  try {
+    const emailH = email ? await sha256hex("apple|" + email) : "";
+    const rows = (await env.DB.prepare("SELECT * FROM km_apple_tokens WHERE folder_id = ? OR email_h = ?")
+      .bind(folderId, emailH).all()).results || [];
+    const ts = now();
+    for (const row of rows) {
+      const q = await appleEnqueue(env, row, ts, "delete", folderId);
+      if (!q) continue;
+      out.queued += 1;
+      out[await appleRevokeQueued(env, q, ts)] += 1;
+    }
+  } catch (e) { console.error("apple revoke-for:", e && e.message); }
+  return out;
+}
+// Ωριαίο cron: (α) ορφανά → ουρά · (β) ουρά: ό,τι έφτασε η ώρα του.
+export async function kmAppleTokensDue(env, nowIso) {
+  const t = nowIso || now();
+  const orphanBefore = new Date(Date.parse(t) - APPLE_ORPHAN_DAYS * 86400000).toISOString();
+  const out = { orphans: 0, due: 0, revoked: 0, wait: 0, config: 0, gave_up: 0 };
+  const orphan = (await env.DB.prepare("SELECT * FROM km_apple_tokens WHERE folder_id IS NULL AND updated < ? LIMIT ?")
+    .bind(orphanBefore, APPLE_TOK_BATCH).all()).results || [];
+  for (const row of orphan) { if (await appleEnqueue(env, row, t, "orphan", orphanBefore)) out.orphans += 1; }
+  const due = (await env.DB.prepare("SELECT * FROM km_apple_revoke WHERE next_at <= ? ORDER BY next_at LIMIT ?")
+    .bind(t, APPLE_TOK_BATCH).all()).results || [];
+  out.due = due.length;
+  for (const q of due) out[await appleRevokeQueued(env, q, t)] += 1;
+  return out;
+}
+// POST /api/km/auth/apple/notify — server-to-server ειδοποιήσεις της Apple.
+// Σώμα: {"payload":"<JWT RS256>"}. 200 σε έγκυρο · 400 σε άκυρο · 503 σε δικό μας
+// προσωρινό σφάλμα (JWKS/βάση) ώστε η Apple να ξαναστείλει.
+async function appleNotify(request, env) {
+  const raw = await readCapped(request, 16384);
+  if (raw === null) return json({ ok: false }, 400);
+  let b; try { b = JSON.parse(raw); } catch (e) { return json({ ok: false }, 400); }
+  const jwt = String((b && b.payload) || "");
+  let claims, head, parts = jwt.split(".");
+  try {
+    if (parts.length !== 3) throw new Error("bad_jwt");
+    head = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[0])));
+    claims = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[1])));
+    if (head.alg !== "RS256" || !head.kid) throw new Error("bad_alg");
+  } catch (e) { console.error("apple notify:", e && e.message); return json({ ok: false }, 400); }
+  let keys;
+  try { keys = await oauthKeys(OAUTH.apple.jwks, head.kid); } catch (e) { console.error("apple notify jwks:", e && e.message); return json({ ok: false }, 503); }
+  try {
+    const jwk = keys.find((k) => k.kid === head.kid);
+    if (!jwk) throw new Error("no_key");
+    const key = await crypto.subtle.importKey("jwk", { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true },
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    if (!(await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64urlDecode(parts[2]), new TextEncoder().encode(parts[0] + "." + parts[1])))) throw new Error("bad_sig");
+    if (claims.iss !== "https://appleid.apple.com") throw new Error("bad_iss");
+    const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+    const okAud = [env.APPLE_CLIENT_ID].concat(APPLE_NOTIFY_AUD).filter(Boolean);
+    if (!aud.some((a) => okAud.includes(a))) throw new Error("bad_aud");
+    const iatMs = Number(claims.iat) * 1000;
+    if (!(iatMs > Date.now() - 7 * 86400000 && iatMs < Date.now() + 600000)) throw new Error("stale");
+  } catch (e) { console.error("apple notify:", e && e.message); return json({ ok: false }, 400); }
+  let ev = claims.events;
+  try { if (typeof ev === "string") ev = JSON.parse(ev); } catch (e) { ev = null; }
+  const type = ev && String(ev.type || "");
+  if (ev && ev.sub && (type === "consent-revoked" || type === "account-delete")) {
+    // Μόνο ό,τι ΠΡΟΗΓΕΙΤΑΙ του γεγονότος: νέα σύνδεση μετά την ανάκληση (ή επανάληψη
+    // παλιού μηνύματος) δεν σβήνει το ζωντανό token.
+    const evMs = Number(ev.event_time) || (Number(claims.iat) * 1000);
+    try {
+      await env.DB.prepare("DELETE FROM km_apple_tokens WHERE sub_h = ? AND updated < ?")
+        .bind(await sha256hex("apple-sub|" + ev.sub), new Date(evMs).toISOString()).run();
+    } catch (e) { console.error("apple notify db:", e && e.message); return json({ ok: false }, 503); }
+  }
+  return json({ ok: true });
+}
+// Διαβάζει σώμα έως max bytes — και χωρίς Content-Length (chunked). null = πάνω από το όριο.
+async function readCapped(request, max) {
+  if (Number(request.headers.get("content-length") || 0) > max) return null;
+  if (!request.body) return "";
+  const rd = request.body.getReader(); const parts = []; let n = 0;
+  for (;;) {
+    const { done, value } = await rd.read();
+    if (done) break;
+    n += value.length;
+    if (n > max) { try { await rd.cancel(); } catch (e) {} return null; }
+    parts.push(value);
+  }
+  const all = new Uint8Array(n); let o = 0; for (const p of parts) { all.set(p, o); o += p.length; }
+  return new TextDecoder().decode(all);
+}
+
 const oauthJwks = {};   // cache ανά isolate: { url: { at, keys } }
 
 function b64url(bytes) {
@@ -1249,7 +1482,9 @@ async function oauthStart(request, env, prov) {
   const appCh = sp.get("app") === "1" ? String(sp.get("ac") || "") : "";
   if (sp.get("app") === "1" && !B64URL43.test(appCh)) return appErr("bad_request");
   const cid = env[P.idVar], sec = prov === "apple" ? (await appleClientSecret(env).catch(() => null)) : env[P.secVar];
-  if (!cid || !sec) return appCh ? appErr("unavailable") : oauthBack(env, oauthFrag("err", { code: "unavailable" }));
+  // K3β: χωρίς κλειδί κρυπτογράφησης token η Apple δεν ξεκινά (fail closed — η ανάκληση θα ήταν αδύνατη).
+  const tkOk = prov !== "apple" || !!(await appleTokKey(env).catch(() => null));
+  if (!cid || !sec || !tkOk) return appCh ? appErr("unavailable") : oauthBack(env, oauthFrag("err", { code: "unavailable" }));
   const t = Date.now();
   await env.DB.prepare("DELETE FROM km_oauth_states WHERE created < ?").bind(new Date(t - 3600 * 1000).toISOString()).run();
   const ip = request.headers.get("CF-Connecting-IP") || "";
@@ -1335,7 +1570,7 @@ async function oauthCallback(request, env, prov) {
   if (!row || (row.provider !== prov && !own) || Date.parse(row.created) < Date.now() - OAUTH_TTL_MS) {
     return back(oauthFrag("err", { code: "state" }));
   }
-  let claims;
+  let claims, tok = null;
   try {
     // K3α: το client_secret της Apple είναι υπογεγραμμένο JWT, όχι σταθερό μυστικό.
     const secret = prov === "apple" ? await appleClientSecret(env) : env[P.secVar];
@@ -1347,6 +1582,7 @@ async function oauthCallback(request, env, prov) {
       body: new URLSearchParams(form).toString() });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.id_token) throw new Error("token_" + r.status + "_" + (j && j.error));
+    tok = j;
     claims = await oauthVerifyIdToken(j.id_token, P, env[P.idVar], row.nonce);
   } catch (e) {
     console.error("oauth " + prov + ":", e && e.message);
@@ -1355,6 +1591,17 @@ async function oauthCallback(request, env, prov) {
   const email = normEmail(claims.email);
   if (!email) return back(oauthFrag("err", { code: "no_email" }));
   if (!P.verified(claims)) return back(oauthFrag("verify", { e: email }));
+  // K3β: το refresh_token της Apple φυλάγεται ΠΡΙΝ από κάθε άλλη απόφαση — ό,τι κι αν γίνει
+  // παρακάτω, η εξουσιοδότηση πρέπει να μπορεί να ανακληθεί. Χωρίς token → σφάλμα, όχι σιωπή.
+  if (prov === "apple") {
+    try {
+      if (!tok || !tok.refresh_token) throw new Error("no_refresh_token");
+      await appleKeepToken(env, email, claims.sub, tok.refresh_token);
+    } catch (e) {
+      console.error("apple keep-token:", e && e.message);
+      return back(oauthFrag("err", { code: "provider" }));
+    }
+  }
   const busy = await emailBusy(env, email);
   if (own) {
     // Απόδειξη κατόχου: πρέπει να ΥΠΑΡΧΕΙ ζωντανός λογαριασμός με αυτό το email.
@@ -1952,6 +2199,8 @@ async function register(request, env, ctx) {
     }
     // Το token καίγεται ΜΑΖΙ με τη δημιουργία — ένα token, ένας λογαριασμός.
     stmts.push(env.DB.prepare("UPDATE km_email_tokens SET used = ? WHERE token_hash = ?").bind(ts, tok));
+    // K3β: το token της Apple (αν υπάρχει) δένεται με τον λογαριασμό ΜΕΣΑ στο ίδιο batch — αλλιώς «ορφανό».
+    stmts.push(await appleLinkStmt(env, email, id.folder));
     try {
       await env.DB.batch(stmts);
     } catch (e) {
@@ -2544,8 +2793,14 @@ async function wipeFolder(env, folderId) {
   await env.DB.prepare("UPDATE km_accounts SET deleted = ? WHERE folder_id = ? AND deleted IS NULL")
     .bind(ts, folderId).run();
 
+  // (α2) K3β · ανάκληση token της Apple — ΑΜΕΣΩΣ μετά τη σφραγίδα, ΠΡΙΝ από R2 και
+  // πριν αδειάσει το email στο (δ): αποτυχία R2 δεν αφήνει token χωρίς ανάκληση.
+  // Η γραμμή μετακομίζει στην ουρά πρώτα· δεν πετάει ποτέ.
+  const apple = await appleRevokeFor(env, folderId, acc.email ? String(acc.email) : "");
+
   // (β) R2
   const r2 = await wipeR2(env, folderId);
+
 
   // (γ) D1 — οι τρεις πίνακες που κρατούν πρόσωπο ή κλειδί.
   const locks = await env.DB.prepare("SELECT COUNT(*) AS n FROM km_locks WHERE folder_id = ?").bind(folderId).first();
@@ -2586,6 +2841,7 @@ async function wipeFolder(env, folderId) {
     deleted_at: already ? acc.deleted : ts,
     was_already_deleted: already,
     r2: r2,
+    apple: apple,
     rows: {
       locks: (locks && locks.n) || 0,
       device_links: (links && links.n) || 0,
@@ -3372,6 +3628,9 @@ async function adminPinakas(request, env) {
   const devAct = await one(`SELECT COUNT(*) AS n FROM km_accounts WHERE deleted IS NULL AND active_device_id IS NOT NULL${andC("created")}`, ...SA);
 
   // ── εκκρεμείς διαγραφές (Η.11β) — μόνο ημερομηνίες, ΟΧΙ email ─────────
+  // K3β: η ουρά ανάκλησης της Apple στον Πίνακα (ο μόνος συναγερμός που βλέπει ο Stavros)
+  let appleQ = null;
+  try { appleQ = await env.DB.prepare("SELECT COUNT(*) AS n, SUM(CASE WHEN last_error = 'config' THEN 1 ELSE 0 END) AS config, MIN(created) AS oldest FROM km_apple_revoke").first(); } catch (e) { appleQ = null; }
   const pending = await all(
     `SELECT substr(folder_id, 1, 8) AS folder, delete_requested_at, delete_due_at
      FROM km_accounts WHERE deleted IS NULL AND delete_due_at IS NOT NULL${andC("delete_requested_at")} ORDER BY delete_due_at`, ...SA);
@@ -3518,6 +3777,7 @@ async function adminPinakas(request, env) {
     by_source: bySource, by_ref: byRef, per_day: perDay, by_country: byCountry,
     devices: { active: Number(devAct.n) || 0, links: dev.links || 0, distinct: dev.distinct_devices || 0, seen_7d: dev.seen_7d || 0, with_unsynced: dev.with_unsynced || 0 },
     pending_deletions: pending,
+    apple_revoke: appleQ,   // K3β · ουρά ανάκλησης Apple: πόσα εκκρεμούν, πόσα για ΔΙΚΟ ΜΑΣ πρόβλημα ρύθμισης
     mail_30d: { sent: mail.sent || 0, ok: mail.ok || 0, failed: mail.failed || 0 },
     feedback: { n: fb.n || 0, avg_stars: fb.avg_stars ? Number(fb.avg_stars).toFixed(2) : null, want_reply: fb.want_reply || 0 },
     support: sup,
