@@ -813,7 +813,7 @@
            οπουδήποτε: το συνηθέστερο αίτιο είναι άκυρο ή λάθος κλειδί. */
         var guide = document.createElement('a');
         guide.className = 'pay-link';
-        guide.href = '/kostometro/kleidi/';   // v87: ίδιο παράθυρο
+        guide.href = (KM_NATIVE ? KM_WEB : '') + '/kostometro/kleidi/';   // v87: ίδιο παράθυρο · v134: στο κέλυφος → fastwrite.tech (ο οδηγός δεν είναι μέσα στο πακέτο)
         guide.textContent = 'Οδηγός κλειδιού ›';
         busy.appendChild(guide);
       } else if (aiPay) {
@@ -2213,7 +2213,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v133';
+  var APP_VER = 'φέτα 3 · v134';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -3355,6 +3355,17 @@
   var KM_WEB = 'https://fastwrite.tech';
   var KM_ORIGIN = KM_NATIVE ? KM_WEB : '';
   var KM_API = KM_ORIGIN + '/api/km/';
+  /* 🔴 v134 (20/10/2026) · KM-V134-HOME — Η ΑΣΠΡΗ ΟΘΟΝΗ ΤΗΣ ΕΦΑΡΜΟΓΗΣ ΚΑΤΑΣΤΗΜΑΤΟΣ.
+     Ο τοπικός server του Capacitor (WebViewLocalServer, html5mode) σερβίρει το ΡΙΖΙΚΟ
+     index.html για κάθε διαδρομή που το τελευταίο κομμάτι της ΔΕΝ έχει τελεία. Άρα το
+     «/kostometro/» μέσα στο κέλυφος = το ριζικό index.html, που ξαναστέλνει στο
+     «/kostometro/» → ατέρμονος κύκλος → άσπρη οθόνη (μετρήθηκε στο κινητό του Stavros 20/10,
+     build 3). Μέσα στο κέλυφος κάθε πλοήγηση προς την αρχή γράφει ΡΗΤΑ index.html.
+     Στον browser μένει «/kostometro/» — ΤΙΠΟΤΑ δεν αλλάζει εκεί. */
+  var KM_HOME = KM_NATIVE ? '/kostometro/index.html' : '/kostometro/';
+  if (KM_NATIVE) {   /* ο οδηγός κλειδιού ζει μόνο στο site — όχι μέσα στο πακέτο */
+    try { Array.prototype.forEach.call(document.querySelectorAll('a[href^="/kostometro/kleidi/"]'), function (a) { a.setAttribute('href', KM_WEB + a.getAttribute('href')); }); } catch (eh) {}
+  }
   var pendingWords = null;   // οι λέξεις που μόλις φτιάχτηκαν, πριν τσεκαριστούν
 
   /* ══ v56 · Η.11 — Ο ΑΝΙΧΝΕΥΤΗΣ ΤΟΥ ΝΕΚΡΟΥ ΛΟΓΑΡΙΑΣΜΟΥ ═══════════════
@@ -5828,8 +5839,8 @@
        query + hash του συνδέσμου — ο σημερινός boot (refCaptureSrc, km_qr) τα διαβάζει όπως στον browser. */
     if (url && url.indexOf(KM_WEB + '/kostometro/') === 0) {
       var lu; try { lu = new URL(url); } catch (e) { return; }
-      if (lu.search) { location.replace('/kostometro/' + lu.search + lu.hash); }   /* άλλο query = πλήρης φόρτωση */
-      else if (lu.hash) { location.replace('/kostometro/' + lu.hash); location.reload(); }   /* μόνο hash = θέλει reload */
+      if (lu.search) { location.replace(KM_HOME + lu.search + lu.hash); }   /* άλλο query = πλήρης φόρτωση */
+      else if (lu.hash) { location.replace(KM_HOME + lu.hash); location.reload(); }   /* μόνο hash = θέλει reload */
       return;
     }
     if (!url || url.indexOf('tech.fastwrite.kostometro://oauth') !== 0) { return; }

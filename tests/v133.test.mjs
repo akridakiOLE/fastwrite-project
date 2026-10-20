@@ -155,7 +155,7 @@ const codeOf = (m) => (/(\d{6})/.exec(m.text) || [])[1];
   const idx = readFileSync("site/kostometro/index.html", "utf8");
   ok("S1 τρία κουμπιά Apple (εγγραφή, μεταφορά QR, απόδειξη κατόχου) + γραμμή όρων με Apple", ["go-apple", "qi-apple", "own-apple"].every((x) => idx.includes('id="' + x + '"')) && /Google \/ Microsoft \/ Apple/.test(idx) && /data-oauth="google-microsoft-apple"/.test(idx));
   const app = readFileSync("site/kostometro/app.js", "utf8"), sw = readFileSync("site/kostometro/sw.js", "utf8"), ver = readFileSync("site/kostometro/version.json", "utf8");
-  ok("S2 έκδοση v133 σε app.js · sw.js · version.json", /APP_VER = 'φέτα 3 · v133'/.test(app) && /CACHE = 'km-v133'/.test(sw) && /"v133"/.test(ver));
+  ok("S2 έκδοση ≥ v133 σε app.js · sw.js · version.json (v134 20/10: η έκδοση ελέγχεται πλέον στο v134.test)", /APP_VER = 'φέτα 3 · v13[3-9]'/.test(app) && /CACHE = 'km-v13[3-9]'/.test(sw) && /"v13[3-9]"/.test(ver));
   const el = readFileSync("site/legal/privacy.html", "utf8"), en = readFileSync("site/legal/privacy-en.html", "utf8");
   ok("S3 Πολιτική ΕΛ+EN: v2.6, καμία σήμανση ⬜, ημερομηνία ισχύος", !/⬜/.test(el + en) && /Έκδοση 2\.6 · Ισχύει από 18 Οκτωβρίου 2026/.test(el) && /Version 2\.6 · Effective from 18 October 2026/.test(en));
   ok("S4 Τ.Θ. 27452, 1645 Λευκωσία · ΚΑΜΙΑ διεύθυνση κατοικίας · ΚΑΜΙΑ παλιά 55518", /Τ\.Θ\. 27452, 1645 Λευκωσία/.test(el) && /P\.O\. Box 27452, 1645 Nicosia/.test(en) && !/55518/.test(el + en) && !/Δερβενίου|Derveniou/.test(el + en));

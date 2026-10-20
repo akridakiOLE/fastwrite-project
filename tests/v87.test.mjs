@@ -13,7 +13,7 @@ let guide = readFileSync("site/kostometro/kleidi/index.html", "utf8");
 const MUT = [
   ["guide", "return true; }\ndocument.getElementById", "try { window.close(); } catch (e) {} return true; }\ndocument.getElementById"],
   ["html", '<a class="howto" href="/kostometro/kleidi/">', '<a class="howto" href="/kostometro/kleidi/" target="_blank">'],
-  ["js", "guide.href = '/kostometro/kleidi/';   // v87", "guide.href = '/kostometro/kleidi/'; guide.target = '_blank';   // v87"],
+  ["js", "guide.href = (KM_NATIVE ? KM_WEB : '') + '/kostometro/kleidi/';   // v87", "guide.href = (KM_NATIVE ? KM_WEB : '') + '/kostometro/kleidi/'; guide.target = '_blank';   // v87"],
   ["guide", "r.indexOf(location.origin + '/kostometro/') === 0", "true"],
 ];
 if (ONLY) {
@@ -30,7 +30,8 @@ check("Ν87-2 · 🔴 κανένας σύνδεσμος προς τον οδηγ
   // v113: +1 σύνδεσμος — το κουτί «Τα 20 δώρα τελείωσαν» (KM-READ-GIFT), ίδιο παράθυρο
   if (links.length !== 3) throw new Error("περίμενα 3 συνδέσμους, βρήκα " + links.length);
   if (links.some((l) => l.includes("_blank"))) throw new Error("σύνδεσμος με _blank");
-  const i = js.indexOf("guide.href = '/kostometro/kleidi/'"); if (i < 0) throw new Error("λείπει ο σύνδεσμος του «σταμάτησε»");
+  // v134: στο κέλυφος Capacitor ο οδηγός ανοίγει στο fastwrite.tech (KM-V134-HOME) — στον browser ίδιο παράθυρο, όπως πριν
+  const i = js.indexOf("guide.href = (KM_NATIVE ? KM_WEB : '') + '/kostometro/kleidi/'"); if (i < 0) throw new Error("λείπει ο σύνδεσμος του «σταμάτησε»");
   if (js.slice(i, js.indexOf("\n", i)).includes("_blank")) throw new Error("ο σύνδεσμος του «σταμάτησε» ανοίγει νέο παράθυρο");
 });
 check("Ν87-3 · το «πίσω» γυρίζει στο ιστορικό ΜΟΝΟ αν ήρθαμε από το Kostometro", () => {

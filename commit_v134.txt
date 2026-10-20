@@ -1,0 +1,13 @@
+v134 · Η άσπρη οθόνη της εφαρμογής καταστήματος: κύκλος ανακατεύθυνσης στο κέλυφος Capacitor
+
+Ο τοπικός server του Capacitor (html5mode) σερβίρει το ριζικό index.html για κάθε
+διαδρομή χωρίς τελεία → το «/kostometro/» γύριζε στη ρίζα → ατέρμονος κύκλος.
+Μετρήθηκε στο κινητό του Stavros 20/10 (build 3 από την κλειστή δοκιμή Google Play).
+
+- KM_HOME: στο κέλυφος «/kostometro/index.html», στον browser «/kostometro/» (τίποτα δεν αλλάζει)
+- App Link (QR, σύσταση) ξαναφορτώνει στο KM_HOME
+- Οδηγός κλειδιού: στο κέλυφος ανοίγει στο fastwrite.tech (δεν είναι μέσα στο πακέτο)
+- tests/v134 9/9 + 5 μεταλλάξεις · v133 S2 δέχεται ≥ v133 · v87 Ν87-2 νέα γραμμή
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JNb61TtknMFxcmZWoPMBbg
