@@ -1,0 +1,9 @@
+Θυρίδα: Τ.Θ. 27452, 1645 Λευκωσία (αντί 55518, που ανήκει στη Λεμεσό) + assetlinks με το cert Google Play
+
+- privacy.html, privacy-en.html, privacy-en-v1-2.html: 7 σημεία
+- .well-known/assetlinks.json: + SHA-256 Play App Signing (D6:B5…45:4D)
+- tests/v133 S4: φρουρός για τη νέα θυρίδα, καμία 55518
+Διόρθωση στοιχείου, όχι ουσιώδης αλλαγή — χωρίς ειδοποίηση χρηστών.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JNb61TtknMFxcmZWoPMBbg
