@@ -13,7 +13,8 @@
 <link rel="apple-touch-icon" href="/kostometro/icons/icon-180.png">
 <link rel="icon" href="/kostometro/icons/icon-192.png">
 <link rel="stylesheet" href="/kostometro/app.css">
-<style>.btn.oauth-btn.oauth-apple{background:#000;color:#fff;border-color:#000}</style>
+<style>html{background:#0a0e14} /* v135 · KM-V135-BG: σκούρο πριν φορτώσει το app.css */
+.btn.oauth-btn.oauth-apple{background:#000;color:#fff;border-color:#000}</style>
 </head>
 <body>
 
@@ -187,7 +188,7 @@
   <div class="setup-inner">
     <h2>Σκάναρε το QR</h2>
     <p class="lede">Στόχευσε το QR που δείχνει η <b>άλλη</b> συσκευή σου.</p>
-    <video id="scan-video" class="scan-video" playsinline muted></video>
+    <video id="scan-video" class="scan-video" playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
     <p class="err" id="scan-err" hidden></p>
     <button class="btn ghost" id="scan-back" type="button">Πίσω</button>
   </div>
@@ -344,7 +345,8 @@
 
 <!-- ══ ΟΘΟΝΗ 1 · ΚΑΜΕΡΑ ════════════════════════════════════════ -->
 <section id="s-cam" class="screen cam" hidden>
-  <video id="vid" playsinline muted autoplay></video>
+  <!-- v135 · KM-V135-POSTER: διάφανο poster — αλλιώς το WebView του Android δείχνει το γκρι «▶» πριν ξεκινήσει η κάμερα -->
+  <video id="vid" playsinline muted autoplay poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
   <div class="cam-top">
     <button class="icon-btn" id="btn-menu" aria-label="Μενού">☰</button>
     <span class="pill" id="pending">0 εκκρεμή</span>

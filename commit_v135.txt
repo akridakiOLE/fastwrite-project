@@ -1,0 +1,10 @@
+v135 · Ευρήματα Stavros στη δοκιμή του build 4 (20/10/2026)
+
+- KM-V135-NOKEY: καμία οθόνη κλειδιού Gemini στην έναρξη (απόφαση 15/10 + 18/10, όπως ο κλάδος pro)
+- KM-V135-READBY: «Διαβάστηκαν από τον Κώστα (AI)» όταν διάβασε ο Κώστας· «από το Gemini» μόνο με κλειδί χρήστη
+- KM-V135-POSTER: διάφανο poster στα δύο <video> — όχι γκρι «▶» στο WebView του Android
+- KM-V135-BG: σκούρο html πριν φορτώσει το app.css (μαζί με backgroundColor στο κέλυφος, kostometro-app)
+- tests/v135 7/7 + 6 μεταλλάξεις · v134 Β8 δέχεται ≥ v134 · v86 Ν86-2 νέα γραμμή συνδέσμου (από v134)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JNb61TtknMFxcmZWoPMBbg

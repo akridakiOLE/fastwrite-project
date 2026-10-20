@@ -62,7 +62,7 @@ const bad = APP.match(/location\.(replace|assign)\(\s*'\/kostometro\/'|location\
 ok("Β5 καμία πλοήγηση σε σκέτο κατάλογο /kostometro/… στο app.js", bad.length === 0, bad.join(", "));
 ok("Β6 οι σύνδεσμοι του οδηγού κλειδιού (index.html) πάνε στο fastwrite.tech μέσα στο κέλυφος", /a\[href\^="\/kostometro\/kleidi\/"\][\s\S]{0,200}KM_WEB \+ a\.getAttribute\('href'\)/.test(APP));
 ok("Β7 στον browser ΤΙΠΟΤΑ δεν αλλάζει (KM_HOME = /kostometro/)", /var KM_HOME = KM_NATIVE \? '[^']+' : '\/kostometro\/';/.test(APP));
-ok("Β8 έκδοση v134 (APP_VER · version.json · sw.js)", APP.includes("var APP_VER = 'φέτα 3 · v134';") && VER.includes('"v134"') && SW.includes("var CACHE = 'km-v134';"));
+ok("Β8 έκδοση ≥ v134 (v135 20/10: η έκδοση ελέγχεται στο v135.test)", /var APP_VER = 'φέτα 3 · v13[4-9]';/.test(APP) && /"v13[4-9]"/.test(VER) && /var CACHE = 'km-v13[4-9]';/.test(SW));
 ok("Β9 το KM_HOME ορίζεται μετά το KM_NATIVE", APP.indexOf("var KM_HOME") > APP.indexOf("var KM_NATIVE ="));
 
 const bad2 = results.filter((r) => !r.ok).length;

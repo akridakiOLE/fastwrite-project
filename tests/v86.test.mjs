@@ -15,7 +15,7 @@ const MUT = [
   // Μ3 · 🔴 το «σταμάτησε» χωρίς δρόμο προς τον οδηγό.
   ["js", "        busy.appendChild(guide);\n", ""],
   // Μ4 · ο σύνδεσμος του «σταμάτησε» δείχνει αλλού.
-  ["js", "guide.href = '/kostometro/kleidi/';", "guide.href = '#';"],
+  ["js", "guide.href = (KM_NATIVE ? KM_WEB : '') + '/kostometro/kleidi/';", "guide.href = '#';"],   // v134: στο κέλυφος → fastwrite.tech
 ];
 if (ONLY) {
   const m = MUT[ONLY - 1]; if (!m) process.exit(2);
@@ -33,7 +33,7 @@ check("Ν86-1 · 🔴 ο οδηγός στις Ρυθμίσεις, μέσα στ
 });
 check("Ν86-2 · 🔴 το «Η ανάγνωση σταμάτησε» δείχνει τον οδηγό", () => {
   const i = js.indexOf("      } else if (aiHalt) {"); const m = js.slice(i, js.indexOf("      } else if (aiPay) {", i));
-  has(m, "guide.href = '/kostometro/kleidi/';", "λάθος ή κανένας σύνδεσμος");
+  has(m, "guide.href = (KM_NATIVE ? KM_WEB : '') + '/kostometro/kleidi/';", "λάθος ή κανένας σύνδεσμος");
   has(m, "busy.appendChild(guide);", "ο σύνδεσμος δεν μπαίνει");
 });
 check("Ν86-3 · δείκτες και έκδοση", () => {

@@ -915,7 +915,8 @@
     if (prefilled) {
       var note = document.createElement('p');
       note.className = 'ai-note';
-      note.textContent = 'Διαβάστηκαν από το Gemini — έλεγξε με τη φωτογραφία και πάτα Αποθήκευση.';
+      /* v135 · KM-V135-READBY: λέει ΠΟΙΟΣ διάβασε — ο Κώστας (δώρο, Anthropic) ή το Gemini (κλειδί χρήστη). Εύρημα Stavros 20/10. */
+      note.textContent = (r && r.aiBy === 'kostas' ? 'Διαβάστηκαν από τον Κώστα (AI)' : 'Διαβάστηκαν από το Gemini') + ' — έλεγξε με τη φωτογραφία και πάτα Αποθήκευση.';
       amts.appendChild(note);
     }
 
@@ -2213,7 +2214,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v134';
+  var APP_VER = 'φέτα 3 · v135';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -5162,7 +5163,8 @@
   /* Πού πάει ο χρήστης μόλις αποκτήσει λογαριασμό — η παλιά ροή, ίδια. */
   function afterAccount() {
     setTimeout(maybeInstall, 600);   // v120 · (1) — η προτροπή ΜΕΤΑ τον λογαριασμό
-    if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
+    /* v135 · KM-V135-NOKEY: καμία οθόνη κλειδιού Gemini στην έναρξη (απόφαση 15/10 + 18/10, ίδιο με το KM-PRO-NOKEY του κλάδου pro).
+       Όποιος έχει ήδη κλειδί το κρατάει (Ρυθμίσεις) — «ξεκινούμε καθαρά» μόνο για τους νέους. */
     if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
     toCam();
   }
@@ -5574,7 +5576,8 @@
              .then(function (changed) { if (changed) { return pullNow(); } })
              .then(function () { return maybeFlush(); });
     scheduleSync(4000);   // v31 — …και μετά ό,τι έμεινε πίσω από εδώ
-    if (!localStorage.getItem(LS.key) && !localStorage.getItem(LS.skip)) { return show('s-key'); }
+    /* v135 · KM-V135-NOKEY: καμία οθόνη κλειδιού Gemini στην έναρξη (απόφαση 15/10 + 18/10, ίδιο με το KM-PRO-NOKEY του κλάδου pro).
+       Όποιος έχει ήδη κλειδί το κρατάει (Ρυθμίσεις) — «ξεκινούμε καθαρά» μόνο για τους νέους. */
     if (!localStorage.getItem(LS.perm)) { return show('s-perm'); }
     if (ownBack) { return ownResume(ownBack); }   // v118
     toCam();
