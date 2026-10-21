@@ -344,6 +344,7 @@
     try { document.body.classList.toggle('on-cam', id === 's-cam'); } catch (e) {}
     /* v124 · μέσα στο Messenger ο Κώστας δεν βγαίνει: η συζήτηση χάνεται μόλις περάσει στον Chrome */
     try { document.body.classList.toggle('on-iab', id === 's-iab'); } catch (e) {}
+    try { document.body.classList.toggle('on-menu', id === 's-menu' || id === 's-settings'); } catch (e) {}   /* v136 · KM-V136-FABMENU */
     var pv = el('preview');
     if (pv) { pv.hidden = true; }     // v9: καμία προεπισκόπηση επιζεί αλλαγής οθόνης
     SCREENS.forEach(function (s) { el(s).hidden = (s !== id); });
@@ -938,6 +939,31 @@
       };
       ds.appendChild(dt); ds.appendChild(db);
       amts.appendChild(ds);
+    }
+    /* v136 · KM-V136-NODATE (εύρημα Stavros 21/10, ΑΓΡΟΚΤΗΜΑ): η ανάγνωση έφερε ποσά αλλά ΟΧΙ ημερομηνία —
+       πριν η κάρτα σιωπούσε και το τιμολόγιο έμενε στη μέρα της φωτογραφίας. Τώρα το λέμε και δίνουμε αλλαγή. */
+    else if (sug && !sug.date && prefilled && !r.invDate && !isReader()) {
+      var nd = document.createElement('div');
+      nd.className = 'date-sug';
+      nd.id = 'date-miss';
+      var nt = document.createElement('span');
+      nt.textContent = 'Δεν βρέθηκε ημερομηνία στη φωτογραφία · τώρα είναι καταχωρημένο ' + dstr(dateOf(r));
+      var ni = document.createElement('input');
+      ni.type = 'date'; ni.hidden = true; ni.max = ymd(Date.now());
+      var nb = document.createElement('button');
+      nb.className = 'btn ghost';
+      nb.textContent = 'Άλλαξέ τη';
+      nb.onclick = function () {
+        ni.value = ymd(dateOf(r)); ni.hidden = false;
+        if (ni.showPicker) { try { ni.showPicker(); } catch (e) {} } else { ni.focus(); }
+      };
+      ni.onchange = function () {
+        var t = fromYmd(ni.value);
+        if (t !== null) { r.invDate = t; put(r).then(function () { after(); }); }
+        ni.hidden = true;
+      };
+      nd.appendChild(nt); nd.appendChild(nb); nd.appendChild(ni);
+      amts.appendChild(nd);
     }
 
     /* v35 · Η.3 — ΣΕ ΑΝΑΓΝΩΣΤΡΙΑ ΣΥΣΚΕΥΗ ΔΕΝ ΥΠΑΡΧΕΙ ΑΠΟΘΗΚΕΥΣΗ.
@@ -2182,6 +2208,8 @@
     el('st-aims').textContent = localStorage.getItem(LS.aiMs) || '—';
     el('st-aierr').textContent = localStorage.getItem(LS.aiErr) || 'κανένα';
     el('st-airaw').textContent = localStorage.getItem(LS.aiRaw) || '—';
+    /* v136 · KM-V136-KEYBTN: «Κλειδί Gemini» μόνο σε όσους έχουν ήδη κλειδί (απόφαση 18/10 «ξεκινούμε καθαρά») */
+    if (el('st-editkey')) { el('st-editkey').hidden = !localStorage.getItem(LS.key); }
     el('st-aitok').textContent = aiTokLine();
     /* v113 · KM-READ-GIFT */
     (function () {
@@ -2214,7 +2242,7 @@
      αποφασίζει: οι τιμές προσυμπληρώνονται και το τιμολόγιο μένει εκκρεμές
      μέχρι ο άνθρωπος να πατήσει Αποθήκευση (απόφαση Stavros 29/8: Β).
      (γ) Καμία οθόνη σφάλματος στην πόρτα — αποτυχία = χειροκίνητα, όπως πριν. */
-  var APP_VER = 'φέτα 3 · v135';
+  var APP_VER = 'φέτα 3 · v136';
   /* v89 · KM-UPD-FIRST — ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ: σημαδεύεται ΕΔΩ, στη φόρτωση, ΠΡΙΝ την
      εγγραφή. Αν περιμέναμε την κάμερα, ο φάκελος θα είχε ήδη γεννηθεί και ο νέος
      χρήστης θα έβλεπε «Ενημερώθηκε» στην πρώτη του φωτογραφία. */
@@ -2593,8 +2621,10 @@
     // ΤΕΛΟΣ: ένα κουτί, μία φορά, με τους δύο δρόμους (Brief §1.4 — καμία τιμή, κανένα PRO)
     btn.hidden = true;
     el('gift-t').textContent = 'Τα 20 δώρα τελείωσαν';
-    el('gift-p').textContent = 'Συνεχίζεις χειροκίνητα, ή βάζεις δικό σου κλειδί Google για αυτόματη ανάγνωση.';
-    el('gift-p').hidden = false; el('gift-k').hidden = false;
+    /* v136 · KM-V136-GIFTEND: χωρίς κλειδί Google (απόφαση 15/10 — κλειδί εκτός Free). Η προβολή του PRO.mini
+       μπαίνει ΕΔΩ, στο ίδιο κουτί με το ίδιο βελάκι, ΜΟΝΟ μαζί με το πραγματικό κουμπί αγοράς (Stavros 21/10). */
+    el('gift-p').textContent = 'Συνεχίζεις χειροκίνητα, εντελώς δωρεάν.';
+    el('gift-p').hidden = false; el('gift-k').hidden = true;
     giftFoldShow(box);   // v114: σε κάθε άνοιγμα ξανά — υπενθύμιση για το κλειδί (εισήγηση Stavros)
   }
   /* v114 · βελάκι αντί για ✕: μαζεμένο = φαίνεται μόνο το βελάκι, ποτέ εντελώς κρυφό */
@@ -2668,7 +2698,9 @@
               '″ · Κώστας AI · απομένουν ' + j.left + '/' + GIFT_N);
             localStorage.setItem(LS.aiRaw, aiStamp() + ' · Κώστας AI · ' + JSON.stringify({ net: j.net, vat: j.vat, total: j.total, date: j.date }));
           } catch (e) {}
-          return { net: aiNum(j.net), vat: aiNum(j.vat), total: aiNum(j.total), date: aiDate(j.date) };
+          /* v136 · KM-V136-NODATE: κάθε τιμολόγιο κρατάει τη δική του ακατέργαστη απάντηση (raw) — όχι μόνο η τελευταία */
+          return { net: aiNum(j.net), vat: aiNum(j.vat), total: aiNum(j.total), date: aiDate(j.date),
+                   raw: JSON.stringify({ net: j.net, vat: j.vat, total: j.total, date: j.date }).slice(0, 200) };
         }
         var e = new Error('http'); e.status = r.status; e.msg = (j && j.error) || ('σφάλμα ' + r.status);
         e.gift = (j && (j.error === 'gift_done' || j.error === 'not_activated')) ? 'done'

@@ -32,7 +32,7 @@ ok("Γ4 ο Κώστας γράφει aiBy='kostas' όταν διαβάζει", A
 let cap = {}; try { cap = JSON.parse(CAP); } catch (e) {}
 ok("Γ5 κέλυφος: σκούρο φόντο (γενικό + Android + iOS)", cap.backgroundColor === "#0a0e14" && cap.android && cap.android.backgroundColor === "#0a0e14" && cap.ios && cap.ios.backgroundColor === "#0a0e14");
 ok("Γ6 index.html: σκούρο html πριν το app.css", /<style>html\{background:#0a0e14\}/.test(HTML) && HTML.indexOf("html{background:#0a0e14}") < HTML.indexOf("<body"));
-ok("Γ7 έκδοση v135 (APP_VER · version.json · sw.js)", APP.includes("var APP_VER = 'φέτα 3 · v135';") && VER.includes('"v135"') && SW.includes("var CACHE = 'km-v135';"));
+ok("Γ7 έκδοση ≥ v135 (v136 21/10: ελέγχεται στο v136.test)", /var APP_VER = 'φέτα 3 · v13[5-9]';/.test(APP) && /"v13[5-9]"/.test(VER) && /var CACHE = 'km-v13[5-9]';/.test(SW));
 const bad = res.filter((x) => !x).length;
 if (ONLY) { console.log(bad ? "Μ" + ONLY + " → κοκκίνισε ✔" : "Μ" + ONLY + " ΠΕΡΑΣΕ ✘"); process.exit(bad ? 0 : 1); }
 console.log("\n" + (res.length - bad) + "/" + res.length + (bad ? " ΑΠΕΤΥΧΑΝ" : " OK")); process.exit(bad ? 1 : 0);
