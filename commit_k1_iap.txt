@@ -1,0 +1,10 @@
+Κ1 · KM-IAP-BRIDGE: γέφυρα αγορών PRO.mini μέσα στην εφαρμογή καταστήματος (site/km-iap.js)
+
+- window.KM_IAP κατά το συμβόλαιο της 18/10 (products · buy · finish · pending), πάνω στο @capgo/native-purchases
+  (τεχνική επιλογή 21/10: Swift Package + StoreKit 2 με appAccountToken, αντί cordova-plugin-purchase — το κέλυφος iOS είναι SPM)
+- καμία αγορά δεν κλείνει πριν πιστώσει ο server · Google: consume από τον server · ακύρωση = null
+- ορίζεται ΜΟΝΟ μέσα στην εφαρμογή με το plugin — στον browser τίποτα δεν αλλάζει
+- index.html: km-iap.js πριν το app.js · tests/k1_iap 13/13 + 8 μεταλλάξεις · pro_v201 132/132
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JNb61TtknMFxcmZWoPMBbg
