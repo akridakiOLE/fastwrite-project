@@ -1,0 +1,7 @@
+legal · Όροι §17: διεύθυνση κατοικίας → Τ.Θ. 27452, 1645 Λευκωσία (24/10/2026)
+
+Η διεύθυνση κατοικίας έμενε δημόσια στους Όρους v1.0 μετά τη διόρθωση της
+Πολιτικής (20/10). Μόνο αυτή η γραμμή αλλάζει.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JNb61TtknMFxcmZWoPMBbg
